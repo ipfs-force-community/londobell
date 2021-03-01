@@ -1,0 +1,6 @@
+/build-dep/.*
+/testrepo
+/tmp
+
+/bell-lotus
+/bell
