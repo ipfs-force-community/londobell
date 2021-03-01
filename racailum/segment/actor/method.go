@@ -1,0 +1,43 @@
+package actor
+
+import (
+	"reflect"
+
+	"github.com/filecoin-project/go-state-types/cbor"
+
+	"github.com/filecoin-project/lotus/chain/stmgr"
+)
+
+var emptyType reflect.Type
+
+// MethodSend is the method info for builtin.MethodSend
+var MethodSend = MethodInfo{
+	Actor: "",
+	Method: stmgr.MethodMeta{
+		Name: "Send",
+	},
+}
+
+// MethodInfo includes actor name & method meta
+type MethodInfo struct {
+	Actor  string
+	Method stmgr.MethodMeta
+}
+
+// ParamObj returns a new instance of param object
+func (mi *MethodInfo) ParamObj() cbor.Er {
+	if mi.Method.Params == nil {
+		return nil
+	}
+
+	return reflect.New(mi.Method.Params.Elem()).Interface().(cbor.Er)
+}
+
+// ReturnObj returns a new instance of return object
+func (mi *MethodInfo) ReturnObj() cbor.Er {
+	if mi.Method.Ret == nil {
+		return nil
+	}
+
+	return reflect.New(mi.Method.Ret.Elem()).Interface().(cbor.Er)
+}
