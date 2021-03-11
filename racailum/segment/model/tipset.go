@@ -9,7 +9,7 @@ import (
 	"github.com/dtynn/londobell/common"
 )
 
-var _ common.Document = (*TipSet)(nil)
+var _ common.IndexedDocument = (*TipSet)(nil)
 
 var (
 	tipsetColName    = getColName(TipSet{})
@@ -41,6 +41,13 @@ type TipSet struct {
 	Receipts     cid.Cid
 	Weight       types.BigInt
 	BaseFee      abi.TokenAmount
+}
+
+// Indexes impl common.Indexed
+func (t *TipSet) Indexes() [][]string {
+	return [][]string{
+		{"ChildEpoch"},
+	}
 }
 
 // CollectionName impl common.Document

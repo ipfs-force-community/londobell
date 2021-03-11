@@ -1,5 +1,3 @@
-db.ActorState.createIndex({"Epoch":1,"Code":1,"Addr":1}, {"sparse": true});
-
 db.AllocatedSectors.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.BlockHeader.createIndex({"Epoch":1,"Miner":1}, {"sparse": true});
@@ -24,7 +22,7 @@ db.MiningProfitability.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.MultisigBalance.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
-// no indexes for Tipset
+db.Tipset.createIndex({"ChildEpoch":1}, {"sparse": true});
 
 db.VerifiedRegistry.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
