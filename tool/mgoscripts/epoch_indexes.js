@@ -8,6 +8,7 @@ db.ExecGas.createIndex({"Epoch":1}, {"sparse": true});
 
 db.ExecTrace.createIndex({"Epoch":1,"Msg.To":1,"Msg.Method":1,"MsgRct.ExitCode":1}, {"sparse": true});
 db.ExecTrace.createIndex({"Epoch":1,"Msg.To":1,"Seq":1}, {"sparse": true});
+db.ExecTrace.createIndex({"Epoch":1,"Depth":1}, {"sparse": true});
 db.ExecTrace.createIndex({"Cid":1}, {"sparse": true});
 
 // no indexes for FilSupply

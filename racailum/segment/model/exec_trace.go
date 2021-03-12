@@ -145,6 +145,7 @@ func (et *ExecTrace) Indexes() [][]string {
 	return [][]string{
 		[]string{execTraceEpochField, "Msg.To", "Msg.Method", "MsgRct.ExitCode"},
 		[]string{execTraceEpochField, "Msg.To", "Seq"},
+		[]string{execTraceEpochField, "Depth"},
 		[]string{"Cid"},
 	}
 }
