@@ -119,7 +119,7 @@ func (a *Aggregator) Aggregate(ctx context.Context, tss []*common.LinkedTipSet) 
 					return fmt.Errorf("parse pipeline for %s: %w", src.Action, err)
 				}
 
-				_, err = a.db.Aggregate(ictx, src.Collection, pipeline)
+				err = a.db.Aggregate(ictx, src.Collection, pipeline, nil)
 				if err != nil {
 					return fmt.Errorf("aggregate: %w", err)
 				}

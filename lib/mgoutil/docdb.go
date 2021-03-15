@@ -66,20 +66,20 @@ func (m *MgoDocDB) Delete(ctx context.Context, colName string, filter interface{
 }
 
 // Aggregate impl common.DocumentDB
-func (m *MgoDocDB) Aggregate(ctx context.Context, colName string, pipeline interface{}) ([]interface{}, error) {
+func (m *MgoDocDB) Aggregate(ctx context.Context, colName string, pipeline interface{}, res interface{}) error {
 	cur, err := m.getCol(colName).Aggregate(ctx, pipeline, m.aggOpt)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	defer cur.Close(ctx)
-
-	var res []interface{}
-	if err := cur.All(ctx, &res); err != nil {
-		return nil, err
+	if res != nil {
+		if err := cur.All(ctx, res); err != nil {
+			return err
+		}
 	}
 
-	return res, nil
+	return nil
 }
 
 func (m *MgoDocDB) getCol(name string) *mongo.Collection {
