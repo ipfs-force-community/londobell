@@ -26,6 +26,11 @@ func NonCtxCanceledErr(err error) error {
 	return err
 }
 
+// FormatTipSetEpochRange returns a string shows the lo & hi bound of the given tipsets
+func FormatTipSetEpochRange(tss []*LinkedTipSet) string {
+	return fmt.Sprintf("[%d, %d]", tss[0].Height(), tss[len(tss)-1].Height())
+}
+
 // FormatTipSet returns a compact representation of the tipset
 func FormatTipSet(ts *types.TipSet) string {
 	return fmt.Sprintf("%s@%d", ts.Key(), ts.Height())

@@ -1,10 +1,4 @@
-var ctx = {
-	Epoch: 582952,
-	ParentBaseFee: "400556778",
-	MinTimestamp: 1,
-};
-
-var stages = [
+[
 	{
 		$match: {
 			Epoch: ctx.Epoch,
@@ -102,8 +96,4 @@ var stages = [
 			whenMatched: "keepExisting",
 		},
 	}
-];
-
-var res = db.ExecTrace.aggregate(stages);
-
-res.forEach(printjson);
+]

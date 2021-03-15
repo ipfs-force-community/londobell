@@ -16,6 +16,7 @@ func NewMgoDocDB(ctx context.Context, cli *mongo.Client, db *mongo.Database) (*M
 		cli:       cli,
 		db:        db,
 		insertOpt: options.InsertMany().SetOrdered(false),
+		aggOpt:    options.Aggregate(),
 	}
 
 	mdb.cols.m = make(map[string]*mongo.Collection)
@@ -28,6 +29,7 @@ type MgoDocDB struct {
 	db  *mongo.Database
 
 	insertOpt *options.InsertManyOptions
+	aggOpt    *options.AggregateOptions
 
 	cols struct {
 		sync.RWMutex
@@ -61,6 +63,23 @@ func (m *MgoDocDB) Delete(ctx context.Context, colName string, filter interface{
 	}
 
 	return deleted, err
+}
+
+// Aggregate impl common.DocumentDB
+func (m *MgoDocDB) Aggregate(ctx context.Context, colName string, pipeline interface{}) ([]interface{}, error) {
+	cur, err := m.getCol(colName).Aggregate(ctx, pipeline, m.aggOpt)
+	if err != nil {
+		return nil, err
+	}
+
+	defer cur.Close(ctx)
+
+	var res []interface{}
+	if err := cur.All(ctx, &res); err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 func (m *MgoDocDB) getCol(name string) *mongo.Collection {

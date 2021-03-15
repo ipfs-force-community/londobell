@@ -13,6 +13,7 @@ import (
 	"github.com/dtynn/londobell/lib/mgoutil"
 	"github.com/dtynn/londobell/lib/mgoutil/mdict"
 	"github.com/dtynn/londobell/racailum/segment"
+	"github.com/dtynn/londobell/racailum/segment/aggregate"
 )
 
 var log = logging.Logger("racailum")
@@ -25,6 +26,7 @@ type SegmentConfig struct {
 
 // Config of RaCailum
 type Config struct {
+	Aggregate        aggregate.Options
 	EnableGasTracing bool
 	Segments         []SegmentConfig
 }
@@ -49,7 +51,7 @@ func New(ctx context.Context, cfg Config, sub common.HeadNotifier, metamgr commo
 		segDocDB, err := mgoutil.NewMgoDocDB(ctx, cli, segdb)
 		segDict, err := mdict.NewDict(segdb)
 
-		seg, err := segment.New(scfg.Name, segDocDB, metamgr, cs, segDict, stm, optfns...)
+		seg, err := segment.New(scfg.Name, cfg.Aggregate, segDocDB, metamgr, cs, segDict, stm, optfns...)
 		if err != nil {
 			return nil, fmt.Errorf("construct segment %s: %w", scfg.Name, err)
 		}
@@ -93,4 +95,15 @@ type RaCailum struct {
 // Extract is used to extract from given tipset manually
 func (r *RaCailum) Extract(ctx context.Context, ts *types.TipSet) error {
 	return r.segments[r.activeseg].Extract(ctx, ts)
+}
+
+// Aggregate is used to trigger aggregations from given tipset boundaries manually
+func (r *RaCailum) Aggregate(ctx context.Context, lo, hi *types.TipSet) error {
+	loEpoch := lo.Height()
+	tss, err := segment.ExtractLinkedTipSets(r.components.cs, hi, &loEpoch)
+	if err != nil {
+		return fmt.Errorf("load tipsets: %w", err)
+	}
+
+	return r.segments[r.activeseg].Aggregate(ctx, tss)
 }

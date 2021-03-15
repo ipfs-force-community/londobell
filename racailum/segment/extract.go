@@ -28,7 +28,7 @@ func (s *Segment) extractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		return nil
 	}
 
-	elog := log.With("range", formatTipSetEpochRange(tss))
+	elog := log.With("range", common.FormatTipSetEpochRange(tss))
 
 	elog.Info("tipsets extracting started")
 	start := time.Now()
@@ -80,7 +80,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 		return nil
 	}
 
-	elog := ctx.log.With("part", formatTipSetEpochRange(part))
+	elog := ctx.log.With("part", common.FormatTipSetEpochRange(part))
 	start := time.Now()
 	defer func() {
 		elog.Infow("tipset part extracting done", "elapsed", time.Now().Sub(start).String())

@@ -20,17 +20,19 @@ const (
 	RegExp   = "RegExp"
 )
 
-// ParsePipelineWithCtx generates a aggregation pipeline from the given source code with context
-func ParsePipelineWithCtx(ctx, src interface{}) (interface{}, error) {
+// Parse generates a aggregation pipeline from the given source code with context
+func Parse(ctx, src interface{}) (interface{}, error) {
 	vm := otto.New()
 
-	if err := vm.Set("ctx", ctx); err != nil {
-		return nil, err
+	if ctx != nil {
+		if err := vm.Set("ctx", ctx); err != nil {
+			return nil, fmt.Errorf("set context: %w", err)
+		}
 	}
 
 	v, err := vm.Eval(fmt.Sprintf("(%s)", src))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("eval source: %w", err)
 	}
 
 	return value2agg(v)
