@@ -138,6 +138,20 @@
 }
 ```
 
+### MinerSectorSummary
+
+```
+{
+	"Addr": "address.Address",
+	"Detail": {
+		"Summaies": "[]*model.MinerSectorSummaryRange"
+	},
+	"Epoch": "abi.ChainEpoch",
+	"Path": "[]cid.Cid",
+	"_id": "cid.Cid"
+}
+```
+
 ### MiningProfitability
 
 ```

@@ -19,6 +19,8 @@ db.Message.createIndex({"Detail.Method":1,"Detail.Actor":1}, {"sparse": true});
 
 db.MinerFunds.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
+db.MinerSectorSummary.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
+
 db.MiningProfitability.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.MultisigBalance.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
