@@ -43,7 +43,7 @@ func init() {
 }
 
 func extractClaimedPowerV2(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *power2.State) error {
-	claims, err := adt2.AsMap(ctx.D.Store(ctx.C), pst.Claims)
+	claims, err := adt2.AsMap(ctx.D.ActorStore(ctx.C), pst.Claims)
 	if err != nil {
 		return fmt.Errorf("construct adt.Map for Claims in *power2.State: %w", err)
 	}
@@ -88,7 +88,7 @@ func extractClaimedPowerV2(ctx *extract.Ctx, res *extract.Res, head *common.Acto
 }
 
 func extractClaimedPowerV3(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *power3.State) error {
-	claims, err := adt3.AsMap(ctx.D.Store(ctx.C), pst.Claims, builtin3.DefaultHamtBitwidth)
+	claims, err := adt3.AsMap(ctx.D.ActorStore(ctx.C), pst.Claims, builtin3.DefaultHamtBitwidth)
 	if err != nil {
 		return fmt.Errorf("construct adt.Map for Claims in *power3.State: %w", err)
 	}

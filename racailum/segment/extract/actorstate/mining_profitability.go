@@ -42,7 +42,7 @@ var sectorSize32GiB = abi.SealProofInfos[abi.RegisteredSealProof_StackedDrg32GiB
 // see https://github.com/filecoin-project/specs-actors/blob/v2.3.4/actors/builtin/miner/miner_actor.go#L870-L882
 // and https://github.com/filecoin-project/specs-actors/blob/v2.3.4/actors/builtin/miner/monies.go#L128-L154
 func extractMiningProfitabilityV2(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward2.State) error {
-	blkraw, err := ctx.D.Blockstore().Get(head.Global.Power.Head)
+	blkraw, err := ctx.D.ChainBlockstore().Get(head.Global.Power.Head)
 	if err != nil {
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
 	}
@@ -96,7 +96,7 @@ func extractMiningProfitabilityV2(ctx *extract.Ctx, res *extract.Res, head *comm
 // see https://github.com/filecoin-project/specs-actors/blob/v3.0.3/actors/builtin/miner/miner_actor.go#L976-L988
 // and https://github.com/filecoin-project/specs-actors/blob/v3.0.3/actors/builtin/miner/monies.go#L143-L169
 func extractMiningProfitabilityV3(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward3.State) error {
-	blkraw, err := ctx.D.Blockstore().Get(head.Global.Power.Head)
+	blkraw, err := ctx.D.ChainBlockstore().Get(head.Global.Power.Head)
 	if err != nil {
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
 	}

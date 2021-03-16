@@ -28,6 +28,7 @@ import (
 	"gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
@@ -298,7 +299,7 @@ var DaemonCmd = &cli.Command{
 
 			go mbs.Run()
 
-			err = ImportChain(ctx, r, chainfile, issnapshot, mds, mbs)
+			err = ImportChain(ctx, r, chainfile, issnapshot, mds, blockstore.WrapIDStore(mbs))
 
 			// close mbs & mds anyway
 			{
@@ -383,7 +384,7 @@ var DaemonCmd = &cli.Command{
 			node.Override(new(dep.MgoBstoreDSN), dep.MgoBstoreDSN(cctx.String("mgo-bstore"))),
 			node.Override(new(dep.MgoBstoreSync), dep.MgoBstoreSync(cctx.IsSet("mgo-bstore-sync"))),
 			node.Override(new(dep.MgoBstoreReadOnly), dep.MgoBstoreReadOnly(cctx.IsSet("mgo-bstore-readonly"))),
-			node.Override(new(dtypes.ChainRawBlockstore), dep.MgoChainRawBlockstore),
+			node.Override(new(dtypes.UniversalBlockstore), dep.MgoChainHotBlockstore),
 		)
 		if err != nil {
 			return xerrors.Errorf("initializing node: %w", err)
@@ -453,7 +454,7 @@ func importKey(ctx context.Context, api api.FullNode, f string) error {
 }
 
 // ImportChain tries to import a snapshot of the chain into the given instance
-func ImportChain(ctx context.Context, r repo.Repo, fname string, snapshot bool, extds dtypes.MetadataDS, extbs dtypes.ChainRawBlockstore) (err error) {
+func ImportChain(ctx context.Context, r repo.Repo, fname string, snapshot bool, extds dtypes.MetadataDS, extbs dtypes.ChainBlockstore) (err error) {
 	var rd io.Reader
 	var l int64
 	if strings.HasPrefix(fname, "http://") || strings.HasPrefix(fname, "https://") {
@@ -496,13 +497,13 @@ func ImportChain(ctx context.Context, r repo.Repo, fname string, snapshot bool, 
 	}
 	defer lr.Close() //nolint:errcheck
 
-	var bs dtypes.ChainRawBlockstore
+	var bs dtypes.ChainBlockstore
 	var mds dtypes.MetadataDS
 
 	if extbs != nil {
 		bs = extbs
 	} else {
-		bs, err = lr.Blockstore(ctx, repo.BlockstoreChain)
+		bs, err = lr.Blockstore(ctx, repo.UniversalBlockstore)
 		if err != nil {
 			return xerrors.Errorf("failed to open blockstore: %w", err)
 		}

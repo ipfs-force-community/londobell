@@ -10,7 +10,7 @@ import (
 )
 
 func extractCborObject(dal common.DAL, c cid.Cid, out cbor.Er) error {
-	blk, err := dal.Blockstore().Get(c)
+	blk, err := dal.ChainBlockstore().Get(c)
 	if err != nil {
 		return err
 	}

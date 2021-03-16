@@ -7,11 +7,11 @@ import (
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 
-	"github.com/filecoin-project/lotus/api/apibstore"
+	"github.com/filecoin-project/lotus/api"
 )
 
 // ChainIO is a type alias to the apibstore.ChainIO
-type ChainIO = apibstore.ChainIO
+type ChainIO = api.ChainIO
 
 // ChainIOEx extends the ChainIO with some write methods
 type ChainIOEx interface {

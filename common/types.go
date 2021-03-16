@@ -10,10 +10,10 @@ import (
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/api"
+	bstore "github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/types"
-	bstore "github.com/filecoin-project/lotus/lib/blockstore"
 )
 
 // HeadNotifier receives head change events from chain syncer
@@ -32,8 +32,8 @@ type DAL interface {
 type ChainStore interface {
 	LoadTipSet(tsk types.TipSetKey) (*types.TipSet, error)
 	Weight(ctx context.Context, ts *types.TipSet) (types.BigInt, error)
-	Store(ctx context.Context) adt.Store
-	Blockstore() bstore.Blockstore
+	ActorStore(ctx context.Context) adt.Store
+	ChainBlockstore() bstore.Blockstore
 }
 
 // StateManager manages the state on chain

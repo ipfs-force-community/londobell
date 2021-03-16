@@ -5,9 +5,9 @@ import (
 
 	"go.uber.org/fx"
 
+	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/lib/mgoutil"
@@ -47,8 +47,8 @@ type chainRawBlockstoreIn struct {
 	RO   MgoBstoreReadOnly `optional:"true"`
 }
 
-// MgoChainRawBlockstore provides a MgoBstore as the dtypes.ChainRawBlockstore
-func MgoChainRawBlockstore(mctx helpers.MetricsCtx, lc fx.Lifecycle, in chainRawBlockstoreIn) (dtypes.ChainRawBlockstore, error) {
+// MgoChainHotBlockstore provides a MgoBstore as the dtypes.HotBlockstore
+func MgoChainHotBlockstore(mctx helpers.MetricsCtx, lc fx.Lifecycle, in chainRawBlockstoreIn) (dtypes.HotBlockstore, error) {
 	ctx := helpers.LifecycleCtx(mctx, lc)
 	mb, err := mbstore.NewMgoBstore(ctx, string(in.DSN), mbstore.MgoPutSync(bool(in.Sync)), mbstore.MgoReadOnly(bool(in.RO)))
 	if err != nil {
@@ -84,7 +84,7 @@ func MgoChainRawBlockstore(mctx helpers.MetricsCtx, lc fx.Lifecycle, in chainRaw
 	}
 
 	log.Infow("constructing mgo ChainRawBlockstore", "sync", in.Sync, "read-only", in.RO)
-	return blockstore.NewIdStore(bs), nil
+	return blockstore.WrapIDStore(bs), nil
 }
 
 // MgoMetaMgr provides a MetaMgr as the common.MetaManager
