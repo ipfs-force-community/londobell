@@ -36,7 +36,7 @@ func main() {
 	app.Setup()
 
 	if err := app.Run(os.Args); err != nil {
-		log.Errorf("cli error: %v", err)
+		log.Errorf("cli error: %s", err)
 		os.Exit(1)
 	}
 }

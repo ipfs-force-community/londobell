@@ -12,6 +12,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/dtynn/londobell/common"
+	"github.com/dtynn/londobell/racailum/segment/aggregate"
 )
 
 var log = logging.Logger("segment")
@@ -86,7 +87,7 @@ func SetBoundary(ctx context.Context, name string, metamgr common.MetaManager, h
 }
 
 // New attempts to construct a *Segment
-func New(name string, db common.DocumentDB, metamgr common.MetaManager, cs common.ChainStore, dict common.ChainDict, stm common.StateManager, optfns ...OptionFn) (*Segment, error) {
+func New(name string, aggopt aggregate.Options, db common.DocumentDB, metamgr common.MetaManager, cs common.ChainStore, dict common.ChainDict, stm common.StateManager, optfns ...OptionFn) (*Segment, error) {
 	initCtx := context.Background()
 
 	opts := DefaultOptions()
@@ -110,10 +111,16 @@ func New(name string, db common.DocumentDB, metamgr common.MetaManager, cs commo
 		return nil, fmt.Errorf("boundady is required")
 	}
 
+	agg, err := aggregate.New(aggopt, db)
+	if err != nil {
+		return nil, err
+	}
+
 	seg := &Segment{
 		name:    name,
 		opts:    opts,
 		db:      db,
+		agg:     agg,
 		metamgr: metamgr,
 	}
 
@@ -134,6 +141,7 @@ type Segment struct {
 	opts    Options
 	db      common.DocumentDB
 	metamgr common.MetaManager
+	agg     *aggregate.Aggregator
 
 	headNotify chan *types.TipSet
 
@@ -209,7 +217,7 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		return nil
 	}
 
-	tipsets, err := extractLinkedTipSets(s.dal.ChainStore, rawts, &hi)
+	tipsets, err := ExtractLinkedTipSets(s.dal.ChainStore, rawts, &hi)
 	if err != nil {
 		return err
 	}
@@ -241,11 +249,20 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		return err
 	}
 
+	if err := s.Aggregate(ctx, tipsets); err != nil {
+		return err
+	}
+
 	if err := s.updateBoundary(ctx, tipsets[len(tipsets)-1], nil); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// Aggregate tries to do aggregationg with given tipsets
+func (s *Segment) Aggregate(ctx context.Context, tss []*common.LinkedTipSet) error {
+	return s.agg.Aggregate(ctx, tss)
 }
 
 func (s *Segment) updateBoundary(ctx context.Context, hi, lo *common.LinkedTipSet) error {

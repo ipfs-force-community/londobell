@@ -19,17 +19,17 @@ func main() {
 
 	models := schema.Models()
 	for _, m := range models {
-		col := m.CollectionName()
+		col := m.D.CollectionName()
 		if _, has := fieldMap[col]; has {
 			continue
 		}
 
 		var indexes [][]string
 
-		if midx, ok := m.(common.Indexed); ok {
+		if midx, ok := m.D.(common.Indexed); ok {
 			indexes = midx.Indexes()
 		} else {
-			ef := m.EpochField()
+			ef := m.D.EpochField()
 
 			if ef == nil {
 				continue

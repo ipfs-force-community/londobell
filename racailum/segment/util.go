@@ -1,20 +1,14 @@
 package segment
 
 import (
-	"fmt"
-
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/types"
 
 	"github.com/dtynn/londobell/common"
 )
 
-func formatTipSetEpochRange(tss []*common.LinkedTipSet) string {
-	return fmt.Sprintf("[%d, %d]", tss[0].Height(), tss[len(tss)-1].Height())
-}
-
-// extract linked tipsets within range [lower, from)
-func extractLinkedTipSets(cs common.ChainStore, from *types.TipSet, lower *abi.ChainEpoch) ([]*common.LinkedTipSet, error) {
+// ExtractLinkedTipSets extracts linked tipsets within range [lower, from)
+func ExtractLinkedTipSets(cs common.ChainStore, from *types.TipSet, lower *abi.ChainEpoch) ([]*common.LinkedTipSet, error) {
 	var destEpoch abi.ChainEpoch
 
 	if lower != nil {

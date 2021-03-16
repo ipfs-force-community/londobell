@@ -3,6 +3,7 @@ package segment
 import (
 	"github.com/filecoin-project/go-state-types/abi"
 
+	"github.com/dtynn/londobell/racailum/segment/aggregate"
 	"github.com/dtynn/londobell/racailum/segment/extract"
 )
 
@@ -29,6 +30,8 @@ type Options struct {
 	Extract extractOptions
 
 	Persist persistOptions
+
+	Aggregate aggregate.Options
 }
 
 // DefaultOptions returns a default instance of the Options

@@ -9,6 +9,7 @@ import (
 	"github.com/dtynn/londobell/dep"
 	"github.com/dtynn/londobell/lib/fxex"
 	"github.com/dtynn/londobell/racailum"
+	"github.com/dtynn/londobell/racailum/segment/aggregate"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
 )
@@ -18,30 +19,85 @@ var raCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		raRunCmd,
 		raExtractCmd,
+		raAggregateCmd,
 	},
 }
 
-var raRunCmd = &cli.Command{
-	Name: "run",
-	Flags: []cli.Flag{
+var (
+	raFlagSegName = &cli.StringFlag{
+		Name:     "seg-name",
+		Required: true,
+	}
+
+	raFlagSegDSN = &cli.StringFlag{
+		Name:     "seg-dsn",
+		Required: true,
+	}
+
+	raFlagAggDir = &cli.StringFlag{
+		Name: "agg-dir",
+	}
+
+	raFlagGasTracing = &cli.BoolFlag{
+		Name: "gas-tracing",
+	}
+
+	raFlags = []cli.Flag{
 		dep.FlagMgoBstoreDSN,
 		dep.FlagMgoMetaDSDSN,
 		dep.FlagMgoMetaMgrDSN,
 
-		&cli.StringFlag{
-			Name:     "seg-name",
-			Required: true,
-		},
+		raFlagSegName,
 
-		&cli.StringFlag{
-			Name:     "seg-dsn",
-			Required: true,
-		},
+		raFlagSegDSN,
 
-		&cli.BoolFlag{
-			Name: "gas-tracing",
-		},
-	},
+		raFlagAggDir,
+
+		raFlagGasTracing,
+	}
+)
+
+func copyFlags(src []cli.Flag) []cli.Flag {
+	dst := make([]cli.Flag, len(src))
+	copy(dst, src)
+	return dst
+}
+
+func buildRaApp(cctx *cli.Context, target interface{}) (*fx.App, error) {
+	aggOpt, err := aggregate.DefaultOptions()
+	if err != nil {
+		return nil, fmt.Errorf("default aggregate options: %w", err)
+	}
+
+	if cctx.IsSet(raFlagAggDir.Name) {
+		aggOpt.Dir = cctx.String(raFlagAggDir.Name)
+	}
+
+	return dep.BellApp(
+		cctx.Context,
+		fxlog,
+		target,
+		fxex.ProvideEx(
+			racailum.Config{
+				Aggregate:        aggOpt,
+				EnableGasTracing: cctx.IsSet(raFlagGasTracing.Name),
+				Segments: []racailum.SegmentConfig{
+					{
+						DSN:  cctx.String(raFlagSegDSN.Name),
+						Name: cctx.String(raFlagSegName.Name),
+					},
+				},
+			},
+			dep.MgoBstoreDSN(cctx.String(dep.FlagMgoBstoreDSN.Name)),
+			dep.MgoMetaDSDSN(cctx.String(dep.FlagMgoMetaDSDSN.Name)),
+			dep.MgoMetaMgrDSN(cctx.String(dep.FlagMgoMetaMgrDSN.Name)),
+		),
+	), nil
+}
+
+var raRunCmd = &cli.Command{
+	Name:  "run",
+	Flags: raFlags,
 	Action: func(cctx *cli.Context) error {
 		var components struct {
 			fx.In
@@ -50,27 +106,12 @@ var raRunCmd = &cli.Command{
 			Ra       *racailum.RaCailum
 		}
 
-		app := dep.BellApp(
-			cctx.Context,
-			fxlog,
-			&components,
-			fxex.ProvideEx(
-				racailum.Config{
-					EnableGasTracing: cctx.IsSet("gas-tracing"),
-					Segments: []racailum.SegmentConfig{
-						{
-							DSN:  cctx.String("seg-dsn"),
-							Name: cctx.String("seg-name"),
-						},
-					},
-				},
-				dep.MgoBstoreDSN(cctx.String(dep.FlagMgoBstoreDSN.Name)),
-				dep.MgoMetaDSDSN(cctx.String(dep.FlagMgoMetaDSDSN.Name)),
-				dep.MgoMetaMgrDSN(cctx.String(dep.FlagMgoMetaMgrDSN.Name)),
-			),
-		)
+		app, err := buildRaApp(cctx, &components)
+		if err != nil {
+			return err
+		}
 
-		err := app.Start(cctx.Context)
+		err = app.Start(cctx.Context)
 		if err != nil {
 			return err
 		}
@@ -123,26 +164,12 @@ var raRunCmd = &cli.Command{
 
 var raExtractCmd = &cli.Command{
 	Name: "extract",
-	Flags: []cli.Flag{
-		dep.FlagMgoBstoreDSN,
-		dep.FlagMgoMetaDSDSN,
-		dep.FlagMgoMetaMgrDSN,
-
-		&cli.StringFlag{
-			Name:     "seg-name",
-			Required: true,
-		},
-
-		&cli.StringFlag{
-			Name:     "seg-dsn",
-			Required: true,
-		},
-
+	Flags: append(copyFlags(raFlags),
 		&cli.StringFlag{
 			Name:     "dest-child",
 			Required: true,
 		},
-	},
+	),
 	Action: func(cctx *cli.Context) error {
 		var components struct {
 			fx.In
@@ -150,26 +177,12 @@ var raExtractCmd = &cli.Command{
 			Ra *racailum.RaCailum
 		}
 
-		app := dep.BellApp(
-			cctx.Context,
-			fxlog,
-			&components,
-			fxex.ProvideEx(
-				racailum.Config{
-					Segments: []racailum.SegmentConfig{
-						{
-							DSN:  cctx.String("seg-dsn"),
-							Name: cctx.String("seg-name"),
-						},
-					},
-				},
-				dep.MgoBstoreDSN(cctx.String(dep.FlagMgoBstoreDSN.Name)),
-				dep.MgoMetaDSDSN(cctx.String(dep.FlagMgoMetaDSDSN.Name)),
-				dep.MgoMetaMgrDSN(cctx.String(dep.FlagMgoMetaMgrDSN.Name)),
-			),
-		)
+		app, err := buildRaApp(cctx, &components)
+		if err != nil {
+			return err
+		}
 
-		err := app.Start(cctx.Context)
+		err = app.Start(cctx.Context)
 		if err != nil {
 			return err
 		}
@@ -194,6 +207,81 @@ var raExtractCmd = &cli.Command{
 		}
 
 		log.Infow("done extracting", "elapsed", time.Now().Sub(start).String())
+		return nil
+	},
+}
+
+var raAggregateCmd = &cli.Command{
+	Name:  "agg",
+	Usage: "start aggregations within given epoch range manually",
+	Flags: append(copyFlags(raFlags),
+		&cli.StringFlag{
+			Name:     "hi-child",
+			Required: true,
+		},
+
+		&cli.StringFlag{
+			Name:     "lo-child",
+			Required: true,
+		},
+	),
+	Action: func(cctx *cli.Context) error {
+		var components struct {
+			fx.In
+			CS common.ChainStore
+			Ra *racailum.RaCailum
+		}
+
+		app, err := buildRaApp(cctx, &components)
+		if err != nil {
+			return err
+		}
+
+		err = app.Start(cctx.Context)
+		if err != nil {
+			return err
+		}
+
+		defer app.Stop(cctx.Context)
+		log.Info("ra app constructed")
+
+		var hi, lo *common.LinkedTipSet
+		{
+			tsk, err := parsetTipSetKey(cctx.String("hi-child"))
+			if err != nil {
+				return fmt.Errorf("hi-child key: %w", err)
+			}
+
+			hi, err = common.LoadLinkedTipSet(components.CS, tsk)
+			if err != nil {
+				return fmt.Errorf("load hi tipset: %w", err)
+			}
+		}
+
+		{
+			tsk, err := parsetTipSetKey(cctx.String("lo-child"))
+			if err != nil {
+				return fmt.Errorf("lo-child key: %w", err)
+			}
+
+			lo, err = common.LoadLinkedTipSet(components.CS, tsk)
+			if err != nil {
+				return fmt.Errorf("load lo tipset: %w", err)
+			}
+		}
+
+		if hi == nil || lo == nil {
+			log.Warn("both boundaries are required")
+			return nil
+		}
+
+		log.Infow("boundry loaded", "lo", lo.Height(), "hi", hi.Height())
+
+		err = components.Ra.Aggregate(cctx.Context, lo.TipSet, hi.TipSet)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	},
 }

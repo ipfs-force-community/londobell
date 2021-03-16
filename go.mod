@@ -27,14 +27,17 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/multiformats/go-multihash v0.0.14
 	github.com/prometheus/client_golang v1.6.0
+	github.com/robertkrimen/otto v0.0.0-20200922221731-ef014fd054ac
 	github.com/urfave/cli/v2 v2.2.0
 	go.mongodb.org/mongo-driver v1.5.0
 	go.opencensus.io v0.22.5
 	go.uber.org/fx v1.9.0
+	go.uber.org/multierr v1.6.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
+	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 )
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
