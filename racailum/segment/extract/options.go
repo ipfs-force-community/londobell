@@ -42,15 +42,17 @@ type ActorStateDiffOptions struct {
 
 func defaultActorStateRegularOptions() ActorStateRegularOptions {
 	return ActorStateRegularOptions{
-		Interval:        builtin.EpochsInHour, // 1h
-		MinerFundsTicks: 4,                    // 4h
-		VerifRegTicks:   4,                    // 4h
+		Interval:                builtin.EpochsInHour, // 1h
+		MinerFundsTicks:         4,                    // 4h
+		VerifRegTicks:           4,                    // 4h
+		MinerSectorSummaryTicks: 24,                   // 24h
 	}
 }
 
 // ActorStateRegularOptions for actor state extracting
 type ActorStateRegularOptions struct {
-	Interval        abi.ChainEpoch
-	MinerFundsTicks int
-	VerifRegTicks   int
+	Interval                abi.ChainEpoch
+	MinerFundsTicks         int
+	VerifRegTicks           int
+	MinerSectorSummaryTicks int
 }
