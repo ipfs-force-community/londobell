@@ -33,14 +33,14 @@ var DefaultBellProvider = fx.Provide(
 
 	// basics
 	NewMgoMetaDSClient,
-	MgoChainRawBlockstore,
+	MgoChainHotBlockstore,
 	MgoMetaDS,
 	MgoMetaMgr,
 	MgoHeadNotifier,
 	NewRaCailum,
 
 	// type convertion
-	fxex.Convert(new(dtypes.ChainRawBlockstore), new(dtypes.ChainBlockstore)),
+	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.ChainBlockstore)),
 	fxex.Convert(new(*store.ChainStore), new(common.ChainStore)),
 	fxex.Convert(new(*stmgr.StateManager), new(common.StateManager)),
 )

@@ -1,7 +1,6 @@
 package actorstate
 
 import (
-	// "github.com/filecoin-project/go-bitfield"
 	"fmt"
 
 	"github.com/ipfs/go-cid"
@@ -15,12 +14,8 @@ import (
 	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
 	adt3 "github.com/filecoin-project/specs-actors/v3/actors/util/adt"
 
+	bstore "github.com/filecoin-project/lotus/blockstore"
 	cstore "github.com/filecoin-project/lotus/chain/store"
-	bstore "github.com/filecoin-project/lotus/lib/blockstore"
-	// "github.com/dtynn/londobell/common"
-	// "github.com/dtynn/londobell/racailum/segment/extract"
-	// "github.com/dtynn/londobell/racailum/segment/model"
-	// "github.com/dtynn/londobell/racailum/segment/model/schema"
 )
 
 func init() {
@@ -66,7 +61,7 @@ func isEmptyMinerStateV2(mst *miner2.State) bool {
 func newEmptyMinerStateV2() (*miner2.State, error) {
 	ctx := context.Background()
 
-	inMemStore := bstore.NewTemporarySync()
+	inMemStore := bstore.NewMemorySync()
 	adtStore := adt2.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
 
 	emptyMap, err := adt2.MakeEmptyMap(adtStore).Root()
@@ -128,7 +123,7 @@ func isEmptyMinerStateV3(mst *miner3.State) bool {
 // see https://github.com/filecoin-project/specs-actors/blob/v3.0.3/actors/builtin/miner/miner_state.go#L173-L230
 func newEmptyMinerStateV3() (*miner3.State, error) {
 	ctx := context.Background()
-	inMemStore := bstore.NewTemporarySync()
+	inMemStore := bstore.NewMemorySync()
 	adtStore := adt3.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
 	return miner3.ConstructState(adtStore, cid.Undef, 0, 0)
 }
