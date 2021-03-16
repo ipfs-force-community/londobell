@@ -14,6 +14,13 @@ func DefaultOptions() Options {
 	}
 }
 
+// DryOptions is the options for dry-state run
+func DryOptions() Options {
+	opt := DefaultOptions()
+	opt.StateRegular = dryActorStateRegularOptions()
+	return opt
+}
+
 // Options for differect extracting jobs
 type Options struct {
 	TipSet       TipSetOptions
@@ -46,6 +53,15 @@ func defaultActorStateRegularOptions() ActorStateRegularOptions {
 		MinerFundsTicks:         4,                    // 4h
 		VerifRegTicks:           4,                    // 4h
 		MinerSectorSummaryTicks: 24,                   // 24h
+	}
+}
+
+func dryActorStateRegularOptions() ActorStateRegularOptions {
+	return ActorStateRegularOptions{
+		Interval:                1,
+		MinerFundsTicks:         1,
+		VerifRegTicks:           1,
+		MinerSectorSummaryTicks: 1,
 	}
 }
 

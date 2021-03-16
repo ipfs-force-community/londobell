@@ -14,6 +14,7 @@ import (
 	"github.com/dtynn/londobell/lib/mgoutil/mdict"
 	"github.com/dtynn/londobell/racailum/segment"
 	"github.com/dtynn/londobell/racailum/segment/aggregate"
+	"github.com/dtynn/londobell/racailum/segment/extract"
 )
 
 var log = logging.Logger("racailum")
@@ -106,4 +107,9 @@ func (r *RaCailum) Aggregate(ctx context.Context, lo, hi *types.TipSet) error {
 	}
 
 	return r.segments[r.activeseg].Aggregate(ctx, tss)
+}
+
+// DryState runs a dry extraction from given ts
+func (r *RaCailum) DryState(ctx context.Context, ts *common.LinkedTipSet) ([]*extract.Res, error) {
+	return r.segments[r.activeseg].DryExtract(ctx, ts)
 }

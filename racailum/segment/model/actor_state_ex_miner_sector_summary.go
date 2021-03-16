@@ -3,10 +3,12 @@ package model
 import (
 	"github.com/dtynn/londobell/common"
 	"github.com/filecoin-project/go-state-types/abi"
+	"go.uber.org/zap"
 )
 
 var (
-	_ common.Document = (*MinerSectorSummary)(nil)
+	_ common.Document      = (*MinerSectorSummary)(nil)
+	_ common.DetailPrinter = (*MinerSectorSummary)(nil)
 
 	minerSectorSummaryColName    = getColName(MinerSectorSummary{})
 	minerSectorSummaryEpochField = extractEpochFieldName(MinerSectorSummary{})
@@ -47,4 +49,12 @@ func (m *MinerSectorSummary) EpochField() *string {
 // ResetPolicy impl common.Document
 func (m *MinerSectorSummary) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(minerSectorSummaryEpochField, lower, upper), true
+}
+
+// PrintDetail impl common.DetailPrinter
+func (m *MinerSectorSummary) PrintDetail(l *zap.SugaredLogger) {
+	l.Infof("Basic: %#v", m.ActorStateExBasic)
+	for si := range m.Detail.Summaies {
+		l.Infof("\tSummary #%d: %#v", si, m.Detail.Summaies[si])
+	}
 }
