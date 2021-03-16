@@ -54,7 +54,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		}
 
 		if !st.VestingFunds.Equals(emptyMinerStateV2.VestingFunds) {
-			funds, err := st.LoadVestingFunds(adt2.WrapStore(ctx.C, ctx.D.Store(ctx.C)))
+			funds, err := st.LoadVestingFunds(adt2.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
 				return fmt.Errorf("load vesting funds: %w", err)
 			}
@@ -70,7 +70,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		}
 
 		if !st.VestingFunds.Equals(emptyMinerStateV3.VestingFunds) {
-			funds, err := st.LoadVestingFunds(adt3.WrapStore(ctx.C, ctx.D.Store(ctx.C)))
+			funds, err := st.LoadVestingFunds(adt3.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
 				return fmt.Errorf("load vesting funds: %w", err)
 			}

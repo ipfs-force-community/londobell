@@ -384,8 +384,7 @@ var DaemonCmd = &cli.Command{
 			node.Override(new(dep.MgoBstoreDSN), dep.MgoBstoreDSN(cctx.String("mgo-bstore"))),
 			node.Override(new(dep.MgoBstoreSync), dep.MgoBstoreSync(cctx.IsSet("mgo-bstore-sync"))),
 			node.Override(new(dep.MgoBstoreReadOnly), dep.MgoBstoreReadOnly(cctx.IsSet("mgo-bstore-readonly"))),
-			node.Override(new(dtypes.HotBlockstore), dep.MgoChainHotBlockstore),
-			node.Override(new(dtypes.ChainBlockstore), node.From(new(dtypes.HotBlockstore))),
+			node.Override(new(dtypes.UniversalBlockstore), dep.MgoChainHotBlockstore),
 		)
 		if err != nil {
 			return xerrors.Errorf("initializing node: %w", err)

@@ -32,8 +32,8 @@ type DAL interface {
 type ChainStore interface {
 	LoadTipSet(tsk types.TipSetKey) (*types.TipSet, error)
 	Weight(ctx context.Context, ts *types.TipSet) (types.BigInt, error)
-	Store(ctx context.Context) adt.Store
-	Blockstore() bstore.Blockstore
+	ActorStore(ctx context.Context) adt.Store
+	ChainBlockstore() bstore.Blockstore
 }
 
 // StateManager manages the state on chain

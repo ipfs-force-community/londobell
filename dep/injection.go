@@ -19,6 +19,11 @@ import (
 	"github.com/dtynn/londobell/lib/fxex"
 )
 
+var (
+	_ common.StateManager = (*stmgr.StateManager)(nil)
+	_ common.ChainStore   = (*store.ChainStore)(nil)
+)
+
 // DefaultBellProvider combines the providers for basic components inside bell
 var DefaultBellProvider = fx.Provide(
 	func() vm.SyscallBuilder {

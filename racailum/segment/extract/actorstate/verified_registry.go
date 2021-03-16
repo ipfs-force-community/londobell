@@ -72,7 +72,7 @@ func extractVerifReg(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead,
 		}
 
 		mapConstructor = func(c cid.Cid) (adtMap, error) {
-			return adt2.AsMap(ctx.D.Store(ctx.C), c)
+			return adt2.AsMap(ctx.D.ActorStore(ctx.C), c)
 		}
 
 	case *verifreg3.State:
@@ -88,7 +88,7 @@ func extractVerifReg(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead,
 		}
 
 		mapConstructor = func(c cid.Cid) (adtMap, error) {
-			return adt3.AsMap(ctx.D.Store(ctx.C), c, builtin3.DefaultHamtBitwidth)
+			return adt3.AsMap(ctx.D.ActorStore(ctx.C), c, builtin3.DefaultHamtBitwidth)
 		}
 
 	default:
