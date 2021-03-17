@@ -5,13 +5,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/urfave/cli/v2"
+	"go.uber.org/fx"
+
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/dep"
 	"github.com/dtynn/londobell/lib/fxex"
 	"github.com/dtynn/londobell/racailum"
 	"github.com/dtynn/londobell/racailum/segment/aggregate"
-	"github.com/urfave/cli/v2"
-	"go.uber.org/fx"
 )
 
 var raCmd = &cli.Command{
@@ -20,6 +21,7 @@ var raCmd = &cli.Command{
 		raRunCmd,
 		raExtractCmd,
 		raAggregateCmd,
+		raDryCmd,
 	},
 }
 
@@ -281,6 +283,94 @@ var raAggregateCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
+
+		return nil
+	},
+}
+
+var raDryCmd = &cli.Command{
+	Name:  "dry",
+	Usage: "run a dry extracting",
+	Flags: append(copyFlags(raFlags),
+		&cli.StringFlag{
+			Name:     "child",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "col",
+			Required: true,
+		},
+		&cli.IntFlag{
+			Name:  "count",
+			Value: 10,
+		},
+	),
+	Action: func(cctx *cli.Context) error {
+		var components struct {
+			fx.In
+			CS common.ChainStore
+			Ra *racailum.RaCailum
+		}
+
+		app, err := buildRaApp(cctx, &components)
+		if err != nil {
+			return err
+		}
+
+		err = app.Start(cctx.Context)
+		if err != nil {
+			return err
+		}
+
+		defer app.Stop(cctx.Context)
+		log.Info("ra app constructed")
+
+		tsk, err := parsetTipSetKey(cctx.String("child"))
+		if err != nil {
+			return fmt.Errorf("child key: %w", err)
+		}
+
+		ts, err := common.LoadLinkedTipSet(components.CS, tsk)
+		if err != nil {
+			return fmt.Errorf("load tipset: %w", err)
+		}
+
+		log.Infow("ts loaded", "height", ts.Height())
+
+		res, err := components.Ra.DryState(cctx.Context, ts)
+		if err != nil {
+			return err
+		}
+
+		log.Infow("results loaded", "count", len(res))
+
+		wanted := cctx.String("col")
+		wantedCount := cctx.Int("count")
+		got := 0
+
+		dlog := log.With("col", wanted)
+
+	WANT_LOOP:
+		for ri := range res {
+			for di := range res[ri].Docs {
+				if res[ri].Docs[di].CollectionName() == wanted {
+					got++
+					doc := res[ri].Docs[di]
+
+					if p, ok := doc.(common.DetailPrinter); ok {
+						p.PrintDetail(dlog)
+					} else {
+						dlog.Infof("%#v", doc)
+					}
+
+					if got >= wantedCount {
+						break WANT_LOOP
+					}
+				}
+			}
+		}
+
+		log.Infow("done", "got", got)
 
 		return nil
 	},

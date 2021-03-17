@@ -11,7 +11,7 @@ most of which can be observed in power.State
 - [x] Per Epoch Reward - actual
 - [x] Per Epoch Reward - position estimate
 - [x] Per Epoch Reward - velocity estimate
-- [] Upcoming Sector Expiration - should be extracted regularly from miner.State
+- [x] Upcoming Sector Expiration - should be extracted regularly from miner.State
 
 ## token circulating supply
 - [x] Genesis Vesting Rate - sum of multisig.State.AmountUnlocked
@@ -21,7 +21,7 @@ most of which can be observed in power.State
 - [x] Locking Rate - from power.State, miner.State, market.State
 - [x] Burn Rate - from burn addr's balance
 - [x] Deal Collateral Locking Rate
-- [] Upcoming Initial Pledge Unlock Rate - with deal stats
+- [x] Upcoming Initial Pledge Unlock Rate - with deal stats
 
 ## mining profitability
 - [x] Initial Pledge per 32GiB QA Power
@@ -37,8 +37,8 @@ most of which can be observed in power.State
 - [] Fault fee per epoch
 - [] DeclareFault count per epoch
 - [] DeclareFaultsRecovered per epoch
-- [] Sector lifetime distribution
-- [] Sector lifetime distribution by miner
+- [x] Sector lifetime distribution
+- [x] Sector lifetime distribution by miner
 - [] SectorExtension per epoch
 - [] SectorTermination per epoch
 - [] Regular deal termination per epoch

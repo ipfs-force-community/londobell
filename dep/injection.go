@@ -46,6 +46,9 @@ var DefaultBellProvider = fx.Provide(
 
 	// type convertion
 	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.ChainBlockstore)),
+	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.StateBlockstore)),
+	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.BaseBlockstore)),
+	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.ExposedBlockstore)),
 	fxex.Convert(new(*store.ChainStore), new(common.ChainStore)),
 	fxex.Convert(new(*stmgr.StateManager), new(common.StateManager)),
 )

@@ -48,8 +48,14 @@ func LoadLinkedTipSet(cs ChainStore, child types.TipSetKey) (*LinkedTipSet, erro
 		return nil, fmt.Errorf("load ts: %w", err)
 	}
 
+	parentts, err := cs.LoadTipSet(ts.Parents())
+	if err != nil {
+		return nil, fmt.Errorf("load parent ts: %w", err)
+	}
+
 	return &LinkedTipSet{
 		TipSet: ts,
+		Parent: parentts,
 		Child:  childts,
 	}, nil
 }

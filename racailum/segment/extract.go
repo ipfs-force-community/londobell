@@ -327,3 +327,87 @@ func (s *Segment) extractDiffStates(ctx *extract.Ctx) error {
 
 	return nil
 }
+
+// DryExtract tries to extract all results from give tipset
+func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet) ([]*extract.Res, error) {
+	dryOptions := extract.DryOptions()
+	aset, err := actor.NewSet(ctx, s.dal.StateManager, ts)
+	if err != nil {
+		return nil, fmt.Errorf("new actor set: %w", err)
+	}
+
+	dlog := log.With("dry", true)
+	ectx, err := extract.NewCtx(ctx, s.dal, dlog, aset, dryOptions)
+	if err != nil {
+		return nil, fmt.Errorf("new extract context: %w", err)
+	}
+
+	tres := extract.NewRes(1024)
+
+	err = ets.Extract(ectx, tres, ts)
+	if err != nil {
+		return nil, fmt.Errorf("extract tipset results: %w", err)
+	}
+
+	results := make([]*extract.Res, len(tres.RegularStates)+1)
+	results[0] = tres
+
+	if len(tres.RegularStates) == 0 {
+		return results, nil
+	}
+
+	innerCtx, innerCancel := context.WithCancel(ctx)
+	defer innerCancel()
+
+	var ewg multierror.Group
+
+	actres := results[1:]
+	lim := limiter.New(s.opts.Extract.StateJobLimit)
+
+	for hi := range tres.RegularStates {
+		hi := hi
+
+		head := tres.RegularStates[hi]
+
+		ewg.Go(func() error {
+			if !lim.Acquire(innerCtx) {
+				return nil
+			}
+
+			defer func() {
+				lim.Release(innerCtx)
+			}()
+
+			select {
+			case <-innerCtx.Done():
+				return nil
+
+			default:
+			}
+
+			var err error
+			defer func() {
+				if err != nil {
+					innerCancel()
+				}
+			}()
+
+			res := extract.NewRes(1024)
+
+			err = east.ExtractRegular(ectx, res, head)
+			if err != nil {
+				return common.NonCtxCanceledErr(err)
+			}
+
+			actres[hi] = res
+
+			return nil
+		})
+	}
+
+	if err := ewg.Wait(); err != nil {
+		return nil, fmt.Errorf("extract part regular states: %w", err)
+	}
+
+	return results, nil
+}
