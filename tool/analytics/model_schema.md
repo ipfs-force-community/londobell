@@ -144,7 +144,7 @@
 {
 	"Addr": "address.Address",
 	"Detail": {
-		"Summaies": "[]*model.MinerSectorSummaryRange"
+		"Summaries": "[]*model.MinerSectorSummaryRange"
 	},
 	"Epoch": "abi.ChainEpoch",
 	"Path": "[]cid.Cid",

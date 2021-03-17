@@ -325,7 +325,7 @@
 {
 	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
-		"Summaies": [
+		"Summaries": [
 			{
 				"DealCount": 0,
 				"LowerBound": 0,
