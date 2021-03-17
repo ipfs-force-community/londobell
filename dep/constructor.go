@@ -19,6 +19,12 @@ import (
 	"github.com/dtynn/londobell/racailum/segment"
 )
 
+var (
+	_ common.MetaManager  = (*mmetamgr.MetaMgr)(nil)
+	_ common.DocumentDB   = (*mgoutil.MgoDocDB)(nil)
+	_ common.HeadNotifier = (*headsub.HeadSub)(nil)
+)
+
 type metadsIn struct {
 	fx.In
 	DSN MgoMetaDSDSN
