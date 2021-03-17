@@ -123,7 +123,7 @@ func extractMinerSectorSummaryV3(ctx *extract.Ctx, res *extract.Res, head *commo
 			Epoch: head.Epoch,
 		},
 		Detail: model.MinerSectorSummaryDetail{
-			Summaies: summaries,
+			Summaries: summaries,
 		},
 	})
 

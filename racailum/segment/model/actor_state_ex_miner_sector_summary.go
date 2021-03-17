@@ -16,7 +16,7 @@ var (
 
 // MinerSectorSummaryDetail contains the summaries in days of miner sectors
 type MinerSectorSummaryDetail struct {
-	Summaies []*MinerSectorSummaryRange
+	Summaries []*MinerSectorSummaryRange
 }
 
 // MinerSectorSummaryRange is the summary of sectors with remain duration within the range [Lower, Upper)
@@ -54,7 +54,7 @@ func (m *MinerSectorSummary) ResetPolicy(lower, upper *abi.ChainEpoch) (interfac
 // PrintDetail impl common.DetailPrinter
 func (m *MinerSectorSummary) PrintDetail(l *zap.SugaredLogger) {
 	l.Infof("Basic: %#v", m.ActorStateExBasic)
-	for si := range m.Detail.Summaies {
-		l.Infof("\tSummary #%d: %#v", si, m.Detail.Summaies[si])
+	for si := range m.Detail.Summaries {
+		l.Infof("\tSummary #%d: %#v", si, m.Detail.Summaries[si])
 	}
 }
