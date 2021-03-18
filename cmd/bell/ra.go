@@ -12,6 +12,7 @@ import (
 	"github.com/dtynn/londobell/dep"
 	"github.com/dtynn/londobell/lib/fxex"
 	"github.com/dtynn/londobell/racailum"
+	"github.com/dtynn/londobell/racailum/grafana"
 	"github.com/dtynn/londobell/racailum/segment/aggregate"
 )
 
@@ -22,6 +23,7 @@ var raCmd = &cli.Command{
 		raExtractCmd,
 		raAggregateCmd,
 		raDryCmd,
+		raGrafanaCmd,
 	},
 }
 
@@ -36,12 +38,29 @@ var (
 		Required: true,
 	}
 
+	raFlagSegDSNRead = &cli.StringFlag{
+		Name:     "seg-dsn-read",
+		Required: true,
+	}
+
 	raFlagAggDir = &cli.StringFlag{
 		Name: "agg-dir",
 	}
 
 	raFlagGasTracing = &cli.BoolFlag{
 		Name: "gas-tracing",
+	}
+
+	raFlagGrafanaDir = &cli.StringFlag{
+		Name: "grafana-dir",
+	}
+
+	raFlagGrafanaListen = &cli.BoolFlag{
+		Name: "grafana-listen",
+	}
+
+	raFlagEnableGrafana = &cli.BoolFlag{
+		Name: "enable-grafana",
 	}
 
 	raFlags = []cli.Flag{
@@ -52,10 +71,15 @@ var (
 		raFlagSegName,
 
 		raFlagSegDSN,
+		raFlagSegDSNRead,
 
 		raFlagAggDir,
 
 		raFlagGasTracing,
+
+		raFlagEnableGrafana,
+		raFlagGrafanaDir,
+		raFlagGrafanaListen,
 	}
 )
 
@@ -75,6 +99,19 @@ func buildRaApp(cctx *cli.Context, target interface{}) (*fx.App, error) {
 		aggOpt.Dir = cctx.String(raFlagAggDir.Name)
 	}
 
+	grOpt, err := grafana.DefaultOptions()
+	if err != nil {
+		return nil, fmt.Errorf("default grafana options: %w", err)
+	}
+
+	if cctx.IsSet(raFlagGrafanaDir.Name) {
+		grOpt.ScriptDir = cctx.String(raFlagAggDir.Name)
+	}
+
+	if cctx.IsSet(raFlagGrafanaDir.Name) {
+		grOpt.ScriptDir = cctx.String(raFlagAggDir.Name)
+	}
+
 	return dep.BellApp(
 		cctx.Context,
 		fxlog,
@@ -82,11 +119,14 @@ func buildRaApp(cctx *cli.Context, target interface{}) (*fx.App, error) {
 		fxex.ProvideEx(
 			racailum.Config{
 				Aggregate:        aggOpt,
+				Grafana:          grOpt,
 				EnableGasTracing: cctx.IsSet(raFlagGasTracing.Name),
+				EnableGrafana:    cctx.IsSet(raFlagEnableGrafana.Name),
 				Segments: []racailum.SegmentConfig{
 					{
-						DSN:  cctx.String(raFlagSegDSN.Name),
-						Name: cctx.String(raFlagSegName.Name),
+						DSN:     cctx.String(raFlagSegDSN.Name),
+						Name:    cctx.String(raFlagSegName.Name),
+						ReadDSN: cctx.String(raFlagSegDSNRead.Name),
 					},
 				},
 			},
@@ -373,5 +413,33 @@ var raDryCmd = &cli.Command{
 		log.Infow("done", "got", got)
 
 		return nil
+	},
+}
+
+var raGrafanaCmd = &cli.Command{
+	Name:  "grafana",
+	Flags: append(copyFlags(raFlags)),
+	Action: func(cctx *cli.Context) error {
+		var components struct {
+			fx.In
+			Ra *racailum.RaCailum
+		}
+
+		app, err := buildRaApp(cctx, &components)
+		if err != nil {
+			return err
+		}
+
+		err = app.Start(cctx.Context)
+		if err != nil {
+			return err
+		}
+
+		defer app.Stop(cctx.Context)
+
+		srv := components.Ra.Grafana().HTTPServer(cctx.Context)
+
+		log.Infof("grafana listen on %s", srv.Addr)
+		return srv.ListenAndServe()
 	},
 }

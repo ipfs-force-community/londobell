@@ -12,6 +12,7 @@ import (
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/lib/mgoutil"
 	"github.com/dtynn/londobell/lib/mgoutil/mdict"
+	"github.com/dtynn/londobell/racailum/grafana"
 	"github.com/dtynn/londobell/racailum/segment"
 	"github.com/dtynn/londobell/racailum/segment/aggregate"
 	"github.com/dtynn/londobell/racailum/segment/extract"
@@ -21,14 +22,17 @@ var log = logging.Logger("racailum")
 
 // SegmentConfig contains info about a segment
 type SegmentConfig struct {
-	DSN  string
-	Name string
+	DSN     string
+	ReadDSN string
+	Name    string
 }
 
 // Config of RaCailum
 type Config struct {
+	Grafana          grafana.Options
 	Aggregate        aggregate.Options
 	EnableGasTracing bool
+	EnableGrafana    bool
 	Segments         []SegmentConfig
 }
 
@@ -48,16 +52,55 @@ func New(ctx context.Context, cfg Config, sub common.HeadNotifier, metamgr commo
 			return nil, fmt.Errorf("connect to segment database %s: %w", scfg.DSN, err)
 		}
 
-		segdb := cli.Database(scfg.Name)
-		segDocDB, err := mgoutil.NewMgoDocDB(ctx, cli, segdb)
-		segDict, err := mdict.NewDict(segdb)
+		var segDocDB common.DocumentDB
+		var segDict common.ChainDict
 
-		seg, err := segment.New(scfg.Name, cfg.Aggregate, segDocDB, metamgr, cs, segDict, stm, optfns...)
+		{
+			segdb := cli.Database(scfg.Name)
+			segDocDB, err = mgoutil.NewMgoDocDB(ctx, cli, segdb)
+			if err != nil {
+				return nil, fmt.Errorf("construct doc db for %s: %w", scfg.Name, err)
+			}
+
+			segDict, err = mdict.NewDict(segdb)
+			if err != nil {
+				return nil, fmt.Errorf("construct dict for %s: %w", scfg.Name, err)
+			}
+		}
+
+		segDocDBRead := segDocDB
+		if scfg.ReadDSN != "" {
+			readcli, err := mgoutil.Connect(ctx, scfg.ReadDSN)
+			if err != nil {
+				return nil, fmt.Errorf("connect to segment database for read %s: %w", scfg.ReadDSN, err)
+			}
+
+			segdbRead := readcli.Database(scfg.Name)
+			segDocDBRead, err = mgoutil.NewMgoDocDB(ctx, readcli, segdbRead)
+			if err != nil {
+				return nil, fmt.Errorf("construct doc db for read for %s: %w", scfg.Name, err)
+			}
+		}
+
+		seg, err := segment.New(scfg.Name, cfg.Aggregate, segDocDB, segDocDBRead, metamgr, cs, segDict, stm, optfns...)
 		if err != nil {
 			return nil, fmt.Errorf("construct segment %s: %w", scfg.Name, err)
 		}
 
 		segments = append(segments, seg)
+	}
+
+	gr, err := grafana.New(ctx, cfg.Grafana, segments)
+	if err != nil {
+		return nil, fmt.Errorf("construct garfana: %w", err)
+	}
+
+	if cfg.EnableGrafana {
+		go func() {
+			if err := gr.Run(ctx); err != nil {
+				log.Errorf("grafana: %s", err)
+			}
+		}()
 	}
 
 	log.Infow("ra sets sail", "gas-tracing", cfg.EnableGasTracing, "segments", len(segments))
@@ -72,6 +115,8 @@ func New(ctx context.Context, cfg Config, sub common.HeadNotifier, metamgr commo
 	ra.components.cs = cs
 	ra.components.stm = stm
 	ra.components.optfns = optfns
+
+	ra.gr = gr
 
 	return ra, nil
 }
@@ -89,6 +134,7 @@ type RaCailum struct {
 		optfns  []segment.OptionFn
 	}
 
+	gr        *grafana.Grafana
 	segments  []*segment.Segment
 	activeseg int
 }
@@ -112,4 +158,9 @@ func (r *RaCailum) Aggregate(ctx context.Context, lo, hi *types.TipSet) error {
 // DryState runs a dry extraction from given ts
 func (r *RaCailum) DryState(ctx context.Context, ts *common.LinkedTipSet) ([]*extract.Res, error) {
 	return r.segments[r.activeseg].DryExtract(ctx, ts)
+}
+
+// Grafana returns the instance of *Grafana
+func (r *RaCailum) Grafana() *grafana.Grafana {
+	return r.gr
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/racailum/segment/aggregate"
@@ -87,7 +88,7 @@ func SetBoundary(ctx context.Context, name string, metamgr common.MetaManager, h
 }
 
 // New attempts to construct a *Segment
-func New(name string, aggopt aggregate.Options, db common.DocumentDB, metamgr common.MetaManager, cs common.ChainStore, dict common.ChainDict, stm common.StateManager, optfns ...OptionFn) (*Segment, error) {
+func New(name string, aggopt aggregate.Options, wdb, rdb common.DocumentDB, metamgr common.MetaManager, cs common.ChainStore, dict common.ChainDict, stm common.StateManager, optfns ...OptionFn) (*Segment, error) {
 	initCtx := context.Background()
 
 	opts := DefaultOptions()
@@ -111,7 +112,7 @@ func New(name string, aggopt aggregate.Options, db common.DocumentDB, metamgr co
 		return nil, fmt.Errorf("boundady is required")
 	}
 
-	agg, err := aggregate.New(aggopt, db)
+	agg, err := aggregate.New(aggopt, wdb)
 	if err != nil {
 		return nil, err
 	}
@@ -119,17 +120,23 @@ func New(name string, aggopt aggregate.Options, db common.DocumentDB, metamgr co
 	seg := &Segment{
 		name:    name,
 		opts:    opts,
-		db:      db,
+		db:      wdb,
+		rdb:     rdb,
 		agg:     agg,
 		metamgr: metamgr,
 	}
 
 	seg.bound.key = bkey
 	seg.bound.Boundary = bound
+	seg.bound.Read = bound
 
 	seg.dal.ChainStore = cs
 	seg.dal.ChainDict = dict
 	seg.dal.StateManager = stm
+
+	if err := metamgr.Watch(context.Background(), bkey, seg.watchReadBoundary); err != nil {
+		return nil, fmt.Errorf("init change stream for boundary: %w", err)
+	}
 
 	return seg, nil
 }
@@ -140,6 +147,7 @@ type Segment struct {
 
 	opts    Options
 	db      common.DocumentDB
+	rdb     common.DocumentDB
 	metamgr common.MetaManager
 	agg     *aggregate.Aggregator
 
@@ -150,6 +158,7 @@ type Segment struct {
 
 		sync.RWMutex
 		Boundary
+		Read Boundary
 	}
 
 	dal struct {
@@ -292,4 +301,34 @@ func (s *Segment) SetBoundary(ctx context.Context, hi, lo *common.LinkedTipSet) 
 
 	// TODO: reset, cleanup and other stuffs
 	return s.updateBoundary(ctx, hi, lo)
+}
+
+// ReadBoundary returns the boundary of the segment
+func (s *Segment) ReadBoundary() Boundary {
+	s.bound.RLock()
+	b := s.bound.Read
+	s.bound.RUnlock()
+	return b
+}
+
+// Name returns the name of the segment
+func (s *Segment) Name() string {
+	return s.name
+}
+
+// ReadDB returns the read only db instance of the segment
+func (s *Segment) ReadDB() common.DocumentDB {
+	return s.rdb
+}
+
+func (s *Segment) watchReadBoundary(raw bson.RawValue) error {
+	var b Boundary
+	if err := raw.Unmarshal(&b); err != nil {
+		return err
+	}
+
+	s.bound.Lock()
+	s.bound.Read = b
+	s.bound.Unlock()
+	return nil
 }
