@@ -159,6 +159,9 @@ func (g *Grafana) serveQuery(ctx context.Context, req *queryReq) queryResp {
 	}
 
 	sets := make([][]pointset, len(req.Targets))
+
+	hlog.Infow("query", "from", fromEpoch, "to", toEpoch, "sets", len(availableSets), "targets", len(req.Targets))
+
 	p := limiter.NewParallel(ctx, 8)
 	defer p.Finish()
 
@@ -177,6 +180,7 @@ func (g *Grafana) serveQuery(ctx context.Context, req *queryReq) queryResp {
 		}
 
 		alog := log.With("col", act.collection, "act", act.action)
+		alog.Infow("query for points")
 
 		p.P(func(ctx context.Context) error {
 			pipeline, err := jsbson.Parse(qctx, act.code)
@@ -200,6 +204,8 @@ func (g *Grafana) serveQuery(ctx context.Context, req *queryReq) queryResp {
 
 				res = append(res, psets...)
 			}
+
+			alog.Infow("aggregated", "point-sets", len(res))
 
 			return nil
 		})
