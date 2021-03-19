@@ -13,19 +13,10 @@
 		}
 	},
 	{
-		$project: {
-			_id: 0,
-			Epoch: 1,
-			"Methods._id": 1,
-			"Methods.GasUsed": 1,
-			"Total.GasUsed": 1,
-		}
-	},
-	{
 		$set: {
 			"Total._id": {
 				"Epoch" : "$Epoch",
-				"Actor" : "",
+				"Actor" : "Total",
 				"Method" : "Total"
 			}
 		}
@@ -49,15 +40,24 @@
 		$unwind: "$Methods",
 	},
 	{
-		$group: {
+		$replaceRoot: {
+			newRoot: "$Methods",
+		}
+	},
+	{
+		$project: {
 			_id: {
-				$concat: ["$Methods._id.Actor", "-", "$Methods._id.Method"]
+				$concat: ["$_id.Actor", "-", "$_id.Method"],
 			},
+			Epoch: "$_id.Epoch",
+			Value: ctx.Data.Value,
+		}
+	},
+	{
+		$group: {
+			_id: "$_id",
 			points: {
-				$push: {
-					Epoch: "$$ROOT.Methods._id.Epoch",
-					Value: "$$ROOT.Methods.GasUsed",
-				},
+				$push: "$$ROOT",
 			}
 		}
 	}

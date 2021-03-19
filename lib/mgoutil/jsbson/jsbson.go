@@ -3,10 +3,14 @@ package jsbson
 import (
 	"fmt"
 
+	logging "github.com/ipfs/go-log/v2"
+
 	"github.com/robertkrimen/otto"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+var log = logging.Logger("jsbson")
 
 // Object classes
 const (
@@ -64,7 +68,8 @@ func value2agg(v otto.Value) (interface{}, error) {
 		return regexp2agg(v.Object())
 
 	default:
-		return nil, fmt.Errorf("unexpected class %s", class)
+		log.Warnf("unexpected object class %s", class)
+		return v.Export()
 	}
 }
 

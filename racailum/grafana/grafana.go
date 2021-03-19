@@ -158,32 +158,24 @@ func (g *Grafana) serveQuery(ctx context.Context, req *queryReq) queryResp {
 		}
 	}
 
-	qctx := queryCtx{
-		From: int64(time2epoch(req.Range.From)),
-		To:   int64(time2epoch(req.Range.To)),
-	}
-
-	actions := make([]script, 0, len(req.Targets))
-	dedup := map[string]struct{}{}
-	for _, t := range req.Targets {
-		if _, has := dedup[t.Target]; has {
-			continue
-		}
-
-		if s, ok := g.scripts[t.Target]; ok {
-			actions = append(actions, s)
-		}
-
-		dedup[t.Target] = struct{}{}
-	}
-
-	sets := make([][]pointset, len(actions))
+	sets := make([][]pointset, len(req.Targets))
 	p := limiter.NewParallel(ctx, 8)
 	defer p.Finish()
 
-	for ai := range actions {
-		ai := ai
-		act := actions[ai]
+	for ti := range req.Targets {
+		ti := ti
+		target := req.Targets[ti]
+		act, ok := g.scripts[target.Target]
+		if !ok {
+			continue
+		}
+
+		qctx := queryCtx{
+			From: int64(fromEpoch),
+			To:   int64(toEpoch),
+			Data: target.Data,
+		}
+
 		alog := log.With("col", act.collection, "act", act.action)
 
 		p.P(func(ctx context.Context) error {
@@ -196,7 +188,7 @@ func (g *Grafana) serveQuery(ctx context.Context, req *queryReq) queryResp {
 			var res []pointset
 
 			defer func() {
-				sets[ai] = res
+				sets[ti] = res
 			}()
 
 			for di := range availableSets {

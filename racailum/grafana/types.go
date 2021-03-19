@@ -39,9 +39,10 @@ type queryReq struct {
 }
 
 type queryReqTarget struct {
-	Target string `json:"target"`
-	RefID  string `json:"refId"`
-	Type   string `json:"type"`
+	Target string      `json:"target"`
+	RefID  string      `json:"refId"`
+	Type   string      `json:"type"`
+	Data   interface{} `json:"data"`
 }
 
 type queryResp []pointset
@@ -49,4 +50,5 @@ type queryResp []pointset
 type queryCtx struct {
 	From int64
 	To   int64
+	Data interface{}
 }
