@@ -1,0 +1,72 @@
+[
+	{
+		$match: {
+			Epoch: {
+				$gte: ctx.From,
+				$lte: ctx.To,
+			},
+			Code: {
+				$in: [
+					"fil/2/reward",
+					"fil/3/reward",
+				]
+			}
+		},
+	},
+	{
+		$sort: {
+			Epoch: 1
+		}
+	},
+	{
+		$project: {
+			Epoch: 1,
+			Values: [
+				{
+					_id: "PerEpochRewardPositionEstimate",
+					Epoch: "$Epoch",
+					Value: {
+						$toDouble: {
+							$divide: [
+								{
+									$toDecimal: "$Detail.ThisEpochRewardSmoothed.PositionEstimate",
+								},
+								1e48
+							]
+						},
+					}
+				},
+				{
+					_id: "PerEpochRewardVelocityEstimate",
+					Epoch: "$Epoch",
+					Value: {
+						$toDouble: {
+							$divide: [
+								{
+									$toDecimal: "$Detail.ThisEpochRewardSmoothed.VelocityEstimate"
+								},
+								1e48
+							]
+						},
+					}
+				},
+			]
+		}
+	},
+	{
+		$unwind: "$Values",
+	},
+	{
+		$replaceRoot: {
+			newRoot: "$Values",
+		}
+	},
+	{
+		$group: {
+			_id: "$_id",
+			points: {
+				$push: "$$ROOT",
+			}
+		}
+	}
+]

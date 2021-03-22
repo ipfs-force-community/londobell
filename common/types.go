@@ -8,6 +8,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/network"
 	"github.com/ipfs/go-cid"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.uber.org/zap"
 
 	"github.com/filecoin-project/lotus/api"
@@ -34,6 +35,7 @@ type ChainStore interface {
 	LoadTipSet(tsk types.TipSetKey) (*types.TipSet, error)
 	Weight(ctx context.Context, ts *types.TipSet) (types.BigInt, error)
 	ActorStore(ctx context.Context) adt.Store
+	GetGenesis() (*types.BlockHeader, error)
 	ChainBlockstore() bstore.Blockstore
 }
 
@@ -60,6 +62,7 @@ type ChainDict interface {
 type MetaManager interface {
 	Load(ctx context.Context, key string, out interface{}) (bool, error)
 	Update(ctx context.Context, key string, val interface{}) error
+	Watch(ctx context.Context, key string, cb func(bson.RawValue) error) error
 }
 
 // Indexed will return pre-planed indexes

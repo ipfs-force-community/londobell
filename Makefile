@@ -56,6 +56,11 @@ build-bell: $(BUILD_DEPS)
 	go build $(GOFLAGS) -o bell ./cmd/bell
 	go run github.com/GeertJohan/go.rice/rice append --exec bell -i ./build
 
+build-bell-grafana: $(BUILD_DEPS)
+	rm -rf ./bell-grafana
+	go build $(GOFLAGS) -o bell-grafana ./cmd/bell-grafana
+	go run github.com/GeertJohan/go.rice/rice append --exec bell-grafana -i ./build
+
 
 dist-clean:
 	git clean -xdff
