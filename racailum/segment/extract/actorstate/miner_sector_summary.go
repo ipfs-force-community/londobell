@@ -115,6 +115,13 @@ func extractMinerSectorSummaryV3(ctx *extract.Ctx, res *extract.Res, head *commo
 		return fmt.Errorf("gen regular id: %w", err)
 	}
 
+	nonEmpty := make([]*model.MinerSectorSummaryRange, 0, len(summaries))
+	for si := range summaries {
+		if s := summaries[si]; s.SectorCount > 0 {
+			nonEmpty = append(nonEmpty, s)
+		}
+	}
+
 	res.Docs = append(res.Docs, &model.MinerSectorSummary{
 		ActorStateExBasic: model.ActorStateExBasic{
 			ID:    id,
@@ -123,7 +130,7 @@ func extractMinerSectorSummaryV3(ctx *extract.Ctx, res *extract.Res, head *commo
 			Epoch: head.Epoch,
 		},
 		Detail: model.MinerSectorSummaryDetail{
-			Summaries: summaries,
+			Summaries: nonEmpty,
 		},
 	})
 
