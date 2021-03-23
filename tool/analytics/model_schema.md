@@ -43,6 +43,37 @@
 }
 ```
 
+### DealProposalSummary
+
+```
+{
+	"ActorStateExBasic": {
+		"Addr": "address.Address",
+		"Epoch": "abi.ChainEpoch",
+		"Path": "[]cid.Cid",
+		"_id": "cid.Cid"
+	},
+	"Detail": {
+		"Regular": {
+			"ClientCollateral": "big.Int",
+			"Clients": "uint64",
+			"Count": "uint64",
+			"PieceSize": "big.Int",
+			"ProviderCollateral": "big.Int",
+			"Providers": "uint64"
+		},
+		"Verified": {
+			"ClientCollateral": "big.Int",
+			"Clients": "uint64",
+			"Count": "uint64",
+			"PieceSize": "big.Int",
+			"ProviderCollateral": "big.Int",
+			"Providers": "uint64"
+		}
+	}
+}
+```
+
 ### ExecGas
 
 ```
