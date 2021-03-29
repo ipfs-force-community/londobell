@@ -57,8 +57,8 @@ most of which can be observed in power.State
 - [x] GasUsage by message type per epoch
 
 ## storage demand & filecoin plus
-- [] Number of regular deals
-- [] Number of Filecoin Plus deals
+- [x] Number of regular deals
+- [x] Number of Filecoin Plus deals
 - [x] Amount of DataCap allocated to notaries
 - [x] Amount of DataCap allocated from notaries to clients
 - [] Flow of DataCap allocation from each notaries
