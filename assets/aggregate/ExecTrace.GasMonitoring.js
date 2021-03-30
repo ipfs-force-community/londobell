@@ -12,11 +12,11 @@
 		$project: {
 			Cid: 1,
 			Epoch: 1,
-			GasUsed: {$toLong: "$GasCost.GasUsed"},
+			GasUsed: {$toDecimal: "$GasCost.GasUsed"},
 			BaseFeeBurn: {$toDecimal: "$GasCost.BaseFeeBurn"},
 			OverEstimationBurn: {$toDecimal: "$GasCost.OverEstimationBurn"},
-			MinerTip: {$toLong: "$GasCost.MinerTip"},
-			MinerPenalty: {$toLong: "$GasCost.MinerPenalty"},
+			MinerTip: {$toDecimal: "$GasCost.MinerTip"},
+			MinerPenalty: {$toDecimal: "$GasCost.MinerPenalty"},
 		}
 	},
 	{
@@ -39,7 +39,7 @@
 						"Detail.Actor": 1,
 						"Detail.Method": 1,
 						GasLimit: 1,
-						GasPremium: {$toLong: "$GasPremium"},
+						GasPremium: {$toDecimal: "$GasPremium"},
 					}
 				}
 			],
