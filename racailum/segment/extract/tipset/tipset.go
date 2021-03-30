@@ -1,6 +1,7 @@
 package tipset
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/lib/mir"
+	"github.com/dtynn/londobell/racailum/segment/actor"
 	"github.com/dtynn/londobell/racailum/segment/extract"
 	"github.com/dtynn/londobell/racailum/segment/model"
 	"github.com/dtynn/londobell/racailum/segment/model/schema"
@@ -271,7 +273,11 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 		mi, err := ctx.Actors.Set.LookupMethodInfo(ctx.C, ts.TipSet, ctx.D, parentMsg, msg)
 		if err != nil {
-			return fmt.Errorf("lookup method info for %s/%d: %w", msg.To, msg.Method, err)
+			if !errors.Is(err, actor.ErrActorMethodNotFound) {
+				return fmt.Errorf("lookup method info for %s/%d: %w", msg.To, msg.Method, err)
+			}
+
+			elog.Errorf("%s", err)
 		}
 
 		mcid := msg.Cid()
