@@ -18,6 +18,13 @@ const (
 
 var log = logging.Logger("headsub")
 
+func NewHeadSub(full api.FullNode) (*HeadSub, error) {
+	return &HeadSub{
+		full:     full,
+		interval: minReListenInterval,
+	}, nil
+}
+
 type HeadSub struct {
 	full     api.FullNode
 	interval time.Duration

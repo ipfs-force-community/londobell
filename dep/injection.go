@@ -37,9 +37,6 @@ var DefaultBellProvider = fx.Provide(
 	stmgr.NewStateManagerWithUpgradeSchedule,
 
 	// basics
-	NewMgoMetaDSClient,
-	MgoChainHotBlockstore,
-	MgoMetaDS,
 	MgoMetaMgr,
 	MgoHeadNotifier,
 	NewRaCailum,
@@ -60,8 +57,6 @@ func BellApp(ctx context.Context, logger fx.Printer, target interface{}, opts ..
 		fxex.ProvideEx(
 			fxex.As(metricsi.CtxScope(ctx, "bell"), new(helpers.MetricsCtx)),
 			fxex.As(ctx, new(GlobalContext)),
-			MgoMetaDSReadOnly(true),
-			MgoBstoreReadOnly(true),
 		),
 		DefaultBellProvider,
 	}, opts...)

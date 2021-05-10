@@ -64,8 +64,6 @@ var (
 	}
 
 	raFlags = []cli.Flag{
-		dep.FlagMgoBstoreDSN,
-		dep.FlagMgoMetaDSDSN,
 		dep.FlagMgoMetaMgrDSN,
 
 		raFlagSegName,
@@ -130,8 +128,6 @@ func buildRaApp(cctx *cli.Context, target interface{}) (*fx.App, error) {
 					},
 				},
 			},
-			dep.MgoBstoreDSN(cctx.String(dep.FlagMgoBstoreDSN.Name)),
-			dep.MgoMetaDSDSN(cctx.String(dep.FlagMgoMetaDSDSN.Name)),
 			dep.MgoMetaMgrDSN(cctx.String(dep.FlagMgoMetaMgrDSN.Name)),
 		),
 	), nil

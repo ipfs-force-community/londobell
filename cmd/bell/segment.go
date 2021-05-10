@@ -35,8 +35,6 @@ var segmentInitBoundaryCmd = &cli.Command{
 			Name: "lo-child",
 		},
 
-		dep.FlagMgoBstoreDSN,
-		dep.FlagMgoMetaDSDSN,
 		dep.FlagMgoMetaMgrDSN,
 	},
 
@@ -52,8 +50,6 @@ var segmentInitBoundaryCmd = &cli.Command{
 			fxlog,
 			&components,
 			fxex.ProvideEx(
-				dep.MgoBstoreDSN(cctx.String(dep.FlagMgoBstoreDSN.Name)),
-				dep.MgoMetaDSDSN(cctx.String(dep.FlagMgoMetaDSDSN.Name)),
 				dep.MgoMetaMgrDSN(cctx.String(dep.FlagMgoMetaMgrDSN.Name)),
 			),
 		)
