@@ -18,6 +18,7 @@ require (
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-datastore v0.4.5
+	github.com/ipfs/go-ds-leveldb v0.4.2
 	github.com/ipfs/go-ipfs-blockstore v1.0.3
 	github.com/ipfs/go-log/v2 v2.1.2-0.20200626104915-0016c0b4b3e4
 	github.com/ipfs/go-metrics-interface v0.0.1
@@ -28,6 +29,7 @@ require (
 	github.com/multiformats/go-multihash v0.0.14
 	github.com/prometheus/client_golang v1.6.0
 	github.com/robertkrimen/otto v0.0.0-20200922221731-ef014fd054ac
+	github.com/syndtr/goleveldb v1.0.0
 	github.com/urfave/cli/v2 v2.2.0
 	go.mongodb.org/mongo-driver v1.5.0
 	go.opencensus.io v0.22.5

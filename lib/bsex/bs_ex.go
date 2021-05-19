@@ -4,7 +4,8 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
+
+	"github.com/filecoin-project/lotus/blockstore"
 )
 
 var _ blockstore.Blockstore = (*CachedBlockstore)(nil)
@@ -40,6 +41,22 @@ func (cbs *CachedBlockstore) Get(c cid.Cid) (blocks.Block, error) {
 
 	cbs.cache.Add(c, b)
 	return b, nil
+}
+
+func (cbs *CachedBlockstore) View(c cid.Cid, callback func([]byte) error) error {
+	if cached, has := cbs.cache.Get(c); has {
+		if b, ok := cached.(blocks.Block); ok {
+			return callback(b.RawData())
+		}
+	}
+
+	b, err := cbs.Blockstore.Get(c)
+	if err != nil {
+		return err
+	}
+
+	cbs.cache.Add(c, b)
+	return callback(b.RawData())
 }
 
 func (cbs *CachedBlockstore) Has(c cid.Cid) (bool, error) {

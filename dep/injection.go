@@ -37,9 +37,12 @@ var DefaultBellProvider = fx.Provide(
 	stmgr.NewStateManagerWithUpgradeSchedule,
 
 	// basics
-	MgoMetaMgr,
-	MgoHeadNotifier,
 	NewRaCailum,
+	HeadNotifier,
+	ChainIOBlockstore,
+	InMemRepo,
+	LockedRepo,
+	InMemMetadataDS,
 
 	// type convertion
 	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.ChainBlockstore)),

@@ -14,6 +14,8 @@ import (
 const (
 	minReListenInterval = time.Second
 	maxReListenInterval = 10 * time.Second
+
+	nonChanModeInterval = 10 * time.Second
 )
 
 var log = logging.Logger("headsub")
@@ -93,25 +95,89 @@ func (h *HeadSub) applyChanges(ctx context.Context, tx chan types.TipSetKey, cha
 func (h *HeadSub) reListen(ctx context.Context) (<-chan []*api.HeadChange, error) {
 	for {
 		ch, err := h.full.ChainNotify(ctx)
-		if err != nil {
-			log.Errorf("call CahinNotify: %s, will re-call in %s", err, h.interval)
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-
-			case <-time.After(h.interval):
-				h.interval *= 2
-				if h.interval > maxReListenInterval {
-					h.interval = maxReListenInterval
-				}
-
-			}
-
-			continue
+		if err == nil {
+			h.interval = minReListenInterval
+			return ch, nil
 		}
 
-		h.interval = minReListenInterval
-		return ch, nil
+		// we have error here, try use non-chan mode
+		ch, err = h.reListenInNonChan(ctx)
+		if err == nil {
+			h.interval = minReListenInterval
+			return ch, nil
+		}
+
+		log.Errorf("call CahinNotify: %s, will re-call in %s", err, h.interval)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+
+		case <-time.After(h.interval):
+			h.interval *= 2
+			if h.interval > maxReListenInterval {
+				h.interval = maxReListenInterval
+			}
+
+		}
+	}
+}
+
+func (h *HeadSub) reListenInNonChan(ctx context.Context) (<-chan []*api.HeadChange, error) {
+	tryCtx, tryCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer tryCancel()
+
+	head, err := h.full.ChainHead(tryCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan []*api.HeadChange, 16)
+	ch <- []*api.HeadChange{
+		{
+			Type: store.HCCurrent,
+			Val:  head,
+		},
+	}
+
+	go h.startChainHeadLoop(ctx, ch)
+
+	return ch, nil
+}
+
+func (h *HeadSub) startChainHeadLoop(ctx context.Context, ch chan []*api.HeadChange) {
+	log.Warn("ChainNotify not supportted, use ChainHead instead")
+	defer func() {
+		log.Warn("ChainHead loop stop")
+		close(ch)
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-time.After(nonChanModeInterval):
+
+		}
+
+		reqCtx, reqCancel := context.WithTimeout(ctx, 5*time.Second)
+		head, err := h.full.ChainHead(reqCtx)
+		reqCancel()
+		if err != nil {
+			log.Errorf("call ChainHead: %s", err)
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+
+		case ch <- []*api.HeadChange{{
+			Type: store.HCCurrent,
+			Val:  head,
+		}}:
+
+		}
 	}
 }
 

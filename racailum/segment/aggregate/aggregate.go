@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -29,16 +28,11 @@ const (
 
 // DefaultOptions constructs default options
 // script names should be in the format "collection-name.action-name.json"
-func DefaultOptions() (Options, error) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return Options{}, err
-	}
-
+func DefaultOptions() Options {
 	return Options{
-		Dir:      filepath.Join(pwd, aggregateSubDir),
+		Dir:      "./" + aggregateSubDir,
 		JobLimit: 64,
-	}, nil
+	}
 }
 
 // Options for Aggregator

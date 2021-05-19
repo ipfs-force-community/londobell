@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sort"
 	"time"
 
@@ -23,16 +21,11 @@ const (
 )
 
 // DefaultOptions return the defaults
-func DefaultOptions() (Options, error) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return Options{}, err
-	}
-
+func DefaultOptions() Options {
 	return Options{
 		ListenAddr: "0.0.0.0:15502",
-		ScriptDir:  filepath.Join(pwd, scriptSubDir),
-	}, nil
+		ScriptDir:  "./" + scriptSubDir,
+	}
 }
 
 // Options for Grafana
