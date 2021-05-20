@@ -15,6 +15,10 @@ import (
 	verifreg3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/verifreg"
 	adt3 "github.com/filecoin-project/specs-actors/v3/actors/util/adt"
 
+	builtin4 "github.com/filecoin-project/specs-actors/v4/actors/builtin"
+	verifreg4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/verifreg"
+	adt4 "github.com/filecoin-project/specs-actors/v4/actors/util/adt"
+
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/racailum/segment/extract"
 	"github.com/dtynn/londobell/racailum/segment/model"
@@ -22,23 +26,12 @@ import (
 )
 
 func init() {
-	mustRegisterRegularExtractor("VerifRegV2", extractVerifRegV2)
-	mustRegisterRegularExtractor("VerifRegV3", extractVerifRegV3)
-
 	schema.Register(
 		schema.Model{
 			Name: "verifreg",
 			D:    &model.VerifiedRegistry{},
 		},
 	)
-}
-
-func extractVerifRegV2(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg2.State) error {
-	return extractVerifReg(ctx, res, head, st)
-}
-
-func extractVerifRegV3(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg3.State) error {
-	return extractVerifReg(ctx, res, head, st)
 }
 
 type adtMap interface {
@@ -89,6 +82,22 @@ func extractVerifReg(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead,
 
 		mapConstructor = func(c cid.Cid) (adtMap, error) {
 			return adt3.AsMap(ctx.D.ActorStore(ctx.C), c, builtin3.DefaultHamtBitwidth)
+		}
+
+	case *verifreg4.State:
+		mapRoots = []namedAdtMapRoot{
+			{
+				name: "Verifier",
+				root: st.Verifiers,
+			},
+			{
+				name: "VerifiedClient",
+				root: st.VerifiedClients,
+			},
+		}
+
+		mapConstructor = func(c cid.Cid) (adtMap, error) {
+			return adt4.AsMap(ctx.D.ActorStore(ctx.C), c, builtin4.DefaultHamtBitwidth)
 		}
 
 	default:

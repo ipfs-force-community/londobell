@@ -11,6 +11,8 @@ import (
 
 	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
 
+	multisig4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/multisig"
+
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/racailum/segment/extract"
 	"github.com/dtynn/londobell/racailum/segment/model"
@@ -18,23 +20,12 @@ import (
 )
 
 func init() {
-	mustRegisterRegularExtractor("MultisigBalanceV2", extractMultisigBalanceV2)
-	mustRegisterRegularExtractor("MultisigBalanceV3", extractMultisigBalanceV3)
-
 	schema.Register(
 		schema.Model{
 			Name: "multisig-balance",
 			D:    &model.MultisigBalance{},
 		},
 	)
-}
-
-func extractMultisigBalanceV2(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, mst *multisig2.State) error {
-	return extractMultisigBalanceDetail(ctx, res, head, mst)
-}
-
-func extractMultisigBalanceV3(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, mst *multisig3.State) error {
-	return extractMultisigBalanceDetail(ctx, res, head, mst)
 }
 
 func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, mst interface{}) error {
@@ -55,6 +46,18 @@ func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *comm
 		locked = st.AmountLocked(epoch - st.StartEpoch)
 
 	case *multisig3.State:
+		if epoch < st.StartEpoch {
+			return nil
+		}
+
+		if epoch > st.StartEpoch+st.UnlockDuration {
+			return nil
+		}
+
+		init = st.InitialBalance
+		locked = st.AmountLocked(epoch - st.StartEpoch)
+
+	case *multisig4.State:
 		if epoch < st.StartEpoch {
 			return nil
 		}

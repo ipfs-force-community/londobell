@@ -12,6 +12,7 @@ require (
 	github.com/filecoin-project/lotus v1.8.0
 	github.com/filecoin-project/specs-actors/v2 v2.3.5-0.20210114162132-5b58b773f4fb
 	github.com/filecoin-project/specs-actors/v3 v3.1.0
+	github.com/filecoin-project/specs-actors/v4 v4.0.0
 	github.com/go-redis/redis/v8 v8.6.0
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/hashicorp/golang-lru v0.5.4
