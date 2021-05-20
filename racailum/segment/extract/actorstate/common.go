@@ -12,28 +12,12 @@ import (
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/ipfs/go-cid"
 
-	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
-
-	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
-
 	"github.com/filecoin-project/lotus/chain/vm"
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/racailum/segment/extract"
 	"github.com/dtynn/londobell/racailum/segment/model"
-	"github.com/dtynn/londobell/racailum/segment/model/schema"
 )
-
-func inti() {
-	schema.Register(
-		schema.Model{
-			Name: "actor-state: miner.State v2",
-			D: &model.ActorState{
-				Detail: &miner2.State{},
-			},
-		},
-	)
-}
 
 var (
 	extractCtxType = reflect.TypeOf((*extract.Ctx)(nil))
@@ -162,23 +146,6 @@ func ExtractDiff(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead) err
 // ExtractRegular tries to take all data out of specified actor state head
 func ExtractRegular(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead) error {
 	return extractState(ctx, res, head, extractorRegistry.regular, true)
-}
-
-func isEmptyState(st interface{}) bool {
-	if st == nil {
-		return true
-	}
-
-	switch st := st.(type) {
-	case *miner2.State:
-		return isEmptyMinerStateV2(st)
-
-	case *miner3.State:
-		return isEmptyMinerStateV3(st)
-
-	default:
-		return false
-	}
 }
 
 func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, reg *registry, enableActorStateDoc bool) error {

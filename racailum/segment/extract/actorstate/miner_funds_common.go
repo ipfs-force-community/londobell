@@ -5,12 +5,16 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/ipfs/go-cid"
+
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	adt2 "github.com/filecoin-project/specs-actors/v2/actors/util/adt"
-	"github.com/ipfs/go-cid"
 
 	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
 	adt3 "github.com/filecoin-project/specs-actors/v3/actors/util/adt"
+
+	miner4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/miner"
+	adt4 "github.com/filecoin-project/specs-actors/v4/actors/util/adt"
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/lib/mir"
@@ -20,23 +24,12 @@ import (
 )
 
 func init() {
-	mustRegisterRegularExtractor("MinerFundsV2", extractMinerFundsV2)
-	mustRegisterRegularExtractor("MinerFundsV3", extractMinerFundsV3)
-
 	schema.Register(
 		schema.Model{
 			Name: "miner-funds",
 			D:    &model.MinerFunds{},
 		},
 	)
-}
-
-func extractMinerFundsV2(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner2.State) error {
-	return extractMinerFunds(ctx, res, head, st)
-}
-
-func extractMinerFundsV3(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner3.State) error {
-	return extractMinerFunds(ctx, res, head, st)
 }
 
 func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st interface{}) error {
@@ -71,6 +64,22 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 
 		if !st.VestingFunds.Equals(emptyMinerStateV3.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt3.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+			if err != nil {
+				return fmt.Errorf("load vesting funds: %w", err)
+			}
+
+			for _, v := range funds.Funds {
+				sum = big.Add(sum, v.Amount)
+			}
+		}
+
+	case *miner4.State:
+		if err := mir.Mirror(&detail, st); err != nil {
+			return fmt.Errorf("mirroring *miner2.State: %w", err)
+		}
+
+		if !st.VestingFunds.Equals(emptyMinerStateV4.VestingFunds) {
+			funds, err := st.LoadVestingFunds(adt4.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
 				return fmt.Errorf("load vesting funds: %w", err)
 			}

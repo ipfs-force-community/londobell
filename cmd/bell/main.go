@@ -10,7 +10,16 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/lib/lotuslog"
 
+	"github.com/dtynn/londobell/dep"
 	"github.com/dtynn/londobell/lib/mgoutil/mcodec"
+)
+
+var (
+	repoFlag = &cli.StringFlag{
+		Name:  "bell-repo",
+		Usage: "repo path for bell",
+		Value: "~/.bell",
+	}
 )
 
 func main() {
@@ -27,10 +36,14 @@ func main() {
 		EnableBashCompletion: true,
 		Commands: []*cli.Command{
 			raCmd,
+			cfgCmd,
 			segmentCmd,
 		},
 		Version: build.CurrentCommit,
-		Flags:   []cli.Flag{},
+		Flags: []cli.Flag{
+			repoFlag,
+			dep.FullNodeAPIFlag,
+		},
 	}
 
 	app.Setup()

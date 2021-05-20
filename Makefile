@@ -46,11 +46,6 @@ lint: $(BUILD_DEPS)
 dep-check: build-dep/.update-modules
 	./tool/scripts/submodule-check.sh
 
-build-bell-lotus: $(BUILD_DEPS)
-	rm -rf ./bell-lotus
-	go build $(GOFLAGS) -o bell-lotus ./cmd/bell-lotus
-	go run github.com/GeertJohan/go.rice/rice append --exec bell-lotus -i ./build
-
 build-bell: $(BUILD_DEPS)
 	rm -rf ./bell
 	go build $(GOFLAGS) -o bell ./cmd/bell

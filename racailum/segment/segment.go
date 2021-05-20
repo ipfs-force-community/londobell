@@ -7,40 +7,18 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
-	"go.mongodb.org/mongo-driver/bson"
+
+	"github.com/filecoin-project/lotus/chain/types"
 
 	"github.com/dtynn/londobell/common"
+	"github.com/dtynn/londobell/lib/mgoutil"
+	"github.com/dtynn/londobell/lib/mgoutil/mdict"
 	"github.com/dtynn/londobell/racailum/segment/aggregate"
 )
 
 var log = logging.Logger("segment")
-
-// Boundary marks the high & low bound of the segment
-type Boundary struct {
-	Hi Anchor
-	Lo Anchor
-}
-
-// SetHi set the high bound to the given tipset
-func (b *Boundary) SetHi(ts *common.LinkedTipSet) {
-	b.Hi = Anchor{
-		Epoch: ts.Height(),
-		TSK:   ts.Key(),
-		State: ts.State(),
-	}
-}
-
-// SetLo set the high bound to the given tipset
-func (b *Boundary) SetLo(ts *common.LinkedTipSet) {
-	b.Lo = Anchor{
-		Epoch: ts.Height(),
-		TSK:   ts.Key(),
-		State: ts.State(),
-	}
-}
 
 // Anchor contains most significant info about a tipset
 type Anchor struct {
@@ -54,89 +32,72 @@ func (a *Anchor) Is(ts *common.LinkedTipSet) bool {
 	return a.TSK == ts.Key() && a.State == ts.State()
 }
 
-// OptionsKey is the meta key for options
-func OptionsKey(name string) string {
-	return fmt.Sprintf("seg-%s-options", name)
-}
-
-// BoundaryKey is the meta key for boundary
-func BoundaryKey(name string) string {
-	return fmt.Sprintf("seg-%s-boundary", name)
-}
-
-// SetBoundary sets the boundary for a given named segment
-func SetBoundary(ctx context.Context, name string, metamgr common.MetaManager, hi, lo *common.LinkedTipSet) error {
-	bkey := BoundaryKey(name)
-	var b Boundary
-	if _, err := metamgr.Load(ctx, bkey, &b); err != nil {
-		return fmt.Errorf("load boundary: %w", err)
-	}
-
-	if hi != nil {
-		b.SetHi(hi)
-	}
-
-	if lo != nil {
-		b.SetLo(lo)
-	}
-
-	if err := metamgr.Update(ctx, bkey, b); err != nil {
-		return fmt.Errorf("update boundary: %w", err)
-	}
-
-	return nil
-}
-
 // New attempts to construct a *Segment
-func New(name string, aggopt aggregate.Options, wdb, rdb common.DocumentDB, metamgr common.MetaManager, cs common.ChainStore, dict common.ChainDict, stm common.StateManager, optfns ...OptionFn) (*Segment, error) {
-	initCtx := context.Background()
-
-	opts := DefaultOptions()
-	optKey := OptionsKey(name)
-	if _, err := metamgr.Load(initCtx, optKey, &opts); err != nil {
-		return nil, fmt.Errorf("load options: %w", err)
-	}
-
-	for _, ofn := range optfns {
-		ofn(&opts)
-	}
-
-	bkey := BoundaryKey(name)
-	var bound Boundary
-	loaded, err := metamgr.Load(initCtx, bkey, &bound)
+func New(ctx context.Context, name string, opts Options, aggopt aggregate.Options, mgr *Manager, cs common.ChainStore, stm common.StateManager) (*Segment, error) {
+	bound, bhas, err := mgr.LoadBoundary(name)
 	if err != nil {
 		return nil, fmt.Errorf("load boundary: %w", err)
 	}
 
-	if !loaded {
-		return nil, fmt.Errorf("boundady is required")
+	if !bhas {
+		return nil, fmt.Errorf("boundary not found")
 	}
 
-	agg, err := aggregate.New(aggopt, wdb)
+	info, ihas, err := mgr.LoadInfo(name)
+	if err != nil {
+		return nil, fmt.Errorf("load info: %w", err)
+	}
+
+	if !ihas {
+		return nil, fmt.Errorf("info not found")
+	}
+
+	wcli, err := mgoutil.Connect(ctx, info.DSN.Write)
+	if err != nil {
+		return nil, fmt.Errorf("connect to write db: %w", err)
+	}
+
+	wdb := wcli.Database(name)
+
+	wdoc, err := mgoutil.NewMgoDocDB(ctx, wcli, wdb)
+	if err != nil {
+		return nil, fmt.Errorf("construct write doc db: %w", err)
+	}
+
+	dict, err := mdict.NewDict(wdb)
+
+	rdoc := wdoc
+	if info.DSN.Read != "" {
+		rcli, err := mgoutil.Connect(ctx, info.DSN.Read)
+		if err != nil {
+			return nil, fmt.Errorf("connect to read db: %w", err)
+		}
+
+		rdoc, err = mgoutil.NewMgoDocDB(ctx, rcli, rcli.Database(name))
+		if err != nil {
+			return nil, fmt.Errorf("construct read doc db: %w", err)
+		}
+	}
+
+	agg, err := aggregate.New(aggopt, wdoc)
 	if err != nil {
 		return nil, err
 	}
 
 	seg := &Segment{
-		name:    name,
-		opts:    opts,
-		db:      wdb,
-		rdb:     rdb,
-		agg:     agg,
-		metamgr: metamgr,
+		name: name,
+		opts: opts,
+		db:   wdoc,
+		rdb:  rdoc,
+		agg:  agg,
+		mgr:  mgr,
 	}
 
-	seg.bound.key = bkey
 	seg.bound.Boundary = bound
-	seg.bound.Read = bound
 
 	seg.dal.ChainStore = cs
 	seg.dal.ChainDict = dict
 	seg.dal.StateManager = stm
-
-	if err := metamgr.Watch(context.Background(), bkey, seg.watchReadBoundary); err != nil {
-		return nil, fmt.Errorf("init change stream for boundary: %w", err)
-	}
 
 	return seg, nil
 }
@@ -145,20 +106,17 @@ func New(name string, aggopt aggregate.Options, wdb, rdb common.DocumentDB, meta
 type Segment struct {
 	name string
 
-	opts    Options
-	db      common.DocumentDB
-	rdb     common.DocumentDB
-	metamgr common.MetaManager
-	agg     *aggregate.Aggregator
+	opts Options
+	db   common.DocumentDB
+	rdb  common.DocumentDB
+	agg  *aggregate.Aggregator
+	mgr  *Manager
 
 	headNotify chan *types.TipSet
 
 	bound struct {
-		key string
-
 		sync.RWMutex
 		Boundary
-		Read Boundary
 	}
 
 	dal struct {
@@ -285,7 +243,7 @@ func (s *Segment) updateBoundary(ctx context.Context, hi, lo *common.LinkedTipSe
 		s.bound.SetLo(lo)
 	}
 
-	err := s.metamgr.Update(ctx, s.bound.key, s.bound.Boundary)
+	err := s.mgr.SetBoundary(s.name, s.bound.Boundary)
 	if err == nil {
 		return nil
 	}
@@ -306,7 +264,7 @@ func (s *Segment) SetBoundary(ctx context.Context, hi, lo *common.LinkedTipSet) 
 // ReadBoundary returns the boundary of the segment
 func (s *Segment) ReadBoundary() Boundary {
 	s.bound.RLock()
-	b := s.bound.Read
+	b := s.bound.Boundary
 	s.bound.RUnlock()
 	return b
 }
@@ -319,16 +277,4 @@ func (s *Segment) Name() string {
 // ReadDB returns the read only db instance of the segment
 func (s *Segment) ReadDB() common.DocumentDB {
 	return s.rdb
-}
-
-func (s *Segment) watchReadBoundary(raw bson.RawValue) error {
-	var b Boundary
-	if err := raw.Unmarshal(&b); err != nil {
-		return err
-	}
-
-	s.bound.Lock()
-	s.bound.Read = b
-	s.bound.Unlock()
-	return nil
 }

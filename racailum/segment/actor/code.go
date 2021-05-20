@@ -21,6 +21,7 @@ var defaultActorUpgradeSchedule = map[string]abi.ChainEpoch{
 	"fil/1/": 0,
 	"fil/2/": build.UpgradeActorsV2Height,
 	"fil/3/": build.UpgradeActorsV3Height,
+	"fil/4/": build.UpgradeActorsV4Height,
 }
 
 // DefaultActorConvertor is the default actor covertor based on specs-actors' upgrade schedule
