@@ -1,27 +1,37 @@
 package actor
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 
-	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 )
 
 func init() {
+	{
+		curActorVersion := actors.Version0
+		upgrades := stmgr.DefaultUpgradeSchedule()
+		for _, up := range upgrades {
+			actver := actors.VersionForNetwork(up.Network)
+			if actver != curActorVersion {
+				defaultActorUpgradeSchedule[fmt.Sprintf("fil/%d/", actver)] = up.Height
+				curActorVersion = actver
+			}
+		}
+	}
+
 	DefaultActorConvertor = generateActorCodeConvertor(defaultActorUpgradeSchedule, generateDefaultActorMap())
 }
 
 // (prevUpgradeHeight, currentUpgradeHeight]
 var defaultActorUpgradeSchedule = map[string]abi.ChainEpoch{
 	"fil/1/": 0,
-	"fil/2/": build.UpgradeActorsV2Height,
-	"fil/3/": build.UpgradeActorsV3Height,
-	"fil/4/": build.UpgradeActorsV4Height,
 }
 
 // DefaultActorConvertor is the default actor covertor based on specs-actors' upgrade schedule
