@@ -5,7 +5,7 @@ import (
 
 	"go.uber.org/fx"
 
-	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
@@ -26,12 +26,12 @@ var (
 )
 
 // HeadNotifier provides a common.HeadNotifier based on metads
-func HeadNotifier(cli api.FullNode) (common.HeadNotifier, error) {
+func HeadNotifier(cli v0api.FullNode) (common.HeadNotifier, error) {
 	sub, err := cliex.NewHeadSub(cli)
 	return sub, err
 }
 
-func ChainIOBlockstore(full api.FullNode) (dtypes.HotBlockstore, error) {
+func ChainIOBlockstore(full v0api.FullNode) (dtypes.HotBlockstore, error) {
 	bs := blockstore.NewAPIBlockstore(full)
 	cached, err := bsex.NewCachedBlockstore(1<<30, bs)
 	if err != nil {

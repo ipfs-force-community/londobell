@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
 
@@ -36,7 +36,7 @@ func copyFlags(src []cli.Flag) []cli.Flag {
 	return dst
 }
 
-func buildRaApp(cctx *cli.Context, full api.FullNode, target interface{}) (*fx.App, error) {
+func buildRaApp(cctx *cli.Context, full v0api.FullNode, target interface{}) (*fx.App, error) {
 	racfg, err := loadConfig(cctx)
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func buildRaApp(cctx *cli.Context, full api.FullNode, target interface{}) (*fx.A
 		fxex.ProvideEx(
 			racfg,
 			segmgr,
-			fxex.As(full, new(api.FullNode)),
+			fxex.As(full, new(v0api.FullNode)),
 		),
 	), nil
 }

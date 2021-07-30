@@ -7,6 +7,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
 )
@@ -20,7 +21,7 @@ const (
 
 var log = logging.Logger("headsub")
 
-func NewHeadSub(full api.FullNode) (*HeadSub, error) {
+func NewHeadSub(full v0api.FullNode) (*HeadSub, error) {
 	return &HeadSub{
 		full:     full,
 		interval: minReListenInterval,
@@ -28,7 +29,7 @@ func NewHeadSub(full api.FullNode) (*HeadSub, error) {
 }
 
 type HeadSub struct {
-	full     api.FullNode
+	full     v0api.FullNode
 	interval time.Duration
 }
 
