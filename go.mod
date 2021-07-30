@@ -1,6 +1,6 @@
 module github.com/dtynn/londobell
 
-go 1.15
+go 1.16
 
 require (
 	github.com/filecoin-project/go-address v0.0.5
