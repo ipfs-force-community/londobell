@@ -312,10 +312,10 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
 	height := ts.Height()
-	forDiff := ctx.Opts.StateDiff.Interval > 0 && height%ctx.Opts.StateDiff.Interval == 0
+
 	forRegular := ctx.Opts.StateRegular.Interval > 0 && height%ctx.Opts.StateRegular.Interval == 0
 
-	if !forDiff && !forRegular {
+	if !forRegular {
 		return nil
 	}
 
@@ -357,30 +357,13 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	}
 
 	elog := ctx.L.With("epoch", height)
-	elog.Infow("actor heads extracted", "count", count, "valuable", len(actors), "regular", forRegular, "diff", forDiff)
+	elog.Infow("actor heads extracted", "count", count, "valuable", len(actors))
 
-	if forRegular {
-		for ai := range actors {
-			actors[ai].Global.Power = powerActor
-		}
-
-		res.RegularStates = actors
+	for ai := range actors {
+		actors[ai].Global.Power = powerActor
 	}
 
-	if forDiff {
-		replaced := 0
-		ctx.Actors.Head.Lock()
-		for ai := range actors {
-			ahead := actors[ai].Head
-			prev, has := ctx.Actors.Head.M[ahead]
-			if !has || prev.Epoch > actors[ai].Epoch {
-				ctx.Actors.Head.M[ahead] = actors[ai]
-				replaced++
-			}
-		}
-		ctx.Actors.Head.Unlock()
-		elog.Infow("diff heads extracted", "replaced", replaced)
-	}
+	res.RegularStates = actors
 
 	res.Docs = append(res.Docs, &model.FilSupply{
 		Epoch:             height,

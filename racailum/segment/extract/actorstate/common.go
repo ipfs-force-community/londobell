@@ -38,12 +38,8 @@ type registry struct {
 }
 
 var extractorRegistry = struct {
-	diff    *registry
 	regular *registry
 }{
-	diff: &registry{
-		e: make(map[reflect.Type][]extractor),
-	},
 	regular: &registry{
 		e: make(map[reflect.Type][]extractor),
 	},
@@ -65,12 +61,6 @@ var (
 	expectedNumIn              = expectedCommonInTypesCount + 1
 	stateInIndex               = expectedCommonInTypesCount
 )
-
-func mustRegisterDiffExtractor(name string, fn interface{}) {
-	if err := registerExtractor(extractorRegistry.diff, name, fn); err != nil {
-		panic(fmt.Errorf("register actor state diff extractor: %s", err))
-	}
-}
 
 func mustRegisterRegularExtractor(name string, fn interface{}) {
 	if err := registerExtractor(extractorRegistry.regular, name, fn); err != nil {
@@ -136,11 +126,6 @@ func registerExtractor(reg *registry, name string, fn interface{}) error {
 	reg.Unlock()
 
 	return nil
-}
-
-// ExtractDiff tries to take all data out of specified actor state head
-func ExtractDiff(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead) error {
-	return extractState(ctx, res, head, extractorRegistry.diff, true)
 }
 
 // ExtractRegular tries to take all data out of specified actor state head

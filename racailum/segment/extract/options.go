@@ -9,7 +9,6 @@ import (
 func DefaultOptions() Options {
 	return Options{
 		TipSet:       defaultTipSetOptions(),
-		StateDiff:    defaultActorStateDiffOptions(),
 		StateRegular: defaultActorStateRegularOptions(),
 	}
 }
@@ -24,7 +23,6 @@ func DryOptions() Options {
 // Options for differect extracting jobs
 type Options struct {
 	TipSet       TipSetOptions
-	StateDiff    ActorStateDiffOptions
 	StateRegular ActorStateRegularOptions
 }
 
@@ -34,12 +32,6 @@ func defaultTipSetOptions() TipSetOptions {
 
 // TipSetOptions for tipset extracting
 type TipSetOptions struct {
-}
-
-func defaultActorStateDiffOptions() ActorStateDiffOptions {
-	return ActorStateDiffOptions{
-		Interval: 0, // just disable state diff extraction here
-	}
 }
 
 // ActorStateDiffOptions for actor state extracting

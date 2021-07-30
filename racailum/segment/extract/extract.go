@@ -2,13 +2,11 @@ package extract
 
 import (
 	"context"
-	"sync"
 
 	"go.uber.org/zap"
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/racailum/segment/actor"
-	"github.com/ipfs/go-cid"
 )
 
 // NewCtx constructs a new extract context
@@ -21,7 +19,6 @@ func NewCtx(ctx context.Context, d common.DAL, l *zap.SugaredLogger, aset *actor
 	}
 
 	ectx.Actors.Set = aset
-	ectx.Actors.Head.M = make(map[cid.Cid]*common.ActorHead)
 	return ectx, nil
 }
 
@@ -34,11 +31,6 @@ type Ctx struct {
 
 	Actors struct {
 		Set *actor.Set
-
-		Head struct {
-			sync.RWMutex
-			M map[cid.Cid]*common.ActorHead
-		}
 	}
 }
 
