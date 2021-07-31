@@ -5,6 +5,8 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
+	multisig5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/multisig"
 	"github.com/ipfs/go-cid"
 
 	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
@@ -31,6 +33,8 @@ func init() {
 func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, mst interface{}) error {
 	epoch := head.Epoch
 	var init, locked abi.TokenAmount
+	dayList := []int{1, 7, 14, 30}
+	vestInFuture := make([]abi.TokenAmount, len(dayList), len(dayList))
 
 	switch st := mst.(type) {
 	case *multisig2.State:
@@ -68,6 +72,15 @@ func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *comm
 
 		init = st.InitialBalance
 		locked = st.AmountLocked(epoch - st.StartEpoch)
+	case *multisig5.State:
+		locked = st.AmountLocked(epoch - st.StartEpoch)
+		for i := range dayList {
+			vestInFuture[i] = big.Sub(locked, st.AmountLocked(epoch+abi.ChainEpoch(dayList[i])*builtin.EpochsInDay-st.StartEpoch))
+		}
+
+		for i := len(vestInFuture) - 1; i > 0; i-- {
+			vestInFuture[i] = big.Sub(vestInFuture[i], vestInFuture[i-1])
+		}
 	}
 
 	vested := big.Sub(init, locked)
@@ -85,8 +98,9 @@ func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *comm
 			Epoch: head.Epoch,
 		},
 		Detail: model.MultisigBalanceDetail{
-			Locked: locked,
-			Vested: vested,
+			Locked:       locked,
+			Vested:       vested,
+			VestInFuture: vestInFuture,
 		},
 	})
 

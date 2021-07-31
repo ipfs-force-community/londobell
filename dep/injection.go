@@ -3,6 +3,7 @@ package dep
 import (
 	"context"
 
+	"github.com/filecoin-project/lotus/build"
 	metricsi "github.com/ipfs/go-metrics-interface"
 	"go.uber.org/fx"
 
@@ -35,6 +36,7 @@ var DefaultBellProvider = fx.Provide(
 	modules.ChainStore,
 	stmgr.DefaultUpgradeSchedule,
 	stmgr.NewStateManagerWithUpgradeSchedule,
+	modules.LoadGenesis(build.MaybeGenesis()),
 
 	// basics
 	NewRaCailum,
