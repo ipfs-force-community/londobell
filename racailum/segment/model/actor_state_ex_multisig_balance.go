@@ -15,8 +15,9 @@ var (
 
 // MultisigBalanceDetail is the detail format of the MultisigBalance
 type MultisigBalanceDetail struct {
-	Locked abi.TokenAmount
-	Vested abi.TokenAmount
+	Locked       abi.TokenAmount
+	Vested       abi.TokenAmount
+	VestInFuture []abi.TokenAmount
 }
 
 // MultisigBalance shows the balance of a specific multisig actor
