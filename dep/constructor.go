@@ -3,12 +3,13 @@ package dep
 import (
 	"context"
 
-	"go.uber.org/fx"
-
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
+	blocks "github.com/ipfs/go-block-format"
+	"github.com/ipfs/go-cid"
+	"go.uber.org/fx"
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/lib/bsex"
@@ -31,9 +32,33 @@ func HeadNotifier(cli v0api.FullNode) (common.HeadNotifier, error) {
 	return sub, err
 }
 
+type WrapAPIBlockstore struct {
+	blockstore.Blockstore
+}
+
+func (a *WrapAPIBlockstore) Put(blocks.Block) error {
+	return nil
+}
+
+func (a *WrapAPIBlockstore) PutMany([]blocks.Block) error {
+	return nil
+}
+
+func (a *WrapAPIBlockstore) AllKeysChan(ctx context.Context) (<-chan cid.Cid, error) {
+	return nil, nil
+}
+
+func (a *WrapAPIBlockstore) DeleteBlock(cid.Cid) error {
+	return nil
+}
+
 func ChainIOBlockstore(full v0api.FullNode) (dtypes.HotBlockstore, error) {
 	bs := blockstore.NewAPIBlockstore(full)
-	cached, err := bsex.NewCachedBlockstore(1<<30, bs)
+	wrapBlockStore := &WrapAPIBlockstore{
+		bs,
+	}
+
+	cached, err := bsex.NewCachedBlockstore(1<<30, wrapBlockStore)
 	if err != nil {
 		return nil, err
 	}
