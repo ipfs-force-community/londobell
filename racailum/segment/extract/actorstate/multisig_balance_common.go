@@ -73,7 +73,9 @@ func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *comm
 		init = st.InitialBalance
 		locked = st.AmountLocked(epoch - st.StartEpoch)
 	case *multisig5.State:
+		init = st.InitialBalance
 		locked = st.AmountLocked(epoch - st.StartEpoch)
+
 		for i := range dayList {
 			vestInFuture[i] = big.Sub(locked, st.AmountLocked(epoch+abi.ChainEpoch(dayList[i])*builtin.EpochsInDay-st.StartEpoch))
 		}
