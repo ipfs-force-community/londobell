@@ -1,8 +1,9 @@
 package model
 
 import (
-	"github.com/dtynn/londobell/common"
 	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/dtynn/londobell/common"
 )
 
 var (
@@ -20,6 +21,7 @@ type MiningProfitabilityDetail struct {
 	InitialStoragePledge      abi.TokenAmount
 	ProjectionOfInitialPledge abi.TokenAmount
 	ProjectionOfFaultFee      abi.TokenAmount
+	Mined                     abi.TokenAmount
 }
 
 // MiningProfitability shows profitability for mining issues

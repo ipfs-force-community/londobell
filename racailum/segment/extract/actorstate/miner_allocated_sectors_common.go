@@ -21,7 +21,8 @@ func init() {
 
 func extractAllocatedSectors(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, root cid.Cid) error {
 	// ignore empty
-	if root.Equals(emptyMinerStateV2.AllocatedSectors) || root.Equals(emptyMinerStateV3.AllocatedSectors) || root.Equals(emptyMinerStateV4.AllocatedSectors) {
+	if root.Equals(emptyMinerStateV2.AllocatedSectors) || root.Equals(emptyMinerStateV3.AllocatedSectors) ||
+		root.Equals(emptyMinerStateV4.AllocatedSectors) || root.Equals(emptyMinerStateV5.AllocatedSectors) {
 		return nil
 	}
 

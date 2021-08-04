@@ -1,11 +1,12 @@
 package actorstate
 
 import (
+	"context"
 	"fmt"
 
+	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
+	adt5 "github.com/filecoin-project/specs-actors/v5/actors/util/adt"
 	"github.com/ipfs/go-cid"
-
-	"context"
 
 	"github.com/filecoin-project/go-bitfield"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
@@ -42,12 +43,20 @@ func init() {
 	}
 
 	emptyMinerStateV4 = empty4
+
+	empty5, err := newEmptyMinerStateV5()
+	if err != nil {
+		panic(fmt.Errorf("construct empty miner state v5: %w", err))
+	}
+
+	emptyMinerStateV5 = empty5
 }
 
 var (
 	emptyMinerStateV2 *miner2.State
 	emptyMinerStateV3 *miner3.State
 	emptyMinerStateV4 *miner4.State
+	emptyMinerStateV5 *miner5.State
 )
 
 func isEmptyMinerStateV2(mst *miner2.State) bool {
@@ -163,4 +172,30 @@ func newEmptyMinerStateV4() (*miner4.State, error) {
 	inMemStore := bstore.NewMemorySync()
 	adtStore := adt4.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
 	return miner4.ConstructState(adtStore, cid.Undef, 0, 0)
+}
+
+func isEmptyMinerStateV5(mst *miner5.State) bool {
+	earlyCount, err := mst.EarlyTerminations.Count()
+	if err != nil || earlyCount != 0 {
+		return false
+	}
+
+	return isEmptyOrZero(mst.PreCommitDeposits) &&
+		isEmptyOrZero(mst.LockedFunds) &&
+		isEmptyOrZero(mst.FeeDebt) &&
+		mst.VestingFunds.Equals(emptyMinerStateV5.VestingFunds) &&
+		isEmptyOrZero(mst.InitialPledge) &&
+		mst.PreCommittedSectors.Equals(emptyMinerStateV5.PreCommittedSectors) &&
+		mst.PreCommittedSectorsCleanUp.Equals(emptyMinerStateV5.PreCommittedSectorsCleanUp) &&
+		mst.AllocatedSectors.Equals(emptyMinerStateV5.AllocatedSectors) &&
+		mst.Sectors.Equals(emptyMinerStateV5.Sectors) &&
+		mst.Deadlines.Equals(emptyMinerStateV5.Deadlines)
+}
+
+// see https://github.com/filecoin-project/specs-actors/blob/v3.0.3/actors/builtin/miner/miner_state.go#L173-L230
+func newEmptyMinerStateV5() (*miner5.State, error) {
+	ctx := context.Background()
+	inMemStore := bstore.NewMemorySync()
+	adtStore := adt5.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
+	return miner5.ConstructState(adtStore, cid.Undef, 0, 0)
 }

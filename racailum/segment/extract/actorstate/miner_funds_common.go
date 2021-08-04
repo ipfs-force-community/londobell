@@ -5,6 +5,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+
 	"github.com/ipfs/go-cid"
 
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
@@ -15,6 +16,9 @@ import (
 
 	miner4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/miner"
 	adt4 "github.com/filecoin-project/specs-actors/v4/actors/util/adt"
+
+	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
+	adt5 "github.com/filecoin-project/specs-actors/v5/actors/util/adt"
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/lib/mir"
@@ -80,6 +84,22 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 
 		if !st.VestingFunds.Equals(emptyMinerStateV4.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt4.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+			if err != nil {
+				return fmt.Errorf("load vesting funds: %w", err)
+			}
+
+			for _, v := range funds.Funds {
+				sum = big.Add(sum, v.Amount)
+			}
+		}
+
+	case *miner5.State:
+		if err := mir.Mirror(&detail, st); err != nil {
+			return fmt.Errorf("mirroring *miner2.State: %w", err)
+		}
+
+		if !st.VestingFunds.Equals(emptyMinerStateV5.VestingFunds) {
+			funds, err := st.LoadVestingFunds(adt5.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
 				return fmt.Errorf("load vesting funds: %w", err)
 			}
