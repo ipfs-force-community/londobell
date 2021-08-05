@@ -106,11 +106,10 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 
 	case *miner5.State:
 		if err := mir.Mirror(&detail, st); err != nil {
-			return fmt.Errorf("mirroring *miner2.State: %w", err)
+			return fmt.Errorf("mirroring *miner5.State: %w", err)
 		}
 
 		if isEmptyOrZero(detail.PreCommitDeposits) &&
-			isEmptyOrZero(detail.VestingTotal) &&
 			isEmptyOrZero(detail.LockedFunds) &&
 			isEmptyOrZero(detail.FeeDebt) &&
 			isEmptyOrZero(detail.InitialPledge) {
@@ -121,10 +120,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			funds, err := st.LoadVestingFunds(adt5.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
 				return fmt.Errorf("load vesting funds: %w", err)
-			}
-
-			for _, v := range funds.Funds {
-				sum = big.Add(sum, v.Amount)
 			}
 
 			// assign vest in future
@@ -184,12 +179,10 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		}
 	}
 
-	detail.VestingTotal = sum
 	detail.VestInFuture = vestInFuture
 	detail.PledgeRelease = pledgeRelease
 	// all zero
 	if isEmptyOrZero(detail.PreCommitDeposits) &&
-		isEmptyOrZero(detail.VestingTotal) &&
 		isEmptyOrZero(detail.LockedFunds) &&
 		isEmptyOrZero(detail.FeeDebt) &&
 		isEmptyOrZero(detail.InitialPledge) {

@@ -17,7 +17,6 @@ var (
 type MinerFundsDetail struct {
 	PreCommitDeposits abi.TokenAmount
 
-	VestingTotal  abi.TokenAmount `mir:"-"`
 	LockedFunds   abi.TokenAmount
 	FeeDebt       abi.TokenAmount
 	InitialPledge abi.TokenAmount
