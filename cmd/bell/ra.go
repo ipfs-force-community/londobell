@@ -103,7 +103,7 @@ var raRunCmd = &cli.Command{
 
 		go func() {
 			log.Info("serving http pprof")
-			if err := http.ListenAndServe("127.0.0.1:56060", nil); err != nil {
+			if err := http.ListenAndServe("0.0.0.0:56060", nil); err != nil {
 				log.Errorf("serving http pprof: %s", err)
 			}
 		}()

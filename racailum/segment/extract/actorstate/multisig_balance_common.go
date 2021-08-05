@@ -5,7 +5,6 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	multisig5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/multisig"
 	"github.com/ipfs/go-cid"
 
@@ -33,7 +32,7 @@ func init() {
 func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, mst interface{}) error {
 	epoch := head.Epoch
 	var init, locked abi.TokenAmount
-	dayList := []int{1, 7, 14, 30}
+	dayList := NormalEpochRange(head)
 	vestInFuture := make([]abi.TokenAmount, len(dayList), len(dayList))
 
 	switch st := mst.(type) {
@@ -77,7 +76,7 @@ func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *comm
 		locked = st.AmountLocked(epoch - st.StartEpoch)
 
 		for i := range dayList {
-			vestInFuture[i] = big.Sub(locked, st.AmountLocked(epoch+abi.ChainEpoch(dayList[i])*builtin.EpochsInDay-st.StartEpoch))
+			vestInFuture[i] = big.Sub(locked, st.AmountLocked(dayList[i]-st.StartEpoch))
 		}
 
 		for i := len(vestInFuture) - 1; i > 0; i-- {

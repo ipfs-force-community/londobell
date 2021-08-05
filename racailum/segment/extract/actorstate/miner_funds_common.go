@@ -5,7 +5,6 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	"github.com/ipfs/go-cid"
 
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
@@ -49,8 +48,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		return nil
 	}
 
-	tsRange := []abi.ChainEpoch{head.Epoch + builtin.EpochsInDay, head.Epoch + builtin.EpochsInDay*7,
-		head.Epoch + builtin.EpochsInDay*14, head.Epoch + builtin.EpochsInDay*30}
+	tsRange := NormalEpochRange(head)
 	vestInFuture := NewTokenAmountArr(len(tsRange))
 	pledgeRelease := NewTokenAmountArr(len(tsRange))
 
@@ -109,6 +107,14 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 	case *miner5.State:
 		if err := mir.Mirror(&detail, st); err != nil {
 			return fmt.Errorf("mirroring *miner2.State: %w", err)
+		}
+
+		if isEmptyOrZero(detail.PreCommitDeposits) &&
+			isEmptyOrZero(detail.VestingTotal) &&
+			isEmptyOrZero(detail.LockedFunds) &&
+			isEmptyOrZero(detail.FeeDebt) &&
+			isEmptyOrZero(detail.InitialPledge) {
+			return nil
 		}
 
 		if !st.VestingFunds.Equals(emptyMinerStateV5.VestingFunds) {

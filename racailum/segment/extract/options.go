@@ -46,6 +46,7 @@ func defaultActorStateRegularOptions() ActorStateRegularOptions {
 		VerifRegTicks:            4,                    // 4h
 		MinerSectorSummaryTicks:  24,                   // 24h
 		DealProposalSummaryTicks: 12,                   // 12h
+		MarketFundsTicks:         24,                   // 24h
 	}
 }
 
@@ -56,6 +57,7 @@ func dryActorStateRegularOptions() ActorStateRegularOptions {
 		VerifRegTicks:            1,
 		MinerSectorSummaryTicks:  1,
 		DealProposalSummaryTicks: 1,
+		MarketFundsTicks:         1,
 	}
 }
 
@@ -66,4 +68,5 @@ type ActorStateRegularOptions struct {
 	VerifRegTicks            int
 	MinerSectorSummaryTicks  int
 	DealProposalSummaryTicks int
+	MarketFundsTicks         int
 }

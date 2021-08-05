@@ -22,8 +22,8 @@ type MinerFundsDetail struct {
 	FeeDebt       abi.TokenAmount
 	InitialPledge abi.TokenAmount
 
-	VestInFuture  []abi.TokenAmount
-	PledgeRelease []abi.TokenAmount
+	VestInFuture  []abi.TokenAmount `mir:"-"`
+	PledgeRelease []abi.TokenAmount `mir:"-"`
 }
 
 // MinerFunds shows funding details for miner
