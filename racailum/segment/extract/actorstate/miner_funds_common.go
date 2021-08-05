@@ -5,7 +5,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-
+	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	"github.com/ipfs/go-cid"
 
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
@@ -36,10 +36,23 @@ func init() {
 	)
 }
 
+func NewTokenAmountArr(length int) []abi.TokenAmount {
+	s := make([]abi.TokenAmount, length, length)
+	for i := range s {
+		s[i] = abi.NewTokenAmount(0)
+	}
+	return s
+}
+
 func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st interface{}) error {
 	if ticks := ctx.Opts.StateRegular.MinerFundsTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
 		return nil
 	}
+
+	tsRange := []abi.ChainEpoch{head.Epoch + builtin.EpochsInDay, head.Epoch + builtin.EpochsInDay*7,
+		head.Epoch + builtin.EpochsInDay*14, head.Epoch + builtin.EpochsInDay*30}
+	vestInFuture := NewTokenAmountArr(len(tsRange))
+	pledgeRelease := NewTokenAmountArr(len(tsRange))
 
 	var detail model.MinerFundsDetail
 	sum := abi.NewTokenAmount(0)
@@ -107,11 +120,67 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			for _, v := range funds.Funds {
 				sum = big.Add(sum, v.Amount)
 			}
+
+			// assign vest in future
+			for _, v := range funds.Funds {
+				if v.Epoch < head.Epoch {
+					continue
+				}
+
+				for j := range tsRange {
+					if v.Epoch < tsRange[j] {
+						vestInFuture[j] = big.Add(vestInFuture[j], v.Amount)
+						break
+					}
+				}
+			}
+		}
+		actStore := ctx.D.ActorStore(ctx.C)
+		deadlines, err := st.LoadDeadlines(actStore)
+		if err != nil {
+			return fmt.Errorf("load deadlines failed: %w", err)
+		}
+
+		err = deadlines.ForEach(actStore, func(dlIdx uint64, dl *miner5.Deadline) error {
+			if dl == nil {
+				return nil
+			}
+
+			ps, err := dl.PartitionsArray(actStore)
+			if err != nil {
+				return fmt.Errorf("get dl partition failed: %w", err)
+			}
+			var part miner5.Partition
+			dlInfo := miner5.NewDeadlineInfo(st.CurrentProvingPeriodStart(head.Epoch), dlIdx, head.Epoch).NextNotElapsed()
+			quant := miner5.QuantSpecForDeadline(dlInfo)
+
+			return ps.ForEach(&part, func(partIdx int64) error {
+				expirations, err := miner5.LoadExpirationQueue(actStore, part.ExpirationsEpochs, quant, miner5.PartitionExpirationAmtBitwidth)
+				if err != nil {
+					return fmt.Errorf("failed to load expiration queue: %w", err)
+				}
+
+				for i := range tsRange {
+					popped, err := expirations.PopUntil(tsRange[i])
+					if err != nil {
+						return fmt.Errorf("failed to pop expiration queue until %d: %w", tsRange[i], err)
+					}
+
+					pledgeRelease[i] = popped.OnTimePledge
+				}
+
+				return nil
+			})
+		})
+
+		if err != nil {
+			return fmt.Errorf("process sector pledge failed")
 		}
 	}
 
 	detail.VestingTotal = sum
-
+	detail.VestInFuture = vestInFuture
+	detail.PledgeRelease = pledgeRelease
 	// all zero
 	if isEmptyOrZero(detail.PreCommitDeposits) &&
 		isEmptyOrZero(detail.VestingTotal) &&
