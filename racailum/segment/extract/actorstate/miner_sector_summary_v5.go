@@ -16,12 +16,12 @@ import (
 )
 
 func init() {
-	summaryDaysV5 = []abi.ChainEpoch{1, 2, 3, 7, 14, 30, 60, 120}
-	for d := (miner5.MinSectorExpiration / builtin5.EpochsInDay); d <= (miner5.MaxSectorExpirationExtension / builtin5.EpochsInDay); d += 180 {
-		summaryDaysV5 = append(summaryDaysV5, abi.ChainEpoch(d))
-	}
-
-	mustRegisterRegularExtractor("MinerSectorSummaryV5", extractMinerSectorSummaryV5)
+	//summaryDaysV5 = []abi.ChainEpoch{1, 2, 3, 7, 14, 30, 60, 120}
+	//for d := (miner5.MinSectorExpiration / builtin5.EpochsInDay); d <= (miner5.MaxSectorExpirationExtension / builtin5.EpochsInDay); d += 180 {
+	//	summaryDaysV5 = append(summaryDaysV5, abi.ChainEpoch(d))
+	//}
+	//
+	//mustRegisterRegularExtractor("MinerSectorSummaryV5", extractMinerSectorSummaryV5)
 }
 
 var summaryDaysV5 []abi.ChainEpoch

@@ -14,20 +14,19 @@ import (
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/racailum/segment/extract"
 	"github.com/dtynn/londobell/racailum/segment/model"
-	"github.com/dtynn/londobell/racailum/segment/model/schema"
 )
 
 func init() {
-	mustRegisterRegularExtractor("ClaimedPowerV5", extractClaimedPowerV5)
-
-	schema.Register(
-		schema.Model{
-			Name: "claimed-power-v5",
-			D: &model.ClaimedPower{
-				Detail: &power5.Claim{},
-			},
-		},
-	)
+	//mustRegisterRegularExtractor("ClaimedPowerV5", extractClaimedPowerV5)
+	//
+	//schema.Register(
+	//	schema.Model{
+	//		Name: "claimed-power-v5",
+	//		D: &model.ClaimedPower{
+	//			Detail: &power5.Claim{},
+	//		},
+	//	},
+	//)
 }
 
 func extractClaimedPowerV5(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *power5.State) error {

@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	mustRegisterRegularExtractor("VerifRegV5", extractVerifRegV5)
+	//mustRegisterRegularExtractor("VerifRegV5", extractVerifRegV5)
 }
 
 func extractVerifRegV5(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg5.State) error {
