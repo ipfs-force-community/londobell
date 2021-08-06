@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	_ common.IndexedDocument = (*MinerFunds)(nil)
+	_ common.IndexedDocument = (*MinerSectorHealth)(nil)
 
 	minerSectorHealthDetail     = getColName(MinerSectorHealth{})
 	minerSectorHealthEpochField = extractEpochFieldName(MinerSectorHealth{})
@@ -15,16 +15,21 @@ var (
 
 // MinerSectorHealthDetail contains sector's health
 type MinerSectorHealthDetail struct {
-	TotalSectors uint64
-	LiveSectors  uint64
-	Faults       uint64
-	Recoveries   uint64
+	Faults     uint64
+	Recoveries uint64
+	Unproven   uint64
+	Active     uint64
+
+	ActiveSectorsQAPower abi.StoragePower
+	FaultsQAPower        abi.StoragePower
+	RecoveriesQAPower    abi.StoragePower
+	UnprovenQAPower      abi.StoragePower
 }
 
 // MinerSectorHealth shows sector health details for miner
 type MinerSectorHealth struct {
 	ActorStateExBasic `bson:",inline"`
-	Detail            MinerFundsDetail
+	Detail            MinerSectorHealthDetail
 }
 
 // CollectionName impl common.Document
