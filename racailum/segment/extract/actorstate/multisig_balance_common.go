@@ -77,6 +77,8 @@ func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *comm
 
 		for i := range dayList {
 			vestInFuture[i] = big.Sub(locked, st.AmountLocked(dayList[i]-st.StartEpoch))
+			vestInFuture[i] = big.Max(vestInFuture[i], big.Zero())
+			vestInFuture[i] = big.Min(vestInFuture[i], head.Balance)
 		}
 
 		for i := len(vestInFuture) - 1; i > 0; i-- {
