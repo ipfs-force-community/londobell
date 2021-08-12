@@ -2,6 +2,8 @@ package dep
 
 import (
 	"context"
+	"os"
+	"strconv"
 
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/blockstore"
@@ -60,7 +62,16 @@ func ChainIOBlockstore(full v0api.FullNode) (dtypes.HotBlockstore, error) {
 		bs,
 	}
 
-	cached, err := bsex.NewCachedBlockstore(1<<30, wrapBlockStore)
+	cacheSize := 1 << 25
+	if size := os.Getenv("BELL_CACHE_SIZE"); size != "" {
+		var err error
+		cacheSize, err = strconv.Atoi(size)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	cached, err := bsex.NewCachedBlockstore(cacheSize, wrapBlockStore)
 	if err != nil {
 		return nil, err
 	}
