@@ -133,6 +133,8 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 				return common.NonCtxCanceledErr(err)
 			}
 
+			log.Infof("after Extract res docs lens %d res regular states %d\n", len(res.Docs), len(res.RegularStates))
+
 			docs[ti] = res.Docs
 			regulars[ti] = res.RegularStates
 			return nil
@@ -231,6 +233,7 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, heads []*common.ActorHe
 				return common.NonCtxCanceledErr(err)
 			}
 
+			log.Infof("after ExtractRegular res docs lens %d res regular states %d\n", len(res.Docs), len(res.RegularStates))
 			docs[hi] = res.Docs
 
 			return nil
