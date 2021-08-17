@@ -232,14 +232,14 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, heads []*common.ActorHe
 				}
 			}()
 
-			res := extract.NewRes(2, 0)
+			res := extract.NewRes(8, 0)
 
 			err = east.ExtractRegular(ctx, res, head)
 			if err != nil {
 				return common.NonCtxCanceledErr(err)
 			}
 
-			if len(res.Docs) > 2 {
+			if len(res.Docs) > 8 {
 				log.Infof("after ExtractRegular res len is %d reg len is %d\n", len(res.Docs), len(res.RegularStates))
 			}
 
