@@ -3,7 +3,7 @@ package main
 import (
 	_ "net/http/pprof"
 	"os"
-	"runtime/debug"
+	//"runtime/debug"
 	"time"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -29,7 +29,7 @@ func init() {
 		t := time.Tick(time.Minute * 5)
 		for {
 			<-t
-			debug.FreeOSMemory()
+			//debug.FreeOSMemory()
 		}
 	}()
 }

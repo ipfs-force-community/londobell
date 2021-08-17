@@ -4,6 +4,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
+	"go4.org/syncutil/singleflight"
 
 	"github.com/filecoin-project/lotus/blockstore"
 )
@@ -16,15 +17,21 @@ func NewCachedBlockstore(cacheSize int, bs blockstore.Blockstore) (*CachedBlocks
 		return nil, err
 	}
 
+	singleFlight := new(singleflight.Group)
+
 	return &CachedBlockstore{
 		cache:      cache,
 		Blockstore: bs,
+
+		sg: singleFlight,
 	}, nil
 }
 
 type CachedBlockstore struct {
 	cache *lru.TwoQueueCache
 	blockstore.Blockstore
+
+	sg *singleflight.Group
 }
 
 func (cbs *CachedBlockstore) Get(c cid.Cid) (blocks.Block, error) {
@@ -34,13 +41,21 @@ func (cbs *CachedBlockstore) Get(c cid.Cid) (blocks.Block, error) {
 		}
 	}
 
-	b, err := cbs.Blockstore.Get(c)
+	b, err := cbs.sg.Do(c.String(), func() (interface{}, error) {
+		b, err := cbs.Blockstore.Get(c)
+		if err != nil {
+			return nil, err
+		}
+
+		cbs.cache.Add(c, b)
+		return b, nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	cbs.cache.Add(c, b)
-	return b, nil
+	return b.(blocks.Block), nil
 }
 
 func (cbs *CachedBlockstore) View(c cid.Cid, callback func([]byte) error) error {
@@ -49,14 +64,21 @@ func (cbs *CachedBlockstore) View(c cid.Cid, callback func([]byte) error) error 
 			return callback(b.RawData())
 		}
 	}
+	b, err := cbs.sg.Do(c.String(), func() (interface{}, error) {
+		b, err := cbs.Blockstore.Get(c)
+		if err != nil {
+			return nil, err
+		}
 
-	b, err := cbs.Blockstore.Get(c)
+		cbs.cache.Add(c, b)
+		return b, nil
+	})
+
 	if err != nil {
 		return err
 	}
 
-	cbs.cache.Add(c, b)
-	return callback(b.RawData())
+	return callback(b.(blocks.Block).RawData())
 }
 
 func (cbs *CachedBlockstore) Has(c cid.Cid) (bool, error) {
