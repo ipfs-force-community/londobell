@@ -240,7 +240,7 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, heads []*common.ActorHe
 			}
 
 			if len(res.Docs) > 2 {
-				log.Info()
+				log.Infof("after ExtractRegular res len is %d reg len is %d\n", len(res.Docs), len(res.RegularStates))
 			}
 
 			docs[hi] = res.Docs
