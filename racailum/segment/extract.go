@@ -126,7 +126,13 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 				}
 			}()
 
-			res := extract.NewRes(1024)
+			forRegular := ectx.Opts.StateRegular.Interval > 0 && ts.Height()%ectx.Opts.StateRegular.Interval == 0
+			regCap := 0
+			if forRegular {
+				regCap = 700000
+			}
+
+			res := extract.NewRes(4096, regCap)
 
 			err = ets.Extract(ectx, res, ts)
 			if err != nil {
@@ -226,14 +232,17 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, heads []*common.ActorHe
 				}
 			}()
 
-			res := extract.NewRes(1024)
+			res := extract.NewRes(2, 0)
 
 			err = east.ExtractRegular(ctx, res, head)
 			if err != nil {
 				return common.NonCtxCanceledErr(err)
 			}
 
-			log.Infof("after ExtractRegular res docs lens %d res regular states %d\n", len(res.Docs), len(res.RegularStates))
+			if len(res.Docs) > 2 {
+				log.Info()
+			}
+
 			docs[hi] = res.Docs
 
 			return nil
@@ -265,7 +274,7 @@ func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet) ([]*e
 		return nil, fmt.Errorf("new extract context: %w", err)
 	}
 
-	tres := extract.NewRes(1024)
+	tres := extract.NewRes(1024, 0)
 
 	err = ets.Extract(ectx, tres, ts)
 	if err != nil {
@@ -315,7 +324,7 @@ func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet) ([]*e
 				}
 			}()
 
-			res := extract.NewRes(1024)
+			res := extract.NewRes(1024, 0)
 
 			err = east.ExtractRegular(ectx, res, head)
 			if err != nil {

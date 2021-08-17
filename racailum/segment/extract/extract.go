@@ -35,9 +35,10 @@ type Ctx struct {
 }
 
 // NewRes constructs a new extract result
-func NewRes(capacity int) *Res {
+func NewRes(docCap, regularStatesCap int) *Res {
 	return &Res{
-		Docs: make([]common.Document, 0, capacity),
+		Docs:          make([]common.Document, 0, docCap),
+		RegularStates: make([]*common.ActorHead, 0, regularStatesCap),
 	}
 }
 
