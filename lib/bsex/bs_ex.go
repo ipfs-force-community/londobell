@@ -30,7 +30,7 @@ func NewCachedBlockstore(cacheSize int, bs blockstore.Blockstore) (*CachedBlocks
 
 		sg: singleFlight,
 	}
-
+	go res.Stat()
 	return res, nil
 }
 
