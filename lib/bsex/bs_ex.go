@@ -115,7 +115,7 @@ func (cbs *CachedBlockstore) Has(c cid.Cid) (bool, error) {
 		atomic.AddInt64(&cbs.hasMiss, 1)
 		b, err := cbs.Blockstore.Has(c)
 		if err != nil {
-			return nil, err
+			return false, err
 		}
 		return b, nil
 	})
