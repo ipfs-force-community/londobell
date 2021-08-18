@@ -23,12 +23,14 @@ func NewCachedBlockstore(cacheSize int, bs blockstore.Blockstore) (*CachedBlocks
 		return nil, err
 	}
 
-	singleFlight := new(singleflight.Group)
+	getSg := new(singleflight.Group)
+	hasSg := new(singleflight.Group)
 	res := &CachedBlockstore{
 		cache:      cache,
 		Blockstore: bs,
 
-		getSg: singleFlight,
+		getSg: getSg,
+		hasSg: hasSg,
 	}
 	go res.Stat()
 	return res, nil
