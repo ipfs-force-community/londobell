@@ -7,11 +7,13 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	"github.com/prometheus/common/log"
+	logging "github.com/ipfs/go-log/v2"
 	"go4.org/syncutil/singleflight"
 
 	"github.com/filecoin-project/lotus/blockstore"
 )
+
+var log = logging.Logger("bs_ex")
 
 var _ blockstore.Blockstore = (*CachedBlockstore)(nil)
 
