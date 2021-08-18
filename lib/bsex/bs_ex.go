@@ -85,6 +85,17 @@ func (cbs *CachedBlockstore) Has(c cid.Cid) (bool, error) {
 	if has := cbs.cache.Contains(c); has {
 		return true, nil
 	}
+	b, err := cbs.sg.Do(c.String(), func() (interface{}, error) {
+		b, err := cbs.Blockstore.Has(c)
+		if err != nil {
+			return nil, err
+		}
+		return b, nil
+	})
 
-	return cbs.Blockstore.Has(c)
+	if err != nil {
+		return false, err
+	}
+
+	return b.(bool), nil
 }
