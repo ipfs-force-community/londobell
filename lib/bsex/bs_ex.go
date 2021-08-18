@@ -28,7 +28,7 @@ func NewCachedBlockstore(cacheSize int, bs blockstore.Blockstore) (*CachedBlocks
 		cache:      cache,
 		Blockstore: bs,
 
-		sg: singleFlight,
+		getSg: singleFlight,
 	}
 	go res.Stat()
 	return res, nil
@@ -50,7 +50,8 @@ type CachedBlockstore struct {
 	cache *lru.TwoQueueCache
 	blockstore.Blockstore
 
-	sg *singleflight.Group
+	getSg *singleflight.Group
+	hasSg *singleflight.Group
 
 	getMiss, getCnt, viewMiss, viewCnt, hasMiss, hasCnt int64
 }
@@ -63,7 +64,7 @@ func (cbs *CachedBlockstore) Get(c cid.Cid) (blocks.Block, error) {
 		}
 	}
 
-	b, err := cbs.sg.Do(c.String(), func() (interface{}, error) {
+	b, err := cbs.getSg.Do(c.String(), func() (interface{}, error) {
 		atomic.AddInt64(&cbs.getMiss, 1)
 		b, err := cbs.Blockstore.Get(c)
 		if err != nil {
@@ -88,7 +89,7 @@ func (cbs *CachedBlockstore) View(c cid.Cid, callback func([]byte) error) error 
 			return callback(b.RawData())
 		}
 	}
-	b, err := cbs.sg.Do(c.String(), func() (interface{}, error) {
+	b, err := cbs.getSg.Do(c.String(), func() (interface{}, error) {
 		atomic.AddInt64(&cbs.viewMiss, 1)
 		b, err := cbs.Blockstore.Get(c)
 		if err != nil {
@@ -111,7 +112,7 @@ func (cbs *CachedBlockstore) Has(c cid.Cid) (bool, error) {
 	if has := cbs.cache.Contains(c); has {
 		return true, nil
 	}
-	b, err := cbs.sg.Do(c.String(), func() (interface{}, error) {
+	b, err := cbs.hasSg.Do(c.String(), func() (interface{}, error) {
 		atomic.AddInt64(&cbs.hasMiss, 1)
 		b, err := cbs.Blockstore.Has(c)
 		if err != nil {
