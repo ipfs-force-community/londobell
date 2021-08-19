@@ -12,6 +12,7 @@ import (
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/dep"
 	"github.com/dtynn/londobell/lib/fxex"
+	"github.com/dtynn/londobell/prometheus"
 	"github.com/dtynn/londobell/racailum"
 
 	// "github.com/dtynn/londobell/racailum/grafana"
@@ -65,8 +66,19 @@ func buildRaApp(cctx *cli.Context, full v0api.FullNode, target interface{}) (*fx
 }
 
 var raRunCmd = &cli.Command{
-	Name:  "run",
-	Flags: []cli.Flag{},
+	Name: "run",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "prometheus-port",
+			Usage: "specify the port of prometheus",
+			Value: "2112",
+		},
+		&cli.BoolFlag{
+			Name:  "prometheus",
+			Usage: "choose whether use prometheus",
+			Value: true,
+		},
+	},
 	Action: func(cctx *cli.Context) error {
 		full, closer, err := getFullNode(cctx)
 		if err != nil {
@@ -99,6 +111,10 @@ var raRunCmd = &cli.Command{
 		ch, err := components.Notifier.Sub(ctx)
 		if err != nil {
 			return fmt.Errorf("sub head change: %w", err)
+		}
+
+		if cctx.Bool("prometheus") {
+			go prometheus.Run(cctx.String("prometheus-port"))
 		}
 
 		go func() {
