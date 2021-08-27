@@ -29,9 +29,10 @@ type MessageParams cbor.Er
 
 // MessageDetail is the detail of message
 type MessageDetail struct {
-	Actor  string
-	Method string
-	Params MessageParams
+	Actor        string
+	Method       string
+	Params       MessageParams
+	PackedHeight abi.ChainEpoch
 }
 
 // Message is the schema of *types.Message
@@ -47,6 +48,7 @@ func (m *Message) Indexes() [][]string {
 		[]string{"From", "Nonce"},
 		[]string{"To", "Method"},
 		[]string{"Detail.Method", "Detail.Actor"},
+		[]string{"Detail.PackedHeight"},
 	}
 }
 
@@ -66,7 +68,7 @@ func (m *Message) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) 
 }
 
 // NewMessage converts from *types.Message to *Message with required infomations
-func NewMessage(mcid cid.Cid, raw *types.Message, act, meth string, params cbor.Er) (*Message, error) {
+func NewMessage(mcid cid.Cid, raw *types.Message, act, meth string, params cbor.Er, epoch abi.ChainEpoch) (*Message, error) {
 	msg := &Message{
 		Cid:     mcid,
 		Message: raw,
@@ -83,6 +85,8 @@ func NewMessage(mcid cid.Cid, raw *types.Message, act, meth string, params cbor.
 
 		msg.Detail.Params = params
 	}
+
+	msg.Detail.PackedHeight = epoch
 
 	return msg, nil
 }

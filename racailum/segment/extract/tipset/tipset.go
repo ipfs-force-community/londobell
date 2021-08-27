@@ -282,7 +282,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 		mcid := msg.Cid()
 		if _, has := dupmsgs[mcid]; !has {
-			mmsg, err := model.NewMessage(mcid, msg, mi.Actor, mi.Method.Name, mi.ParamObj())
+			mmsg, err := model.NewMessage(mcid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 			if err != nil {
 				elog.Errorw("convert to model.Message", "mcid", mcid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
