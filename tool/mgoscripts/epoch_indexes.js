@@ -18,6 +18,7 @@ db.ExecTrace.createIndex({"Cid":1}, {"sparse": true});
 db.Message.createIndex({"From":1,"Nonce":1}, {"sparse": true});
 db.Message.createIndex({"To":1,"Method":1}, {"sparse": true});
 db.Message.createIndex({"Detail.Method":1,"Detail.Actor":1}, {"sparse": true});
+db.Message.createIndex({"Detail.PackedHeight":1},{"sparse":true});
 
 db.MinerFunds.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
