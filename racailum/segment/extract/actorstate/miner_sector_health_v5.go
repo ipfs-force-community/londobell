@@ -31,10 +31,14 @@ func extractMinerSectorHealthV5(ctx *extract.Ctx, res *extract.Res, head *common
 		return fmt.Errorf("load deadlines failed: %w", err)
 	}
 	detail := model.MinerSectorHealthDetail{
-		ActiveSectorsQAPower: abi.NewTokenAmount(0),
-		FaultsQAPower:        abi.NewTokenAmount(0),
-		RecoveriesQAPower:    abi.NewTokenAmount(0),
-		UnprovenQAPower:      abi.NewTokenAmount(0),
+		ActiveSectorsQAPower:  abi.NewTokenAmount(0),
+		FaultsQAPower:         abi.NewTokenAmount(0),
+		RecoveriesQAPower:     abi.NewTokenAmount(0),
+		UnprovenQAPower:       abi.NewTokenAmount(0),
+		ActiveSectorsRawPower: abi.NewTokenAmount(0),
+		FaultsRawPower:        abi.NewTokenAmount(0),
+		RecoveriesRawPower:    abi.NewTokenAmount(0),
+		UnprovenRawPower:      abi.NewTokenAmount(0),
 	}
 	err = deadlines.ForEach(actStore, func(dlIdx uint64, dl *miner5.Deadline) error {
 		if dl == nil {
