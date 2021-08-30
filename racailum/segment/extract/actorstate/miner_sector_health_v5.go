@@ -52,6 +52,11 @@ func extractMinerSectorHealthV5(ctx *extract.Ctx, res *extract.Res, head *common
 			detail.RecoveriesQAPower = big.Add(detail.RecoveriesQAPower, part.RecoveringPower.QA)
 			detail.UnprovenQAPower = big.Add(detail.UnprovenQAPower, part.UnprovenPower.QA)
 
+			detail.ActiveSectorsRawPower = big.Add(detail.ActiveSectorsRawPower, part.ActivePower().Raw)
+			detail.FaultsRawPower = big.Add(detail.FaultsRawPower, part.FaultyPower.Raw)
+			detail.RecoveriesRawPower = big.Add(detail.RecoveriesRawPower, part.RecoveringPower.Raw)
+			detail.UnprovenRawPower = big.Add(detail.UnprovenRawPower, part.UnprovenPower.Raw)
+
 			bf, err := part.ActiveSectors()
 			if err != nil {
 				return fmt.Errorf("load partition active sector failed: %w", err)

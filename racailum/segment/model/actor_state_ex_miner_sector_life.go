@@ -24,6 +24,11 @@ type MinerSectorHealthDetail struct {
 	FaultsQAPower        abi.StoragePower
 	RecoveriesQAPower    abi.StoragePower
 	UnprovenQAPower      abi.StoragePower
+
+	ActiveSectorsRawPower abi.StoragePower
+	FaultsRawPower        abi.StoragePower
+	RecoveriesRawPower    abi.StoragePower
+	UnprovenRawPower      abi.StoragePower
 }
 
 // MinerSectorHealth shows sector health details for miner
