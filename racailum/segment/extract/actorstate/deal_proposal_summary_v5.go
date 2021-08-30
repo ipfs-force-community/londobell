@@ -13,16 +13,17 @@ import (
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/racailum/segment/extract"
 	"github.com/dtynn/londobell/racailum/segment/model"
+	"github.com/dtynn/londobell/racailum/segment/model/schema"
 )
 
 func init() {
-	//mustRegisterRegularExtractor("DealProposalSummaryV5", extractDealProposalSummaryV5)
-	//schema.Register(
-	//	schema.Model{
-	//		Name: "deal-proposal-summary",
-	//		D:    &model.DealProposalSummary{},
-	//	},
-	//)
+	mustRegisterRegularExtractor("DealProposalSummaryV5", extractDealProposalSummaryV5)
+	schema.Register(
+		schema.Model{
+			Name: "deal-proposal-summary",
+			D:    &model.DealProposalSummary{},
+		},
+	)
 }
 
 func extractDealProposalSummaryV5(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market5.State) error {
