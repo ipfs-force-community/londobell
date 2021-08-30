@@ -16,12 +16,12 @@ import (
 )
 
 func init() {
-	//summaryDaysV5 = []abi.ChainEpoch{1, 2, 3, 7, 14, 30, 60, 120}
-	//for d := (miner5.MinSectorExpiration / builtin5.EpochsInDay); d <= (miner5.MaxSectorExpirationExtension / builtin5.EpochsInDay); d += 180 {
-	//	summaryDaysV5 = append(summaryDaysV5, abi.ChainEpoch(d))
-	//}
-	//
-	//mustRegisterRegularExtractor("MinerSectorSummaryV5", extractMinerSectorSummaryV5)
+	summaryDaysV5 = []abi.ChainEpoch{1, 7, 14, 30}
+	for d := (miner5.MinSectorExpiration / builtin5.EpochsInDay); d <= (miner5.MaxSectorExpirationExtension / builtin5.EpochsInDay); d += 180 {
+		summaryDaysV5 = append(summaryDaysV5, abi.ChainEpoch(d))
+	}
+
+	mustRegisterRegularExtractor("MinerSectorSummaryV5", extractMinerSectorSummaryV5)
 }
 
 var summaryDaysV5 []abi.ChainEpoch
@@ -78,6 +78,13 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 	}
 
 	var out miner5.SectorOnChainInfo
+	minerCommittedCapacity := uint64(0)
+	actStore := ctx.D.ActorStore(ctx.C)
+	minfo, err := st.GetInfo(actStore)
+	if err != nil {
+		return fmt.Errorf("get miner info failed :%w", err)
+	}
+	sectorSize := minfo.SectorSize
 	err = sectors.ForEach(&out, func(n int64) error {
 		if out.Expiration <= head.Epoch {
 			return nil
@@ -94,6 +101,9 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 		target.TotalVerifiedDealWeight = big.Add(target.TotalVerifiedDealWeight, out.VerifiedDealWeight)
 		target.TotalInitialPledge = big.Add(target.TotalInitialPledge, out.InitialPledge)
 
+		if len(out.DealIDs) == 0 {
+			minerCommittedCapacity += uint64(sectorSize)
+		}
 		return nil
 	})
 
@@ -121,7 +131,8 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 			Epoch: head.Epoch,
 		},
 		Detail: model.MinerSectorSummaryDetail{
-			Summaries: nonEmpty,
+			Summaries:         nonEmpty,
+			CommittedCapacity: minerCommittedCapacity,
 		},
 	})
 
