@@ -30,7 +30,7 @@ type MinerSectorHealthDetail struct {
 	RecoveriesRawPower    abi.StoragePower
 	UnprovenRawPower      abi.StoragePower
 
-	EarlyTermination uint64
+	TerminatedSectors uint64
 }
 
 // MinerSectorHealth shows sector health details for miner
