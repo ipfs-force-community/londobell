@@ -3,8 +3,10 @@ package actorstate
 import (
 	"fmt"
 
+	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/specs-actors/v5/actors/builtin"
 	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
 	"github.com/ipfs/go-cid"
 
@@ -40,6 +42,7 @@ func extractMinerSectorHealthV5(ctx *extract.Ctx, res *extract.Res, head *common
 		RecoveriesRawPower:    abi.NewTokenAmount(0),
 		UnprovenRawPower:      abi.NewTokenAmount(0),
 	}
+
 	err = deadlines.ForEach(actStore, func(dlIdx uint64, dl *miner5.Deadline) error {
 		if dl == nil {
 			return nil
@@ -51,6 +54,23 @@ func extractMinerSectorHealthV5(ctx *extract.Ctx, res *extract.Res, head *common
 		}
 		var part miner5.Partition
 		return ps.ForEach(&part, func(partIdx int64) error {
+			bq, err := miner5.LoadBitfieldQueue(actStore, part.EarlyTerminated, builtin.NoQuantization, miner5.PartitionEarlyTerminationArrayAmtBitwidth)
+			if err != nil {
+				return fmt.Errorf("load bitfield of early terminatied failed: %w", err)
+			}
+
+			err = bq.ForEach(func(epoch abi.ChainEpoch, bf bitfield.BitField) error {
+				count, err := bf.Count()
+				if err != nil {
+					return fmt.Errorf("count bf failed %w", err)
+				}
+				detail.EarlyTermination += count
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("process bitfield queue failed: %w", err)
+			}
+
 			detail.ActiveSectorsQAPower = big.Add(detail.ActiveSectorsQAPower, part.ActivePower().QA)
 			detail.FaultsQAPower = big.Add(detail.FaultsQAPower, part.FaultyPower.QA)
 			detail.RecoveriesQAPower = big.Add(detail.RecoveriesQAPower, part.RecoveringPower.QA)
