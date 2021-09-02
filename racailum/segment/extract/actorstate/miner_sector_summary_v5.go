@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	summaryDaysV5 = []abi.ChainEpoch{1, 7, 14, 30}
+	summaryDaysV5 = []abi.ChainEpoch{7, 14, 30}
 	for d := (miner5.MinSectorExpiration / builtin5.EpochsInDay); d <= (miner5.MaxSectorExpirationExtension / builtin5.EpochsInDay); d += 180 {
 		summaryDaysV5 = append(summaryDaysV5, abi.ChainEpoch(d))
 	}
