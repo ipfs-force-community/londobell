@@ -17,7 +17,6 @@ import (
 	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
 
 	"github.com/filecoin-project/lotus/api"
-	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
 
 	"github.com/dtynn/londobell/common"
@@ -334,7 +333,7 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	actors := []*common.ActorHead{}
 	var powerActor *types.Actor
 	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
-		if addr == builtin.SystemActorAddr || addr == builtin.CronActorAddr || lbuiltin.IsAccountActor(act.Code) {
+		if addr == builtin.SystemActorAddr || addr == builtin.CronActorAddr {
 			return nil
 		}
 
