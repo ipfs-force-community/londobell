@@ -2,6 +2,7 @@ package actorstate
 
 import (
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
+	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
 
 	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
 
@@ -51,6 +52,8 @@ func isEmptyState(st interface{}) bool {
 	case *miner4.State:
 		return isEmptyMinerStateV4(st)
 
+	case *miner5.State:
+		return isEmptyMinerStateV5(st)
 	default:
 		return false
 	}

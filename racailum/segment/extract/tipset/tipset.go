@@ -333,6 +333,7 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	actors := []*common.ActorHead{}
 	var powerActor *types.Actor
 	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
+		count++
 		if addr == builtin.SystemActorAddr || addr == builtin.CronActorAddr {
 			return nil
 		}
