@@ -111,6 +111,8 @@ type ActorHead struct {
 
 	Addr  address.Address
 	Epoch abi.ChainEpoch
+	// for account actor
+	PubAddr address.Address
 }
 
 // InvocResultCompact is the compact representation of api.InvocResult

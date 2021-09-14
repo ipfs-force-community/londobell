@@ -36,6 +36,7 @@ func NewActorState(head *common.ActorHead, raw cbor.Er) (*ActorState, error) {
 		Balance: head.Balance,
 		Epoch:   head.Epoch,
 		Detail:  raw,
+		PubKey:  head.PubAddr,
 	}, nil
 }
 
@@ -47,6 +48,7 @@ type ActorState struct {
 	Balance types.BigInt
 	Epoch   abi.ChainEpoch
 	Detail  ActorStateDetail
+	PubKey  address.Address
 }
 
 // Indexes impl common.Indexed

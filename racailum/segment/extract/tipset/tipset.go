@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-address"
+	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	"github.com/ipfs/go-cid"
 
@@ -332,6 +334,9 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	count := 0
 	actors := []*common.ActorHead{}
 	var powerActor *types.Actor
+	var pubKey address.Address
+
+	store := ctx.D.ActorStore(ctx.C)
 	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
 		count++
 		if addr == builtin.SystemActorAddr || addr == builtin.CronActorAddr {
@@ -342,13 +347,21 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			powerActor = act
 		}
 
+		if builtin2.IsAccountActor(act.Code) {
+			pubAddr, err := vm.ResolveToKeyAddr(tree, store, addr)
+			if err != nil {
+				return err
+			}
+			pubKey = pubAddr
+		}
+
 		actors = append(actors, &common.ActorHead{
 			Actor:             act,
 			CirculatingSupply: &supply,
 			Addr:              addr,
 			Epoch:             height,
+			PubAddr:           pubKey,
 		})
-
 		return nil
 	})
 
