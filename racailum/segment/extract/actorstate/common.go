@@ -141,21 +141,30 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, re
 
 	}
 
+	// account actor is special
+	if builtin.IsAccountActor(head.Code) && enableActorStateDoc {
+		as, err := model.NewActorState(head, nil)
+		if err != nil {
+			return fmt.Errorf("convert actor state from raw for %s (%s): %w", head.Addr, head.Head, err)
+
+		}
+		res.Docs = append(res.Docs, as)
+		return nil
+	}
+
 	state, err := vm.DumpActorState(head.Actor, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 
 	}
 
-	// account actor's state is nil
-	if !builtin.IsAccountActor(head.Code) && isEmptyState(state) {
+	if isEmptyState(state) {
 		return nil
 	}
 
 	raw, ok := state.(cbor.Er)
 	if !ok {
 		return fmt.Errorf("get non cbor.Er from vm.DumpActorState for %s (%s): %T", head.Addr, head.Head, raw)
-
 	}
 
 	if enableActorStateDoc {
