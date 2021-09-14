@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/cbor"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -146,7 +147,8 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, re
 
 	}
 
-	if isEmptyState(state) {
+	// account actor's state is nil
+	if !builtin.IsAccountActor(head.Code) && isEmptyState(state) {
 		return nil
 	}
 
