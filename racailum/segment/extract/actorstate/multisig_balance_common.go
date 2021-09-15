@@ -91,7 +91,7 @@ func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *comm
 	vested = big.Max(vested, big.Zero())
 	locked = big.Min(locked, head.Balance)
 
-	id, err := genRegularHeadID(head.Head, head.Addr, head.Epoch)
+	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
 		return fmt.Errorf("generate id: %w", err)
 	}

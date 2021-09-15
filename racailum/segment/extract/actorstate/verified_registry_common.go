@@ -143,7 +143,7 @@ func extractVerifReg(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead,
 				return fmt.Errorf("parse addr from adt.Map key %s: %w", keystr, err)
 			}
 
-			id, err := genRegularHeadID(head.Head, addr, head.Epoch)
+			id, err := GenRegularHeadID(head.Head, addr, head.Epoch)
 			if err != nil {
 				return err
 			}

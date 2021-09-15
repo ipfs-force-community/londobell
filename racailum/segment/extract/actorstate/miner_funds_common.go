@@ -189,7 +189,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		return nil
 	}
 
-	id, err := genRegularHeadID(head.Head, head.Addr, head.Epoch)
+	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
 		return fmt.Errorf("generate regular id: %w", err)
 	}

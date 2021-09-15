@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	"github.com/ipfs/go-cid"
+	"golang.org/x/xerrors"
 
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
@@ -19,12 +21,14 @@ import (
 	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
 
 	"github.com/filecoin-project/lotus/api"
+	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 	"github.com/filecoin-project/lotus/chain/types"
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/lib/mir"
 	"github.com/dtynn/londobell/racailum/segment/actor"
 	"github.com/dtynn/londobell/racailum/segment/extract"
+	"github.com/dtynn/londobell/racailum/segment/extract/actorstate"
 	"github.com/dtynn/londobell/racailum/segment/model"
 	"github.com/dtynn/londobell/racailum/segment/model/schema"
 )
@@ -114,6 +118,10 @@ var extractors = []extractor{
 	{
 		name:   "actor-head",
 		method: extractActorHead,
+	},
+	{
+		name:   "actor-balance",
+		method: extractActorBalance,
 	},
 }
 
@@ -311,6 +319,77 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	return nil
 }
 
+func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
+	height := ts.Height()
+	if ticks := ctx.Opts.StateRegular.ActorBalance; ticks > 0 && height%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
+		return nil
+	}
+
+	root := ts.ParentState()
+	tree, err := ctx.D.StateTree(root)
+	if err != nil {
+		return fmt.Errorf("load state tree for %s: %w", root, err)
+	}
+	actorBalance := []*model.ActorBalance{}
+	iact, err := tree.GetActor(_init.Address)
+	if err != nil {
+		return xerrors.Errorf("failed to load init actor: %w", err)
+	}
+	store := ctx.D.ActorStore(ctx.C)
+	ist, err := _init.Load(store, iact)
+	if err != nil {
+		return xerrors.Errorf("failed to load init actor state: %w", err)
+	}
+	robustMap := make(map[address.Address]address.Address)
+	err = ist.ForEachActor(func(id abi.ActorID, addr address.Address) error {
+		idAddr, err := address.NewIDAddress(uint64(id))
+		if err != nil {
+			return xerrors.Errorf("failed to write to addr map: %w", err)
+		}
+
+		robustMap[idAddr] = addr
+
+		return nil
+	})
+	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
+		addresses := []address.Address{addr, robustMap[addr]}
+		if builtin2.IsAccountActor(act.Code) {
+			pubAddr, err := vm.ResolveToKeyAddr(tree, store, addr)
+			if err != nil {
+				return err
+			}
+			addresses = append(addresses, pubAddr)
+		}
+		id, err := actorstate.GenRegularHeadID(act.Head, addr, height)
+		if err != nil {
+			return fmt.Errorf("generate regular id: %w", err)
+		}
+		actorBalance = append(actorBalance, &model.ActorBalance{
+			ActorStateExBasic: model.ActorStateExBasic{
+				ID:    id,
+				Path:  []cid.Cid{act.Head},
+				Addr:  addr,
+				Epoch: height,
+			},
+			Addresses: addresses,
+			Balance:   act.Balance,
+		})
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walk through all actors: %w", err)
+	}
+
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("actor balanced extracted")
+
+	for i := range actorBalance {
+		res.Docs = append(res.Docs, actorBalance[i])
+	}
+
+	return nil
+}
+
 func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
 	height := ts.Height()
 
@@ -334,9 +413,7 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	count := 0
 	actors := []*common.ActorHead{}
 	var powerActor *types.Actor
-	var pubKey address.Address
 
-	store := ctx.D.ActorStore(ctx.C)
 	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
 		count++
 		if addr == builtin.SystemActorAddr || addr == builtin.CronActorAddr {
@@ -347,21 +424,13 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			powerActor = act
 		}
 
-		if builtin2.IsAccountActor(act.Code) {
-			pubAddr, err := vm.ResolveToKeyAddr(tree, store, addr)
-			if err != nil {
-				return err
-			}
-			pubKey = pubAddr
-		}
-
 		actors = append(actors, &common.ActorHead{
 			Actor:             act,
 			CirculatingSupply: &supply,
 			Addr:              addr,
 			Epoch:             height,
-			PubAddr:           pubKey,
 		})
+
 		return nil
 	})
 

@@ -57,7 +57,7 @@ func extractMiningProfitabilityV2(ctx *extract.Ctx, res *extract.Res, head *comm
 		ProjectionOfFaultFee:      miner2.PledgePenaltyForContinuedFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower),
 	}
 
-	id, err := genRegularHeadID(head.Head, head.Addr, head.Epoch)
+	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
 		return fmt.Errorf("gen regular id: %w", err)
 	}

@@ -87,7 +87,7 @@ func extractDealProposalSummaryV5(ctx *extract.Ctx, res *extract.Res, head *comm
 		details[di].Providers = uint64(len(providers[di]))
 	}
 
-	id, err := genRegularHeadID(head.Head, head.Addr, head.Epoch)
+	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
 		return fmt.Errorf("ge regular id: %w", err)
 	}

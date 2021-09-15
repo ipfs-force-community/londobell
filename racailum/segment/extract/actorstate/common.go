@@ -10,7 +10,6 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/cbor"
-	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -141,17 +140,6 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, re
 
 	}
 
-	// account actor is special
-	if builtin.IsAccountActor(head.Code) && enableActorStateDoc {
-		as, err := model.NewActorState(head, nil)
-		if err != nil {
-			return fmt.Errorf("convert actor state from raw for %s (%s): %w", head.Addr, head.Head, err)
-
-		}
-		res.Docs = append(res.Docs, as)
-		return nil
-	}
-
 	state, err := vm.DumpActorState(head.Actor, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
@@ -192,7 +180,7 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, re
 	return nil
 }
 
-func genRegularHeadID(root cid.Cid, addr address.Address, epoch abi.ChainEpoch) (cid.Cid, error) {
+func GenRegularHeadID(root cid.Cid, addr address.Address, epoch abi.ChainEpoch) (cid.Cid, error) {
 	rbytes := root.Bytes()
 	abytes := addr.Bytes()
 

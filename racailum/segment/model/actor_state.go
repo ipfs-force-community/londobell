@@ -36,7 +36,6 @@ func NewActorState(head *common.ActorHead, raw cbor.Er) (*ActorState, error) {
 		Balance: head.Balance,
 		Epoch:   head.Epoch,
 		Detail:  raw,
-		PubKey:  head.PubAddr,
 	}, nil
 }
 
