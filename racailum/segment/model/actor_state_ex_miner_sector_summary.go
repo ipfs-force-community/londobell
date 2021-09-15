@@ -30,6 +30,7 @@ type MinerSectorSummaryRange struct {
 	TotalDealWeight         abi.DealWeight
 	TotalVerifiedDealWeight abi.DealWeight
 	TotalInitialPledge      abi.TokenAmount
+	TotalV1InitialPledge    abi.TokenAmount
 }
 
 // MinerSectorSummary shows the distribution of sector lifetimes of a miner

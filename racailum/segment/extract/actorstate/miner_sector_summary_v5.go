@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	summaryDaysV5 = []abi.ChainEpoch{7, 14, 30}
+	summaryDaysV5 = []abi.ChainEpoch{1, 7, 14, 30}
 	for d := (miner5.MinSectorExpiration / builtin5.EpochsInDay); d <= (miner5.MaxSectorExpirationExtension / builtin5.EpochsInDay); d += 180 {
 		summaryDaysV5 = append(summaryDaysV5, abi.ChainEpoch(d))
 	}
@@ -49,6 +49,7 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 			TotalDealWeight:         big.NewInt(0),
 			TotalVerifiedDealWeight: big.NewInt(0),
 			TotalInitialPledge:      abi.NewTokenAmount(0),
+			TotalV1InitialPledge:    abi.NewTokenAmount(0),
 		}
 
 		summaries = append(summaries, current)
@@ -67,6 +68,7 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 		TotalDealWeight:         big.NewInt(0),
 		TotalVerifiedDealWeight: big.NewInt(0),
 		TotalInitialPledge:      abi.NewTokenAmount(0),
+		TotalV1InitialPledge:    abi.NewTokenAmount(0),
 	}
 
 	summaries = append(summaries, last)
@@ -100,6 +102,10 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 		target.TotalDealWeight = big.Add(target.TotalDealWeight, out.DealWeight)
 		target.TotalVerifiedDealWeight = big.Add(target.TotalVerifiedDealWeight, out.VerifiedDealWeight)
 		target.TotalInitialPledge = big.Add(target.TotalInitialPledge, out.InitialPledge)
+
+		if out.SealProof < abi.RegisteredSealProof_StackedDrg2KiBV1_1 {
+			target.TotalV1InitialPledge = big.Add(target.TotalV1InitialPledge, out.InitialPledge)
+		}
 
 		if len(out.DealIDs) == 0 {
 			minerCommittedCapacity += uint64(sectorSize)
