@@ -46,6 +46,7 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 			UpperBound:              days * builtin5.EpochsInDay,
 			SectorCount:             0,
 			DealCount:               0,
+			V1SectorCount:           0,
 			TotalDealWeight:         big.NewInt(0),
 			TotalVerifiedDealWeight: big.NewInt(0),
 			TotalInitialPledge:      abi.NewTokenAmount(0),
@@ -64,6 +65,7 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 		LowerBound:              prevDays * builtin5.EpochsInDay,
 		UpperBound:              -1,
 		SectorCount:             0,
+		V1SectorCount:           0,
 		DealCount:               0,
 		TotalDealWeight:         big.NewInt(0),
 		TotalVerifiedDealWeight: big.NewInt(0),
@@ -105,6 +107,7 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 
 		if out.SealProof < abi.RegisteredSealProof_StackedDrg2KiBV1_1 {
 			target.TotalV1InitialPledge = big.Add(target.TotalV1InitialPledge, out.InitialPledge)
+			target.V1SectorCount += 1
 		}
 
 		if len(out.DealIDs) == 0 {

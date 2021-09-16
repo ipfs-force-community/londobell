@@ -27,6 +27,7 @@ type MinerSectorSummaryRange struct {
 	UpperBound              abi.ChainEpoch
 	SectorCount             uint64
 	DealCount               uint64
+	V1SectorCount           uint64
 	TotalDealWeight         abi.DealWeight
 	TotalVerifiedDealWeight abi.DealWeight
 	TotalInitialPledge      abi.TokenAmount
