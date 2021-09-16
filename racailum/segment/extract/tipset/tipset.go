@@ -352,6 +352,8 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 
 		return nil
 	})
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("actor balanced extracted")
 	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
 		addresses := []address.Address{addr, robustMap[addr]}
 		if builtin2.IsAccountActor(act.Code) {
@@ -367,10 +369,12 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		}
 		actType := builtin.ActorNameByCode(act.Code)
 		actTypes := strings.Split(actType, "/")
-		if len(actTypes) <= 1 {
-			return fmt.Errorf("actor type is invalid: %s", actType)
+		if len(actTypes) > 1 {
+			actType = actTypes[len(actTypes)-1]
+		} else {
+			elog.Warnf("actor %s acttype out of design", actType)
 		}
-		actType = actTypes[len(actTypes)-1]
+
 		actorBalance = append(actorBalance, &model.ActorBalance{
 			ActorStateExBasic: model.ActorStateExBasic{
 				ID:    id,
@@ -387,9 +391,6 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	if err != nil {
 		return fmt.Errorf("walk through all actors: %w", err)
 	}
-
-	elog := ctx.L.With("epoch", height)
-	elog.Infow("actor balanced extracted")
 
 	for i := range actorBalance {
 		res.Docs = append(res.Docs, actorBalance[i])
