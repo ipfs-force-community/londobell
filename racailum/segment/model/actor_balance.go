@@ -37,6 +37,7 @@ type ActorBalance struct {
 
 	Addresses []address.Address
 	Balance   abi.TokenAmount
+	Code      string
 }
 
 // CollectionName impl CollectionName
@@ -57,5 +58,7 @@ func (a *ActorBalance) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, b
 func (a *ActorBalance) Indexes() [][]string {
 	return [][]string{
 		[]string{"Addresses"},
+		[]string{"Code"},
+		[]string{"Addresses", "Code"},
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/filecoin-project/go-address"
@@ -364,6 +365,12 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		if err != nil {
 			return fmt.Errorf("generate regular id: %w", err)
 		}
+		actType := builtin.ActorNameByCode(act.Code)
+		actTypes := strings.Split(actType, "/")
+		if len(actTypes) <= 1 {
+			return fmt.Errorf("actor type is invalid: %s", actType)
+		}
+		actType = actTypes[len(actTypes)-1]
 		actorBalance = append(actorBalance, &model.ActorBalance{
 			ActorStateExBasic: model.ActorStateExBasic{
 				ID:    id,
@@ -373,6 +380,7 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 			},
 			Addresses: addresses,
 			Balance:   act.Balance,
+			Code:      actType,
 		})
 		return nil
 	})
