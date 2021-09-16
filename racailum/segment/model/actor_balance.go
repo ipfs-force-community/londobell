@@ -33,7 +33,7 @@ func EmptyActorBalance() ActorBalance {
 
 // ActorBalance is the data model of ActorBalance
 type ActorBalance struct {
-	ActorStateExBasic
+	ActorStateExBasic `bson:",inline"`
 
 	Addresses []address.Address
 	Balance   abi.TokenAmount
