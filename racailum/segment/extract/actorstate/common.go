@@ -176,18 +176,18 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, re
 		res.Docs = append(res.Docs, as)
 	}
 
-	rawTyp := reflect.ValueOf(raw).Type()
-	reg.RLock()
-	exes, ok := reg.e[rawTyp]
-	reg.RUnlock()
+	//rawTyp := reflect.ValueOf(raw).Type()
+	//reg.RLock()
+	//exes, ok := reg.e[rawTyp]
+	//reg.RUnlock()
 
-	if ok && len(exes) > 0 {
-		for ei := range exes {
-			if err := exes[ei].method(ctx, res, head, raw); err != nil {
-				return fmt.Errorf("extracting %s: %w", exes[ei].name, err)
-			}
-		}
-	}
+	//if ok && len(exes) > 0 {
+	//	for ei := range exes {
+	//		if err := exes[ei].method(ctx, res, head, raw); err != nil {
+	//			return fmt.Errorf("extracting %s: %w", exes[ei].name, err)
+	//		}
+	//	}
+	//}
 
 	return nil
 }
