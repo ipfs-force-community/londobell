@@ -367,7 +367,7 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		if err != nil {
 			return fmt.Errorf("generate regular id: %w", err)
 		}
-		actType := builtin.ActorNameByCode(act.Code)
+		actType := builtin2.ActorNameByCode(act.Code)
 		actTypes := strings.Split(actType, "/")
 		if len(actTypes) > 1 {
 			actType = actTypes[len(actTypes)-1]
