@@ -3,6 +3,7 @@ package segment
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -51,45 +52,59 @@ func New(ctx context.Context, name string, opts Options, aggopt aggregate.Option
 	if !ihas {
 		return nil, fmt.Errorf("info not found")
 	}
-
-	wcli, err := mgoutil.Connect(ctx, info.DSN.Write)
-	if err != nil {
-		return nil, fmt.Errorf("connect to write db: %w", err)
-	}
-
-	wdb := wcli.Database(name)
-
-	wdoc, err := mgoutil.NewMgoDocDB(ctx, wcli, wdb)
-	if err != nil {
-		return nil, fmt.Errorf("construct write doc db: %w", err)
-	}
-
-	dict, err := mdict.NewDict(wdb)
-
-	rdoc := wdoc
-	if info.DSN.Read != "" {
-		rcli, err := mgoutil.Connect(ctx, info.DSN.Read)
+	shards := []ShardDb{}
+	var dict *mdict.Dict
+	for i := range info.Dsn {
+		wcli, err := mgoutil.Connect(ctx, info.Dsn[i].Write)
 		if err != nil {
-			return nil, fmt.Errorf("connect to read db: %w", err)
+			return nil, fmt.Errorf("connect to write db: %w", err)
 		}
 
-		rdoc, err = mgoutil.NewMgoDocDB(ctx, rcli, rcli.Database(name))
+		wdb := wcli.Database(name)
+
+		wdoc, err := mgoutil.NewMgoDocDB(ctx, wcli, wdb)
 		if err != nil {
-			return nil, fmt.Errorf("construct read doc db: %w", err)
+			return nil, fmt.Errorf("construct write doc db: %w", err)
 		}
-	}
 
-	agg, err := aggregate.New(aggopt, wdoc)
-	if err != nil {
-		return nil, err
-	}
+		// TODO: fix me
+		dict, err = mdict.NewDict(wdb)
 
+		rdoc := wdoc
+		if info.Dsn[i].Read != "" {
+			rcli, err := mgoutil.Connect(ctx, info.Dsn[i].Read)
+			if err != nil {
+				return nil, fmt.Errorf("connect to read db: %w", err)
+			}
+
+			rdoc, err = mgoutil.NewMgoDocDB(ctx, rcli, rcli.Database(name))
+			if err != nil {
+				return nil, fmt.Errorf("construct read doc db: %w", err)
+			}
+		}
+		agg, err := aggregate.New(aggopt, wdoc)
+		if err != nil {
+			return nil, err
+		}
+		shards = append(shards, ShardDb{
+			db:  wdoc,
+			rdb: rdoc,
+			agg: agg,
+			Lo:  abi.ChainEpoch(info.Dsn[i].Lo),
+			Hi:  abi.ChainEpoch(info.Dsn[i].Hi),
+		})
+	}
+	sort.Slice(shards, func(i, j int) bool {
+		if shards[i].Lo == shards[j].Lo {
+			return shards[i].Hi < shards[j].Hi
+		}
+
+		return shards[i].Lo < shards[j].Lo
+	})
 	seg := &Segment{
 		name: name,
 		opts: opts,
-		db:   wdoc,
-		rdb:  rdoc,
-		agg:  agg,
+		dbs:  shards,
 		mgr:  mgr,
 	}
 
@@ -102,14 +117,20 @@ func New(ctx context.Context, name string, opts Options, aggopt aggregate.Option
 	return seg, nil
 }
 
+type ShardDb struct {
+	db  common.DocumentDB
+	rdb common.DocumentDB
+	agg *aggregate.Aggregator
+	Lo  abi.ChainEpoch
+	Hi  abi.ChainEpoch
+}
+
 // Segment is one partition of the structrued data extracted from the chain
 type Segment struct {
 	name string
 
 	opts Options
-	db   common.DocumentDB
-	rdb  common.DocumentDB
-	agg  *aggregate.Aggregator
+	dbs  []ShardDb
 	mgr  *Manager
 
 	headNotify chan *types.TipSet
@@ -119,6 +140,7 @@ type Segment struct {
 		Boundary
 	}
 
+	// TODO: multi seg should fix here
 	dal struct {
 		common.ChainStore
 		common.ChainDict
@@ -205,21 +227,44 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		if tipsets[tssize-1].Height() <= confidentEpoch {
 			break
 		}
+
 	}
 
 	tipsets = tipsets[:tssize]
 	if len(tipsets) == 0 {
 		return nil
 	}
+	tipsetGroup := [][]*common.LinkedTipSet{}
 
-	if err := s.extractTipSets(ctx, tipsets); err != nil {
-		return err
+	for i, j, k := 0, 0, 0; i < len(s.dbs) && j < len(tipsets); {
+		if len(tipsetGroup) <= k {
+			tipsetGroup = append(tipsetGroup, make([]*common.LinkedTipSet, 0))
+		}
+
+		ts := tipsets[j]
+
+		if ts.Height() >= s.dbs[i].Hi {
+			i++
+			k++
+		} else {
+			tipsetGroup[k] = append(tipsetGroup[k], ts)
+			j++
+		}
 	}
 
-	if err := s.Aggregate(ctx, tipsets); err != nil {
-		return err
-	}
+	for i := range tipsetGroup {
+		if len(tipsetGroup[i]) == 0 {
+			continue
+		}
 
+		if err := s.extractTipSets(ctx, tipsetGroup[i], i); err != nil {
+			return err
+		}
+
+		if err := s.Aggregate(ctx, tipsetGroup[i], i); err != nil {
+			return err
+		}
+	}
 	if err := s.updateBoundary(ctx, tipsets[len(tipsets)-1], nil); err != nil {
 		return err
 	}
@@ -228,8 +273,8 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 }
 
 // Aggregate tries to do aggregationg with given tipsets
-func (s *Segment) Aggregate(ctx context.Context, tss []*common.LinkedTipSet) error {
-	return s.agg.Aggregate(ctx, tss)
+func (s *Segment) Aggregate(ctx context.Context, tss []*common.LinkedTipSet, segIdx int) error {
+	return s.dbs[segIdx].agg.Aggregate(ctx, tss)
 }
 
 func (s *Segment) updateBoundary(ctx context.Context, hi, lo *common.LinkedTipSet) error {
@@ -276,5 +321,5 @@ func (s *Segment) Name() string {
 
 // ReadDB returns the read only db instance of the segment
 func (s *Segment) ReadDB() common.DocumentDB {
-	return s.rdb
+	panic("implement me!")
 }

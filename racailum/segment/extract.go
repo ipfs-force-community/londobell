@@ -23,7 +23,7 @@ type persistCtx struct {
 	asyncPersistWaitGroup multierror.Group
 }
 
-func (s *Segment) extractTipSets(ctx context.Context, tss []*common.LinkedTipSet) error {
+func (s *Segment) extractTipSets(ctx context.Context, tss []*common.LinkedTipSet, segIdx int) error {
 	if len(tss) == 0 {
 		return nil
 	}
@@ -58,7 +58,7 @@ func (s *Segment) extractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		}
 
 		part := tss[start:end]
-		if err := s.extractPart(pctx, part); err != nil {
+		if err := s.extractPart(pctx, part, segIdx); err != nil {
 			return err
 		}
 
@@ -75,7 +75,7 @@ func (s *Segment) extractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 	return nil
 }
 
-func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) error {
+func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, segIdx int) error {
 	if len(part) == 0 {
 		return nil
 	}
@@ -153,7 +153,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 
 	if s.opts.Persist.Async {
 		ctx.asyncPersistWaitGroup.Go(func() error {
-			if err := s.insertMany(ctx.ctx, elog, docs); err != nil {
+			if err := s.insertMany(ctx.ctx, segIdx, elog, docs); err != nil {
 				if nerr := common.NonCtxCanceledErr(err); nerr != nil {
 					elog.Errorf("insert extracted documents from tipsets: %s", err)
 					return nerr
@@ -163,7 +163,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 			return nil
 		})
 	} else {
-		if err := s.insertMany(ctx.ctx, elog, docs); err != nil {
+		if err := s.insertMany(ctx.ctx, segIdx, elog, docs); err != nil {
 			return fmt.Errorf("insert extracted documents from tipsets: %w", err)
 		}
 	}
@@ -172,7 +172,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 	ectx.C = ctx.ctx
 	for rhi := range regulars {
 		if rheads := regulars[rhi]; len(rheads) > 0 {
-			if err := s.extractRegularStates(ectx, rheads); err != nil {
+			if err := s.extractRegularStates(ectx, rheads, segIdx); err != nil {
 				return fmt.Errorf("#%d regular heads: %w", rhi, err)
 			}
 		}
@@ -181,7 +181,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 	return nil
 }
 
-func (s *Segment) extractRegularStates(ctx *extract.Ctx, heads []*common.ActorHead) error {
+func (s *Segment) extractRegularStates(ctx *extract.Ctx, heads []*common.ActorHead, segIdx int) error {
 	if len(heads) == 0 {
 		return nil
 	}
@@ -253,7 +253,7 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, heads []*common.ActorHe
 		return fmt.Errorf("extract part regular states: %w", err)
 	}
 
-	if err := s.insertMany(originCtx, ctx.L, docs); err != nil {
+	if err := s.insertMany(originCtx, segIdx, ctx.L, docs); err != nil {
 		return fmt.Errorf("insert extracted documents from regular states: %w", err)
 	}
 

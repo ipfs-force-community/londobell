@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	levelds "github.com/ipfs/go-ds-leveldb"
@@ -36,11 +39,8 @@ var segmentUpdateCmd = &cli.Command{
 		},
 
 		&cli.StringFlag{
-			Name: "dsn-write",
-		},
-
-		&cli.StringFlag{
-			Name: "dsn-read",
+			Name:  "seg-db-config",
+			Usage: "specify the seg db config path",
 		},
 
 		&cli.StringFlag{
@@ -77,14 +77,24 @@ var segmentUpdateCmd = &cli.Command{
 			return err
 		}
 
-		if dsn := cctx.String("dsn-write"); dsn != "" {
-			setInfo = true
-			info.DSN.Write = dsn
-		}
+		if segInfoPath := cctx.String("seg-db-config"); segInfoPath != "" {
+			f, err := os.Open(segInfoPath)
+			if err != nil {
+				return fmt.Errorf("open seg info path failed: %w", err)
+			}
+			defer f.Close()
 
-		if cctx.IsSet("dsn-read") {
+			bs, err := ioutil.ReadAll(f)
+			if err != nil {
+				return fmt.Errorf("read info from file failed: %w", err)
+			}
+
+			err = json.Unmarshal(bs, &info)
+			if err != nil {
+				return fmt.Errorf("json unmarshal seg info failed: %w", err)
+			}
+
 			setInfo = true
-			info.DSN.Read = cctx.String("dsn-read")
 		}
 
 		if setInfo {

@@ -10,7 +10,7 @@ import (
 	"github.com/dtynn/londobell/common"
 )
 
-func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets [][]common.Document) error {
+func (s *Segment) insertMany(ctx context.Context, segIdx int, l *zap.SugaredLogger, docSets [][]common.Document) error {
 	if len(docSets) == 0 {
 		return nil
 	}
@@ -27,7 +27,7 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 		}
 
 		insertOps++
-		inserted, err := s.db.Insert(ctx, col, docs[col])
+		inserted, err := s.dbs[segIdx].db.Insert(ctx, col, docs[col])
 		if err != nil {
 			return err
 		}

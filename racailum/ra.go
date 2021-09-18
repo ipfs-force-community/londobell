@@ -63,6 +63,7 @@ func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.Cha
 		return nil, err
 	}
 
+	// TODO: fix grafana with multi seg
 	gr, err := grafana.New(ctx, cfg.Grafana, []*segment.Segment{activeSeg})
 	if err != nil {
 		return nil, fmt.Errorf("construct garfana: %w", err)
@@ -119,8 +120,11 @@ func (r *RaCailum) Aggregate(ctx context.Context, lo, hi *types.TipSet) error {
 	if err != nil {
 		return fmt.Errorf("load tipsets: %w", err)
 	}
+	// TODO: fix me
+	//return r.activeSeg.Aggregate(ctx, tss)
 
-	return r.activeSeg.Aggregate(ctx, tss)
+	_ = tss
+	return nil
 }
 
 // DryState runs a dry extraction from given ts

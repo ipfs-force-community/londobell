@@ -55,11 +55,15 @@ func NewManager(mds dtypes.MetadataDS) (*Manager, error) {
 	}, nil
 }
 
+type SegDb struct {
+	Write string
+	Read  string
+	Lo    int
+	Hi    int
+}
+
 type Info struct {
-	DSN struct {
-		Write string
-		Read  string
-	}
+	Dsn []SegDb
 }
 
 type Manager struct {
