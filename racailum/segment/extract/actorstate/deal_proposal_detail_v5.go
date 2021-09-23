@@ -23,6 +23,13 @@ func init() {
 			D:    &model.DealProposalDetail{},
 		},
 	)
+
+	schema.Register(
+		schema.Model{
+			Name: "deal-proposal-full",
+			D:    &model.DealProposal{},
+		},
+	)
 }
 
 func extractDealProposalDetailedV5(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market5.State) error {

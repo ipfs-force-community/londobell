@@ -8,10 +8,10 @@ import (
 )
 
 var (
-	_ common.Document = (*DealProposalDetail)(nil)
+	_ common.Document = (*DealProposal)(nil)
 
-	dealProposalColName    = getColName(DealProposalDetail{})
-	dealProposalEpochField = extractEpochFieldName(DealProposalDetail{})
+	dealProposalColName    = getColName(DealProposal{})
+	dealProposalEpochField = extractEpochFieldName(DealProposal{})
 )
 
 // DealProposal contains the details about a set of deals
