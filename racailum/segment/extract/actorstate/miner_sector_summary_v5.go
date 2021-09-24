@@ -13,6 +13,7 @@ import (
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/racailum/segment/extract"
 	"github.com/dtynn/londobell/racailum/segment/model"
+	"github.com/dtynn/londobell/racailum/segment/model/schema"
 )
 
 func init() {
@@ -21,6 +22,12 @@ func init() {
 		summaryDaysV5 = append(summaryDaysV5, abi.ChainEpoch(d))
 	}
 
+	schema.Register(
+		schema.Model{
+			Name: "miner-deal-sector",
+			D:    &model.MinerDealSector{},
+		},
+	)
 	mustRegisterRegularExtractor("MinerSectorSummaryV5", extractMinerSectorSummaryV5)
 }
 
@@ -89,6 +96,8 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 		return fmt.Errorf("get miner info failed :%w", err)
 	}
 	sectorSize := minfo.SectorSize
+
+	mds := []model.MinerDealSector{}
 	err = sectors.ForEach(&out, func(n int64) error {
 		if out.Expiration <= head.Epoch {
 			return nil
@@ -112,6 +121,19 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 
 		if len(out.DealIDs) == 0 {
 			minerCommittedCapacity += uint64(sectorSize)
+		} else {
+			mds = append(mds, model.MinerDealSector{
+				ID:                 fmt.Sprintf("%s-%d-%d", head.Addr, head.Epoch, out.SectorNumber),
+				Epoch:              head.Epoch,
+				SectorNumber:       out.SectorNumber,
+				SealProof:          out.SealProof,
+				DealIDs:            out.DealIDs,
+				DealWeight:         out.DealWeight,
+				VerifiedDealWeight: out.VerifiedDealWeight,
+				InitialPledge:      out.InitialPledge,
+				QAPower:            miner5.QAPowerForSector(sectorSize, &out),
+				Miner:              head.Addr,
+			})
 		}
 		return nil
 	})
@@ -144,6 +166,10 @@ func extractMinerSectorSummaryV5(ctx *extract.Ctx, res *extract.Res, head *commo
 			CommittedCapacity: minerCommittedCapacity,
 		},
 	})
+
+	for i := range mds {
+		res.Docs = append(res.Docs, &mds[i])
+	}
 
 	return nil
 }
