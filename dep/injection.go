@@ -2,11 +2,14 @@ package dep
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/filecoin-project/lotus/build"
 	metricsi "github.com/ipfs/go-metrics-interface"
 	"go.uber.org/fx"
 
+	"github.com/filecoin-project/lotus/chain/beacon"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -34,8 +37,21 @@ var DefaultBellProvider = fx.Provide(
 	// from lotus
 	journal.NilJournal,
 	modules.ChainStore,
-	stmgr.DefaultUpgradeSchedule,
-	stmgr.NewStateManagerWithUpgradeSchedule,
+	filcns.NewTipSetExecutor,
+	modules.BuiltinDrandConfig,
+	func(cs store.ChainStore, dc dtypes.DrandSchedule) beacon.Schedule {
+		rbp := modules.RandomBeaconParams{
+			Cs:          &cs,
+			DrandConfig: dc,
+		}
+		b, err := modules.RandomSchedule(rbp, dtypes.AfterGenesisSet{})
+		if err != nil {
+			panic(fmt.Errorf("construct random schedule failed: %w", err))
+		}
+		return b
+	},
+	filcns.DefaultUpgradeSchedule,
+	stmgr.NewStateManager,
 	modules.LoadGenesis(build.MaybeGenesis()),
 
 	// basics

@@ -31,7 +31,7 @@ func extractMiningProfitabilityV3(ctx *extract.Ctx, res *extract.Res, head *comm
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
 	}
 
-	state, err := vm.DumpActorState(head.Global.Power, blkraw.RawData())
+	state, err := vm.DumpActorState(ActorReg, head.Global.Power, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 	}

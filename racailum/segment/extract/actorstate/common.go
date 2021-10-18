@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -37,6 +38,8 @@ type registry struct {
 	sync.RWMutex
 	e map[reflect.Type][]extractor
 }
+
+var ActorReg = filcns.NewActorRegistry()
 
 var extractorRegistry = struct {
 	regular *registry
@@ -152,7 +155,7 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, re
 		return nil
 	}
 
-	state, err := vm.DumpActorState(head.Actor, blkraw.RawData())
+	state, err := vm.DumpActorState(ActorReg, head.Actor, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 

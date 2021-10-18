@@ -17,8 +17,8 @@ import (
 
 	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
 	linit "github.com/filecoin-project/lotus/chain/actors/builtin/init"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/state"
-	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
@@ -157,8 +157,9 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 		code = ccode
 		actorName = cname
 	}
+	vma := filcns.NewActorRegistry()
 
-	mi, ok := stmgr.MethodsMap[code][call.Method]
+	mi, ok := vma.Methods[code][call.Method]
 	if !ok {
 		return MethodInfo{}, fmt.Errorf("%w: lookup method for from=%s, to=%s, code=%s, meth=%d", ErrActorMethodNotFound, call.From, call.To, code, call.Method)
 	}

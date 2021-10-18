@@ -10,15 +10,18 @@ import (
 
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
-	"github.com/filecoin-project/lotus/chain/stmgr"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 )
 
 func init() {
 	{
 		curActorVersion := actors.Version0
-		upgrades := stmgr.DefaultUpgradeSchedule()
+		upgrades := filcns.DefaultUpgradeSchedule()
 		for _, up := range upgrades {
-			actver := actors.VersionForNetwork(up.Network)
+			actver,err := actors.VersionForNetwork(up.Network)
+			if err != nil {
+				panic(err)
+			}
 			if actver != curActorVersion {
 				defaultActorUpgradeSchedule[fmt.Sprintf("fil/%d/", actver)] = up.Height
 				curActorVersion = actver
@@ -47,7 +50,8 @@ type actorCodeConvertor func(abi.ChainEpoch, string) (cid.Cid, string, bool)
 
 func generateDefaultActorMap() map[cid.Cid]string {
 	actorMap := map[cid.Cid]string{}
-	for code := range stmgr.MethodsMap {
+	vma := filcns.NewActorRegistry()
+	for code := range vma.Methods {
 		actorMap[code] = builtin.ActorNameByCode(code)
 	}
 

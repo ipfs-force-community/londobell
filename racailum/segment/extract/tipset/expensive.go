@@ -5,13 +5,13 @@ import (
 
 	"github.com/filecoin-project/go-state-types/network"
 
-	"github.com/filecoin-project/lotus/chain/stmgr"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 
 	"github.com/dtynn/londobell/common"
 )
 
 func init() {
-	sched := stmgr.DefaultUpgradeSchedule()
+	sched := filcns.DefaultUpgradeSchedule()
 	for si := range sched {
 		if sched[si].Expensive {
 			expensiveNetworkVersions[sched[si].Network] = struct{}{}
