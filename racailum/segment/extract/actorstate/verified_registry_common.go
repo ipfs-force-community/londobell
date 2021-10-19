@@ -23,6 +23,10 @@ import (
 	verifreg5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/verifreg"
 	adt5 "github.com/filecoin-project/specs-actors/v5/actors/util/adt"
 
+	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
+	verifreg6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/verifreg"
+	adt6 "github.com/filecoin-project/specs-actors/v6/actors/util/adt"
+
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/racailum/segment/extract"
 	"github.com/dtynn/londobell/racailum/segment/model"
@@ -117,6 +121,21 @@ func extractVerifReg(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead,
 
 		mapConstructor = func(c cid.Cid) (adtMap, error) {
 			return adt5.AsMap(ctx.D.ActorStore(ctx.C), c, builtin5.DefaultHamtBitwidth)
+		}
+	case *verifreg6.State:
+		mapRoots = []namedAdtMapRoot{
+			{
+				name: "Verifier",
+				root: st.Verifiers,
+			},
+			{
+				name: "VerifiedClient",
+				root: st.VerifiedClients,
+			},
+		}
+
+		mapConstructor = func(c cid.Cid) (adtMap, error) {
+			return adt6.AsMap(ctx.D.ActorStore(ctx.C), c, builtin6.DefaultHamtBitwidth)
 		}
 	default:
 		return fmt.Errorf("unexpected state: %T", st)

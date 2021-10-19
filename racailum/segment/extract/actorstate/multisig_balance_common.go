@@ -5,7 +5,6 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	multisig5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/multisig"
 	"github.com/ipfs/go-cid"
 
 	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
@@ -13,6 +12,10 @@ import (
 	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
 
 	multisig4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/multisig"
+
+	multisig5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/multisig"
+
+	multisig6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/multisig"
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/racailum/segment/extract"
@@ -85,6 +88,21 @@ func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *comm
 		for i := len(vestInFuture) - 1; i > 0; i-- {
 			vestInFuture[i] = big.Sub(vestInFuture[i], vestInFuture[i-1])
 		}
+	case *multisig6.State:
+		init = st.InitialBalance
+		locked = st.AmountLocked(epoch - st.StartEpoch)
+		locked = big.Max(locked, big.Zero())
+
+		for i := range dayList {
+			vestInFuture[i] = big.Sub(locked, st.AmountLocked(dayList[i]-st.StartEpoch))
+			vestInFuture[i] = big.Max(vestInFuture[i], big.Zero())
+			vestInFuture[i] = big.Min(vestInFuture[i], head.Balance)
+		}
+
+		for i := len(vestInFuture) - 1; i > 0; i-- {
+			vestInFuture[i] = big.Sub(vestInFuture[i], vestInFuture[i-1])
+		}
+
 	}
 
 	vested := big.Sub(init, locked)
