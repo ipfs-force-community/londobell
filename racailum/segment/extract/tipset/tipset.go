@@ -200,11 +200,11 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	elog := ctx.L.With("epoch", ts.Height())
 
-	if isExpensive(ctx.C, ctx.D, ts) {
-		// TODO: extract simple invoc results here
-		elog.Warn("ignore expensive epoch exec trace")
-		return nil
-	}
+	// if isExpensive(ctx.C, ctx.D, ts) {
+	//     // TODO: extract simple invoc results here
+	//     elog.Warn("ignore expensive epoch exec trace")
+	//     return nil
+	// }
 
 	start := time.Now()
 	st, rawinvocs, err := ctx.D.ExecutionTrace(ctx.C, ts.TipSet)
