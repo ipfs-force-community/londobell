@@ -72,6 +72,7 @@ var DefaultBellProvider = fx.Provide(
 	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.ExposedBlockstore)),
 	fxex.Convert(new(*store.ChainStore), new(common.ChainStore)),
 	fxex.Convert(new(*stmgr.StateManager), new(common.StateManager)),
+	fxex.Convert(new(*filcns.TipSetExecutor), new(stmgr.Executor)),
 )
 
 // BellApp constructs a *fx.App with givent opts and defaults
