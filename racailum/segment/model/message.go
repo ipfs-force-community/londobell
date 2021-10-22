@@ -49,6 +49,7 @@ func (m *Message) Indexes() [][]string {
 		[]string{"To", "Method"},
 		[]string{"Detail.Method", "Detail.Actor"},
 		[]string{"Detail.PackedHeight"},
+		[]string{"Detail.PackedHeight", "Detail.Method"},
 	}
 }
 
