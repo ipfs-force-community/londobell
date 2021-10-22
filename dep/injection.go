@@ -40,7 +40,7 @@ var DefaultBellProvider = fx.Provide(
 		return filcns.Weight
 	},
 	modules.ChainStore,
-	filcns.NewTipSetExecutor(),
+	filcns.NewTipSetExecutor,
 	modules.BuiltinDrandConfig,
 	func(cs *store.ChainStore, dc dtypes.DrandSchedule) beacon.Schedule {
 		rbp := modules.RandomBeaconParams{
