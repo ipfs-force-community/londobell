@@ -1,4 +1,4 @@
-FFI_PATH:=extern/filecoin-ffi/
+I_PATH:=extern/filecoin-ffi/
 FFI_DEPS:=.install-filcrypto
 FFI_DEPS:=$(addprefix $(FFI_PATH),$(FFI_DEPS))
 
@@ -55,6 +55,12 @@ build-bell-grafana: $(BUILD_DEPS)
 	rm -rf ./bell-grafana
 	go build $(GOFLAGS) -o bell-grafana ./cmd/bell-grafana
 	go run github.com/GeertJohan/go.rice/rice append --exec bell-grafana -i ./build
+
+build-bell-calib: $(BUILD_DEPS)
+	GOFLAGS+=-tags=calibnet
+	rm -rf ./bell
+	go build $(GOFLAGS) -o bell ./cmd/bell
+	go run github.com/GeertJohan/go.rice/rice append --exec bell -i ./build
 
 
 dist-clean:
