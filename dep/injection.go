@@ -36,6 +36,9 @@ var DefaultBellProvider = fx.Provide(
 
 	// from lotus
 	journal.NilJournal,
+	func() store.WeightFunc {
+		return filcns.Weight
+	},
 	modules.ChainStore,
 	filcns.NewTipSetExecutor,
 	modules.BuiltinDrandConfig,

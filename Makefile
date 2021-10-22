@@ -1,4 +1,4 @@
-I_PATH:=extern/filecoin-ffi/
+FFI_PATH:=extern/filecoin-ffi/
 FFI_DEPS:=.install-filcrypto
 FFI_DEPS:=$(addprefix $(FFI_PATH),$(FFI_DEPS))
 
