@@ -39,9 +39,9 @@ var DefaultBellProvider = fx.Provide(
 	modules.ChainStore,
 	filcns.NewTipSetExecutor,
 	modules.BuiltinDrandConfig,
-	func(cs store.ChainStore, dc dtypes.DrandSchedule) beacon.Schedule {
+	func(cs *store.ChainStore, dc dtypes.DrandSchedule) beacon.Schedule {
 		rbp := modules.RandomBeaconParams{
-			Cs:          &cs,
+			Cs:          cs,
 			DrandConfig: dc,
 		}
 		b, err := modules.RandomSchedule(rbp, dtypes.AfterGenesisSet{})
