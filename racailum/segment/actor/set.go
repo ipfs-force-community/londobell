@@ -3,6 +3,7 @@ package actor
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -135,6 +136,10 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 	if code == cid.Undef {
 		act, err := stm.LoadActor(ctx, call.To, ts)
 		if err != nil {
+			if errors.Is(err, types.ErrActorNotFound) {
+				return MethodInfo{}, fmt.Errorf("%w: %s", ErrActorMethodNotFound, err)
+			}
+
 			return MethodInfo{}, fmt.Errorf("fallback to load from StateManager, still failed: %w", err)
 		}
 
