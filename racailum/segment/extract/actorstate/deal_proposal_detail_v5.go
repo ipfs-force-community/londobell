@@ -23,6 +23,13 @@ func init() {
 			D:    &model.DealProposalDetail{},
 		},
 	)
+
+	schema.Register(
+		schema.Model{
+			Name: "deal-proposal-full",
+			D:    &model.DealProposal{},
+		},
+	)
 }
 
 func extractDealProposalDetailedV5(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market5.State) error {
@@ -47,6 +54,7 @@ func extractDealProposalDetailedV5(ctx *extract.Ctx, res *extract.Res, head *com
 	details := map[address.Address]*model.DealProposalDetail{}
 
 	var out market5.DealProposal
+	var dealProposals []model.DealProposal
 	err = deals.ForEach(&out, func(idx int64) error {
 		if _, ok := details[out.Provider]; !ok {
 			details[out.Provider] = &model.DealProposalDetail{
@@ -75,6 +83,12 @@ func extractDealProposalDetailedV5(ctx *extract.Ctx, res *extract.Res, head *com
 		} else {
 			details[out.Provider].Detail.UnVerifiedDealEndCount++
 		}
+
+		dealProposals = append(dealProposals, model.DealProposal{
+			ID:           idx,
+			Epoch:        head.Epoch,
+			DealProposal: out,
+		})
 		return nil
 	})
 
@@ -86,5 +100,8 @@ func extractDealProposalDetailedV5(ctx *extract.Ctx, res *extract.Res, head *com
 		res.Docs = append(res.Docs, details[i])
 	}
 
+	for i := range dealProposals {
+		res.Docs = append(res.Docs, &dealProposals[i])
+	}
 	return nil
 }
