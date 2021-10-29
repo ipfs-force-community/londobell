@@ -104,14 +104,14 @@ func init() {
 }
 
 var extractors = []extractor{
-	//{
-	//	name:   "tipset",
-	//	method: extractTipSet,
-	//},
-	//{
-	//	name:   "block-header",
-	//	method: extractBlochHeaders,
-	//},
+	{
+		name:   "tipset",
+		method: extractTipSet,
+	},
+	{
+		name:   "block-header",
+		method: extractBlochHeaders,
+	},
 	{
 		name:   "exec-trace",
 		method: extractExecTrace,
