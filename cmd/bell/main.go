@@ -3,8 +3,6 @@ package main
 import (
 	_ "net/http/pprof"
 	"os"
-	//"runtime/debug"
-	"time"
 
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
@@ -23,16 +21,6 @@ var (
 		Value: "~/.bell",
 	}
 )
-
-func init() {
-	go func() {
-		t := time.Tick(time.Minute * 5)
-		for {
-			<-t
-			//debug.FreeOSMemory()
-		}
-	}()
-}
 
 func main() {
 	lotuslog.SetupLogLevels()
