@@ -18,7 +18,7 @@ func init() {
 		curActorVersion := actors.Version0
 		upgrades := filcns.DefaultUpgradeSchedule()
 		for _, up := range upgrades {
-			actver,err := actors.VersionForNetwork(up.Network)
+			actver, err := actors.VersionForNetwork(up.Network)
 			if err != nil {
 				panic(err)
 			}
