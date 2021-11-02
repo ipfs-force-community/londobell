@@ -9,4 +9,4 @@ then
 fi
 
 echo "make link for build dir"
-ln -s `go run tool/import.go` ./build
+ln -s `go run tool/import/main.go` ./build

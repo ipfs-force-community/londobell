@@ -66,9 +66,9 @@ dist-clean:
 
 
 gen-indexes:
-	go run ./tool/genindex.go > ./tool/mgoscripts/epoch_indexes.js
+	go run ./tool/genindex/main.go > ./tool/mgoscripts/epoch_indexes.js
 
 
 gen-model:
-	go run ./tool/genschema.go > ./tool/analytics/model_schema.md
-	go run ./tool/genexamples.go > ./tool/analytics/model_example.md
+	go run ./tool/genschema/main.go > ./tool/analytics/model_schema.md
+	go run ./tool/genexamples/main.go > ./tool/analytics/model_example.md
