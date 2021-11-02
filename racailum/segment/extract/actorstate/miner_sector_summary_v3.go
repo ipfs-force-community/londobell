@@ -48,7 +48,7 @@ func extractMinerSectorSummaryV3(ctx *extract.Ctx, res *extract.Res, head *commo
 	summaries := make([]*model.MinerSectorSummaryRange, 0, len(summaryDaysV3)+1)
 	summariesInDays := make([]*model.MinerSectorSummaryRange, 0, int(daysMax+1))
 
-	var prevDays abi.ChainEpoch = 0
+	var prevDays abi.ChainEpoch
 	for _, days := range summaryDaysV3 {
 		current := &model.MinerSectorSummaryRange{
 			LowerBound:              prevDays * builtin3.EpochsInDay,
