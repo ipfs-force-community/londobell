@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/dtynn/londobell/common"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 // New returns a limiter with given capacity

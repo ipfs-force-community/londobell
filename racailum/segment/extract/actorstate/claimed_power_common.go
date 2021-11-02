@@ -7,7 +7,7 @@ import (
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/ipfs/go-cid"
 
-	"github.com/dtynn/londobell/common"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 func genClaimedPowerID(buf *bytes.Buffer, keystr string, detail cbor.Er) (cid.Cid, error) {

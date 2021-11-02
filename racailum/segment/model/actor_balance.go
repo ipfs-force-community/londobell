@@ -4,8 +4,8 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/racailum/segment/model/schema"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 var (

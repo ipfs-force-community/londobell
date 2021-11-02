@@ -9,8 +9,8 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/lib/mgoutil/mcodec"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/mgoutil/mcodec"
 )
 
 func init() {

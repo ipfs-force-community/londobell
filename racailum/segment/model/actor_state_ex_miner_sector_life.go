@@ -3,7 +3,7 @@ package model
 import (
 	"github.com/filecoin-project/go-state-types/abi"
 
-	"github.com/dtynn/londobell/common"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 var (

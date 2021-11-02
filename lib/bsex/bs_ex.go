@@ -8,7 +8,7 @@ import (
 
 	"github.com/filecoin-project/lotus/blockstore"
 
-	"github.com/dtynn/londobell/prometheus"
+	"github.com/ipfs-force-community/londobell/prometheus"
 )
 
 var _ blockstore.Blockstore = (*CachedBlockstore)(nil)

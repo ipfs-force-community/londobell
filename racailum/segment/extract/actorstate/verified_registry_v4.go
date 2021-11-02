@@ -3,8 +3,8 @@ package actorstate
 import (
 	verifreg4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/verifreg"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 )
 
 func init() {

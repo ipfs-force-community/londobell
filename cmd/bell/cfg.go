@@ -10,7 +10,7 @@ import (
 
 	"github.com/filecoin-project/lotus/node/config"
 
-	"github.com/dtynn/londobell/racailum"
+	"github.com/ipfs-force-community/londobell/racailum"
 )
 
 var cfgCmd = &cli.Command{

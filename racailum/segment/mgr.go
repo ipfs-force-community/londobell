@@ -9,7 +9,7 @@ import (
 
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 
-	"github.com/dtynn/londobell/common"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 var (

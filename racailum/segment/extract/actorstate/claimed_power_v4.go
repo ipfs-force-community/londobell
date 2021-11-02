@@ -11,10 +11,10 @@ import (
 	power4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/power"
 	adt4 "github.com/filecoin-project/specs-actors/v4/actors/util/adt"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/racailum/segment/extract"
-	"github.com/dtynn/londobell/racailum/segment/model"
-	"github.com/dtynn/londobell/racailum/segment/model/schema"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {

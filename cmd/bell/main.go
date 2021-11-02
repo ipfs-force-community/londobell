@@ -10,8 +10,8 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/lib/lotuslog"
 
-	"github.com/dtynn/londobell/dep"
-	"github.com/dtynn/londobell/lib/mgoutil/mcodec"
+	"github.com/ipfs-force-community/londobell/dep"
+	"github.com/ipfs-force-community/londobell/lib/mgoutil/mcodec"
 )
 
 var (

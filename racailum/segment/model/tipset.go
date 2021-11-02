@@ -6,7 +6,7 @@ import (
 
 	"github.com/filecoin-project/lotus/chain/types"
 
-	"github.com/dtynn/londobell/common"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 var _ common.IndexedDocument = (*TipSet)(nil)

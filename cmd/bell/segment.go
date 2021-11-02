@@ -13,10 +13,10 @@ import (
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/dep"
-	"github.com/dtynn/londobell/lib/fxex"
-	"github.com/dtynn/londobell/racailum/segment"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/dep"
+	"github.com/ipfs-force-community/londobell/lib/fxex"
+	"github.com/ipfs-force-community/londobell/racailum/segment"
 )
 
 var segmentCmd = &cli.Command{

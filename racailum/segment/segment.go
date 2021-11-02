@@ -12,10 +12,10 @@ import (
 
 	"github.com/filecoin-project/lotus/chain/types"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/lib/mgoutil"
-	"github.com/dtynn/londobell/lib/mgoutil/mdict"
-	"github.com/dtynn/londobell/racailum/segment/aggregate"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/mgoutil"
+	"github.com/ipfs-force-community/londobell/lib/mgoutil/mdict"
+	"github.com/ipfs-force-community/londobell/racailum/segment/aggregate"
 )
 
 var log = logging.Logger("segment")

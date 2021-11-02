@@ -7,7 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/dtynn/londobell/common"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets [][]common.Document) error {

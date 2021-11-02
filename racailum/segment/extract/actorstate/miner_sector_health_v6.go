@@ -8,9 +8,9 @@ import (
 	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
 	"github.com/ipfs/go-cid"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/racailum/segment/extract"
-	"github.com/dtynn/londobell/racailum/segment/model"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 )
 
 func init() {

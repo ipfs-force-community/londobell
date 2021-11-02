@@ -11,9 +11,9 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/lib/limiter"
-	"github.com/dtynn/londobell/lib/mgoutil/jsbson"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/limiter"
+	"github.com/ipfs-force-community/londobell/lib/mgoutil/jsbson"
 )
 
 var log = logging.Logger("aggregate")
