@@ -422,7 +422,6 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	count := 0
 	actors := []*common.ActorHead{}
 	var powerActor *types.Actor
-	store := ctx.D.ActorStore(ctx.C)
 	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
 		count++
 		if addr == builtin.SystemActorAddr || addr == builtin.CronActorAddr {
@@ -433,21 +432,12 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			powerActor = act
 		}
 
-		newActorHead := &common.ActorHead{
+		actors = append(actors, &common.ActorHead{
 			Actor:             act,
 			CirculatingSupply: &supply,
 			Addr:              addr,
 			Epoch:             height,
-		}
-		if builtin2.IsAccountActor(act.Code) {
-			pubAddr, err := vm.ResolveToKeyAddr(tree, store, addr)
-			if err != nil {
-				return err
-			}
-			newActorHead.PubAddr = pubAddr
-		}
-
-		actors = append(actors, newActorHead)
+		})
 
 		return nil
 	})
