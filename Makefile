@@ -38,9 +38,10 @@ build-dep/.update-modules:
 CLEAN+=build-dep/.update-modules
 
 test: $(BUILD_DEPS)
-	go test -v -failfast ./...
+	go test -v -failfast `go list ./... | grep -v /extern/`
 
 lint: $(BUILD_DEPS)
+	go vet `go list ./... | grep -v /extern/`
 	golint --set_exit_status `go list ./... | grep -v /extern/`
 
 dep-check: build-dep/.update-modules
