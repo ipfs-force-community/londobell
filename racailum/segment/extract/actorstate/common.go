@@ -30,8 +30,8 @@ var (
 )
 
 var (
-	bigZero         = big.Zero()
-	tokenAmountZero = abi.NewTokenAmount(0)
+	bigZero = big.Zero()
+	// tokenAmountZero = abi.NewTokenAmount(0)
 )
 
 type registry struct {

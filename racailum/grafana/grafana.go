@@ -94,7 +94,7 @@ func (g *Grafana) Run(ctx context.Context) error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		srv.Shutdown(shutdownCtx)
+		srv.Shutdown(shutdownCtx) // nolint: errcheck
 	}()
 
 	return srv.ListenAndServe()

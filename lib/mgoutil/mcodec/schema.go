@@ -199,7 +199,7 @@ func ExampleRegisry() *bsoncodec.Registry {
 	builder = builder.RegisterDefaultEncoder(reflect.Struct, structCodec)
 	builder = builder.RegisterDefaultEncoder(reflect.Slice, schemaSliceExampleCodec{})
 	builder = builder.RegisterDefaultEncoder(reflect.Ptr, schemaPtrExampleCodec{})
-	builder = builder.RegisterEncoder(reflect.TypeOf([]byte(nil)), schemaBytesExampleCodec{})
+	builder = builder.RegisterTypeEncoder(reflect.TypeOf([]byte(nil)), schemaBytesExampleCodec{})
 
 	reg.RLock()
 	for t := range reg.codecs {

@@ -93,6 +93,9 @@ func extractMinerSectorHealthV5(ctx *extract.Ctx, res *extract.Res, head *common
 			return nil
 		})
 	})
+	if err != nil {
+		return fmt.Errorf("walk through deadlines: %w", err)
+	}
 
 	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {

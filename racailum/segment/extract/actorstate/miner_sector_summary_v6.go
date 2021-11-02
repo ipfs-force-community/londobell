@@ -46,7 +46,7 @@ func extractMinerSectorSummaryV6(ctx *extract.Ctx, res *extract.Res, head *commo
 	summaries := make([]*model.MinerSectorSummaryRange, 0, len(summaryDaysV6)+1)
 	summariesInDays := make([]*model.MinerSectorSummaryRange, 0, int(daysMax+1))
 
-	var prevDays abi.ChainEpoch = 0
+	var prevDays abi.ChainEpoch
 	for _, days := range summaryDaysV6 {
 		current := &model.MinerSectorSummaryRange{
 			LowerBound:              prevDays * builtin6.EpochsInDay,
@@ -116,7 +116,7 @@ func extractMinerSectorSummaryV6(ctx *extract.Ctx, res *extract.Res, head *commo
 
 		if out.SealProof < abi.RegisteredSealProof_StackedDrg2KiBV1_1 {
 			target.TotalV1InitialPledge = big.Add(target.TotalV1InitialPledge, out.InitialPledge)
-			target.V1SectorCount += 1
+			target.V1SectorCount++
 		}
 
 		if len(out.DealIDs) == 0 {

@@ -12,7 +12,7 @@ import (
 var _ common.IndexedDocument = (*TipSet)(nil)
 
 var (
-	tipsetColName    = getColName(TipSet{})
+	// tipsetColName    = getColName(TipSet{})
 	tipsetEpochField = extractEpochFieldName(TipSet{})
 )
 

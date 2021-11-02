@@ -31,12 +31,6 @@ var raCmd = &cli.Command{
 	},
 }
 
-func copyFlags(src []cli.Flag) []cli.Flag {
-	dst := make([]cli.Flag, len(src))
-	copy(dst, src)
-	return dst
-}
-
 func buildRaApp(cctx *cli.Context, full v0api.FullNode, target interface{}) (*fx.App, error) {
 	racfg, err := loadConfig(cctx)
 	if err != nil {
@@ -104,7 +98,7 @@ var raRunCmd = &cli.Command{
 			return err
 		}
 
-		defer app.Stop(cctx.Context)
+		defer app.Stop(cctx.Context) // nolint: errcheck
 
 		ctx := cctx.Context
 
@@ -267,7 +261,7 @@ var raRunCmd = &cli.Command{
 //             return nil
 //         }
 
-//         log.Infow("boundry loaded", "lo", lo.Height(), "hi", hi.Height())
+//         log.Infow("boundray loaded", "lo", lo.Height(), "hi", hi.Height())
 
 //         err = components.Ra.Aggregate(cctx.Context, lo.TipSet, hi.TipSet)
 //         if err != nil {

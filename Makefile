@@ -38,10 +38,10 @@ build-dep/.update-modules:
 CLEAN+=build-dep/.update-modules
 
 test: $(BUILD_DEPS)
-	go test -v -failfast ./...
+	go test -v -failfast `go list ./... | grep -v /extern/`
 
 lint: $(BUILD_DEPS)
-	golint --set_exit_status `go list ./... | grep -v /extern/`
+	golangci-lint run
 
 dep-check: build-dep/.update-modules
 	./tool/scripts/submodule-check.sh
@@ -49,17 +49,15 @@ dep-check: build-dep/.update-modules
 build-bell: $(BUILD_DEPS)
 	rm -rf ./bell
 	go build $(GOFLAGS) -o bell ./cmd/bell
-	go run github.com/GeertJohan/go.rice/rice append --exec bell -i ./build
 
 build-bell-grafana: $(BUILD_DEPS)
 	rm -rf ./bell-grafana
 	go build $(GOFLAGS) -o bell-grafana ./cmd/bell-grafana
-	go run github.com/GeertJohan/go.rice/rice append --exec bell-grafana -i ./build
+
 build-bell-calib: GOFLAGS+=-tags=calibnet
 build-bell-calib: $(BUILD_DEPS)
 	rm -rf ./bell
 	go build $(GOFLAGS) -o bell ./cmd/bell
-	go run github.com/GeertJohan/go.rice/rice append --exec bell -i ./build
 
 
 dist-clean:
@@ -68,9 +66,9 @@ dist-clean:
 
 
 gen-indexes:
-	go run ./tool/genindex.go > ./tool/mgoscripts/epoch_indexes.js
+	go run ./tool/genindex/main.go > ./tool/mgoscripts/epoch_indexes.js
 
 
 gen-model:
-	go run ./tool/genschema.go > ./tool/analytics/model_schema.md
-	go run ./tool/genexamples.go > ./tool/analytics/model_example.md
+	go run ./tool/genschema/main.go > ./tool/analytics/model_schema.md
+	go run ./tool/genexamples/main.go > ./tool/analytics/model_example.md

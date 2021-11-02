@@ -21,7 +21,7 @@ var (
 var (
 	_ common.Indexed = (*ActorStateExBasic)(nil)
 
-	actorStateExBasicEpochField = extractEpochFieldName(ActorStateExBasic{})
+	// actorStateExBasicEpochField = extractEpochFieldName(ActorStateExBasic{})
 )
 
 // ActorStateExBasic is the basic schema for all kinds of actor-state-exes

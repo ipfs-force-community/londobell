@@ -42,6 +42,9 @@ var cfgInitCmd = &cli.Command{
 		}
 
 		err = os.MkdirAll(filepath.Dir(cfgPath), 0755)
+		if err != nil {
+			return fmt.Errorf("MkdirAll for %s: %w", cfgPath, err)
+		}
 
 		cfg := racailum.DefaultConfig()
 		content, err := config.ConfigComment(cfg)

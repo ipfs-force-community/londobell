@@ -42,6 +42,10 @@ func extractMarketFundsV6(ctx *extract.Ctx, res *extract.Res, head *common.Actor
 
 	actStore := ctx.D.ActorStore(ctx.C)
 	proposals, err := market6.AsDealProposalArray(actStore, st.Proposals)
+	if err != nil {
+		return fmt.Errorf("constrcut DealProposalArray: %w", err)
+	}
+
 	deal := &market6.DealProposal{}
 	err = proposals.ForEach(deal, func(_ int64) error {
 		if deal.StartEpoch >= head.Epoch {
@@ -74,6 +78,10 @@ func extractMarketFundsV6(ctx *extract.Ctx, res *extract.Res, head *common.Actor
 		}
 		return nil
 	})
+
+	if err != nil {
+		return fmt.Errorf("walk throuth proposals: %w", err)
+	}
 
 	totalLock := big.Add(big.Add(st.TotalProviderLockedCollateral, st.TotalClientLockedCollateral), st.TotalClientStorageFee)
 	detail.TotalLocked = totalLock

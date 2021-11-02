@@ -4,11 +4,9 @@ import (
 	"reflect"
 
 	"github.com/filecoin-project/go-state-types/cbor"
-	
+
 	"github.com/filecoin-project/lotus/chain/vm"
 )
-
-var emptyType reflect.Type
 
 // MethodSend is the method info for builtin.MethodSend
 var MethodSend = MethodInfo{

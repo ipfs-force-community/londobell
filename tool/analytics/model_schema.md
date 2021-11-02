@@ -1,4 +1,31 @@
 ## Schema
+### ActorBalance
+
+```
+{
+	"Addr": "address.Address",
+	"Addresses": "[]address.Address",
+	"Balance": "big.Int",
+	"Code": "string",
+	"Epoch": "abi.ChainEpoch",
+	"Path": "[]cid.Cid",
+	"_id": "cid.Cid"
+}
+```
+
+### ActorState
+
+```
+{
+	"Addr": "address.Address",
+	"Balance": "big.Int",
+	"Code": "string",
+	"Detail": "model.ActorStateDetail",
+	"Epoch": "abi.ChainEpoch",
+	"_id": "cid.Cid"
+}
+```
+
 ### AllocatedSectors
 
 ```
@@ -40,6 +67,45 @@
 	"Epoch": "abi.ChainEpoch",
 	"Path": "[]cid.Cid",
 	"_id": "cid.Cid"
+}
+```
+
+### DealProposal
+
+```
+{
+	"Client": "address.Address",
+	"ClientCollateral": "big.Int",
+	"EndEpoch": "abi.ChainEpoch",
+	"Epoch": "abi.ChainEpoch",
+	"Label": "string",
+	"PieceCID": "cid.Cid",
+	"PieceSize": "abi.PaddedPieceSize",
+	"Provider": "address.Address",
+	"ProviderCollateral": "big.Int",
+	"StartEpoch": "abi.ChainEpoch",
+	"StoragePricePerEpoch": "big.Int",
+	"VerifiedDeal": "bool",
+	"_id": "int64"
+}
+```
+
+### DealProposalDetail
+
+```
+{
+	"ActorStateExBasic": {
+		"Addr": "address.Address",
+		"Epoch": "abi.ChainEpoch",
+		"Path": "[]cid.Cid",
+		"_id": "cid.Cid"
+	},
+	"Detail": {
+		"UnVerifiedDealCount": "uint64",
+		"UnVerifiedDealEndCount": "uint64",
+		"VerifiedDealCount": "uint64",
+		"VerifiedDealEndCount": "uint64"
+	}
 }
 ```
 
@@ -132,9 +198,30 @@
 		"FilCirculating": "big.Int",
 		"FilLocked": "big.Int",
 		"FilMined": "big.Int",
+		"FilReserveDisbursed": "big.Int",
 		"FilVested": "big.Int"
 	},
 	"_id": "abi.ChainEpoch"
+}
+```
+
+### MarketFunds
+
+```
+{
+	"Addr": "address.Address",
+	"Detail": {
+		"ClientUnLockCollateralInFuture": "[]big.Int",
+		"ClientUnlockStorageFeeInFuture": "[]big.Int",
+		"ProviderUnLockCollateralInFuture": "[]big.Int",
+		"TotalClientLockedCollateral": "big.Int",
+		"TotalClientStorageFee": "big.Int",
+		"TotalLocked": "big.Int",
+		"TotalProviderLockedCollateral": "big.Int"
+	},
+	"Epoch": "abi.ChainEpoch",
+	"Path": "[]cid.Cid",
+	"_id": "cid.Cid"
 }
 ```
 
@@ -145,9 +232,27 @@
 	"Detail": {
 		"Actor": "string",
 		"Method": "string",
+		"PackedHeight": "abi.ChainEpoch",
 		"Params": "model.MessageParams"
 	},
 	"_id": "cid.Cid"
+}
+```
+
+### MinerDealSector
+
+```
+{
+	"DealIDs": "[]abi.DealID",
+	"DealWeight": "big.Int",
+	"Epoch": "abi.ChainEpoch",
+	"InitialPledge": "big.Int",
+	"Miner": "address.Address",
+	"QAPower": "big.Int",
+	"SealProof": "abi.RegisteredSealProof",
+	"SectorNumber": "abi.SectorNumber",
+	"VerifiedDealWeight": "big.Int",
+	"_id": "string"
 }
 ```
 
@@ -160,8 +265,9 @@
 		"FeeDebt": "big.Int",
 		"InitialPledge": "big.Int",
 		"LockedFunds": "big.Int",
+		"PledgeRelease": "[]big.Int",
 		"PreCommitDeposits": "big.Int",
-		"VestingTotal": "big.Int"
+		"VestInFuture": "[]big.Int"
 	},
 	"Epoch": "abi.ChainEpoch",
 	"Path": "[]cid.Cid",
@@ -175,6 +281,7 @@
 {
 	"Addr": "address.Address",
 	"Detail": {
+		"CommittedCapacity": "uint64",
 		"Summaries": "[]*model.MinerSectorSummaryRange"
 	},
 	"Epoch": "abi.ChainEpoch",
@@ -193,6 +300,7 @@
 		"InitialConsensusPledge": "big.Int",
 		"InitialPledge": "big.Int",
 		"InitialStoragePledge": "big.Int",
+		"Mined": "big.Int",
 		"ProjectionOfFaultFee": "big.Int",
 		"ProjectionOfInitialPledge": "big.Int"
 	},
@@ -209,6 +317,7 @@
 	"Addr": "address.Address",
 	"Detail": {
 		"Locked": "big.Int",
+		"VestInFuture": "[]big.Int",
 		"Vested": "big.Int"
 	},
 	"Epoch": "abi.ChainEpoch",
