@@ -8,8 +8,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/vm"
 )
 
-var emptyType reflect.Type
-
 // MethodSend is the method info for builtin.MethodSend
 var MethodSend = MethodInfo{
 	Actor: "",
