@@ -5,8 +5,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/racailum/segment/actor"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
 )
 
 // NewCtx constructs a new extract context

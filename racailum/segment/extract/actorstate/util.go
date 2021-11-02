@@ -8,7 +8,7 @@ import (
 	"github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/ipfs/go-cid"
 
-	"github.com/dtynn/londobell/common"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 func extractCborObject(dal common.DAL, c cid.Cid, out cbor.Er) error {

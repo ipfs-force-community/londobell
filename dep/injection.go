@@ -19,8 +19,8 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/lib/fxex"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/fxex"
 )
 
 var (

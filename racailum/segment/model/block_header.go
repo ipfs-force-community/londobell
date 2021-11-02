@@ -3,14 +3,14 @@ package model
 import (
 	"fmt"
 
-	"github.com/dtynn/londobell/lib/mir"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/chain/types"
 
-	"github.com/dtynn/londobell/common"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/mir"
 )
 
 var (

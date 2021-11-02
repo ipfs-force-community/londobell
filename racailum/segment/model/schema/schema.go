@@ -3,7 +3,7 @@ package schema
 import (
 	"sync"
 
-	"github.com/dtynn/londobell/common"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 // Model is a named document

@@ -15,13 +15,13 @@ import (
 	dstore "github.com/ipfs/go-datastore"
 	"go.uber.org/fx"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/lib/bsex"
-	"github.com/dtynn/londobell/lib/cliex"
-	"github.com/dtynn/londobell/lib/mgoutil"
-	"github.com/dtynn/londobell/lib/mgoutil/mmetamgr"
-	"github.com/dtynn/londobell/racailum"
-	"github.com/dtynn/londobell/racailum/segment"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/bsex"
+	"github.com/ipfs-force-community/londobell/lib/cliex"
+	"github.com/ipfs-force-community/londobell/lib/mgoutil"
+	"github.com/ipfs-force-community/londobell/lib/mgoutil/mmetamgr"
+	"github.com/ipfs-force-community/londobell/racailum"
+	"github.com/ipfs-force-community/londobell/racailum/segment"
 )
 
 var (

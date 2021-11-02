@@ -1,4 +1,4 @@
-module github.com/dtynn/londobell
+module github.com/ipfs-force-community/londobell
 
 go 1.16
 

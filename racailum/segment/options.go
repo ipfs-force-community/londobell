@@ -3,8 +3,8 @@ package segment
 import (
 	"github.com/filecoin-project/go-state-types/abi"
 
-	"github.com/dtynn/londobell/racailum/segment/aggregate"
-	"github.com/dtynn/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/aggregate"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 )
 
 type extractOptions struct {

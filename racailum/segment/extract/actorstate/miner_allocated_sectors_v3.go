@@ -3,8 +3,8 @@ package actorstate
 import (
 	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 )
 
 func init() {

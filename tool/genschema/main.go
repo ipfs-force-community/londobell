@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dtynn/londobell/lib/mgoutil/mcodec"
-	_ "github.com/dtynn/londobell/racailum/segment/extract/actorstate"
-	_ "github.com/dtynn/londobell/racailum/segment/extract/tipset"
-	_ "github.com/dtynn/londobell/racailum/segment/model"
-	"github.com/dtynn/londobell/racailum/segment/model/schema"
+	"github.com/ipfs-force-community/londobell/lib/mgoutil/mcodec"
+	_ "github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate"
+	_ "github.com/ipfs-force-community/londobell/racailum/segment/extract/tipset"
+	_ "github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func main() {

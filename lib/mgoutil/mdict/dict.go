@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/dtynn/londobell/common"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 var _ common.ChainDict = (*Dict)(nil)

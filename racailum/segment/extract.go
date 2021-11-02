@@ -8,12 +8,12 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"go.uber.org/zap"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/lib/limiter"
-	"github.com/dtynn/londobell/racailum/segment/actor"
-	"github.com/dtynn/londobell/racailum/segment/extract"
-	east "github.com/dtynn/londobell/racailum/segment/extract/actorstate"
-	ets "github.com/dtynn/londobell/racailum/segment/extract/tipset"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/limiter"
+	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	east "github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate"
+	ets "github.com/ipfs-force-community/londobell/racailum/segment/extract/tipset"
 )
 
 type persistCtx struct {

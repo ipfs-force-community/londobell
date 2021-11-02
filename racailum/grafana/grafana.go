@@ -8,9 +8,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/dtynn/londobell/lib/limiter"
-	"github.com/dtynn/londobell/lib/mgoutil/jsbson"
-	"github.com/dtynn/londobell/racailum/segment"
+	"github.com/ipfs-force-community/londobell/lib/limiter"
+	"github.com/ipfs-force-community/londobell/lib/mgoutil/jsbson"
+	"github.com/ipfs-force-community/londobell/racailum/segment"
 	logging "github.com/ipfs/go-log/v2"
 )
 

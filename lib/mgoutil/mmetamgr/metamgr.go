@@ -11,8 +11,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 
-	"github.com/dtynn/londobell/common"
-	"github.com/dtynn/londobell/lib/mgoutil"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/mgoutil"
 )
 
 var log = logging.Logger("metamgr")

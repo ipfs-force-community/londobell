@@ -9,8 +9,8 @@ import (
 
 	"github.com/filecoin-project/lotus/chain/types"
 
-	"github.com/dtynn/londobell/lib/chainx"
-	"github.com/dtynn/londobell/racailum/segment/model/schema"
+	"github.com/ipfs-force-community/londobell/lib/chainx"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {
