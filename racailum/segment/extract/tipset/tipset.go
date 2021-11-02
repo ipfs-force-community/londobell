@@ -4,11 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	"github.com/ipfs/go-cid"
+	"golang.org/x/xerrors"
 
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
@@ -17,13 +22,14 @@ import (
 	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
 
 	"github.com/filecoin-project/lotus/api"
-	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
+	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 	"github.com/filecoin-project/lotus/chain/types"
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/lib/mir"
 	"github.com/dtynn/londobell/racailum/segment/actor"
 	"github.com/dtynn/londobell/racailum/segment/extract"
+	"github.com/dtynn/londobell/racailum/segment/extract/actorstate"
 	"github.com/dtynn/londobell/racailum/segment/model"
 	"github.com/dtynn/londobell/racailum/segment/model/schema"
 )
@@ -98,14 +104,14 @@ func init() {
 }
 
 var extractors = []extractor{
-	{
-		name:   "tipset",
-		method: extractTipSet,
-	},
-	{
-		name:   "block-header",
-		method: extractBlochHeaders,
-	},
+	//{
+	//	name:   "tipset",
+	//	method: extractTipSet,
+	//},
+	//{
+	//	name:   "block-header",
+	//	method: extractBlochHeaders,
+	//},
 	{
 		name:   "exec-trace",
 		method: extractExecTrace,
@@ -113,6 +119,10 @@ var extractors = []extractor{
 	{
 		name:   "actor-head",
 		method: extractActorHead,
+	},
+	{
+		name:   "actor-balance",
+		method: extractActorBalance,
 	},
 }
 
@@ -190,11 +200,11 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	elog := ctx.L.With("epoch", ts.Height())
 
-	if isExpensive(ctx.C, ctx.D, ts) {
-		// TODO: extract simple invoc results here
-		elog.Warn("ignore expensive epoch exec trace")
-		return nil
-	}
+	// if isExpensive(ctx.C, ctx.D, ts) {
+	//     // TODO: extract simple invoc results here
+	//     elog.Warn("ignore expensive epoch exec trace")
+	//     return nil
+	// }
 
 	start := time.Now()
 	st, rawinvocs, err := ctx.D.ExecutionTrace(ctx.C, ts.TipSet)
@@ -282,7 +292,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 		mcid := msg.Cid()
 		if _, has := dupmsgs[mcid]; !has {
-			mmsg, err := model.NewMessage(mcid, msg, mi.Actor, mi.Method.Name, mi.ParamObj())
+			mmsg, err := model.NewMessage(mcid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 			if err != nil {
 				elog.Errorw("convert to model.Message", "mcid", mcid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
@@ -310,12 +320,91 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	return nil
 }
 
+func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
+	height := ts.Height()
+	if ticks := ctx.Opts.StateRegular.ActorBalance; ticks > 0 && height%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
+		return nil
+	}
+
+	root := ts.ParentState()
+	tree, err := ctx.D.StateTree(root)
+	if err != nil {
+		return fmt.Errorf("load state tree for %s: %w", root, err)
+	}
+	actorBalance := []*model.ActorBalance{}
+	iact, err := tree.GetActor(_init.Address)
+	if err != nil {
+		return xerrors.Errorf("failed to load init actor: %w", err)
+	}
+	store := ctx.D.ActorStore(ctx.C)
+	ist, err := _init.Load(store, iact)
+	if err != nil {
+		return xerrors.Errorf("failed to load init actor state: %w", err)
+	}
+	robustMap := make(map[address.Address]address.Address)
+	err = ist.ForEachActor(func(id abi.ActorID, addr address.Address) error {
+		idAddr, err := address.NewIDAddress(uint64(id))
+		if err != nil {
+			return xerrors.Errorf("failed to write to addr map: %w", err)
+		}
+
+		robustMap[idAddr] = addr
+
+		return nil
+	})
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("actor balanced extracted")
+	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
+		addresses := []address.Address{addr, robustMap[addr]}
+		if builtin2.IsAccountActor(act.Code) {
+			pubAddr, err := vm.ResolveToKeyAddr(tree, store, addr)
+			if err != nil {
+				return err
+			}
+			addresses = append(addresses, pubAddr)
+		}
+		id, err := actorstate.GenRegularHeadID(act.Head, addr, height)
+		if err != nil {
+			return fmt.Errorf("generate regular id: %w", err)
+		}
+		actType := builtin2.ActorNameByCode(act.Code)
+		actTypes := strings.Split(actType, "/")
+		if len(actTypes) > 1 {
+			actType = actTypes[len(actTypes)-1]
+		} else {
+			elog.Warnf("actor %s acttype out of design", actType)
+		}
+
+		actorBalance = append(actorBalance, &model.ActorBalance{
+			ActorStateExBasic: model.ActorStateExBasic{
+				ID:    id,
+				Path:  []cid.Cid{act.Head},
+				Addr:  addr,
+				Epoch: height,
+			},
+			Addresses: addresses,
+			Balance:   act.Balance,
+			Code:      actType,
+		})
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walk through all actors: %w", err)
+	}
+
+	for i := range actorBalance {
+		res.Docs = append(res.Docs, actorBalance[i])
+	}
+
+	return nil
+}
+
 func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
 	height := ts.Height()
-	forDiff := ctx.Opts.StateDiff.Interval > 0 && height%ctx.Opts.StateDiff.Interval == 0
+
 	forRegular := ctx.Opts.StateRegular.Interval > 0 && height%ctx.Opts.StateRegular.Interval == 0
 
-	if !forDiff && !forRegular {
+	if !forRegular {
 		return nil
 	}
 
@@ -334,7 +423,8 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	actors := []*common.ActorHead{}
 	var powerActor *types.Actor
 	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
-		if addr == builtin.SystemActorAddr || addr == builtin.CronActorAddr || lbuiltin.IsAccountActor(act.Code) {
+		count++
+		if addr == builtin.SystemActorAddr || addr == builtin.CronActorAddr {
 			return nil
 		}
 
@@ -357,30 +447,13 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	}
 
 	elog := ctx.L.With("epoch", height)
-	elog.Infow("actor heads extracted", "count", count, "valuable", len(actors), "regular", forRegular, "diff", forDiff)
+	elog.Infow("actor heads extracted", "count", count, "valuable", len(actors))
 
-	if forRegular {
-		for ai := range actors {
-			actors[ai].Global.Power = powerActor
-		}
-
-		res.RegularStates = actors
+	for ai := range actors {
+		actors[ai].Global.Power = powerActor
 	}
 
-	if forDiff {
-		replaced := 0
-		ctx.Actors.Head.Lock()
-		for ai := range actors {
-			ahead := actors[ai].Head
-			prev, has := ctx.Actors.Head.M[ahead]
-			if !has || prev.Epoch > actors[ai].Epoch {
-				ctx.Actors.Head.M[ahead] = actors[ai]
-				replaced++
-			}
-		}
-		ctx.Actors.Head.Unlock()
-		elog.Infow("diff heads extracted", "replaced", replaced)
-	}
+	res.RegularStates = actors
 
 	res.Docs = append(res.Docs, &model.FilSupply{
 		Epoch:             height,

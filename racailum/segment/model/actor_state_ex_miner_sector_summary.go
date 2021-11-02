@@ -1,9 +1,10 @@
 package model
 
 import (
-	"github.com/dtynn/londobell/common"
 	"github.com/filecoin-project/go-state-types/abi"
 	"go.uber.org/zap"
+
+	"github.com/dtynn/londobell/common"
 )
 
 var (
@@ -16,7 +17,8 @@ var (
 
 // MinerSectorSummaryDetail contains the summaries in days of miner sectors
 type MinerSectorSummaryDetail struct {
-	Summaries []*MinerSectorSummaryRange
+	Summaries         []*MinerSectorSummaryRange
+	CommittedCapacity uint64
 }
 
 // MinerSectorSummaryRange is the summary of sectors with remain duration within the range [Lower, Upper)
@@ -25,9 +27,11 @@ type MinerSectorSummaryRange struct {
 	UpperBound              abi.ChainEpoch
 	SectorCount             uint64
 	DealCount               uint64
+	V1SectorCount           uint64
 	TotalDealWeight         abi.DealWeight
 	TotalVerifiedDealWeight abi.DealWeight
 	TotalInitialPledge      abi.TokenAmount
+	TotalV1InitialPledge    abi.TokenAmount
 }
 
 // MinerSectorSummary shows the distribution of sector lifetimes of a miner

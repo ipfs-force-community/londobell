@@ -8,7 +8,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/filecoin-project/go-jsonrpc"
-	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
@@ -52,6 +52,6 @@ func getRepoHomeDir(cctx *cli.Context) (string, error) {
 	return dir, nil
 }
 
-func getFullNode(cctx *cli.Context) (api.FullNode, jsonrpc.ClientCloser, error) {
+func getFullNode(cctx *cli.Context) (v0api.FullNode, jsonrpc.ClientCloser, error) {
 	return cliutil.GetFullNodeAPI(cctx)
 }

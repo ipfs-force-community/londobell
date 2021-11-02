@@ -126,12 +126,20 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 				}
 			}()
 
-			res := extract.NewRes(1024)
+			forRegular := ectx.Opts.StateRegular.Interval > 0 && ts.Height()%ectx.Opts.StateRegular.Interval == 0
+			regCap := 0
+			if forRegular {
+				regCap = 700000
+			}
+
+			res := extract.NewRes(4096, regCap)
 
 			err = ets.Extract(ectx, res, ts)
 			if err != nil {
 				return common.NonCtxCanceledErr(err)
 			}
+
+			log.Infof("after Extract res docs lens %d res regular states %d\n", len(res.Docs), len(res.RegularStates))
 
 			docs[ti] = res.Docs
 			regulars[ti] = res.RegularStates
@@ -170,7 +178,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 		}
 	}
 
-	return s.extractDiffStates(ectx)
+	return nil
 }
 
 func (s *Segment) extractRegularStates(ctx *extract.Ctx, heads []*common.ActorHead) error {
@@ -224,11 +232,15 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, heads []*common.ActorHe
 				}
 			}()
 
-			res := extract.NewRes(1024)
+			res := extract.NewRes(8, 0)
 
 			err = east.ExtractRegular(ctx, res, head)
 			if err != nil {
 				return common.NonCtxCanceledErr(err)
+			}
+
+			if len(res.Docs) > 8 {
+				log.Infof("after ExtractRegular res len is %d reg len is %d\n", len(res.Docs), len(res.RegularStates))
 			}
 
 			docs[hi] = res.Docs
@@ -248,86 +260,6 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, heads []*common.ActorHe
 	return nil
 }
 
-func (s *Segment) extractDiffStates(ctx *extract.Ctx) error {
-	ctx.Actors.Head.Lock()
-	heads := ctx.Actors.Head.M
-	ctx.Actors.Head.Unlock()
-
-	if len(heads) == 0 {
-		return nil
-	}
-
-	start := time.Now()
-	defer func() {
-		ctx.L.Infow("actor diff states extracting done", "elapsed", time.Now().Sub(start).String())
-	}()
-
-	originCtx := ctx.C
-	innerCtx, innerCancel := context.WithCancel(originCtx)
-	defer innerCancel()
-
-	ctx.C = innerCtx
-	defer func() {
-		ctx.C = originCtx
-	}()
-
-	var ewg multierror.Group
-	docs := make([][]common.Document, len(heads))
-	lim := limiter.New(s.opts.Extract.StateJobLimit)
-
-	i := 0
-	for key := range heads {
-		head := heads[key]
-		hi := i
-		i++
-
-		ewg.Go(func() error {
-			if !lim.Acquire(innerCtx) {
-				return nil
-			}
-
-			defer func() {
-				lim.Release(innerCtx)
-			}()
-
-			select {
-			case <-innerCtx.Done():
-				return nil
-
-			default:
-			}
-
-			var err error
-			defer func() {
-				if err != nil {
-					innerCancel()
-				}
-			}()
-
-			res := extract.NewRes(16)
-
-			err = east.ExtractDiff(ctx, res, head)
-			if err != nil {
-				return common.NonCtxCanceledErr(err)
-			}
-
-			docs[hi] = res.Docs
-
-			return nil
-		})
-	}
-
-	if err := ewg.Wait(); err != nil {
-		return fmt.Errorf("extract part diff states: %w", err)
-	}
-
-	if err := s.insertMany(originCtx, ctx.L, docs); err != nil {
-		return fmt.Errorf("insert extracted documents from diff states: %w", err)
-	}
-
-	return nil
-}
-
 // DryExtract tries to extract all results from give tipset
 func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet) ([]*extract.Res, error) {
 	dryOptions := extract.DryOptions()
@@ -342,7 +274,7 @@ func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet) ([]*e
 		return nil, fmt.Errorf("new extract context: %w", err)
 	}
 
-	tres := extract.NewRes(1024)
+	tres := extract.NewRes(1024, 0)
 
 	err = ets.Extract(ectx, tres, ts)
 	if err != nil {
@@ -392,7 +324,7 @@ func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet) ([]*e
 				}
 			}()
 
-			res := extract.NewRes(1024)
+			res := extract.NewRes(1024, 0)
 
 			err = east.ExtractRegular(ectx, res, head)
 			if err != nil {

@@ -55,6 +55,11 @@ build-bell-grafana: $(BUILD_DEPS)
 	rm -rf ./bell-grafana
 	go build $(GOFLAGS) -o bell-grafana ./cmd/bell-grafana
 	go run github.com/GeertJohan/go.rice/rice append --exec bell-grafana -i ./build
+build-bell-calib: GOFLAGS+=-tags=calibnet
+build-bell-calib: $(BUILD_DEPS)
+	rm -rf ./bell
+	go build $(GOFLAGS) -o bell ./cmd/bell
+	go run github.com/GeertJohan/go.rice/rice append --exec bell -i ./build
 
 
 dist-clean:

@@ -10,7 +10,7 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 
 	"github.com/dtynn/londobell/common"
@@ -132,7 +132,7 @@ func setSegmentBoundary(cctx *cli.Context, slog *zap.SugaredLogger, segname stri
 		fxlog,
 		&components,
 		fxex.ProvideEx(
-			fxex.As(full, new(api.FullNode)),
+			fxex.As(full, new(v0api.FullNode)),
 		),
 	)
 

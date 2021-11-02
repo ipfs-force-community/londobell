@@ -7,11 +7,15 @@ import (
 
 	miner4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/miner"
 
+	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
+
+	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
+
 	"github.com/dtynn/londobell/racailum/segment/model"
 	"github.com/dtynn/londobell/racailum/segment/model/schema"
 )
 
-func inti() {
+func init() {
 	schema.Register(
 		schema.Model{
 			Name: "actor-state: miner.State v2",
@@ -33,6 +37,18 @@ func inti() {
 				Detail: &miner4.State{},
 			},
 		},
+		schema.Model{
+			Name: "actor-state: miner.State v5",
+			D: &model.ActorState{
+				Detail: &miner5.State{},
+			},
+		},
+		schema.Model{
+			Name: "actor-state: miner.State v6",
+			D: &model.ActorState{
+				Detail: &miner6.State{},
+			},
+		},
 	)
 }
 
@@ -50,6 +66,12 @@ func isEmptyState(st interface{}) bool {
 
 	case *miner4.State:
 		return isEmptyMinerStateV4(st)
+
+	case *miner5.State:
+		return isEmptyMinerStateV5(st)
+
+	case *miner6.State:
+		return isEmptyMinerStateV6(st)
 
 	default:
 		return false

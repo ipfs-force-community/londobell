@@ -1,11 +1,10 @@
 package actorstate
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ipfs/go-cid"
-
-	"context"
 
 	"github.com/filecoin-project/go-bitfield"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
@@ -16,6 +15,12 @@ import (
 
 	miner4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/miner"
 	adt4 "github.com/filecoin-project/specs-actors/v4/actors/util/adt"
+
+	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
+	adt5 "github.com/filecoin-project/specs-actors/v5/actors/util/adt"
+
+	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
+	adt6 "github.com/filecoin-project/specs-actors/v6/actors/util/adt"
 
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	cstore "github.com/filecoin-project/lotus/chain/store"
@@ -42,12 +47,28 @@ func init() {
 	}
 
 	emptyMinerStateV4 = empty4
+
+	empty5, err := newEmptyMinerStateV5()
+	if err != nil {
+		panic(fmt.Errorf("construct empty miner state v5: %w", err))
+	}
+
+	emptyMinerStateV5 = empty5
+
+	empty6, err := newEmptyMinerStateV6()
+	if err != nil {
+		panic(fmt.Errorf("construct empty miner state v5: %w", err))
+	}
+
+	emptyMinerStateV6 = empty6
 }
 
 var (
 	emptyMinerStateV2 *miner2.State
 	emptyMinerStateV3 *miner3.State
 	emptyMinerStateV4 *miner4.State
+	emptyMinerStateV5 *miner5.State
+	emptyMinerStateV6 *miner6.State
 )
 
 func isEmptyMinerStateV2(mst *miner2.State) bool {
@@ -163,4 +184,56 @@ func newEmptyMinerStateV4() (*miner4.State, error) {
 	inMemStore := bstore.NewMemorySync()
 	adtStore := adt4.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
 	return miner4.ConstructState(adtStore, cid.Undef, 0, 0)
+}
+
+func isEmptyMinerStateV5(mst *miner5.State) bool {
+	earlyCount, err := mst.EarlyTerminations.Count()
+	if err != nil || earlyCount != 0 {
+		return false
+	}
+
+	return isEmptyOrZero(mst.PreCommitDeposits) &&
+		isEmptyOrZero(mst.LockedFunds) &&
+		isEmptyOrZero(mst.FeeDebt) &&
+		mst.VestingFunds.Equals(emptyMinerStateV5.VestingFunds) &&
+		isEmptyOrZero(mst.InitialPledge) &&
+		mst.PreCommittedSectors.Equals(emptyMinerStateV5.PreCommittedSectors) &&
+		mst.PreCommittedSectorsCleanUp.Equals(emptyMinerStateV5.PreCommittedSectorsCleanUp) &&
+		mst.AllocatedSectors.Equals(emptyMinerStateV5.AllocatedSectors) &&
+		mst.Sectors.Equals(emptyMinerStateV5.Sectors) &&
+		mst.Deadlines.Equals(emptyMinerStateV5.Deadlines)
+}
+
+// see https://github.com/filecoin-project/specs-actors/blob/v3.0.3/actors/builtin/miner/miner_state.go#L173-L230
+func newEmptyMinerStateV5() (*miner5.State, error) {
+	ctx := context.Background()
+	inMemStore := bstore.NewMemorySync()
+	adtStore := adt5.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
+	return miner5.ConstructState(adtStore, cid.Undef, 0, 0)
+}
+
+func isEmptyMinerStateV6(mst *miner6.State) bool {
+	earlyCount, err := mst.EarlyTerminations.Count()
+	if err != nil || earlyCount != 0 {
+		return false
+	}
+
+	return isEmptyOrZero(mst.PreCommitDeposits) &&
+		isEmptyOrZero(mst.LockedFunds) &&
+		isEmptyOrZero(mst.FeeDebt) &&
+		mst.VestingFunds.Equals(emptyMinerStateV6.VestingFunds) &&
+		isEmptyOrZero(mst.InitialPledge) &&
+		mst.PreCommittedSectors.Equals(emptyMinerStateV6.PreCommittedSectors) &&
+		mst.PreCommittedSectorsCleanUp.Equals(emptyMinerStateV6.PreCommittedSectorsCleanUp) &&
+		mst.AllocatedSectors.Equals(emptyMinerStateV6.AllocatedSectors) &&
+		mst.Sectors.Equals(emptyMinerStateV6.Sectors) &&
+		mst.Deadlines.Equals(emptyMinerStateV6.Deadlines)
+}
+
+// see https://github.com/filecoin-project/specs-actors/blob/v3.0.3/actors/builtin/miner/miner_state.go#L173-L230
+func newEmptyMinerStateV6() (*miner6.State, error) {
+	ctx := context.Background()
+	inMemStore := bstore.NewMemorySync()
+	adtStore := adt6.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
+	return miner6.ConstructState(adtStore, cid.Undef, 0, 0)
 }

@@ -4,8 +4,8 @@ import (
 	"reflect"
 
 	"github.com/filecoin-project/go-state-types/cbor"
-
-	"github.com/filecoin-project/lotus/chain/stmgr"
+	
+	"github.com/filecoin-project/lotus/chain/vm"
 )
 
 var emptyType reflect.Type
@@ -13,7 +13,7 @@ var emptyType reflect.Type
 // MethodSend is the method info for builtin.MethodSend
 var MethodSend = MethodInfo{
 	Actor: "",
-	Method: stmgr.MethodMeta{
+	Method: vm.MethodMeta{
 		Name: "Send",
 	},
 }
@@ -21,7 +21,7 @@ var MethodSend = MethodInfo{
 // MethodInfo includes actor name & method meta
 type MethodInfo struct {
 	Actor  string
-	Method stmgr.MethodMeta
+	Method vm.MethodMeta
 }
 
 // ParamObj returns a new instance of param object

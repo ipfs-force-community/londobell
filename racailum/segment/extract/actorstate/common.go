@@ -10,6 +10,8 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/cbor"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -37,13 +39,11 @@ type registry struct {
 	e map[reflect.Type][]extractor
 }
 
+var ActorReg = filcns.NewActorRegistry()
+
 var extractorRegistry = struct {
-	diff    *registry
 	regular *registry
 }{
-	diff: &registry{
-		e: make(map[reflect.Type][]extractor),
-	},
 	regular: &registry{
 		e: make(map[reflect.Type][]extractor),
 	},
@@ -65,12 +65,6 @@ var (
 	expectedNumIn              = expectedCommonInTypesCount + 1
 	stateInIndex               = expectedCommonInTypesCount
 )
-
-func mustRegisterDiffExtractor(name string, fn interface{}) {
-	if err := registerExtractor(extractorRegistry.diff, name, fn); err != nil {
-		panic(fmt.Errorf("register actor state diff extractor: %s", err))
-	}
-}
 
 func mustRegisterRegularExtractor(name string, fn interface{}) {
 	if err := registerExtractor(extractorRegistry.regular, name, fn); err != nil {
@@ -138,11 +132,6 @@ func registerExtractor(reg *registry, name string, fn interface{}) error {
 	return nil
 }
 
-// ExtractDiff tries to take all data out of specified actor state head
-func ExtractDiff(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead) error {
-	return extractState(ctx, res, head, extractorRegistry.diff, true)
-}
-
 // ExtractRegular tries to take all data out of specified actor state head
 func ExtractRegular(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead) error {
 	return extractState(ctx, res, head, extractorRegistry.regular, true)
@@ -155,7 +144,18 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, re
 
 	}
 
-	state, err := vm.DumpActorState(head.Actor, blkraw.RawData())
+	// account actor is special
+	if builtin.IsAccountActor(head.Code) && enableActorStateDoc {
+		as, err := model.NewActorState(head, nil)
+		if err != nil {
+			return fmt.Errorf("convert actor state from raw for %s (%s): %w", head.Addr, head.Head, err)
+
+		}
+		res.Docs = append(res.Docs, as)
+		return nil
+	}
+
+	state, err := vm.DumpActorState(ActorReg, head.Actor, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 
@@ -168,7 +168,6 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, re
 	raw, ok := state.(cbor.Er)
 	if !ok {
 		return fmt.Errorf("get non cbor.Er from vm.DumpActorState for %s (%s): %T", head.Addr, head.Head, raw)
-
 	}
 
 	if enableActorStateDoc {
@@ -196,7 +195,7 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, re
 	return nil
 }
 
-func genRegularHeadID(root cid.Cid, addr address.Address, epoch abi.ChainEpoch) (cid.Cid, error) {
+func GenRegularHeadID(root cid.Cid, addr address.Address, epoch abi.ChainEpoch) (cid.Cid, error) {
 	rbytes := root.Bytes()
 	abytes := addr.Bytes()
 

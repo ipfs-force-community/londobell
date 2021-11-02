@@ -13,6 +13,10 @@ import (
 
 	multisig4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/multisig"
 
+	multisig5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/multisig"
+
+	multisig6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/multisig"
+
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/racailum/segment/extract"
 	"github.com/dtynn/londobell/racailum/segment/model"
@@ -31,6 +35,8 @@ func init() {
 func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, mst interface{}) error {
 	epoch := head.Epoch
 	var init, locked abi.TokenAmount
+	dayList := NormalEpochRange(head)
+	vestInFuture := make([]abi.TokenAmount, len(dayList), len(dayList))
 
 	switch st := mst.(type) {
 	case *multisig2.State:
@@ -68,11 +74,42 @@ func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *comm
 
 		init = st.InitialBalance
 		locked = st.AmountLocked(epoch - st.StartEpoch)
+	case *multisig5.State:
+		init = st.InitialBalance
+		locked = st.AmountLocked(epoch - st.StartEpoch)
+		locked = big.Max(locked, big.Zero())
+
+		for i := range dayList {
+			vestInFuture[i] = big.Sub(locked, st.AmountLocked(dayList[i]-st.StartEpoch))
+			vestInFuture[i] = big.Max(vestInFuture[i], big.Zero())
+			vestInFuture[i] = big.Min(vestInFuture[i], head.Balance)
+		}
+
+		for i := len(vestInFuture) - 1; i > 0; i-- {
+			vestInFuture[i] = big.Sub(vestInFuture[i], vestInFuture[i-1])
+		}
+	case *multisig6.State:
+		init = st.InitialBalance
+		locked = st.AmountLocked(epoch - st.StartEpoch)
+		locked = big.Max(locked, big.Zero())
+
+		for i := range dayList {
+			vestInFuture[i] = big.Sub(locked, st.AmountLocked(dayList[i]-st.StartEpoch))
+			vestInFuture[i] = big.Max(vestInFuture[i], big.Zero())
+			vestInFuture[i] = big.Min(vestInFuture[i], head.Balance)
+		}
+
+		for i := len(vestInFuture) - 1; i > 0; i-- {
+			vestInFuture[i] = big.Sub(vestInFuture[i], vestInFuture[i-1])
+		}
+
 	}
 
 	vested := big.Sub(init, locked)
+	vested = big.Max(vested, big.Zero())
+	locked = big.Min(locked, head.Balance)
 
-	id, err := genRegularHeadID(head.Head, head.Addr, head.Epoch)
+	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
 		return fmt.Errorf("generate id: %w", err)
 	}
@@ -85,8 +122,9 @@ func extractMultisigBalanceDetail(ctx *extract.Ctx, res *extract.Res, head *comm
 			Epoch: head.Epoch,
 		},
 		Detail: model.MultisigBalanceDetail{
-			Locked: locked,
-			Vested: vested,
+			Locked:       locked,
+			Vested:       vested,
+			VestInFuture: vestInFuture,
 		},
 	})
 

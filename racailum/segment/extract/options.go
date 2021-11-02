@@ -9,7 +9,6 @@ import (
 func DefaultOptions() Options {
 	return Options{
 		TipSet:       defaultTipSetOptions(),
-		StateDiff:    defaultActorStateDiffOptions(),
 		StateRegular: defaultActorStateRegularOptions(),
 	}
 }
@@ -24,7 +23,6 @@ func DryOptions() Options {
 // Options for differect extracting jobs
 type Options struct {
 	TipSet       TipSetOptions
-	StateDiff    ActorStateDiffOptions
 	StateRegular ActorStateRegularOptions
 }
 
@@ -34,12 +32,6 @@ func defaultTipSetOptions() TipSetOptions {
 
 // TipSetOptions for tipset extracting
 type TipSetOptions struct {
-}
-
-func defaultActorStateDiffOptions() ActorStateDiffOptions {
-	return ActorStateDiffOptions{
-		Interval: 0, // just disable state diff extraction here
-	}
 }
 
 // ActorStateDiffOptions for actor state extracting
@@ -54,6 +46,10 @@ func defaultActorStateRegularOptions() ActorStateRegularOptions {
 		VerifRegTicks:            4,                    // 4h
 		MinerSectorSummaryTicks:  24,                   // 24h
 		DealProposalSummaryTicks: 12,                   // 12h
+		MarketFundsTicks:         24,                   // 24h
+		MinerSectorHeathTicks:    1,                    // 1h
+		DealProposalDetailTicks:  12,                   // 12h
+		ActorBalance:             24,                   // 24h
 	}
 }
 
@@ -64,6 +60,10 @@ func dryActorStateRegularOptions() ActorStateRegularOptions {
 		VerifRegTicks:            1,
 		MinerSectorSummaryTicks:  1,
 		DealProposalSummaryTicks: 1,
+		MarketFundsTicks:         1,
+		MinerSectorHeathTicks:    1,
+		DealProposalDetailTicks:  1,
+		ActorBalance:             1,
 	}
 }
 
@@ -74,4 +74,8 @@ type ActorStateRegularOptions struct {
 	VerifRegTicks            int
 	MinerSectorSummaryTicks  int
 	DealProposalSummaryTicks int
+	DealProposalDetailTicks  int
+	MarketFundsTicks         int
+	MinerSectorHeathTicks    int
+	ActorBalance             int
 }

@@ -5,13 +5,14 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
 
 	"github.com/dtynn/londobell/common"
 	"github.com/dtynn/londobell/dep"
 	"github.com/dtynn/londobell/lib/fxex"
+	"github.com/dtynn/londobell/prometheus"
 	"github.com/dtynn/londobell/racailum"
 
 	// "github.com/dtynn/londobell/racailum/grafana"
@@ -36,7 +37,7 @@ func copyFlags(src []cli.Flag) []cli.Flag {
 	return dst
 }
 
-func buildRaApp(cctx *cli.Context, full api.FullNode, target interface{}) (*fx.App, error) {
+func buildRaApp(cctx *cli.Context, full v0api.FullNode, target interface{}) (*fx.App, error) {
 	racfg, err := loadConfig(cctx)
 	if err != nil {
 		return nil, err
@@ -59,14 +60,25 @@ func buildRaApp(cctx *cli.Context, full api.FullNode, target interface{}) (*fx.A
 		fxex.ProvideEx(
 			racfg,
 			segmgr,
-			fxex.As(full, new(api.FullNode)),
+			fxex.As(full, new(v0api.FullNode)),
 		),
 	), nil
 }
 
 var raRunCmd = &cli.Command{
-	Name:  "run",
-	Flags: []cli.Flag{},
+	Name: "run",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "prometheus-port",
+			Usage: "specify the port of prometheus",
+			Value: "2112",
+		},
+		&cli.BoolFlag{
+			Name:  "prometheus",
+			Usage: "choose whether use prometheus",
+			Value: true,
+		},
+	},
 	Action: func(cctx *cli.Context) error {
 		full, closer, err := getFullNode(cctx)
 		if err != nil {
@@ -101,9 +113,13 @@ var raRunCmd = &cli.Command{
 			return fmt.Errorf("sub head change: %w", err)
 		}
 
+		if cctx.Bool("prometheus") {
+			go prometheus.Run(cctx.String("prometheus-port"))
+		}
+
 		go func() {
 			log.Info("serving http pprof")
-			if err := http.ListenAndServe("127.0.0.1:56060", nil); err != nil {
+			if err := http.ListenAndServe("0.0.0.0:56060", nil); err != nil {
 				log.Errorf("serving http pprof: %s", err)
 			}
 		}()
