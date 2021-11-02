@@ -3,7 +3,6 @@ package model
 import (
 	"fmt"
 
-	"github.com/ipfs-force-community/londobell/lib/mir"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
@@ -11,6 +10,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 
 	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/mir"
 )
 
 var (
