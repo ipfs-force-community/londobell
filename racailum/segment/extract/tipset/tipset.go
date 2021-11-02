@@ -145,7 +145,7 @@ func Extract(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error 
 	return nil
 }
 
-func extractTipSet(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
+func extractTipSet(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error { // nolint: deadcode
 	doc, err := model.NewTipSet(ts)
 	if err != nil {
 		return err
@@ -156,7 +156,7 @@ func extractTipSet(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) 
 	return nil
 }
 
-func extractBlochHeaders(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
+func extractBlochHeaders(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error { // nolint: deadcode
 	rawBHs := ts.Blocks()
 	for bi := range rawBHs {
 		bh, err := model.NewBlockHeader(rawBHs[bi])

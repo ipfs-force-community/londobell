@@ -24,7 +24,7 @@ func init() {
 
 var genesis *types.BlockHeader
 
-func getCollections() []string {
+func getCollections() []string { // nolint: deadcode
 	m := schema.Models()
 	colMap := map[string]struct{}{}
 	for mi := range m {

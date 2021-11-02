@@ -31,12 +31,6 @@ var raCmd = &cli.Command{
 	},
 }
 
-func copyFlags(src []cli.Flag) []cli.Flag {
-	dst := make([]cli.Flag, len(src))
-	copy(dst, src)
-	return dst
-}
-
 func buildRaApp(cctx *cli.Context, full v0api.FullNode, target interface{}) (*fx.App, error) {
 	racfg, err := loadConfig(cctx)
 	if err != nil {

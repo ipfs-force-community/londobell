@@ -122,10 +122,3 @@ func isPublic(name string) bool {
 	b := name[0]
 	return b >= 'A' && b <= 'Z'
 }
-
-func copyAppendIndexes(prev []int, idx ...int) []int {
-	next := make([]int, len(prev)+len(idx))
-	copy(next[:len(prev)], prev)
-	copy(next[len(prev):], idx)
-	return next
-}
