@@ -65,7 +65,7 @@ var DefaultBellProvider = fx.Provide(
 	LockedRepo,
 	InMemMetadataDS,
 
-	// type convertion
+	// type conversion
 	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.ChainBlockstore)),
 	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.StateBlockstore)),
 	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.BaseBlockstore)),

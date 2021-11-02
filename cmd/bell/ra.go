@@ -267,7 +267,7 @@ var raRunCmd = &cli.Command{
 //             return nil
 //         }
 
-//         log.Infow("boundry loaded", "lo", lo.Height(), "hi", hi.Height())
+//         log.Infow("boundray loaded", "lo", lo.Height(), "hi", hi.Height())
 
 //         err = components.Ra.Aggregate(cctx.Context, lo.TipSet, hi.TipSet)
 //         if err != nil {

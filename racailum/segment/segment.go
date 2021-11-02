@@ -141,8 +141,8 @@ func (s *Segment) Incoming(ctx context.Context, ts *types.TipSet) {
 
 // Run starts a watching loop for incoming tipsets
 func (s *Segment) Run(ctx context.Context) {
-	log.Info("start head wathcing loop start")
-	defer log.Info("stop head wathcing loop")
+	log.Info("start head watching loop start")
+	defer log.Info("stop head watching loop")
 
 	for {
 		select {
