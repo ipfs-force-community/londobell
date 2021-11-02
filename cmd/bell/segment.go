@@ -141,7 +141,7 @@ func setSegmentBoundary(cctx *cli.Context, slog *zap.SugaredLogger, segname stri
 		return err
 	}
 
-	defer app.Stop(cctx.Context)
+	defer app.Stop(cctx.Context) // nolint: errcheck
 
 	bound, _, err := segmgr.LoadBoundary(segname)
 

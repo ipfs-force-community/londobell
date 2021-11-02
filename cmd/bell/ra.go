@@ -104,7 +104,7 @@ var raRunCmd = &cli.Command{
 			return err
 		}
 
-		defer app.Stop(cctx.Context)
+		defer app.Stop(cctx.Context) // nolint: errcheck
 
 		ctx := cctx.Context
 
