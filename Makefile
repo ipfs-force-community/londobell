@@ -41,8 +41,7 @@ test: $(BUILD_DEPS)
 	go test -v -failfast `go list ./... | grep -v /extern/`
 
 lint: $(BUILD_DEPS)
-	go vet `go list ./... | grep -v /extern/`
-	golint --set_exit_status `go list ./... | grep -v /extern/`
+	golangci-lint run
 
 dep-check: build-dep/.update-modules
 	./tool/scripts/submodule-check.sh

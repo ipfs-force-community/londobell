@@ -13,7 +13,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	"github.com/ipfs/go-cid"
-	"golang.org/x/xerrors"
 
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
@@ -334,24 +333,28 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	actorBalance := []*model.ActorBalance{}
 	iact, err := tree.GetActor(_init.Address)
 	if err != nil {
-		return xerrors.Errorf("failed to load init actor: %w", err)
+		return fmt.Errorf("failed to load init actor: %w", err)
 	}
 	store := ctx.D.ActorStore(ctx.C)
 	ist, err := _init.Load(store, iact)
 	if err != nil {
-		return xerrors.Errorf("failed to load init actor state: %w", err)
+		return fmt.Errorf("failed to load init actor state: %w", err)
 	}
 	robustMap := make(map[address.Address]address.Address)
 	err = ist.ForEachActor(func(id abi.ActorID, addr address.Address) error {
 		idAddr, err := address.NewIDAddress(uint64(id))
 		if err != nil {
-			return xerrors.Errorf("failed to write to addr map: %w", err)
+			return fmt.Errorf("failed to write to addr map: %w", err)
 		}
 
 		robustMap[idAddr] = addr
 
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("walk through actors: %w", err)
+	}
+
 	elog := ctx.L.With("epoch", height)
 	elog.Infow("actor balanced extracted")
 	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {

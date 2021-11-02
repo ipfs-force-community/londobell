@@ -65,6 +65,9 @@ func New(ctx context.Context, name string, opts Options, aggopt aggregate.Option
 	}
 
 	dict, err := mdict.NewDict(wdb)
+	if err != nil {
+		return nil, fmt.Errorf("construct Dict: %w", err)
+	}
 
 	rdoc := wdoc
 	if info.DSN.Read != "" {
