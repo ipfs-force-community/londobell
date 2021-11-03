@@ -24,6 +24,9 @@ MODULES+=$(FFI_PATH)
 BUILD_DEPS+=build-dep/.filecoin-install
 CLEAN+=build-dep/.filecoin-install
 
+dev-env:
+	ln -s ../../.githooks/pre-push ./.git/hooks/pre-push
+
 link-build-dir:
 	./tool/scripts/link-build.sh
 BUILD_DEPS+=link-build-dir
