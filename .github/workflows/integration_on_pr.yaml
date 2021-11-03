@@ -1,0 +1,41 @@
+name: integration_on_pr
+
+on:
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: dependencies
+        run: sudo apt install mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang build-essential hwloc libhwloc-dev wget -y
+
+      - uses: actions/checkout@v2
+
+      - name: setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.16'
+
+      - name: install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.1
+
+      - name: build
+        if: ${{ success() }}
+        run: make build-bell
+
+      - name: lint
+        if: ${{ success() }}
+        run: make lint
+
+      - name: test
+        if: ${{ success() }}
+        run: make test
+
+      - name: fail_notify
+        if: ${{ failure() }}
+        env:
+          DINGTALK_BOT_ACCESS_TOKEN: ${{ secrets.DINGTALK_BOT_ACCESS_TOKEN }}
+          GITHUB_PR_NUM: ${{ github.event.number }}
+        run: ./tool/ci/dingtalk_pr_action_failed.sh
