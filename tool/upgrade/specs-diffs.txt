@@ -1,0 +1,30 @@
+Specs v0 => v2:
+	> miner.Actor
+		+ FeeDebt: big.Int
+		+ InitialPledge: big.Int
+		- InitialPledgeRequirement: big.Int
+	> power.Actor
+		- LastProcessedCronEpoch: abi.ChainEpoch
+		> ThisEpochQAPowerSmoothed
+			 *smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.Actor
+		+ BaselineTotal: big.Int
+		+ SimpleTotal: big.Int
+		+ TotalStoragePowerReward: big.Int
+		- TotalMined: big.Int
+		> ThisEpochRewardSmoothed
+			 *smoothing.FilterEstimate => smoothing.FilterEstimate
+
+Specs v2 => v3:
+
+Specs v3 => v4:
+	> miner.Actor
+		+ DeadlineCronActive: bool
+
+Specs v4 => v5:
+	> miner.Actor
+		+ PreCommittedSectorsCleanUp: cid.Cid
+		- PreCommittedSectorsExpiry: cid.Cid
+
+Specs v5 => v6:
+

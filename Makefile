@@ -71,3 +71,6 @@ gen-indexes:
 gen-model:
 	go run ./tool/genschema/main.go > ./tool/analytics/model_schema.md
 	go run ./tool/genexamples/main.go > ./tool/analytics/model_example.md
+
+gen-diff:
+	go run ./tool/actordiff/main.go > ./tool/upgrade/specs-diffs.txt
