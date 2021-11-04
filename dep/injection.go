@@ -23,6 +23,7 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/cliex"
 	"github.com/ipfs-force-community/londobell/racailum"
+	"github.com/ipfs-force-community/londobell/racailum/segment"
 )
 
 var (
@@ -41,6 +42,10 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 
 		dix.If(logger != nil, dix.Logger(logger)),
 		dix.If(len(target) > 0, dix.Populate(invokePopulate, target...)),
+
+		dix.Override(new(racailum.Config), LoadRaConfig),
+		dix.Override(new(SegmentMetaDS), OpenSegmentDS),
+		dix.Override(new(*segment.Manager), NewSegmentManager),
 
 		dix.Override(new(vm.SyscallBuilder), vm.Syscalls(ffiwrapper.ProofVerifier)),
 		dix.Override(new(journal.Journal), journal.NilJournal),
