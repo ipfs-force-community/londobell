@@ -70,7 +70,7 @@ var segmentUpdateCmd = &cli.Command{
 			return err
 		}
 
-		defer stopper(cctx.Context)
+		defer stopper(cctx.Context) // nolint: errcheck
 
 		segname := cctx.String("name")
 		slog := log.With("seg", segname)
@@ -208,7 +208,7 @@ var segmentShowCmd = &cli.Command{
 			return err
 		}
 
-		defer stopper(cctx.Context)
+		defer stopper(cctx.Context) // nolint: errcheck
 
 		segname := cctx.String("name")
 		slog := log.With("seg", segname)

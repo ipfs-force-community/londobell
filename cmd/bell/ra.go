@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dtynn/dix"
-	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
 
@@ -25,14 +24,6 @@ var raCmd = &cli.Command{
 		// raDryCmd,
 		// raGrafanaCmd,
 	},
-}
-
-func buildRaApp(cctx *cli.Context, full v0api.FullNode, target interface{}) (dix.StopFunc, error) {
-	return dix.New(cctx.Context,
-		dep.Bell(cctx.Context, fxlog, target),
-		dix.Override(new(v0api.FullNode), full),
-	)
-
 }
 
 var raRunCmd = &cli.Command{
@@ -67,7 +58,7 @@ var raRunCmd = &cli.Command{
 			return err
 		}
 
-		defer stopper(cctx.Context)
+		defer stopper(cctx.Context) // nolint: errcheck
 
 		ctx := cctx.Context
 
