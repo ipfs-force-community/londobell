@@ -64,7 +64,7 @@ dist-clean:
 	git submodule deinit --all -f
 
 
-gen-indexes:
+gen-index:
 	go run ./tool/genindex/main.go > ./tool/mgoscripts/epoch_indexes.js
 
 
