@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dtynn/dix"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/dep"
-	"github.com/ipfs-force-community/londobell/lib/fxex"
 	"github.com/ipfs-force-community/londobell/prometheus"
 	"github.com/ipfs-force-community/londobell/racailum"
 
@@ -31,7 +31,7 @@ var raCmd = &cli.Command{
 	},
 }
 
-func buildRaApp(cctx *cli.Context, full v0api.FullNode, target interface{}) (*fx.App, error) {
+func buildRaApp(cctx *cli.Context, full v0api.FullNode, target interface{}) (dix.StopFunc, error) {
 	racfg, err := loadConfig(cctx)
 	if err != nil {
 		return nil, err
@@ -47,16 +47,13 @@ func buildRaApp(cctx *cli.Context, full v0api.FullNode, target interface{}) (*fx
 		return nil, err
 	}
 
-	return dep.BellApp(
-		cctx.Context,
-		fxlog,
-		target,
-		fxex.ProvideEx(
-			racfg,
-			segmgr,
-			fxex.As(full, new(v0api.FullNode)),
-		),
-	), nil
+	return dix.New(cctx.Context,
+		dep.Bell(cctx.Context, fxlog, target),
+		dix.Override(new(v0api.FullNode), full),
+		dix.Override(new(racailum.Config), racfg),
+		dix.Override(new(*segment.Manager), segmgr),
+	)
+
 }
 
 var raRunCmd = &cli.Command{
@@ -88,17 +85,12 @@ var raRunCmd = &cli.Command{
 			Ra       *racailum.RaCailum
 		}
 
-		app, err := buildRaApp(cctx, full, &components)
+		stopper, err := buildRaApp(cctx, full, &components)
 		if err != nil {
 			return err
 		}
 
-		err = app.Start(cctx.Context)
-		if err != nil {
-			return err
-		}
-
-		defer app.Stop(cctx.Context) // nolint: errcheck
+		defer stopper(cctx.Context) // nolint: errcheck
 
 		ctx := cctx.Context
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/dtynn/dix"
 	levelds "github.com/ipfs/go-ds-leveldb"
 	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/urfave/cli/v2"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/dep"
-	"github.com/ipfs-force-community/londobell/lib/fxex"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
 )
 
@@ -127,21 +127,17 @@ func setSegmentBoundary(cctx *cli.Context, slog *zap.SugaredLogger, segname stri
 		CS common.ChainStore
 	}
 
-	app := dep.BellApp(
+	stopper, err := dix.New(
 		cctx.Context,
-		fxlog,
-		&components,
-		fxex.ProvideEx(
-			fxex.As(full, new(v0api.FullNode)),
-		),
+		dep.Bell(cctx.Context, fxlog, &components),
+		dix.Override(new(v0api.FullNode), full),
 	)
 
-	err = app.Start(cctx.Context)
 	if err != nil {
 		return err
 	}
 
-	defer app.Stop(cctx.Context) // nolint: errcheck
+	defer stopper(cctx.Context) // nolint: errcheck
 
 	bound, _, err := segmgr.LoadBoundary(segname)
 	if err != nil {

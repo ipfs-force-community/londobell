@@ -30,12 +30,6 @@ var (
 	_ common.HeadNotifier = (*cliex.HeadSub)(nil)
 )
 
-// HeadNotifier provides a common.HeadNotifier based on metads
-func HeadNotifier(cli v0api.FullNode) (common.HeadNotifier, error) {
-	sub, err := cliex.NewHeadSub(cli)
-	return sub, err
-}
-
 type WrapAPIBlockstore struct {
 	blockstore.Blockstore
 }
