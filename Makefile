@@ -64,10 +64,13 @@ dist-clean:
 	git submodule deinit --all -f
 
 
-gen-indexes:
+gen-index:
 	go run ./tool/genindex/main.go > ./tool/mgoscripts/epoch_indexes.js
 
 
 gen-model:
 	go run ./tool/genschema/main.go > ./tool/analytics/model_schema.md
 	go run ./tool/genexamples/main.go > ./tool/analytics/model_example.md
+
+gen-diff:
+	go run ./tool/actordiff/main.go > ./tool/upgrade/specs-diffs.txt
