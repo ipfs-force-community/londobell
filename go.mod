@@ -3,7 +3,7 @@ module github.com/ipfs-force-community/londobell
 go 1.16
 
 require (
-	github.com/dtynn/dix v0.1.2 // indirect
+	github.com/dtynn/dix v0.1.2
 	github.com/filecoin-project/go-address v0.0.5
 	github.com/filecoin-project/go-amt-ipld/v2 v2.1.1-0.20201006184820-924ee87a1349 // indirect
 	github.com/filecoin-project/go-bitfield v0.2.4
@@ -26,7 +26,6 @@ require (
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipld/go-car v0.3.1-0.20210601190600-f512dac51e8e
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/multiformats/go-multihash v0.0.15
 	github.com/prometheus/client_golang v1.10.0
 	github.com/robertkrimen/otto v0.0.0-20200922221731-ef014fd054ac
 	github.com/syndtr/goleveldb v1.0.0
@@ -35,7 +34,6 @@ require (
 	go.uber.org/fx v1.13.1
 	go.uber.org/zap v1.16.0
 	go4.org v0.0.0-20200411211856-f5505b9728dd
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 )
 
