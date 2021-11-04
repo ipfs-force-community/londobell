@@ -2,12 +2,12 @@ package dep
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/filecoin-project/lotus/build"
+	"github.com/dtynn/dix"
 	metricsi "github.com/ipfs/go-metrics-interface"
 	"go.uber.org/fx"
 
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/beacon"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/stmgr"
@@ -18,9 +18,12 @@ import (
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
+	"github.com/filecoin-project/lotus/node/repo"
 
 	"github.com/ipfs-force-community/londobell/common"
-	"github.com/ipfs-force-community/londobell/lib/fxex"
+	"github.com/ipfs-force-community/londobell/lib/cliex"
+	"github.com/ipfs-force-community/londobell/racailum"
+	"github.com/ipfs-force-community/londobell/racailum/segment"
 )
 
 var (
@@ -28,71 +31,51 @@ var (
 	_ common.ChainStore   = (*store.ChainStore)(nil)
 )
 
-// DefaultBellProvider combines the providers for basic components inside bell
-var DefaultBellProvider = fx.Provide(
-	func() vm.SyscallBuilder {
-		return vm.Syscalls(ffiwrapper.ProofVerifier)
-	},
-
-	// from lotus
-	journal.NilJournal,
-	func() store.WeightFunc {
-		return filcns.Weight
-	},
-	modules.ChainStore,
-	filcns.NewTipSetExecutor,
-	modules.BuiltinDrandConfig,
-	func(cs *store.ChainStore, dc dtypes.DrandSchedule) beacon.Schedule {
-		rbp := modules.RandomBeaconParams{
-			Cs:          cs,
-			DrandConfig: dc,
-		}
-		b, err := modules.RandomSchedule(rbp, dtypes.AfterGenesisSet{})
-		if err != nil {
-			panic(fmt.Errorf("construct random schedule failed: %w", err))
-		}
-		return b
-	},
-	filcns.DefaultUpgradeSchedule,
-	stmgr.NewStateManager,
-	modules.LoadGenesis(build.MaybeGenesis()),
-
-	// basics
-	NewRaCailum,
-	HeadNotifier,
-	ChainIOBlockstore,
-	InMemRepo,
-	LockedRepo,
-	InMemMetadataDS,
-
-	// type conversion
-	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.ChainBlockstore)),
-	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.StateBlockstore)),
-	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.BaseBlockstore)),
-	fxex.Convert(new(dtypes.HotBlockstore), new(dtypes.ExposedBlockstore)),
-	fxex.Convert(new(*store.ChainStore), new(common.ChainStore)),
-	fxex.Convert(new(*stmgr.StateManager), new(common.StateManager)),
-	fxex.Convert(new(*filcns.TipSetExecutor), new(stmgr.Executor)),
+const (
+	invokePopulate dix.Invoke = 1
 )
 
-// BellApp constructs a *fx.App with givent opts and defaults
-func BellApp(ctx context.Context, logger fx.Printer, target interface{}, opts ...fx.Option) *fx.App {
-	opts = append([]fx.Option{
-		// raw stores should be readonly
-		fxex.ProvideEx(
-			fxex.As(metricsi.CtxScope(ctx, "bell"), new(helpers.MetricsCtx)),
-			fxex.As(ctx, new(GlobalContext)),
-		),
-		DefaultBellProvider,
-	}, opts...)
+func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Option {
+	return dix.Options(
+		dix.Override(new(GlobalContext), ctx),
+		dix.Override(new(helpers.MetricsCtx), metricsi.CtxScope(ctx, "bell")),
 
-	if logger != nil {
-		opts = append(opts, fx.Logger(logger))
-	}
+		dix.If(logger != nil, dix.Logger(logger)),
+		dix.If(len(target) > 0, dix.Populate(invokePopulate, target...)),
 
-	if target != nil {
-		opts = append(opts, fx.Populate(target))
-	}
+		dix.Override(new(racailum.Config), LoadRaConfig),
+		dix.Override(new(SegmentMetaDS), OpenSegmentDS),
+		dix.Override(new(*segment.Manager), NewSegmentManager),
 
-	return fx.New(opts...)
+		dix.Override(new(vm.SyscallBuilder), vm.Syscalls(ffiwrapper.ProofVerifier)),
+		dix.Override(new(journal.Journal), journal.NilJournal),
+		dix.Override(new(store.WeightFunc), filcns.Weight),
+		dix.Override(new(*store.ChainStore), modules.ChainStore),
+		dix.Override(new(stmgr.Executor), filcns.NewTipSetExecutor),
+		dix.Override(new(dtypes.DrandSchedule), modules.BuiltinDrandConfig),
+		dix.Override(new(beacon.Schedule), func(cs *store.ChainStore, dc dtypes.DrandSchedule) (beacon.Schedule, error) {
+			rbp := modules.RandomBeaconParams{
+				Cs:          cs,
+				DrandConfig: dc,
+			}
+			return modules.RandomSchedule(rbp, dtypes.AfterGenesisSet{})
+		}),
+		dix.Override(new(stmgr.UpgradeSchedule), filcns.DefaultUpgradeSchedule),
+		dix.Override(new(*stmgr.StateManager), stmgr.NewStateManager),
+		dix.Override(new(modules.Genesis), modules.LoadGenesis(build.MaybeGenesis())),
+		dix.Override(new(common.HeadNotifier), cliex.NewHeadSub),
+		dix.Override(new(*racailum.RaCailum), NewRaCailum),
+		dix.Override(new(repo.Repo), repo.NewMemory(nil)),
+		dix.Override(new(repo.LockedRepo), LockedRepo),
+		dix.Override(new(dtypes.MetadataDS), InMemMetadataDS),
+
+		dix.Override(new(dtypes.HotBlockstore), ChainIOBlockstore),
+		dix.Override(new(dtypes.ChainBlockstore), dix.From(new(dtypes.HotBlockstore))),
+		dix.Override(new(dtypes.StateBlockstore), dix.From(new(dtypes.HotBlockstore))),
+		dix.Override(new(dtypes.BaseBlockstore), dix.From(new(dtypes.HotBlockstore))),
+		dix.Override(new(dtypes.ExposedBlockstore), dix.From(new(dtypes.HotBlockstore))),
+
+		dix.Override(new(common.ChainStore), dix.From(new(*store.ChainStore))),
+		dix.Override(new(common.StateManager), dix.From(new(*stmgr.StateManager))),
+	)
 }

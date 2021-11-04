@@ -2,20 +2,16 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
 
-	levelds "github.com/ipfs/go-ds-leveldb"
-	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/dtynn/dix"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
 	"github.com/filecoin-project/lotus/api/v0api"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/dep"
-	"github.com/ipfs-force-community/londobell/lib/fxex"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
 )
 
@@ -57,22 +53,30 @@ var segmentUpdateCmd = &cli.Command{
 	},
 
 	Action: func(cctx *cli.Context) error {
+		di := struct {
+			fx.In
+			SegMgr *segment.Manager
+			Full   v0api.FullNode
+			CStore common.ChainStore
+		}{}
 
-		ds, err := openSegmentDS(cctx)
+		stopper, err := dix.New(
+			cctx.Context,
+			dep.Bell(cctx.Context, fxlog, &di),
+			dep.InjectRepoPath(cctx),
+			dep.InjectFullNode(cctx),
+		)
 		if err != nil {
 			return err
 		}
 
-		segmgr, err := segment.NewManager(ds)
-		if err != nil {
-			return err
-		}
+		defer stopper(cctx.Context) // nolint: errcheck
 
 		segname := cctx.String("name")
 		slog := log.With("seg", segname)
 
 		setInfo := false
-		info, _, err := segmgr.LoadInfo(segname)
+		info, _, err := di.SegMgr.LoadInfo(segname)
 		if err != nil {
 			return err
 		}
@@ -88,7 +92,7 @@ var segmentUpdateCmd = &cli.Command{
 		}
 
 		if setInfo {
-			if err := segmgr.SetInfo(segname, info); err != nil {
+			if err := di.SegMgr.SetInfo(segname, info); err != nil {
 				return err
 			}
 
@@ -96,13 +100,13 @@ var segmentUpdateCmd = &cli.Command{
 		}
 
 		if cctx.IsSet("child-hi") || cctx.IsSet("child-lo") {
-			if err := setSegmentBoundary(cctx, slog, segname, segmgr); err != nil {
+			if err := setSegmentBoundary(cctx, slog, di.Full, di.CStore, segname, di.SegMgr); err != nil {
 				return err
 			}
 		}
 
 		if cctx.Bool("set-active") {
-			if err := segmgr.SetActive(segname); err != nil {
+			if err := di.SegMgr.SetActive(segname); err != nil {
 				return err
 			}
 
@@ -114,35 +118,7 @@ var segmentUpdateCmd = &cli.Command{
 	},
 }
 
-func setSegmentBoundary(cctx *cli.Context, slog *zap.SugaredLogger, segname string, segmgr *segment.Manager) error {
-	full, closer, err := getFullNode(cctx)
-	if err != nil {
-		return err
-	}
-
-	defer closer()
-
-	var components struct {
-		fx.In
-		CS common.ChainStore
-	}
-
-	app := dep.BellApp(
-		cctx.Context,
-		fxlog,
-		&components,
-		fxex.ProvideEx(
-			fxex.As(full, new(v0api.FullNode)),
-		),
-	)
-
-	err = app.Start(cctx.Context)
-	if err != nil {
-		return err
-	}
-
-	defer app.Stop(cctx.Context) // nolint: errcheck
-
+func setSegmentBoundary(cctx *cli.Context, slog *zap.SugaredLogger, full v0api.FullNode, cstore common.ChainStore, segname string, segmgr *segment.Manager) error {
 	bound, _, err := segmgr.LoadBoundary(segname)
 	if err != nil {
 		return fmt.Errorf("load boundary for %s: %w", segname, err)
@@ -155,7 +131,7 @@ func setSegmentBoundary(cctx *cli.Context, slog *zap.SugaredLogger, segname stri
 			return fmt.Errorf("hi-child key: %w", err)
 		}
 
-		hi, err := common.LoadLinkedTipSet(components.CS, tsk)
+		hi, err := common.LoadLinkedTipSet(cstore, tsk)
 		if err != nil {
 			return fmt.Errorf("load hi tipset: %w", err)
 		}
@@ -170,7 +146,7 @@ func setSegmentBoundary(cctx *cli.Context, slog *zap.SugaredLogger, segname stri
 			return fmt.Errorf("lo-child key: %w", err)
 		}
 
-		lo, err := common.LoadLinkedTipSet(components.CS, tsk)
+		lo, err := common.LoadLinkedTipSet(cstore, tsk)
 		if err != nil {
 			return fmt.Errorf("load lo tipset: %w", err)
 		}
@@ -218,21 +194,27 @@ var segmentShowCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		ds, err := openSegmentDS(cctx)
+		di := struct {
+			fx.In
+			SegMgr *segment.Manager
+		}{}
+
+		stopper, err := dix.New(
+			cctx.Context,
+			dep.Bell(cctx.Context, fxlog, &di),
+			dep.InjectRepoPath(cctx),
+		)
 		if err != nil {
 			return err
 		}
 
-		segmgr, err := segment.NewManager(ds)
-		if err != nil {
-			return err
-		}
+		defer stopper(cctx.Context) // nolint: errcheck
 
 		segname := cctx.String("name")
 		slog := log.With("seg", segname)
 
 		if cctx.Bool("info") {
-			info, has, err := segmgr.LoadInfo(segname)
+			info, has, err := di.SegMgr.LoadInfo(segname)
 			if err != nil {
 				return err
 			}
@@ -245,7 +227,7 @@ var segmentShowCmd = &cli.Command{
 		}
 
 		if cctx.Bool("boundary") {
-			bound, has, err := segmgr.LoadBoundary(segname)
+			bound, has, err := di.SegMgr.LoadBoundary(segname)
 			if err != nil {
 				return err
 			}
@@ -258,7 +240,7 @@ var segmentShowCmd = &cli.Command{
 		}
 
 		if cctx.Bool("active") {
-			activated, has, err := segmgr.LoadActive()
+			activated, has, err := di.SegMgr.LoadActive()
 			if err != nil {
 				return err
 			}
@@ -276,31 +258,4 @@ var segmentShowCmd = &cli.Command{
 		}
 		return nil
 	},
-}
-
-func segmentDSPath(cctx *cli.Context) (string, error) {
-	dir, err := getRepoHomeDir(cctx)
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(dir, "segment"), nil
-}
-
-func openSegmentDS(cctx *cli.Context) (dtypes.MetadataDS, error) {
-	dsPath, err := segmentDSPath(cctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return levelDs(dsPath, false)
-}
-
-func levelDs(path string, readonly bool) (dtypes.MetadataDS, error) {
-	return levelds.NewDatastore(path, &levelds.Options{
-		Compression: ldbopts.NoCompression,
-		NoSync:      false,
-		Strict:      ldbopts.StrictAll,
-		ReadOnly:    readonly,
-	})
 }

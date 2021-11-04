@@ -2,17 +2,21 @@ package dep
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	dstore "github.com/ipfs/go-datastore"
+	levelds "github.com/ipfs/go-ds-leveldb"
+	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 	"go.uber.org/fx"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -29,12 +33,6 @@ var (
 	_ common.DocumentDB   = (*mgoutil.MgoDocDB)(nil)
 	_ common.HeadNotifier = (*cliex.HeadSub)(nil)
 )
-
-// HeadNotifier provides a common.HeadNotifier based on metads
-func HeadNotifier(cli v0api.FullNode) (common.HeadNotifier, error) {
-	sub, err := cliex.NewHeadSub(cli)
-	return sub, err
-}
 
 type WrapAPIBlockstore struct {
 	blockstore.Blockstore
@@ -119,4 +117,32 @@ func InMemMetadataDS(lr repo.LockedRepo, g modules.Genesis) (dtypes.MetadataDS, 
 	}
 	err = ds.Put(dstore.NewKey("0"), bh.Cid().Bytes())
 	return ds, err
+}
+
+func LoadRaConfig(rpath RepoPath) (racailum.Config, error) {
+	cfgPath := ConfigFilePath(rpath)
+	cfg := racailum.DefaultConfig()
+	_, err := config.FromFile(cfgPath, &cfg)
+	if err != nil {
+		return racailum.Config{}, fmt.Errorf("read config from file %s: %w", cfgPath, err)
+	}
+
+	return cfg, nil
+}
+
+func OpenSegmentDS(rpath RepoPath) (SegmentMetaDS, error) {
+	return levelDs(SegmentMetaDSPath(rpath), false)
+}
+
+func levelDs(path string, readonly bool) (dtypes.MetadataDS, error) {
+	return levelds.NewDatastore(path, &levelds.Options{
+		Compression: ldbopts.NoCompression,
+		NoSync:      false,
+		Strict:      ldbopts.StrictAll,
+		ReadOnly:    readonly,
+	})
+}
+
+func NewSegmentManager(segds SegmentMetaDS) (*segment.Manager, error) {
+	return segment.NewManager(segds)
 }

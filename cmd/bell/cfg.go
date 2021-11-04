@@ -10,6 +10,7 @@ import (
 
 	"github.com/filecoin-project/lotus/node/config"
 
+	"github.com/ipfs-force-community/londobell/dep"
 	"github.com/ipfs-force-community/londobell/racailum"
 )
 
@@ -24,10 +25,12 @@ var cfgInitCmd = &cli.Command{
 	Name:  "init",
 	Flags: []cli.Flag{},
 	Action: func(cctx *cli.Context) error {
-		cfgPath, err := configPath(cctx)
+		rpath, err := dep.GetRepoPath(cctx)
 		if err != nil {
 			return err
 		}
+
+		cfgPath := dep.ConfigFilePath(rpath)
 
 		_, err = os.Stat(cfgPath)
 		if err == nil {
@@ -61,28 +64,4 @@ var cfgInitCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-func configPath(cctx *cli.Context) (string, error) {
-	dir, err := getRepoHomeDir(cctx)
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(dir, "config"), nil
-}
-
-func loadConfig(cctx *cli.Context) (racailum.Config, error) {
-	cfgPath, err := configPath(cctx)
-	if err != nil {
-		return racailum.Config{}, err
-	}
-
-	cfg := racailum.DefaultConfig()
-	_, err = config.FromFile(cfgPath, &cfg)
-	if err != nil {
-		return racailum.Config{}, err
-	}
-
-	return cfg, nil
 }

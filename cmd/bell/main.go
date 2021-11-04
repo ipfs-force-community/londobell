@@ -14,14 +14,6 @@ import (
 	"github.com/ipfs-force-community/londobell/lib/mgoutil/mcodec"
 )
 
-var (
-	repoFlag = &cli.StringFlag{
-		Name:  "bell-repo",
-		Usage: "repo path for bell",
-		Value: "~/.bell",
-	}
-)
-
 func main() {
 	lotuslog.SetupLogLevels()
 
@@ -41,7 +33,7 @@ func main() {
 		},
 		Version: build.CurrentCommit,
 		Flags: []cli.Flag{
-			repoFlag,
+			dep.RepoFlag,
 			dep.FullNodeAPIFlag,
 		},
 	}
