@@ -21,7 +21,6 @@ func main() {
 	logging.SetLogLevel("vm", "ERROR")
 
 	mcodec.Setup()
-
 	app := &cli.App{
 		Name:                 "bell",
 		Usage:                "chain info manager of Filecoin",

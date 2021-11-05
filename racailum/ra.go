@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ipfs-force-community/londobell/metrics"
+
 	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/filecoin-project/lotus/chain/types"
@@ -31,6 +33,7 @@ func DefaultConfig() Config {
 		Grafana:          grafana.DefaultOptions(),
 		Aggregate:        aggregate.DefaultOptions(),
 		Segment:          segment.DefaultOptions(),
+		Metrics:          metrics.DefaultOptions(),
 		EnableGasTracing: false,
 		EnableGrafana:    true,
 	}
@@ -41,6 +44,7 @@ type Config struct {
 	Grafana          grafana.Options
 	Aggregate        aggregate.Options
 	Segment          segment.Options
+	Metrics          metrics.Options
 	EnableGasTracing bool
 	EnableGrafana    bool
 }
