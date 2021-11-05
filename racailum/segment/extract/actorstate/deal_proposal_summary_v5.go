@@ -6,24 +6,19 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/ipfs/go-cid"
+
 	market5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/market"
 	adt5 "github.com/filecoin-project/specs-actors/v5/actors/util/adt"
-	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {
 	mustRegisterRegularExtractor("DealProposalSummaryV5", extractDealProposalSummaryV5)
-	schema.Register(
-		schema.Model{
-			Name: "deal-proposal-summary",
-			D:    &model.DealProposalSummary{},
-		},
-	)
+
 }
 
 func extractDealProposalSummaryV5(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market5.State) error {

@@ -16,9 +16,9 @@ func (sd *StructDiff) IsEmpty() bool {
 	return len(sd.Adds) == 0 && len(sd.Minuses) == 0 && len(sd.Minuses) == 0
 }
 
-// compareStructs compares two structs and returns their field diffs
+// CompareStructs compares two structs and returns their field diffs
 // we just let it panic if either prev or next is not a struct
-func compareStructs(prev, next reflect.Type) StructDiff {
+func CompareStructs(prev, next reflect.Type) StructDiff {
 	prevFields := map[string]reflect.StructField{}
 	nextFields := map[string]reflect.StructField{}
 
@@ -80,7 +80,7 @@ PREV_FIELDS:
 				}
 
 				if pInsideKind == reflect.Struct {
-					insideDiff := compareStructs(pInside, nInside)
+					insideDiff := CompareStructs(pInside, nInside)
 					if insideDiff.IsEmpty() {
 						continue PREV_FIELDS
 					}

@@ -17,9 +17,9 @@ import (
 )
 
 func init() {
-	summaryDaysV4 = []abi.ChainEpoch{1, 2, 3, 7, 14, 30, 60, 120}
+	summaryDaysV4 = []abi.ChainEpoch{1, 7, 14, 30}
 	for d := (miner4.MinSectorExpiration / builtin4.EpochsInDay); d <= (miner4.MaxSectorExpirationExtension / builtin4.EpochsInDay); d += 180 {
-		summaryDaysV4 = append(summaryDaysV3, abi.ChainEpoch(d))
+		summaryDaysV4 = append(summaryDaysV4, abi.ChainEpoch(d))
 	}
 
 	mustRegisterRegularExtractor("MinerSectorSummaryV4", extractMinerSectorSummaryV4)
@@ -32,24 +32,26 @@ func extractMinerSectorSummaryV4(ctx *extract.Ctx, res *extract.Res, head *commo
 		return nil
 	}
 
-	if st.Sectors.Equals(emptyMinerStateV3.Sectors) {
+	if st.Sectors.Equals(emptyMinerStateV4.Sectors) {
 		return nil
 	}
 
-	daysMax := summaryDaysV3[len(summaryDaysV3)-1]
-	summaries := make([]*model.MinerSectorSummaryRange, 0, len(summaryDaysV3)+1)
+	daysMax := summaryDaysV4[len(summaryDaysV4)-1]
+	summaries := make([]*model.MinerSectorSummaryRange, 0, len(summaryDaysV4)+1)
 	summariesInDays := make([]*model.MinerSectorSummaryRange, 0, int(daysMax+1))
 
 	var prevDays abi.ChainEpoch
-	for _, days := range summaryDaysV3 {
+	for _, days := range summaryDaysV4 {
 		current := &model.MinerSectorSummaryRange{
 			LowerBound:              prevDays * builtin4.EpochsInDay,
 			UpperBound:              days * builtin4.EpochsInDay,
 			SectorCount:             0,
 			DealCount:               0,
+			V1SectorCount:           0,
 			TotalDealWeight:         big.NewInt(0),
 			TotalVerifiedDealWeight: big.NewInt(0),
 			TotalInitialPledge:      abi.NewTokenAmount(0),
+			TotalV1InitialPledge:    abi.NewTokenAmount(0),
 		}
 
 		summaries = append(summaries, current)
@@ -64,10 +66,12 @@ func extractMinerSectorSummaryV4(ctx *extract.Ctx, res *extract.Res, head *commo
 		LowerBound:              prevDays * builtin4.EpochsInDay,
 		UpperBound:              -1,
 		SectorCount:             0,
+		V1SectorCount:           0,
 		DealCount:               0,
 		TotalDealWeight:         big.NewInt(0),
 		TotalVerifiedDealWeight: big.NewInt(0),
 		TotalInitialPledge:      abi.NewTokenAmount(0),
+		TotalV1InitialPledge:    abi.NewTokenAmount(0),
 	}
 
 	summaries = append(summaries, last)
@@ -79,6 +83,15 @@ func extractMinerSectorSummaryV4(ctx *extract.Ctx, res *extract.Res, head *commo
 	}
 
 	var out miner4.SectorOnChainInfo
+	minerCommittedCapacity := uint64(0)
+	actStore := ctx.D.ActorStore(ctx.C)
+	minfo, err := st.GetInfo(actStore)
+	if err != nil {
+		return fmt.Errorf("get miner info failed :%w", err)
+	}
+	sectorSize := minfo.SectorSize
+
+	mds := []model.MinerDealSector{}
 	err = sectors.ForEach(&out, func(n int64) error {
 		if out.Expiration <= head.Epoch {
 			return nil
@@ -95,6 +108,27 @@ func extractMinerSectorSummaryV4(ctx *extract.Ctx, res *extract.Res, head *commo
 		target.TotalVerifiedDealWeight = big.Add(target.TotalVerifiedDealWeight, out.VerifiedDealWeight)
 		target.TotalInitialPledge = big.Add(target.TotalInitialPledge, out.InitialPledge)
 
+		if out.SealProof < abi.RegisteredSealProof_StackedDrg2KiBV1_1 {
+			target.TotalV1InitialPledge = big.Add(target.TotalV1InitialPledge, out.InitialPledge)
+			target.V1SectorCount++
+		}
+
+		if len(out.DealIDs) == 0 {
+			minerCommittedCapacity += uint64(sectorSize)
+		} else {
+			mds = append(mds, model.MinerDealSector{
+				ID:                 fmt.Sprintf("%s-%d-%d", head.Addr, head.Epoch, out.SectorNumber),
+				Epoch:              head.Epoch,
+				SectorNumber:       out.SectorNumber,
+				SealProof:          out.SealProof,
+				DealIDs:            out.DealIDs,
+				DealWeight:         out.DealWeight,
+				VerifiedDealWeight: out.VerifiedDealWeight,
+				InitialPledge:      out.InitialPledge,
+				QAPower:            miner4.QAPowerForSector(sectorSize, &out),
+				Miner:              head.Addr,
+			})
+		}
 		return nil
 	})
 
@@ -122,9 +156,14 @@ func extractMinerSectorSummaryV4(ctx *extract.Ctx, res *extract.Res, head *commo
 			Epoch: head.Epoch,
 		},
 		Detail: model.MinerSectorSummaryDetail{
-			Summaries: nonEmpty,
+			Summaries:         nonEmpty,
+			CommittedCapacity: minerCommittedCapacity,
 		},
 	})
+
+	for i := range mds {
+		res.Docs = append(res.Docs, &mds[i])
+	}
 
 	return nil
 }

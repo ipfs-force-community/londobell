@@ -22,8 +22,9 @@ func init() {
 	mustRegisterRegularExtractor("MiningProfitabilityV6", extractMiningProfitabilityV6)
 }
 
-// see https://github.com/filecoin-project/specs-actors/blob/v4.0.0/actors/builtin/miner/miner_actor.go#L984-L996
-// and https://github.com/filecoin-project/specs-actors/blob/v4.0.0/actors/builtin/miner/monies.go#L166-L181
+// VERCHECK
+// see https://github.com/filecoin-project/specs-actors/blob/v6.0.0/actors/builtin/miner/miner_actor.go#L1165-L1178
+// and https://github.com/filecoin-project/specs-actors/blob/v6.0.0/actors/builtin/miner/monies.go#L99-L104
 func extractMiningProfitabilityV6(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward6.State) error {
 	blkraw, err := ctx.D.ChainBlockstore().Get(head.Global.Power.Head)
 	if err != nil {

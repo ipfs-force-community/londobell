@@ -5,15 +5,15 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/ipfs/go-cid"
+
 	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
 	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
 	adt6 "github.com/filecoin-project/specs-actors/v6/actors/util/adt"
-	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {
@@ -22,12 +22,6 @@ func init() {
 		summaryDaysV6 = append(summaryDaysV6, abi.ChainEpoch(d))
 	}
 
-	schema.Register(
-		schema.Model{
-			Name: "miner-deal-sector",
-			D:    &model.MinerDealSector{},
-		},
-	)
 	mustRegisterRegularExtractor("MinerSectorSummaryV6", extractMinerSectorSummaryV6)
 }
 

@@ -1,0 +1,16 @@
+package actorstate
+
+import (
+	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
+
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+)
+
+func init() {
+	mustRegisterRegularExtractor("MinerFundsV0", extractMinerFundsV0)
+}
+
+func extractMinerFundsV0(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner0.State) error {
+	return extractMinerFunds(ctx, res, head, st)
+}

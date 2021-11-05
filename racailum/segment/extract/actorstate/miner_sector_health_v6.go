@@ -25,6 +25,7 @@ func extractMinerSectorHealthV6(ctx *extract.Ctx, res *extract.Res, head *common
 	if !st.DeadlineCronActive {
 		return nil
 	}
+
 	actStore := ctx.D.ActorStore(ctx.C)
 	deadlines, err := st.LoadDeadlines(actStore)
 	if err != nil {

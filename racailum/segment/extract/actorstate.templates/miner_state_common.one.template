@@ -1,0 +1,159 @@
+package actorstate
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/ipfs/go-cid"
+
+	"github.com/filecoin-project/go-bitfield"
+
+	{{ range $vinfo := .Vers }}
+	miner{{ $vinfo.Ver }} "{{ $vinfo.ImportPath }}/actors/builtin/miner"
+	adt{{ $vinfo.Ver }} "{{ $vinfo.ImportPath }}/actors/util/adt"
+
+	{{ end }}
+
+	bstore "github.com/filecoin-project/lotus/blockstore"
+	cstore "github.com/filecoin-project/lotus/chain/store"
+)
+
+func init() {
+	{{ range $vinfo := .Vers }}
+	empty{{ $vinfo.Ver }}, err := newEmptyMinerStateV{{ $vinfo.Ver }}()
+	if err != nil {
+		panic(fmt.Errorf("construct empty miner state v{{ $vinfo.Ver }}: %w", err))
+	}
+
+	emptyMinerStateV{{ $vinfo.Ver }} = empty{{ $vinfo.Ver }}
+	{{ end }}
+}
+
+var (
+	{{ range $vinfo := .Vers -}}
+	emptyMinerStateV{{ $vinfo.Ver }} *miner{{ $vinfo.Ver }}.State
+	{{ end }}
+)
+
+{{ range $vinfo := .Vers }}
+{{ if gt $vinfo.Ver 2 }}
+func isEmptyMinerStateV{{ $vinfo.Ver }}(mst *miner{{ $vinfo.Ver }}.State) bool {
+	earlyCount, err := mst.EarlyTerminations.Count()
+	if err != nil || earlyCount != 0 {
+		return false
+	}
+
+	return isEmptyOrZero(mst.PreCommitDeposits) &&
+		isEmptyOrZero(mst.LockedFunds) &&
+		isEmptyOrZero(mst.FeeDebt) &&
+		mst.VestingFunds.Equals(emptyMinerStateV{{ $vinfo.Ver }}.VestingFunds) &&
+		isEmptyOrZero(mst.InitialPledge) &&
+		mst.PreCommittedSectors.Equals(emptyMinerStateV{{ $vinfo.Ver }}.PreCommittedSectors) &&
+		{{ if gt $vinfo.Ver 4 -}}
+		mst.PreCommittedSectorsCleanUp.Equals(emptyMinerStateV{{ $vinfo.Ver }}.PreCommittedSectorsCleanUp) &&
+		{{- else -}}
+		mst.PreCommittedSectorsExpiry.Equals(emptyMinerStateV{{ $vinfo.Ver }}.PreCommittedSectorsExpiry) &&
+		{{- end }}
+		mst.AllocatedSectors.Equals(emptyMinerStateV{{ $vinfo.Ver }}.AllocatedSectors) &&
+		mst.Sectors.Equals(emptyMinerStateV{{ $vinfo.Ver }}.Sectors) &&
+		mst.Deadlines.Equals(emptyMinerStateV{{ $vinfo.Ver }}.Deadlines)
+}
+
+// VERCHECK
+{{ with (eq $vinfo.Ver 3) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v3.1.1/actors/builtin/miner/miner_actor.go#L97-L134
+{{- end -}}
+{{ with (eq $vinfo.Ver 4) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v4.0.1/actors/builtin/miner/miner_actor.go#L98-L130
+{{- end -}}
+{{ with (eq $vinfo.Ver 5) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v5.0.4/actors/builtin/miner/miner_actor.go#L100-L136
+{{- end -}}
+{{ with (eq $vinfo.Ver 6) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v6.0.0/actors/builtin/miner/miner_actor.go#L100-L136
+{{- end }}
+func newEmptyMinerStateV{{ $vinfo.Ver }}() (*miner{{ $vinfo.Ver }}.State, error) {
+	ctx := context.Background()
+	inMemStore := bstore.NewMemorySync()
+	adtStore := adt{{ $vinfo.Ver }}.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
+	return miner{{ $vinfo.Ver }}.ConstructState(adtStore, cid.Undef, 0, 0)
+}
+{{ else }}
+func isEmptyMinerStateV{{ $vinfo.Ver }}(mst *miner{{ $vinfo.Ver }}.State) bool {
+	earlyCount, err := mst.EarlyTerminations.Count()
+	if err != nil || earlyCount != 0 {
+		return false
+	}
+
+	return isEmptyOrZero(mst.PreCommitDeposits) &&
+		isEmptyOrZero(mst.LockedFunds) &&
+		{{ if ne $vinfo.Ver 0 -}}
+		isEmptyOrZero(mst.FeeDebt) &&
+		{{- end }}
+		mst.VestingFunds.Equals(emptyMinerStateV{{ $vinfo.Ver }}.VestingFunds) &&
+		{{- if eq $vinfo.Ver 0 -}}
+		isEmptyOrZero(mst.InitialPledgeRequirement) &&
+		{{ else }}
+		isEmptyOrZero(mst.InitialPledge) &&
+		{{- end }}
+		mst.PreCommittedSectors.Equals(emptyMinerStateV{{ $vinfo.Ver }}.PreCommittedSectors) &&
+		mst.PreCommittedSectorsExpiry.Equals(emptyMinerStateV{{ $vinfo.Ver }}.PreCommittedSectorsExpiry) &&
+		mst.AllocatedSectors.Equals(emptyMinerStateV{{ $vinfo.Ver }}.AllocatedSectors) &&
+		mst.Sectors.Equals(emptyMinerStateV{{ $vinfo.Ver }}.Sectors) &&
+		mst.Deadlines.Equals(emptyMinerStateV{{ $vinfo.Ver }}.Deadlines)
+}
+
+{{ if eq $vinfo.Ver 0 -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v0.9.14/actors/builtin/miner/miner_actor.go#L99-L155
+{{- else }}
+// see https://github.com/filecoin-project/specs-actors/blob/v2.3.4/actors/builtin/miner/miner_actor.go#L96-L156
+{{- end }}
+func newEmptyMinerStateV{{ $vinfo.Ver }}() (*miner{{ $vinfo.Ver }}.State, error) {
+	ctx := context.Background()
+
+	inMemStore := bstore.NewMemorySync()
+	adtStore := adt{{ $vinfo.Ver }}.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
+
+	emptyMap, err := adt{{ $vinfo.Ver }}.MakeEmptyMap(adtStore).Root()
+	if err != nil {
+		return nil, err
+	}
+
+	emptyArray, err := adt{{ $vinfo.Ver }}.MakeEmptyArray(adtStore).Root()
+	if err != nil {
+		return nil, err
+	}
+
+	emptyBitfield := bitfield.NewFromSet(nil)
+	emptyBitfieldCid, err := adtStore.Put(ctx, emptyBitfield)
+	if err != nil {
+		return nil, err
+	}
+
+	emptyDeadline := miner{{ $vinfo.Ver }}.ConstructDeadline(emptyArray)
+	emptyDeadlineCid, err := adtStore.Put(ctx, emptyDeadline)
+	if err != nil {
+		return nil, err
+	}
+
+	emptyDeadlines := miner{{ $vinfo.Ver }}.ConstructDeadlines(emptyDeadlineCid)
+	emptyVestingFunds := miner{{ $vinfo.Ver }}.ConstructVestingFunds()
+	emptyDeadlinesCid, err := adtStore.Put(ctx, emptyDeadlines)
+	if err != nil {
+		return nil, err
+	}
+
+	emptyVestingFundsCid, err := adtStore.Put(ctx, emptyVestingFunds)
+	if err != nil {
+		return nil, err
+	}
+
+	{{ if eq $vinfo.Ver 0 -}}
+	state, err := miner{{ $vinfo.Ver }}.ConstructState(cid.Undef, 0, emptyBitfieldCid, emptyArray, emptyMap, emptyDeadlinesCid, emptyVestingFundsCid)
+	{{ else }}
+	state, err := miner{{ $vinfo.Ver }}.ConstructState(cid.Undef, 0, 0, emptyBitfieldCid, emptyArray, emptyMap, emptyDeadlinesCid, emptyVestingFundsCid)
+	{{- end }}
+	return state, err
+}
+{{ end }}
+{{ end }}

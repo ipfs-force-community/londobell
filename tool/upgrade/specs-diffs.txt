@@ -14,8 +14,17 @@ Specs v0 => v2:
 		- TotalMined: big.Int
 		> ThisEpochRewardSmoothed
 			 *smoothing.FilterEstimate => smoothing.FilterEstimate
+	> miner.Partition
+		+ Unproven: bitfield.BitField
+		+ UnprovenPower: miner.PowerPair
 
 Specs v2 => v3:
+	> miner.Deadline
+		+ OptimisticPoStSubmissions: cid.Cid
+		+ OptimisticPoStSubmissionsSnapshot: cid.Cid
+		+ PartitionsPoSted: bitfield.BitField
+		+ PartitionsSnapshot: cid.Cid
+		- PostSubmissions: bitfield.BitField
 
 Specs v3 => v4:
 	> miner.Actor

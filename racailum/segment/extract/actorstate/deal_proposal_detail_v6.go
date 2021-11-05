@@ -12,24 +12,11 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {
 	mustRegisterRegularExtractor("DealProposalDetailedV6", extractDealProposalDetailedV6)
-	schema.Register(
-		schema.Model{
-			Name: "deal-proposal-detail",
-			D:    &model.DealProposalDetail{},
-		},
-	)
 
-	schema.Register(
-		schema.Model{
-			Name: "deal-proposal-full",
-			D:    &model.DealProposal{},
-		},
-	)
 }
 
 func extractDealProposalDetailedV6(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market6.State) error {

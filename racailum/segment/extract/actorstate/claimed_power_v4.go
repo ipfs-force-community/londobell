@@ -8,32 +8,35 @@ import (
 	"github.com/ipfs/go-cid"
 
 	builtin4 "github.com/filecoin-project/specs-actors/v4/actors/builtin"
+
 	power4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/power"
 	adt4 "github.com/filecoin-project/specs-actors/v4/actors/util/adt"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+	// "github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {
-	mustRegisterRegularExtractor("ClaimedPowerV4", extractClaimedPowerV4)
+	// mustRegisterRegularExtractor("ClaimedPowerV4", extractClaimedPowerV4)
 
-	schema.Register(
-		schema.Model{
-			Name: "claimed-power-v4",
-			D: &model.ClaimedPower{
-				Detail: &power4.Claim{},
-			},
-		},
-	)
+	// schema.Register(
+	//     schema.Model{
+	//         Name: "claimed-power-v4",
+	//         D: &model.ClaimedPower{
+	//             Detail: &power4.Claim{},
+	//         },
+	//     },
+	// )
 }
 
-func extractClaimedPowerV4(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *power4.State) error {
+func extractClaimedPowerV4(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *power4.State) error { // nolint: deadcode
+
 	claims, err := adt4.AsMap(ctx.D.ActorStore(ctx.C), pst.Claims, builtin4.DefaultHamtBitwidth)
+
 	if err != nil {
-		return fmt.Errorf("construct adt.Map for Claims in *power3.State: %w", err)
+		return fmt.Errorf("construct adt.Map for Claims in *power4.State: %w", err)
 	}
 
 	out := &power4.Claim{}

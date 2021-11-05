@@ -12,17 +12,11 @@ import (
 	"github.com/ipfs-force-community/londobell/lib/mir"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {
 	mustRegisterRegularExtractor("MarketFundsV6", extractMarketFundsV6)
-	schema.Register(
-		schema.Model{
-			Name: "market-funds",
-			D:    &model.MarketFunds{},
-		},
-	)
+
 }
 
 func extractMarketFundsV6(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market6.State) error {
@@ -78,7 +72,6 @@ func extractMarketFundsV6(ctx *extract.Ctx, res *extract.Res, head *common.Actor
 		}
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("walk throuth proposals: %w", err)
 	}

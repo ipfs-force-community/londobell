@@ -8,9 +8,9 @@ import (
 )
 
 func init() {
-	mustRegisterRegularExtractor("AllocatedSectorsV2", extractAllocatedSectorsV2)
+	// mustRegisterRegularExtractor("AllocatedSectorsV2", extractAllocatedSectorsV2)
 }
 
-func extractAllocatedSectorsV2(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *miner2.State) error {
+func extractAllocatedSectorsV2(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *miner2.State) error { // nolint: deadcode
 	return extractAllocatedSectors(ctx, res, head, pst.AllocatedSectors)
 }

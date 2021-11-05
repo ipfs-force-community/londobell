@@ -1,0 +1,16 @@
+package actorstate
+
+import (
+	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
+
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+)
+
+func init() {
+	// mustRegisterRegularExtractor("AllocatedSectorsV{{ .Ver }}", extractAllocatedSectorsV{{ .Ver }})
+}
+
+func extractAllocatedSectorsV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *miner{{ .Ver }}.State) error { // nolint: deadcode
+	return extractAllocatedSectors(ctx, res, head, pst.AllocatedSectors)
+}

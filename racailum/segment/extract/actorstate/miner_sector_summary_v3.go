@@ -14,23 +14,15 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {
-	summaryDaysV3 = []abi.ChainEpoch{1, 2, 3, 7, 14, 30, 60, 120}
+	summaryDaysV3 = []abi.ChainEpoch{1, 7, 14, 30}
 	for d := (miner3.MinSectorExpiration / builtin3.EpochsInDay); d <= (miner3.MaxSectorExpirationExtension / builtin3.EpochsInDay); d += 180 {
 		summaryDaysV3 = append(summaryDaysV3, abi.ChainEpoch(d))
 	}
 
 	mustRegisterRegularExtractor("MinerSectorSummaryV3", extractMinerSectorSummaryV3)
-
-	schema.Register(
-		schema.Model{
-			Name: "miner-sector-summary",
-			D:    &model.MinerSectorSummary{},
-		},
-	)
 }
 
 var summaryDaysV3 []abi.ChainEpoch
@@ -55,9 +47,11 @@ func extractMinerSectorSummaryV3(ctx *extract.Ctx, res *extract.Res, head *commo
 			UpperBound:              days * builtin3.EpochsInDay,
 			SectorCount:             0,
 			DealCount:               0,
+			V1SectorCount:           0,
 			TotalDealWeight:         big.NewInt(0),
 			TotalVerifiedDealWeight: big.NewInt(0),
 			TotalInitialPledge:      abi.NewTokenAmount(0),
+			TotalV1InitialPledge:    abi.NewTokenAmount(0),
 		}
 
 		summaries = append(summaries, current)
@@ -72,10 +66,12 @@ func extractMinerSectorSummaryV3(ctx *extract.Ctx, res *extract.Res, head *commo
 		LowerBound:              prevDays * builtin3.EpochsInDay,
 		UpperBound:              -1,
 		SectorCount:             0,
+		V1SectorCount:           0,
 		DealCount:               0,
 		TotalDealWeight:         big.NewInt(0),
 		TotalVerifiedDealWeight: big.NewInt(0),
 		TotalInitialPledge:      abi.NewTokenAmount(0),
+		TotalV1InitialPledge:    abi.NewTokenAmount(0),
 	}
 
 	summaries = append(summaries, last)
@@ -87,6 +83,15 @@ func extractMinerSectorSummaryV3(ctx *extract.Ctx, res *extract.Res, head *commo
 	}
 
 	var out miner3.SectorOnChainInfo
+	minerCommittedCapacity := uint64(0)
+	actStore := ctx.D.ActorStore(ctx.C)
+	minfo, err := st.GetInfo(actStore)
+	if err != nil {
+		return fmt.Errorf("get miner info failed :%w", err)
+	}
+	sectorSize := minfo.SectorSize
+
+	mds := []model.MinerDealSector{}
 	err = sectors.ForEach(&out, func(n int64) error {
 		if out.Expiration <= head.Epoch {
 			return nil
@@ -103,6 +108,27 @@ func extractMinerSectorSummaryV3(ctx *extract.Ctx, res *extract.Res, head *commo
 		target.TotalVerifiedDealWeight = big.Add(target.TotalVerifiedDealWeight, out.VerifiedDealWeight)
 		target.TotalInitialPledge = big.Add(target.TotalInitialPledge, out.InitialPledge)
 
+		if out.SealProof < abi.RegisteredSealProof_StackedDrg2KiBV1_1 {
+			target.TotalV1InitialPledge = big.Add(target.TotalV1InitialPledge, out.InitialPledge)
+			target.V1SectorCount++
+		}
+
+		if len(out.DealIDs) == 0 {
+			minerCommittedCapacity += uint64(sectorSize)
+		} else {
+			mds = append(mds, model.MinerDealSector{
+				ID:                 fmt.Sprintf("%s-%d-%d", head.Addr, head.Epoch, out.SectorNumber),
+				Epoch:              head.Epoch,
+				SectorNumber:       out.SectorNumber,
+				SealProof:          out.SealProof,
+				DealIDs:            out.DealIDs,
+				DealWeight:         out.DealWeight,
+				VerifiedDealWeight: out.VerifiedDealWeight,
+				InitialPledge:      out.InitialPledge,
+				QAPower:            miner3.QAPowerForSector(sectorSize, &out),
+				Miner:              head.Addr,
+			})
+		}
 		return nil
 	})
 
@@ -130,9 +156,14 @@ func extractMinerSectorSummaryV3(ctx *extract.Ctx, res *extract.Res, head *commo
 			Epoch: head.Epoch,
 		},
 		Detail: model.MinerSectorSummaryDetail{
-			Summaries: nonEmpty,
+			Summaries:         nonEmpty,
+			CommittedCapacity: minerCommittedCapacity,
 		},
 	})
+
+	for i := range mds {
+		res.Docs = append(res.Docs, &mds[i])
+	}
 
 	return nil
 }

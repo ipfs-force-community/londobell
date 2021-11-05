@@ -1,6 +1,8 @@
 package actorstate
 
 import (
+	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
+
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 
 	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
@@ -17,6 +19,13 @@ import (
 
 func init() {
 	schema.Register(
+		schema.Model{
+			Name: "actor-state: miner.State v0",
+			D: &model.ActorState{
+				Detail: &miner0.State{},
+			},
+		},
+
 		schema.Model{
 			Name: "actor-state: miner.State v2",
 			D: &model.ActorState{
@@ -37,12 +46,14 @@ func init() {
 				Detail: &miner4.State{},
 			},
 		},
+
 		schema.Model{
 			Name: "actor-state: miner.State v5",
 			D: &model.ActorState{
 				Detail: &miner5.State{},
 			},
 		},
+
 		schema.Model{
 			Name: "actor-state: miner.State v6",
 			D: &model.ActorState{
@@ -58,6 +69,9 @@ func isEmptyState(st interface{}) bool {
 	}
 
 	switch st := st.(type) {
+	case *miner0.State:
+		return isEmptyMinerStateV0(st)
+
 	case *miner2.State:
 		return isEmptyMinerStateV2(st)
 

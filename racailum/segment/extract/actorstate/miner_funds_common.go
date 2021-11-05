@@ -7,6 +7,9 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
+	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
+	adt0 "github.com/filecoin-project/specs-actors/actors/util/adt"
+
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	adt2 "github.com/filecoin-project/specs-actors/v2/actors/util/adt"
 
@@ -59,6 +62,22 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 	sum := abi.NewTokenAmount(0)
 
 	switch st := st.(type) {
+	case *miner0.State:
+		if err := mir.Mirror(&detail, st); err != nil {
+			return fmt.Errorf("mirroring *miner2.State: %w", err)
+		}
+
+		if !st.VestingFunds.Equals(emptyMinerStateV0.VestingFunds) {
+			funds, err := st.LoadVestingFunds(adt0.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+			if err != nil {
+				return fmt.Errorf("load vesting funds: %w", err)
+			}
+
+			for _, v := range funds.Funds {
+				sum = big.Add(sum, v.Amount)
+			}
+		}
+
 	case *miner2.State:
 		if err := mir.Mirror(&detail, st); err != nil {
 			return fmt.Errorf("mirroring *miner2.State: %w", err)
@@ -180,6 +199,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		if err != nil {
 			return fmt.Errorf("process sector pledge failed")
 		}
+
 	case *miner6.State:
 		if err := mir.Mirror(&detail, st); err != nil {
 			return fmt.Errorf("mirroring *miner6.State: %w", err)
@@ -192,7 +212,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			return nil
 		}
 
-		if !st.VestingFunds.Equals(emptyMinerStateV5.VestingFunds) {
+		if !st.VestingFunds.Equals(emptyMinerStateV6.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt6.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
 				return fmt.Errorf("load vesting funds: %w", err)
@@ -232,7 +252,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			quant := miner6.QuantSpecForDeadline(dlInfo)
 
 			return ps.ForEach(&part, func(partIdx int64) error {
-				expirations, err := miner6.LoadExpirationQueue(actStore, part.ExpirationsEpochs, quant, miner5.PartitionExpirationAmtBitwidth)
+				expirations, err := miner6.LoadExpirationQueue(actStore, part.ExpirationsEpochs, quant, miner6.PartitionExpirationAmtBitwidth)
 				if err != nil {
 					return fmt.Errorf("failed to load expiration queue: %w", err)
 				}
@@ -253,6 +273,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		if err != nil {
 			return fmt.Errorf("process sector pledge failed")
 		}
+
 	}
 
 	detail.VestInFuture = vestInFuture

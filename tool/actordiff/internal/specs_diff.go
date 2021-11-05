@@ -73,7 +73,7 @@ func CompareSpecs(prev, next *Specs) SpecsDiff {
 		pstateTyp := reflect.TypeOf(pactor.State()).Elem()
 		nstateTyp := reflect.TypeOf(nactor.State()).Elem()
 
-		fields := compareStructs(pstateTyp, nstateTyp)
+		fields := CompareStructs(pstateTyp, nstateTyp)
 		if fields.IsEmpty() {
 			continue
 		}

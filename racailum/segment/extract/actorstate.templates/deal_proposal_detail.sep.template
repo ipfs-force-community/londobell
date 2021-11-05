@@ -1,0 +1,111 @@
+package actorstate
+
+import (
+	"fmt"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	market{{ .Ver }} "{{ .ImportPath }}/actors/builtin/market"
+	adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+	"github.com/ipfs/go-cid"
+
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	{{ if eq .Ver 0 -}}
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+	{{- end }}
+)
+
+func init() {
+	mustRegisterRegularExtractor("DealProposalDetailedV{{ .Ver }}", extractDealProposalDetailedV{{ .Ver }})
+	{{ if eq .Ver 0 -}}
+	schema.Register(
+		schema.Model{
+			Name: "deal-proposal-detail",
+			D:    &model.DealProposalDetail{},
+		},
+	)
+
+	schema.Register(
+		schema.Model{
+			Name: "deal-proposal-full",
+			D:    &model.DealProposal{},
+		},
+	)
+	{{- end }}
+}
+
+func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market{{ .Ver }}.State) error {
+	if ticks := ctx.Opts.StateRegular.DealProposalDetailTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
+		return nil
+	}
+
+	deals, err := market{{ .Ver }}.AsDealProposalArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
+	if err != nil {
+		return fmt.Errorf("load deal proposal array: %w", err)
+	}
+
+	dealsStateArr, err := market{{ .Ver }}.AsDealStateArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.States)
+	if err != nil {
+		return fmt.Errorf("load deal state array: %w", err)
+	}
+	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
+	if err != nil {
+		return fmt.Errorf("ge regular id: %w", err)
+	}
+
+	details := map[address.Address]*model.DealProposalDetail{}
+
+	var out market{{ .Ver }}.DealProposal
+	var dealProposals []model.DealProposal
+	err = deals.ForEach(&out, func(idx int64) error {
+		if _, ok := details[out.Provider]; !ok {
+			details[out.Provider] = &model.DealProposalDetail{
+				ActorStateExBasic: model.ActorStateExBasic{
+					ID:    id,
+					Path:  []cid.Cid{head.Head, st.Proposals},
+					Addr:  out.Provider,
+					Epoch: head.Epoch,
+				},
+			}
+		}
+
+		dealState, found, err := dealsStateArr.Get(abi.DealID(idx))
+		if err != nil {
+			return fmt.Errorf("load deal state failed: %w", err)
+		}
+
+		// no matter expire or slash
+		unExpired := out.EndEpoch > head.Epoch || (found && dealState.SlashEpoch != -1)
+		if unExpired && out.VerifiedDeal {
+			details[out.Provider].Detail.VerifiedDealCount++
+		} else if unExpired {
+			details[out.Provider].Detail.UnVerifiedDealCount++
+		} else if out.VerifiedDeal {
+			details[out.Provider].Detail.VerifiedDealEndCount++
+		} else {
+			details[out.Provider].Detail.UnVerifiedDealEndCount++
+		}
+
+		dealProposals = append(dealProposals, model.DealProposal{
+			ID:           idx,
+			Epoch:        head.Epoch,
+			DealProposal: out,
+		})
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("walk through deal proposals: %w", err)
+	}
+
+	for i := range details {
+		res.Docs = append(res.Docs, details[i])
+	}
+
+	for i := range dealProposals {
+		res.Docs = append(res.Docs, &dealProposals[i])
+	}
+	return nil
+}

@@ -9,7 +9,6 @@ import (
 
 func init() {
 	mustRegisterRegularExtractor("MinerFundsV3", extractMinerFundsV3)
-
 }
 
 func extractMinerFundsV3(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner3.State) error {

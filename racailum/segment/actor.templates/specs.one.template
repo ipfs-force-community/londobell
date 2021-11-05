@@ -1,0 +1,44 @@
+package actor
+
+import (
+	"fmt"
+
+	"github.com/filecoin-project/go-state-types/rt"
+	"github.com/filecoin-project/lotus/chain/actors"
+	{{ range $vi := .Vers -}}
+	exported{{ .Ver }} "{{ .ImportPath }}/actors/builtin/exported"
+	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
+
+	{{ end }}
+)
+
+func init() {
+	if len(actors.Versions) != len(Specs) {
+		panic(fmt.Errorf("length of specs & versions are not equal, %d != %d", len(Specs), len(actors.Versions)))
+	}
+
+	if len(actors.Versions) != len(WatchOuts) {
+		panic(fmt.Errorf("length of watch-out types & versions are not equal, %d != %d", len(WatchOuts), len(actors.Versions)))
+	}
+
+	for i := 1; i < len(WatchOuts); i++ {
+		if len(WatchOuts[i]) != len(WatchOuts[i-1]) {
+			panic(fmt.Errorf("number of watch-out types are differet for %d & %d, %d != %d", i-1, i, len(WatchOuts[i-1]), len(WatchOuts[i])))
+		}
+	}
+}
+
+var Specs = [][]rt.VMActor{
+	{{ range $vi := .Vers -}}
+	exported{{ .Ver }}.BuiltinActors(),
+	{{ end -}}
+}
+
+var WatchOuts = [][]interface{}{
+	{{ range $vi := .Vers -}}
+	[]interface{}{
+		miner{{ .Ver }}.Deadline{},
+		miner{{ .Ver }}.Partition{},
+	},
+	{{ end -}}
+}

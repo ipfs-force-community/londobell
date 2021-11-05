@@ -22,8 +22,9 @@ func init() {
 	mustRegisterRegularExtractor("MiningProfitabilityV2", extractMiningProfitabilityV2)
 }
 
-// see https://github.com/filecoin-project/specs-actors/blob/v2.3.4/actors/builtin/miner/miner_actor.go#L870-L882
-// and https://github.com/filecoin-project/specs-actors/blob/v2.3.4/actors/builtin/miner/monies.go#L128-L154
+// VERCHECK
+// see https://github.com/filecoin-project/specs-actors/blob/v2.3.5/actors/builtin/miner/miner_actor.go#L870-L882
+// and https://github.com/filecoin-project/specs-actors/blob/v2.3.5/actors/builtin/miner/monies.go#L79-L84
 func extractMiningProfitabilityV2(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward2.State) error {
 	blkraw, err := ctx.D.ChainBlockstore().Get(head.Global.Power.Head)
 	if err != nil {
@@ -55,6 +56,7 @@ func extractMiningProfitabilityV2(ctx *extract.Ctx, res *extract.Res, head *comm
 		InitialStoragePledge:      storagePledge,
 		ProjectionOfInitialPledge: storagePledge, // TODO: projection is just equal to the init storage power here, correct me if I'm wrong
 		ProjectionOfFaultFee:      miner2.PledgePenaltyForContinuedFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower),
+		Mined:                     st.TotalStoragePowerReward,
 	}
 
 	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
