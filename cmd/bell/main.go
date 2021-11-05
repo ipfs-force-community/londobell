@@ -31,7 +31,7 @@ func main() {
 			cfgCmd,
 			segmentCmd,
 		},
-		Version: build.CurrentCommit,
+		Version: build.UserVersion(),
 		Flags: []cli.Flag{
 			dep.RepoFlag,
 			dep.FullNodeAPIFlag,
