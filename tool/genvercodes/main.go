@@ -40,7 +40,7 @@ func main() {
 	dirs := []dirOption{
 		{
 			In:  "./racailum/segment/extract/actorstate.templates/",
-			Out: "./racailum/segment/extract/actorstate/",
+			Out: "./racailum/segment/extract/actorstate/gen/",
 		},
 		{
 			In:  "./racailum/segment/actor.templates/",

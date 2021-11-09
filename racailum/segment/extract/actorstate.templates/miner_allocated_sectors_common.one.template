@@ -1,4 +1,4 @@
-package actorstate
+package gen
 
 import (
 	"github.com/filecoin-project/go-bitfield"

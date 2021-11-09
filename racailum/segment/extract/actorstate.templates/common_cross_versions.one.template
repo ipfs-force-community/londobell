@@ -1,4 +1,4 @@
-package actorstate
+package gen
 
 import (
 	{{ range $vi := .Vers -}}
@@ -23,7 +23,7 @@ func init() {
 	)
 }
 
-func isEmptyState(st interface{}) bool {
+func IsEmptyState(st interface{}) bool {
 	if st == nil {
 		return true
 	}

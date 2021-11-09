@@ -1,14 +1,15 @@
-package actorstate
+package gen
 
 import (
 	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 )
 
 func init() {
-	mustRegisterRegularExtractor("MinerFundsV{{ .Ver }}", extractMinerFundsV{{ .Ver }})
+	reg.MustRegisterRegularExtractor("MinerFundsV{{ .Ver }}", extractMinerFundsV{{ .Ver }})
 }
 
 func extractMinerFundsV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner{{ .Ver }}.State) error {

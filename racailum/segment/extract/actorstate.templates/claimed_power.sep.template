@@ -1,4 +1,4 @@
-package actorstate
+package gen
 
 import (
 	"bytes"
@@ -15,12 +15,13 @@ import (
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {
-	mustRegisterRegularExtractor("ClaimedPowerV{{ .Ver }}", extractClaimedPowerV{{ .Ver }})
+	reg.MustRegisterRegularExtractor("ClaimedPowerV{{ .Ver }}", extractClaimedPowerV{{ .Ver }})
 
 	schema.Register(
 	    schema.Model{

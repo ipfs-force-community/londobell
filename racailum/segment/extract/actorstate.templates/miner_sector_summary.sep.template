@@ -1,4 +1,4 @@
-package actorstate
+package gen
 
 import (
 	"fmt"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	{{ if eq .Ver 0 -}}
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
@@ -40,7 +41,7 @@ func init() {
 		},
 	)
 	{{- end}}
-	mustRegisterRegularExtractor("MinerSectorSummaryV{{ .Ver }}", extractMinerSectorSummaryV{{ .Ver }})
+	reg.MustRegisterRegularExtractor("MinerSectorSummaryV{{ .Ver }}", extractMinerSectorSummaryV{{ .Ver }})
 }
 
 var summaryDaysV{{ .Ver }} []abi.ChainEpoch

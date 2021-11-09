@@ -1,4 +1,4 @@
-package actorstate
+package gen
 
 import (
 	"fmt"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	{{ if eq .Ver 0 -}}
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
@@ -22,7 +23,7 @@ import (
 )
 
 func init() {
-	mustRegisterRegularExtractor("VerifRegV{{ .Ver }}", extractVerifRegV{{ .Ver }})
+	reg.MustRegisterRegularExtractor("VerifRegV{{ .Ver }}", extractVerifRegV{{ .Ver }})
 
 	{{ if eq .Ver 0 -}}
 	schema.Register(

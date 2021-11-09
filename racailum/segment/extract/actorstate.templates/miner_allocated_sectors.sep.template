@@ -1,4 +1,4 @@
-package actorstate
+package gen
 
 import (
 	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	// mustRegisterRegularExtractor("AllocatedSectorsV{{ .Ver }}", extractAllocatedSectorsV{{ .Ver }})
+	// reg.MustRegisterRegularExtractor("AllocatedSectorsV{{ .Ver }}", extractAllocatedSectorsV{{ .Ver }})
 }
 
 func extractAllocatedSectorsV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *miner{{ .Ver }}.State) error { // nolint: deadcode
