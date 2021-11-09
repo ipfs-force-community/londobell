@@ -41,6 +41,17 @@ type registry struct {
 	e map[reflect.Type][]Extractor
 }
 
+func All() []Extractor {
+	execs := make([]Extractor, 0, 32)
+
+	extractorRegistry.regular.RLock()
+	for _, exts := range extractorRegistry.regular.e {
+		execs = append(execs, exts...)
+	}
+	extractorRegistry.regular.RUnlock()
+	return execs
+}
+
 func Extractors(typ reflect.Type) ([]Extractor, bool) {
 	extractorRegistry.regular.RLock()
 	execs, ok := extractorRegistry.regular.e[typ]

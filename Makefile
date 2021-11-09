@@ -75,6 +75,7 @@ gen-model:
 gen-diff:
 	go run ./tool/actordiff/main.go > ./tool/upgrade/specs-diffs.txt
 	go run ./tool/paramdiff/main.go > ./tool/upgrade/params-n-returns-diffs.txt
+	go run ./tool/extractorsdiff/main.go > ./tool/upgrade/extractors-diffs.txt
 
 gen-extractor:
 	go run tool/genvercodes/main.go
