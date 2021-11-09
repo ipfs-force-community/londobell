@@ -16,20 +16,20 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-	// "github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {
-	// mustRegisterRegularExtractor("ClaimedPowerV{{ .Ver }}", extractClaimedPowerV{{ .Ver }})
+	mustRegisterRegularExtractor("ClaimedPowerV{{ .Ver }}", extractClaimedPowerV{{ .Ver }})
 
-	// schema.Register(
-	//     schema.Model{
-	//         Name: "claimed-power-v{{ .Ver }}",
-	//         D: &model.ClaimedPower{
-	//             Detail: &power{{ .Ver }}.Claim{},
-	//         },
-	//     },
-	// )
+	schema.Register(
+	    schema.Model{
+	        Name: "claimed-power-v{{ .Ver }}",
+	        D: &model.ClaimedPower{
+	            Detail: &power{{ .Ver }}.Claim{},
+	        },
+	    },
+	)
 }
 
 func extractClaimedPowerV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *power{{ .Ver }}.State) error { // nolint: deadcode

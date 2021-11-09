@@ -29,6 +29,13 @@ func init() {
 			D:    &model.MinerDealSector{},
 		},
 	)
+
+	schema.Register(
+		schema.Model{
+			Name: "miner-sector-summary",
+			D:    &model.MinerSectorSummary{},
+		},
+	)
 	mustRegisterRegularExtractor("MinerSectorSummaryV0", extractMinerSectorSummaryV0)
 }
 
