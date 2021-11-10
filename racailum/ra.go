@@ -3,22 +3,26 @@ package racailum
 import (
 	"context"
 	"fmt"
-
-	"github.com/ipfs-force-community/londobell/metrics"
+	"time"
 
 	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
+	lconfig "github.com/filecoin-project/lotus/node/config"
 
 	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/metrics"
 	"github.com/ipfs-force-community/londobell/racailum/grafana"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
 	"github.com/ipfs-force-community/londobell/racailum/segment/aggregate"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/tracing"
 )
 
 var log = logging.Logger("racailum")
+
+const DefaultHTTPListenAddr = ":15002"
 
 // SegmentConfig contains info about a segment
 type SegmentConfig struct {
@@ -30,23 +34,41 @@ type SegmentConfig struct {
 // DefaultConfig returns the default config
 func DefaultConfig() Config {
 	return Config{
+		HTTP:             DefaultHTTPOptions(),
 		Grafana:          grafana.DefaultOptions(),
 		Aggregate:        aggregate.DefaultOptions(),
 		Segment:          segment.DefaultOptions(),
 		Metrics:          metrics.DefaultOptions(),
+		Tracing:          tracing.DefaultOptions(),
 		EnableGasTracing: false,
 		EnableGrafana:    true,
+		EnableDebug:      true,
+	}
+}
+
+type HTTPOptions struct {
+	Listen     string
+	StableWait lconfig.Duration
+}
+
+func DefaultHTTPOptions() HTTPOptions {
+	return HTTPOptions{
+		Listen:     DefaultHTTPListenAddr,
+		StableWait: lconfig.Duration(5 * time.Second),
 	}
 }
 
 // Config of RaCailum
 type Config struct {
+	HTTP             HTTPOptions
 	Grafana          grafana.Options
 	Aggregate        aggregate.Options
 	Segment          segment.Options
 	Metrics          metrics.Options
+	Tracing          tracing.Options
 	EnableGasTracing bool
 	EnableGrafana    bool
+	EnableDebug      bool
 }
 
 // New returns an instance of *RaCailum
@@ -67,18 +89,18 @@ func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.Cha
 		return nil, err
 	}
 
-	gr, err := grafana.New(ctx, cfg.Grafana, []*segment.Segment{activeSeg})
-	if err != nil {
-		return nil, fmt.Errorf("construct garfana: %w", err)
-	}
+	// gr, err := grafana.New(ctx, cfg.Grafana, []*segment.Segment{activeSeg})
+	// if err != nil {
+	//     return nil, fmt.Errorf("construct garfana: %w", err)
+	// }
 
-	if cfg.EnableGrafana {
-		go func() {
-			if err := gr.Run(ctx); err != nil {
-				log.Errorf("grafana: %s", err)
-			}
-		}()
-	}
+	// if cfg.EnableGrafana {
+	//     go func() {
+	//         if err := gr.Run(ctx); err != nil {
+	//             log.Errorf("grafana: %s", err)
+	//         }
+	//     }()
+	// }
 
 	log.Infow("ra sets sail", "gas-tracing", cfg.EnableGasTracing, "active-seg", activeSegName)
 	ra := &RaCailum{
@@ -90,7 +112,7 @@ func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.Cha
 	ra.components.cs = cs
 	ra.components.stm = stm
 
-	ra.gr = gr
+	// ra.gr = gr
 
 	return ra, nil
 }
@@ -107,7 +129,7 @@ type RaCailum struct {
 		optfns []segment.OptionFn
 	}
 
-	gr        *grafana.Grafana
+	// gr        *grafana.Grafana
 	activeSeg *segment.Segment
 }
 
@@ -133,6 +155,6 @@ func (r *RaCailum) DryState(ctx context.Context, ts *common.LinkedTipSet) ([]*ex
 }
 
 // Grafana returns the instance of *Grafana
-func (r *RaCailum) Grafana() *grafana.Grafana {
-	return r.gr
-}
+// func (r *RaCailum) Grafana() *grafana.Grafana {
+//     return r.gr
+// }

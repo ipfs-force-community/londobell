@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/dtynn/dix"
+	"github.com/filecoin-project/lotus/node"
 	"github.com/urfave/cli/v2"
 	"go.opencensus.io/stats"
 	"go.uber.org/fx"
@@ -29,48 +33,57 @@ var raCmd = &cli.Command{
 var raRunCmd = &cli.Command{
 	Name: "run",
 	Action: func(cctx *cli.Context) error {
-		rpath, err := dep.GetRepoPath(cctx)
-		if err != nil {
-			return err
-		}
-		cfg, err := dep.LoadRaConfig(rpath)
-		if err != nil {
-			return err
-		}
+		ctx, cancel := context.WithCancel(cctx.Context)
+		defer cancel()
+
 		var components struct {
 			fx.In
 			CS       common.ChainStore
 			Notifier common.HeadNotifier
 			Ra       *racailum.RaCailum
+			Cfg      racailum.Config
+			Mux      *http.ServeMux
 		}
 
 		stopper, err := dix.New(
-			cctx.Context,
-			dep.Bell(cctx.Context, fxlog, &components),
+			ctx,
+			dep.Bell(ctx, fxlog, &components),
 			dep.InjectRepoPath(cctx),
 			dep.InjectFullNode(cctx),
 		)
 		if err != nil {
 			return err
 		}
-		defer stopper(cctx.Context) // nolint: errcheck
 
-		ctx := cctx.Context
+		httpStoper, errCh := serveHTTP(components.Cfg.HTTP.Listen, components.Mux)
+		select {
+		case err = <-errCh:
+
+		case <-time.After(time.Duration(components.Cfg.HTTP.StableWait)):
+
+		}
+
+		if err != nil {
+			return fmt.Errorf("start http server: %w", err)
+		}
+
+		doneCh := node.MonitorShutdown(
+			ctx.Done(),
+			node.ShutdownHandler{Component: "http server", StopFunc: httpStoper},
+			node.ShutdownHandler{Component: "application", StopFunc: node.StopFunc(stopper)},
+		)
 
 		ch, err := components.Notifier.Sub(ctx)
 		if err != nil {
 			return fmt.Errorf("sub head change: %w", err)
 		}
 
-		if err := setupMetrics(cfg.Metrics); err != nil {
-			return fmt.Errorf("setup metrics err: %v", err)
-		}
-
+		// TODO: turn this code block into some Run func
 	HEAD_LOOP:
 		for {
 			select {
-			case <-ctx.Done():
-				log.Info("context done")
+			case <-doneCh:
+				log.Info("quit head-change loop")
 				return nil
 
 			case tsk, ok := <-ch:
@@ -100,4 +113,34 @@ var raRunCmd = &cli.Command{
 			}
 		}
 	},
+}
+
+func serveHTTP(addr string, mux *http.ServeMux) (func(context.Context) error, <-chan error) {
+	errCh := make(chan error, 1)
+	if addr == "" {
+		close(errCh)
+		log.Warn("no listen address provided")
+		return func(context.Context) error { return nil }, errCh
+	}
+
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
+	go func() {
+		defer close(errCh)
+
+		log.Infof("http server will start on %s", addr)
+		err := srv.ListenAndServe()
+		if err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				errCh <- err
+			}
+		}
+
+		return
+	}()
+
+	return srv.Shutdown, errCh
 }
