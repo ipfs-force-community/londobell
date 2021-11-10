@@ -3,6 +3,7 @@ module github.com/ipfs-force-community/londobell
 go 1.16
 
 require (
+	contrib.go.opencensus.io/exporter/jaeger v0.2.1 // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.1.0
 	github.com/dtynn/dix v0.1.2
 	github.com/filecoin-project/go-address v0.0.5

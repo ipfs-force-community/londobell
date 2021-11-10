@@ -2,11 +2,17 @@ package metrics
 
 import (
 	"context"
-	"time"
 
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
+
+	"github.com/filecoin-project/lotus/metrics"
+)
+
+var (
+	Timer               = metrics.Timer
+	SinceInMilliseconds = metrics.SinceInMilliseconds
 )
 
 var (
@@ -27,16 +33,6 @@ var (
 	Extract, _ = tag.NewKey("extract_type")
 	Cache, _   = tag.NewKey("cache")
 )
-
-type Options struct {
-	PrometheusPort string
-}
-
-func DefaultOptions() Options {
-	return Options{
-		PrometheusPort: ":56060",
-	}
-}
 
 var DefaultViews = []*view.View{
 	{
@@ -102,17 +98,6 @@ var CacheView = []*view.View{
 		Aggregation: view.Count(),
 		TagKeys:     []tag.Key{Cache},
 	},
-}
-
-func Timer(ctx context.Context, m *stats.Float64Measure) func() {
-	start := time.Now()
-	return func() {
-		stats.Record(ctx, m.M(SinceInMilliseconds(start)))
-	}
-}
-
-func SinceInMilliseconds(startTime time.Time) float64 {
-	return float64(time.Since(startTime).Nanoseconds()) / 1e6
 }
 
 func RecordInc(ctx context.Context, m *stats.Int64Measure) {

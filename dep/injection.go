@@ -2,6 +2,7 @@ package dep
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/dtynn/dix"
 	metricsi "github.com/ipfs/go-metrics-interface"
@@ -32,12 +33,20 @@ var (
 )
 
 const (
-	invokePopulate dix.Invoke = 1
+	invokeNone dix.Invoke = iota // nolint: varcheck,deadcode
+
+	invokeSetupGrafana
+	invokeSetupDebug
+	invokeSetupMetrics
+	invokeSetupTracing
+
+	invokePopulate
 )
 
 func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Option {
 	return dix.Options(
 		dix.Override(new(GlobalContext), ctx),
+		dix.Override(new(*http.ServeMux), http.NewServeMux()),
 		dix.Override(new(helpers.MetricsCtx), metricsi.CtxScope(ctx, "bell")),
 
 		dix.If(logger != nil, dix.Logger(logger)),
@@ -77,5 +86,10 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 
 		dix.Override(new(common.ChainStore), dix.From(new(*store.ChainStore))),
 		dix.Override(new(common.StateManager), dix.From(new(*stmgr.StateManager))),
+
+		dix.Override(invokeSetupDebug, SetupDebug),
+		dix.Override(invokeSetupMetrics, SetupMetric),
+		dix.Override(invokeSetupTracing, SetupTracing),
+		dix.Override(invokeSetupGrafana, SetupGrafana),
 	)
 }

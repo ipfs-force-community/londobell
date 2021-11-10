@@ -3,6 +3,7 @@ package dep
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 
@@ -24,8 +25,11 @@ import (
 	"github.com/ipfs-force-community/londobell/lib/cliex"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil/mmetamgr"
+	"github.com/ipfs-force-community/londobell/metrics"
 	"github.com/ipfs-force-community/londobell/racailum"
+	"github.com/ipfs-force-community/londobell/racailum/debug"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
+	"github.com/ipfs-force-community/londobell/racailum/tracing"
 )
 
 var (
@@ -145,4 +149,37 @@ func levelDs(path string, readonly bool) (dtypes.MetadataDS, error) {
 
 func NewSegmentManager(segds SegmentMetaDS) (*segment.Manager, error) {
 	return segment.NewManager(segds)
+}
+
+func SetupDebug(cfg racailum.Config, mux *http.ServeMux) error {
+	if cfg.EnableDebug {
+		debug.Setup(mux)
+	}
+
+	return nil
+}
+
+func SetupMetric(cfg racailum.Config, mux *http.ServeMux) error {
+	return metrics.Setup(&cfg.Metrics, mux)
+}
+
+func SetupTracing(lc fx.Lifecycle, cfg racailum.Config) error {
+	je := tracing.Setup(&cfg.Tracing)
+	if je == nil {
+		return nil
+	}
+
+	lc.Append(fx.Hook{
+		OnStop: func(context.Context) error {
+			je.Flush()
+			return nil
+		},
+	})
+
+	return nil
+}
+
+func SetupGrafana(cfg racailum.Config, mux *http.ServeMux) error {
+	// TODO: move grafana setup here
+	return nil
 }
