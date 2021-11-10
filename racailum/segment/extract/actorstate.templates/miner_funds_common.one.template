@@ -1,0 +1,174 @@
+package gen
+
+import (
+	"fmt"
+
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+	"github.com/ipfs/go-cid"
+
+	{{ range $vi := .Vers }}
+	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
+	adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+
+	{{ end }}
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/mir"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+)
+
+func init() {
+	schema.Register(
+		schema.Model{
+			Name: "miner-funds",
+			D:    &model.MinerFunds{},
+		},
+	)
+}
+
+func NewTokenAmountArr(length int) []abi.TokenAmount {
+	s := make([]abi.TokenAmount, length, length)
+	for i := range s {
+		s[i] = abi.NewTokenAmount(0)
+	}
+	return s
+}
+
+func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st interface{}) error {
+	if ticks := ctx.Opts.StateRegular.MinerFundsTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
+		return nil
+	}
+
+	tsRange := NormalEpochRange(head)
+	vestInFuture := NewTokenAmountArr(len(tsRange))
+	pledgeRelease := NewTokenAmountArr(len(tsRange))
+
+	var detail model.MinerFundsDetail
+	sum := abi.NewTokenAmount(0)
+
+	switch st := st.(type) {
+	{{ range $vi := .Vers -}}
+	{{ if lt .Ver 5 -}}
+	case *miner{{ .Ver }}.State:
+		if err := mir.Mirror(&detail, st); err != nil {
+			return fmt.Errorf("mirroring *miner2.State: %w", err)
+		}
+
+		if !st.VestingFunds.Equals(emptyMinerStateV{{ .Ver }}.VestingFunds) {
+			funds, err := st.LoadVestingFunds(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+			if err != nil {
+				return fmt.Errorf("load vesting funds: %w", err)
+			}
+
+			for _, v := range funds.Funds {
+				sum = big.Add(sum, v.Amount)
+			}
+		}
+
+	{{ else }}
+	case *miner{{ .Ver }}.State:
+		if err := mir.Mirror(&detail, st); err != nil {
+			return fmt.Errorf("mirroring *miner{{ .Ver }}.State: %w", err)
+		}
+
+		if isEmptyOrZero(detail.PreCommitDeposits) &&
+			isEmptyOrZero(detail.LockedFunds) &&
+			isEmptyOrZero(detail.FeeDebt) &&
+			isEmptyOrZero(detail.InitialPledge) {
+			return nil
+		}
+
+		if !st.VestingFunds.Equals(emptyMinerStateV{{ .Ver }}.VestingFunds) {
+			funds, err := st.LoadVestingFunds(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+			if err != nil {
+				return fmt.Errorf("load vesting funds: %w", err)
+			}
+
+			// assign vest in future
+			for _, v := range funds.Funds {
+				if v.Epoch < head.Epoch {
+					continue
+				}
+
+				for j := range tsRange {
+					if v.Epoch < tsRange[j] {
+						vestInFuture[j] = big.Add(vestInFuture[j], v.Amount)
+						break
+					}
+				}
+			}
+		}
+		actStore := ctx.D.ActorStore(ctx.C)
+		deadlines, err := st.LoadDeadlines(actStore)
+		if err != nil {
+			return fmt.Errorf("load deadlines failed: %w", err)
+		}
+
+		err = deadlines.ForEach(actStore, func(dlIdx uint64, dl *miner{{ .Ver }}.Deadline) error {
+			if dl == nil {
+				return nil
+			}
+
+			ps, err := dl.PartitionsArray(actStore)
+			if err != nil {
+				return fmt.Errorf("get dl partition failed: %w", err)
+			}
+			var part miner{{ .Ver }}.Partition
+			dlInfo := miner{{ .Ver }}.NewDeadlineInfo(st.CurrentProvingPeriodStart(head.Epoch), dlIdx, head.Epoch).NextNotElapsed()
+			quant := miner{{ .Ver }}.QuantSpecForDeadline(dlInfo)
+
+			return ps.ForEach(&part, func(partIdx int64) error {
+				expirations, err := miner{{ .Ver }}.LoadExpirationQueue(actStore, part.ExpirationsEpochs, quant, miner{{ .Ver }}.PartitionExpirationAmtBitwidth)
+				if err != nil {
+					return fmt.Errorf("failed to load expiration queue: %w", err)
+				}
+
+				for i := range tsRange {
+					popped, err := expirations.PopUntil(tsRange[i])
+					if err != nil {
+						return fmt.Errorf("failed to pop expiration queue until %d: %w", tsRange[i], err)
+					}
+
+					pledgeRelease[i] = popped.OnTimePledge
+				}
+
+				return nil
+			})
+		})
+
+		if err != nil {
+			return fmt.Errorf("process sector pledge failed")
+		}
+	{{ end }}
+	{{ end }}
+	}
+
+	detail.VestInFuture = vestInFuture
+	detail.PledgeRelease = pledgeRelease
+	// all zero
+	if isEmptyOrZero(detail.PreCommitDeposits) &&
+		isEmptyOrZero(detail.LockedFunds) &&
+		isEmptyOrZero(detail.FeeDebt) &&
+		isEmptyOrZero(detail.InitialPledge) {
+		return nil
+	}
+
+	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
+	if err != nil {
+		return fmt.Errorf("generate regular id: %w", err)
+	}
+
+	res.Docs = append(res.Docs, &model.MinerFunds{
+		ActorStateExBasic: model.ActorStateExBasic{
+			ID:    id,
+			Path:  []cid.Cid{head.Head},
+			Addr:  head.Addr,
+			Epoch: head.Epoch,
+		},
+		Detail: detail,
+	})
+
+	return nil
+}

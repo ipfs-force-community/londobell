@@ -1,0 +1,41 @@
+package gen
+
+import (
+	{{ range $vi := .Vers -}}
+	miner{{ $vi.Ver }} "{{ $vi.ImportPath }}/actors/builtin/miner"
+
+	{{ end }}
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+)
+
+func init() {
+	schema.Register(
+		{{ range $vi := .Vers -}}
+		schema.Model{
+			Name: "actor-state: miner.State v{{ $vi.Ver }}",
+			D: &model.ActorState{
+				Detail: &miner{{ $vi.Ver }}.State{},
+			},
+		},
+
+		{{ end }}
+	)
+}
+
+func IsEmptyState(st interface{}) bool {
+	if st == nil {
+		return true
+	}
+
+	switch st := st.(type) {
+	{{ range $vi := .Vers -}}
+	case *miner{{ $vi.Ver }}.State:
+		return isEmptyMinerStateV{{ $vi.Ver }}(st)
+
+	{{ end }}
+
+	default:
+		return false
+	}
+}

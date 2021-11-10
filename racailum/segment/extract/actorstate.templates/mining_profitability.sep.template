@@ -1,0 +1,124 @@
+package gen
+
+import (
+	"fmt"
+
+	"github.com/filecoin-project/go-state-types/big"
+	"github.com/ipfs/go-cid"
+
+	builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
+	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
+	power{{ .Ver }} "{{ .ImportPath }}/actors/builtin/power"
+	reward{{ .Ver }} "{{ .ImportPath }}/actors/builtin/reward"
+
+	"github.com/filecoin-project/lotus/chain/vm"
+
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	{{ if eq .Ver 0 -}}
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+	{{- end }}
+)
+
+func init() {
+	reg.MustRegisterRegularExtractor("MiningProfitabilityV{{ .Ver }}", extractMiningProfitabilityV{{ .Ver }})
+
+	{{ if eq .Ver 0 -}}
+	schema.Register(
+		schema.Model{
+			Name: "mining-profitability",
+			D:    &model.MiningProfitability{},
+		},
+	)
+	{{- end }}
+}
+
+// VERCHECK
+{{ with (eq .Ver 0) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v0.9.14/actors/builtin/miner/miner_actor.go#L764-L775
+// and https://github.com/filecoin-project/specs-actors/blob/v0.9.14/actors/builtin/miner/monies.go#L62-L105
+{{- end -}}
+{{ with (eq .Ver 2) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v2.3.5/actors/builtin/miner/miner_actor.go#L870-L882
+// and https://github.com/filecoin-project/specs-actors/blob/v2.3.5/actors/builtin/miner/monies.go#L79-L84
+{{- end -}}
+{{ with (eq .Ver 3) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v3.1.1/actors/builtin/miner/miner_actor.go#L976-L988
+// and https://github.com/filecoin-project/specs-actors/blob/v3.1.1/actors/builtin/miner/monies.go#L86-L91
+{{- end -}}
+{{ with (eq .Ver 4) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v4.0.1/actors/builtin/miner/miner_actor.go#L984-L996
+// and https://github.com/filecoin-project/specs-actors/blob/v4.0.1/actors/builtin/miner/monies.go#L166-L181
+{{- end -}}
+{{ with (eq .Ver 5) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v5.0.4/actors/builtin/miner/miner_actor.go#L1154-L1166
+// and https://github.com/filecoin-project/specs-actors/blob/v5.0.4/actors/builtin/miner/monies.go#L98-L103
+{{- end -}}
+{{ with (eq .Ver 6) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v6.0.0/actors/builtin/miner/miner_actor.go#L1165-L1178
+// and https://github.com/filecoin-project/specs-actors/blob/v6.0.0/actors/builtin/miner/monies.go#L99-L104
+{{- end }}
+func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward{{ .Ver }}.State) error {
+	blkraw, err := ctx.D.ChainBlockstore().Get(head.Global.Power.Head)
+	if err != nil {
+		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
+	}
+
+	state, err := vm.DumpActorState(reg.ActorReg, head.Global.Power, blkraw.RawData())
+	if err != nil {
+		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
+	}
+
+	pwrState, ok := state.(*power{{ .Ver }}.State)
+	if !ok {
+		return fmt.Errorf("expecting *power{{ .Ver }}.State, got %T", pwrState)
+	}
+
+	qaPower := miner{{ .Ver }}.QAPowerForWeight(sectorSize32GiB, 180, big.Zero(), big.Zero())
+
+	storagePledge := miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner{{ .Ver }}.InitialPledgeProjectionPeriod)
+	{{ if eq .Ver 0 -}}
+	initPledge := miner{{ .Ver }}.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, pwrState.ThisEpochPledgeCollateral,
+		st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating)
+	{{- else -}}
+	initPledge := miner{{ .Ver }}.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating)
+	{{- end }}
+
+	// we just ignore the influence of spaceRacePledgeCap here
+	consensusPledge := big.Sub(initPledge, storagePledge)
+
+	detail := model.MiningProfitabilityDetail{
+		ExpectedDayReward:         miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, builtin{{ .Ver }}.EpochsInDay),
+		InitialPledge:             initPledge,
+		InitialConsensusPledge:    consensusPledge,
+		InitialStoragePledge:      storagePledge,
+		ProjectionOfInitialPledge: storagePledge, // TODO: projection is just equal to the init storage power here, correct me if I'm wrong
+		{{ if eq .Ver 0 -}}
+		ProjectionOfFaultFee:      miner{{ .Ver }}.PledgePenaltyForDeclaredFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, ctx.D.GetNtwkVersion(ctx.C, head.Epoch)),
+		Mined:                     st.TotalMined,
+		{{- else -}}
+		ProjectionOfFaultFee:      miner{{ .Ver }}.PledgePenaltyForContinuedFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower),
+		Mined:                     st.TotalStoragePowerReward,
+		{{- end}}
+	}
+
+	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
+	if err != nil {
+		return fmt.Errorf("gen regular id: %w", err)
+	}
+
+	res.Docs = append(res.Docs, &model.MiningProfitability{
+		ActorStateExBasic: model.ActorStateExBasic{
+			ID:    id,
+			Path:  []cid.Cid{head.Head, head.Global.Power.Head},
+			Addr:  head.Addr,
+			Epoch: head.Epoch,
+		},
+
+		Detail: detail,
+	})
+
+	return nil
+}

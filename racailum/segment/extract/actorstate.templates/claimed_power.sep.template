@@ -1,0 +1,83 @@
+package gen
+
+import (
+	"bytes"
+	"fmt"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/ipfs/go-cid"
+
+	{{ if gt .Ver 2 }}
+	builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
+	{{ end }}
+	power{{ .Ver }} "{{ .ImportPath }}/actors/builtin/power"
+	adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+)
+
+func init() {
+	reg.MustRegisterRegularExtractor("ClaimedPowerV{{ .Ver }}", extractClaimedPowerV{{ .Ver }})
+
+	schema.Register(
+	    schema.Model{
+	        Name: "claimed-power-v{{ .Ver }}",
+	        D: &model.ClaimedPower{
+	            Detail: &power{{ .Ver }}.Claim{},
+	        },
+	    },
+	)
+}
+
+func extractClaimedPowerV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *power{{ .Ver }}.State) error { // nolint: deadcode
+	{{ if gt .Ver 2 }}
+	claims, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), pst.Claims, builtin{{ .Ver }}.DefaultHamtBitwidth)
+	{{ else }}
+	claims, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), pst.Claims)
+	{{ end }}
+	if err != nil {
+		return fmt.Errorf("construct adt.Map for Claims in *power{{ .Ver }}.State: %w", err)
+	}
+
+	out := &power{{ .Ver }}.Claim{}
+	var buf bytes.Buffer
+	if err := claims.ForEach(out, func(keystr string) error {
+		detail := *out
+		if isEmptyOrZero(detail.RawBytePower) {
+			return nil
+		}
+
+		buf.Reset()
+
+		addr, err := address.NewFromBytes([]byte(keystr))
+		if err != nil {
+			return fmt.Errorf("parse addr from adt.Map key %s: %w", keystr, err)
+		}
+
+		id, err := genClaimedPowerID(&buf, keystr, &detail)
+		if err != nil {
+			return err
+		}
+
+		res.Docs = append(res.Docs, &model.ClaimedPower{
+			ActorStateExBasic: model.ActorStateExBasic{
+				ID:    id,
+				Path:  []cid.Cid{head.Head, pst.Claims},
+				Addr:  addr,
+				Epoch: head.Epoch,
+			},
+			Detail: &detail,
+		})
+
+		*out = power{{ .Ver }}.Claim{}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
