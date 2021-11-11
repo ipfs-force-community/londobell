@@ -58,7 +58,7 @@ func applyEnvOpts(opt *Options) {
 type Options struct {
 	Enable  bool
 	Name    string
-	Sampler string
+	Sampler *float64
 
 	CollectorEndpoint string
 	AgentEndpoint     string

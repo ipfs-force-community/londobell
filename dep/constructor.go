@@ -163,8 +163,8 @@ func SetupMetric(cfg racailum.Config, mux *http.ServeMux) error {
 	return metrics.Setup(&cfg.Metrics, mux)
 }
 
-func SetupTracing(lc fx.Lifecycle, cfg racailum.Config) error {
-	je := tracing.Setup(&cfg.Tracing)
+func SetupTracing(lc fx.Lifecycle, cfg racailum.Config, mux *http.ServeMux) error {
+	je := tracing.Setup(&cfg.Tracing, mux)
 	if je == nil {
 		return nil
 	}
