@@ -22,7 +22,7 @@ func applyEnvOpts(opt *Options) {
 type Options struct {
 	Enable  bool
 	Name    string
-	Sampler string
+	Sampler *float64
 
 	{{ range $n := .Names -}}
 	{{ slice $n 3 }} string
