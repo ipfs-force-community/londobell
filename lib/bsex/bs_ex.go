@@ -3,13 +3,13 @@ package bsex
 import (
 	"context"
 
-	lru "github.com/hashicorp/golang-lru"
-	"github.com/ipfs-force-community/londobell/metrics"
 	blocks "github.com/ipfs/go-block-format"
-	"github.com/ipfs/go-cid"
-	"go4.org/syncutil/singleflight"
 
 	"github.com/filecoin-project/lotus/blockstore"
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/ipfs-force-community/londobell/metrics"
+	"github.com/ipfs/go-cid"
+	"go4.org/syncutil/singleflight"
 )
 
 var _ blockstore.Blockstore = (*CachedBlockstore)(nil)

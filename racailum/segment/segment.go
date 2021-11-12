@@ -6,6 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ipfs-force-community/londobell/metrics"
+	"go.opencensus.io/stats"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -239,10 +242,12 @@ func (s *Segment) updateBoundary(ctx context.Context, hi, lo *common.LinkedTipSe
 	prev := s.bound.Boundary
 
 	if hi != nil {
+		stats.Record(ctx, metrics.UpperBoundary.M(int64(hi.Height())))
 		s.bound.SetHi(hi)
 	}
 
 	if lo != nil {
+		stats.Record(ctx, metrics.LowerBoundary.M(int64(lo.Height())))
 		s.bound.SetLo(lo)
 	}
 

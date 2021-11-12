@@ -103,9 +103,9 @@ var raRunCmd = &cli.Command{
 				estart := time.Now()
 				if err := components.Ra.Extract(ctx, ts); err != nil {
 					log.Errorf("failed to persist tipset: %s", err)
-					metrics.RecordInc(ctx, metrics.ExtractError)
+					stats.Record(ctx, metrics.ExtractError.M(1))
 				} else {
-					metrics.RecordInc(ctx, metrics.ExtractComplete)
+					stats.Record(ctx, metrics.ExtractError.M(0))
 					stats.Record(ctx, metrics.TipSetHeight.M(int64(ts.Height())))
 					stats.Record(ctx, metrics.ExtractDuration.M(metrics.SinceInMilliseconds(estart)))
 				}
