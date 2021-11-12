@@ -131,7 +131,11 @@ func LoadRaConfig(rpath RepoPath) (racailum.Config, error) {
 }
 
 func OpenSegmentDS(rpath RepoPath) (SegmentMetaDS, error) {
-	return levelDs(SegmentMetaDSPath(rpath), false)
+	ds, err := levelDs(SegmentMetaDSPath(rpath), false)
+	if err != nil {
+		ds, err = levelDs(SegmentMetaDSPath(rpath), true)
+	}
+	return ds, err
 }
 
 func levelDs(path string, readonly bool) (dtypes.MetadataDS, error) {
