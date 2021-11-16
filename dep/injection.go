@@ -87,7 +87,7 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 		dix.Override(new(common.ChainStore), dix.From(new(*store.ChainStore))),
 		dix.Override(new(common.StateManager), dix.From(new(*stmgr.StateManager))),
 
-		dix.Override(invokeSetupDebug, SetupDebug),
+		dix.Override(invokeSetupDebug, SetupPprof),
 		dix.Override(invokeSetupMetrics, SetupMetric),
 		dix.Override(invokeSetupTracing, SetupTracing),
 		dix.Override(invokeSetupGrafana, SetupGrafana),

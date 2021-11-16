@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"go.opencensus.io/trace"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
@@ -193,6 +195,10 @@ func copyIndexes(src []int) []int {
 }
 
 func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
+	_, span := trace.StartSpan(ctx.C, "extractor.extractExecTrace")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
+
 	if ts.Child == nil {
 		return fmt.Errorf("child is required for a *LinkedTipSet@%d", ts.Height())
 	}
@@ -320,6 +326,9 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 }
 
 func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
+	_, span := trace.StartSpan(ctx.C, "extractor.extractActorBalance")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
 	height := ts.Height()
 	if ticks := ctx.Opts.StateRegular.ActorBalance; ticks > 0 && height%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
 		return nil
@@ -403,6 +412,9 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 }
 
 func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
+	_, span := trace.StartSpan(ctx.C, "extractor.extractActorHead")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
 	height := ts.Height()
 
 	forRegular := ctx.Opts.StateRegular.Interval > 0 && height%ctx.Opts.StateRegular.Interval == 0

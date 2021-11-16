@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipfs-force-community/londobell/metrics"
 	"go.opencensus.io/stats"
+	"go.opencensus.io/trace"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
@@ -165,6 +166,10 @@ func (s *Segment) Run(ctx context.Context) {
 
 // Extract attempts to extract data between given tipset and the hi-bound of the segment
 func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
+	ctx, span := trace.StartSpan(ctx, "segment.Extract")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(rawts.Height())))
+	defer span.End()
+
 	tsk := rawts.Key()
 	tsh := rawts.Height()
 
@@ -239,6 +244,9 @@ func (s *Segment) Aggregate(ctx context.Context, tss []*common.LinkedTipSet) err
 }
 
 func (s *Segment) updateBoundary(ctx context.Context, hi, lo *common.LinkedTipSet) error {
+	_, span := trace.StartSpan(ctx, "segment.updateBoundary")
+	defer span.End()
+
 	prev := s.bound.Boundary
 
 	if hi != nil {

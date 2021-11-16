@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.opencensus.io/trace"
+
 	"github.com/hashicorp/go-multierror"
 	"go.uber.org/zap"
 
@@ -24,6 +26,9 @@ type persistCtx struct {
 }
 
 func (s *Segment) extractTipSets(ctx context.Context, tss []*common.LinkedTipSet) error {
+	ctx, span := trace.StartSpan(ctx, "segment.extractTipSets")
+	defer span.End()
+
 	if len(tss) == 0 {
 		return nil
 	}

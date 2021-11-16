@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sync"
 
+	"go.opencensus.io/trace"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
@@ -31,6 +33,9 @@ var (
 
 // NewSet loads actor codes and construct a actor set with the given tipset
 func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet) (*Set, error) {
+	_, span := trace.StartSpan(ctx, "actor.NewSet")
+	defer span.End()
+
 	m := map[address.Address]cid.Cid{}
 
 	root := ts.State()

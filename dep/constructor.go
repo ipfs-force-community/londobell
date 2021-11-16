@@ -151,7 +151,7 @@ func NewSegmentManager(segds SegmentMetaDS) (*segment.Manager, error) {
 	return segment.NewManager(segds)
 }
 
-func SetupDebug(cfg racailum.Config, mux *http.ServeMux) error {
+func SetupPprof(cfg racailum.Config, mux *http.ServeMux) error {
 	if cfg.EnableDebug {
 		debug.Setup(mux)
 	}

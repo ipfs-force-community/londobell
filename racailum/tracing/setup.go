@@ -22,16 +22,6 @@ func Setup(opt *Options, mux *http.ServeMux) *jaeger.Exporter {
 	exporter := tracing.SetupJaegerTracing(opt.Name)
 	applySampler(opt)
 
-	// TODO: register sampler set handler
-	mux.HandleFunc("/_tracing", func(rw http.ResponseWriter, req *http.Request) {
-		defer req.Body.Close()
-
-		if _, err := rw.Write([]byte("we should register some http handler for tracing adjustment, but none now")); err != nil {
-			log.Warnf("write response body: %s", err)
-		}
-		return
-	})
-
 	return exporter
 }
 
@@ -41,7 +31,6 @@ func applySampler(opt *Options) {
 	}
 
 	var sampler trace.Sampler
-
 	f := *opt.Sampler
 	log.Infof("set trace sampler probability", "value", f)
 
@@ -50,13 +39,13 @@ func applySampler(opt *Options) {
 		sampler = trace.NeverSample()
 
 	case f >= 1:
-		sampler = trace.AlwaysSample()
+		sampler = FilterSample(defaultKeys)
 
 	default:
-		sampler = trace.ProbabilitySampler(f)
+		sampler = MixinSample(logicAnd, sampler, trace.ProbabilitySampler(f))
 	}
 
-	// this should override the setup inside tracing.SetupJaegerTracing
+	//this should override the setup inside tracing.SetupJaegerTracing
 	trace.ApplyConfig(trace.Config{
 		DefaultSampler: sampler,
 	})

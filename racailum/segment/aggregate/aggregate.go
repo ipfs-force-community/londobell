@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opencensus.io/trace"
+
 	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -82,6 +84,9 @@ type Aggregator struct {
 
 // Aggregate tries to execute aggregations based on given tipsets
 func (a *Aggregator) Aggregate(ctx context.Context, tss []*common.LinkedTipSet) error {
+	ctx, span := trace.StartSpan(ctx, "segment.Aggregator")
+	defer span.End()
+
 	if len(tss) == 0 {
 		return nil
 	}
