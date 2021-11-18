@@ -20,6 +20,7 @@ import (
 
 func init() {
 	reg.MustRegisterRegularExtractor("MinerSectorHealthV4", extractMinerSectorHealthV4)
+
 }
 
 func extractMinerSectorHealthV4(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner4.State) error {

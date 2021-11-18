@@ -16,10 +16,19 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {
 	reg.MustRegisterRegularExtractor("MinerSectorHealthV0", extractMinerSectorHealthV0)
+
+	schema.Register(
+		schema.Model{
+			Name: "miner-sector-health",
+			D:    &model.MinerSectorHealth{},
+		},
+	)
+
 }
 
 func extractMinerSectorHealthV0(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner0.State) error {

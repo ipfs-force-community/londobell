@@ -40,6 +40,8 @@ db.MinerDealSector.createIndex({"Epoch":1,"Miner":1}, {"sparse": true});
 
 db.MinerFunds.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
+db.MinerSectorHealth.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
+
 db.MinerSectorSummary.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.MiningProfitability.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});

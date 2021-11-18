@@ -12,10 +12,23 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	{{ if eq .Ver 0 -}}
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+	{{- end}}
 )
 
 func init() {
 	reg.MustRegisterRegularExtractor("MinerSectorHealthV{{ .Ver }}", extractMinerSectorHealthV{{ .Ver }})
+
+	{{ if eq .Ver 0 -}}
+	schema.Register(
+		schema.Model{
+			Name: "miner-sector-health",
+			D:    &model.MinerSectorHealth{},
+		},
+	)
+	{{- end}}
+
 }
 
 func extractMinerSectorHealthV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner{{ .Ver }}.State) error {
