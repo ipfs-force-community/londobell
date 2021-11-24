@@ -79,3 +79,8 @@ gen-diff:
 
 gen-extractor:
 	go run tool/genvercodes/main.go
+
+build-replay: GOFLAGS+=-tags=calibnet
+build-replay: $(BUILD_DEPS)
+	rm -rf ./replay
+	go build $(GOFLAGS) -o replay ./tool/replaytool/cmd/replay
