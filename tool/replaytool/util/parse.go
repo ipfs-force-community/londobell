@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func ParseStringToCidArray(source string) ([]cid.Cid, error) {
+func parseStringToCidArray(source string) ([]cid.Cid, error) {
 	strs := strings.Split(source, ",")
 
 	var cids []cid.Cid
@@ -22,7 +22,7 @@ func ParseStringToCidArray(source string) ([]cid.Cid, error) {
 }
 
 func ParseTipSetKey(s string) (types.TipSetKey, error) {
-	cids, err := ParseStringToCidArray(s)
+	cids, err := parseStringToCidArray(s)
 	if err != nil {
 		return types.EmptyTSK, err
 	}

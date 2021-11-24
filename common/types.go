@@ -2,7 +2,7 @@ package common
 
 import (
 	"context"
-	"github.com/filecoin-project/lotus/chain/vm"
+
 	"time"
 
 	"github.com/filecoin-project/go-address"
@@ -51,7 +51,12 @@ type StateManager interface {
 	LoadActorRaw(_ context.Context, addr address.Address, st cid.Cid) (*types.Actor, error)
 	GetNtwkVersion(ctx context.Context, height abi.ChainEpoch) network.Version
 	GetVMCirculatingSupplyDetailed(ctx context.Context, height abi.ChainEpoch, st *state.StateTree) (api.CirculatingSupply, error)
-	Replay(ctx context.Context, ts *types.TipSet, mcid cid.Cid) (*types.Message, *vm.ApplyRet, error)
+	//Replay(ctx context.Context, ts *types.TipSet, mcid cid.Cid) (*types.Message, *vm.ApplyRet, error)
+	//Beacon() beacon.Schedule
+	//GetVMCirculatingSupply(ctx context.Context, height abi.ChainEpoch, st *state.StateTree) (abi.TokenAmount, error)
+	//VMSys() vm.SyscallBuilder
+	//VMConstructor() func(context.Context, *vm.VMOpts) (*vm.VM, error)
+	//ChainStore() *store.ChainStore
 }
 
 // ChainDict is a dict for enums

@@ -74,3 +74,9 @@ gen-indexes:
 gen-model:
 	go run ./tool/genschema.go > ./tool/analytics/model_schema.md
 	go run ./tool/genexamples.go > ./tool/analytics/model_example.md
+
+build-replay: GOFLAGS+=-tags=calibnet
+build-replay: $(BUILD_DEPS)
+	rm -rf replay
+	go build $(GOFLAGS) -o replay ./tool/replaytool/cmd/replay
+	#go run github.com/GeertJohan/go.rice/rice append --exec ./tool/replaytool/replay -i ./build

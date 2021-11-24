@@ -47,9 +47,10 @@ var DefaultBellProvider = fx.Provide(
 			Cs:          cs,
 			DrandConfig: dc,
 		}
-		b, err := modules.RandomSchedule(rbp, dtypes.AfterGenesisSet{})
+		b, err := modules.RandomSchedule(rbp, dtypes.AfterGenesisSet{}) ///
 		if err != nil {
-			panic(fmt.Errorf("construct random schedule failed: %w", err))
+			fmt.Errorf("construct random schedule failed: %w", err)
+			panic(fmt.Errorf("construct random schedule failed: %w", err)) ///
 		}
 		return b
 	},
