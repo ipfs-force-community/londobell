@@ -31,17 +31,17 @@ func main() {
 				//Required: true,
 			},
 			&cli.StringFlag{
-				Name:    "message",
-				FilePath: "./message.txt",
+				Name:     "message",
+				FilePath: "../example/message.txt",
 			},
 		},
 
 		Action: func(cctx *cli.Context) error {
 			//加载message
 			content := cctx.String("message")
+			fmt.Println(content)
 			var msglist []types.Message
 			json.Unmarshal([]byte(content), &msglist)
-			fmt.Println(msglist)
 
 			full, closer, err := getFullNode(cctx)
 			if err != nil {
@@ -87,12 +87,12 @@ func main() {
 			}
 
 			//基于tipset和消息cids重放
-			invocResult, err := replay(cctx.Context, components.SM, ts, msglist)
+			replayResult, err := replay(cctx.Context, components.SM, ts, msglist)
 			if err != nil {
 				return fmt.Errorf("replay err: %w", err)
 			}
 
-			util.WriteTofile(invocResult)
+			util.WriteTofile(replayResult)
 
 			return nil
 		},
@@ -105,7 +105,6 @@ func main() {
 		os.Exit(1)
 	}
 }
-
 
 func buildApp(cctx *cli.Context, full v0api.FullNode, target interface{}) (*fx.App, error) {
 	return dep.BellApp(

@@ -31,6 +31,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/urfave/cli/v2 v2.2.0
 	go.mongodb.org/mongo-driver v1.5.0
+	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/fx v1.9.0
 	go.uber.org/zap v1.16.0
 	go4.org v0.0.0-20200411211856-f5505b9728dd

@@ -8,6 +8,7 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/rand"
+	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -17,31 +18,20 @@ import (
 	"golang.org/x/xerrors"
 )
 
-type messageFinder struct {
-	mcid cid.Cid // the message cid to find
-	outm *types.Message
-	outr *vm.ApplyRet
-}
-
-func replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msglist []types.Message) (invocResult []*api.InvocResult, err error) {
+func replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msglist []types.Message) (replayResult []*api.InvocResult, err error) {
 	for _, msg := range msglist {
+		maxNonce, err := nonceForTipset(ts, sm, msg)
+		if err != nil {
+			return nil, err
+		}
+
 		mstToReplay := msg.Cid()
 		fmt.Println(mstToReplay.String())
 
-		//m, r, err := sm.(*stmgr.StateManager).Replay(ctx, ts, mstToReplay)  //finder.outr == nil时，应用不属于tipset的消息
-		//if err != nil {
-		//	if xerrors.Is(err, xerrors.Errorf("unexpected error during execution: %w", err)) {
-		//		//执行不属于tipset的消息
-		//		m, r, err = replayCustom(ctx, msg, sm, ts)
-		//		if err != nil {
-		//			return nil, err
-		//		}
-		//	} else {
-		//		return nil, err
-		//	}
-		//}
+		msg.Nonce = maxNonce
+		fmt.Println(msg.Nonce)
 
-		m, r, err := replayCustom(ctx, msg, sm, ts)
+		m, r, err := replayCustom(ctx, &msg, sm, ts)
 		if err != nil {
 			return nil, err
 		}
@@ -50,7 +40,7 @@ func replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msgli
 		if r.ActorErr != nil {
 			errstr = r.ActorErr.Error()
 		}
-		invocResult = append(invocResult, &api.InvocResult{ //只要ExecutionTrace和GasCost
+		replayResult = append(replayResult, &api.InvocResult{ //只要ExecutionTrace和GasCost
 			MsgCid:         mstToReplay,
 			Msg:            m,
 			MsgRct:         &r.MessageReceipt,
@@ -61,14 +51,34 @@ func replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msgli
 		})
 	}
 
-	return invocResult, nil
+	return replayResult, nil
 }
 
-func replayCustom(ctx context.Context, msg types.Message, sm common.StateManager, ts *types.TipSet) (*types.Message, *vm.ApplyRet, error){
-	//var finder messageFinder
-	//finder.mcid = msgcid
+func statetreeForTipset(ts *types.TipSet, sm common.StateManager) (*state.StateTree, error) {
+	statetree, err := sm.ParentState(ts)
+	if err != nil {
+		return nil, err
+	}
 
-	m, ret, err := executeTipsetCustom(ctx, &msg, sm, ts)
+	return statetree, nil
+}
+
+func nonceForTipset(ts *types.TipSet, sm common.StateManager, msg types.Message) (uint64, error) {
+	statetree, err := statetreeForTipset(ts, sm)
+	if err != nil {
+		return 0, err
+	}
+
+	act, err := statetree.GetActor(msg.From) //没有这个actor？？
+	if err != nil {
+		return 0, err
+	}
+
+	return act.Nonce, nil
+}
+
+func replayCustom(ctx context.Context, msg *types.Message, sm common.StateManager, ts *types.TipSet) (*types.Message, *vm.ApplyRet, error) {
+	m, ret, err := executeTipsetCustom(ctx, msg, sm, ts)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -76,7 +86,7 @@ func replayCustom(ctx context.Context, msg types.Message, sm common.StateManager
 	return m, ret, nil
 }
 
-func executeTipsetCustom(ctx context.Context, cmsg types.ChainMsg, sm common.StateManager, ts *types.TipSet) (*types.Message, *vm.ApplyRet, error) {
+func executeTipsetCustom(ctx context.Context, cmsg *types.Message, sm common.StateManager, ts *types.TipSet) (*types.Message, *vm.ApplyRet, error) {
 	ctx, span := trace.StartSpan(ctx, "computeTipSetState")
 	defer span.End()
 
@@ -92,7 +102,7 @@ func executeTipsetCustom(ctx context.Context, cmsg types.ChainMsg, sm common.Sta
 	return applyBlocksCustom(ctx, cmsg, sm, pstate, height, r, baseFee, ts)
 }
 
-func applyBlocksCustom(ctx context.Context, cmsg types.ChainMsg, sm common.StateManager, pstate cid.Cid, epoch abi.ChainEpoch, r vm.Rand, baseFee abi.TokenAmount, ts *types.TipSet) (*types.Message, *vm.ApplyRet, error) {
+func applyBlocksCustom(ctx context.Context, cmsg *types.Message, sm common.StateManager, pstate cid.Cid, epoch abi.ChainEpoch, r vm.Rand, baseFee abi.TokenAmount, ts *types.TipSet) (*types.Message, *vm.ApplyRet, error) {
 	done := metrics.Timer(ctx, metrics.VMApplyBlocksTotal)
 	defer done()
 
@@ -130,29 +140,4 @@ func applyBlocksCustom(ctx context.Context, cmsg types.ChainMsg, sm common.State
 	}
 
 	return m, ret, nil
-
-	//if em != nil {
-	//	m := cmsg.VMMessage()
-	//	if err := em.MessageApplied(ctx, ts, cmsg.Cid(), m, ret, false); err != nil {
-	//		return err
-	//	}
-	//}
-
-
-	//支持隐式消息？？
-
 }
-
-//根据消息cid解码ChainMsg类型cm，调用vmi.ApplyMessage(ctx, cm)，得到ApplyRet类型
-//其中vmi由makeVmWithBaseState(pstate)得到，而pstate为blockheader的ParentStateRoot;由mcid推出blockheader??直接使用tipset的blockheader
-
-//应用显示消息和隐式消息，怎样算应用成功？
-//不会改变状态？？
-
-
-
-
-
-
-
-

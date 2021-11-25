@@ -1,9 +1,10 @@
 package util
 
 import (
+	"strings"
+
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
-	"strings"
 )
 
 func parseStringToCidArray(source string) ([]cid.Cid, error) {

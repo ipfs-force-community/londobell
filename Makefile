@@ -77,5 +77,6 @@ gen-model:
 
 build-replay: GOFLAGS+=-tags=calibnet
 build-replay: $(BUILD_DEPS)
-	rm -rf replay
+	rm -rf ./replay
 	go build $(GOFLAGS) -o replay ./tool/replaytool/cmd/replay
+	#go run github.com/GeertJohan/go.rice/rice append --exec replay -i ./build
