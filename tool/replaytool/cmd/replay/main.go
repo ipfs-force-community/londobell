@@ -22,6 +22,10 @@ func main() {
 		EnableBashCompletion: true,
 		//Version:
 		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "message",
+				FilePath: "./example/message.txt",
+			},
 			dep.FullNodeAPIFlag,
 
 			//参数为空时？
@@ -29,10 +33,6 @@ func main() {
 				Name:    "tipsetkey-cid-string",
 				Aliases: []string{"t"},
 				//Required: true,
-			},
-			&cli.StringFlag{
-				Name:     "message",
-				FilePath: "../example/message.txt",
 			},
 		},
 
