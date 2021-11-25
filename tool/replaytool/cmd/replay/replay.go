@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/dtynn/londobell/common"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
@@ -19,17 +18,19 @@ import (
 )
 
 func replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msglist []types.Message) (replayResult []*api.InvocResult, err error) {
+	statetree, err := statetreeForTipset(ts, sm)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, msg := range msglist {
-		maxNonce, err := nonceForTipset(ts, sm, msg)
+		maxNonce, err := nonceForActor(statetree, msg)
 		if err != nil {
 			return nil, err
 		}
 
-		mstToReplay := msg.Cid()
-		fmt.Println(mstToReplay.String())
-
 		msg.Nonce = maxNonce
-		fmt.Println(msg.Nonce)
+		mstToReplay := msg.Cid()
 
 		m, r, err := replayCustom(ctx, &msg, sm, ts)
 		if err != nil {
@@ -40,7 +41,7 @@ func replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msgli
 		if r.ActorErr != nil {
 			errstr = r.ActorErr.Error()
 		}
-		replayResult = append(replayResult, &api.InvocResult{ //只要ExecutionTrace和GasCost
+		replayResult = append(replayResult, &api.InvocResult{
 			MsgCid:         mstToReplay,
 			Msg:            m,
 			MsgRct:         &r.MessageReceipt,
@@ -63,12 +64,7 @@ func statetreeForTipset(ts *types.TipSet, sm common.StateManager) (*state.StateT
 	return statetree, nil
 }
 
-func nonceForTipset(ts *types.TipSet, sm common.StateManager, msg types.Message) (uint64, error) {
-	statetree, err := statetreeForTipset(ts, sm)
-	if err != nil {
-		return 0, err
-	}
-
+func nonceForActor(statetree *state.StateTree, msg types.Message) (uint64, error) {
 	act, err := statetree.GetActor(msg.From) //没有这个actor？？
 	if err != nil {
 		return 0, err

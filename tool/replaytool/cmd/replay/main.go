@@ -39,7 +39,6 @@ func main() {
 		Action: func(cctx *cli.Context) error {
 			//加载message
 			content := cctx.String("message")
-			fmt.Println(content)
 			var msglist []types.Message
 			json.Unmarshal([]byte(content), &msglist)
 
