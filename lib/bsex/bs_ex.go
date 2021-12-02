@@ -1,14 +1,15 @@
 package bsex
 
 import (
-	lru "github.com/hashicorp/golang-lru"
+	"context"
+
 	blocks "github.com/ipfs/go-block-format"
-	"github.com/ipfs/go-cid"
-	"go4.org/syncutil/singleflight"
 
 	"github.com/filecoin-project/lotus/blockstore"
-
-	"github.com/ipfs-force-community/londobell/prometheus"
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/ipfs-force-community/londobell/metrics"
+	"github.com/ipfs/go-cid"
+	"go4.org/syncutil/singleflight"
 )
 
 var _ blockstore.Blockstore = (*CachedBlockstore)(nil)
@@ -41,7 +42,7 @@ type CachedBlockstore struct {
 }
 
 func (cbs *CachedBlockstore) Get(c cid.Cid) (blocks.Block, error) {
-	prometheus.CacheGetCnt.Inc()
+	metrics.RecordInc(context.Background(), metrics.CacheGetCnt)
 	if cached, has := cbs.cache.Get(c); has {
 		if b, ok := cached.(blocks.Block); ok {
 			return b, nil
@@ -49,7 +50,7 @@ func (cbs *CachedBlockstore) Get(c cid.Cid) (blocks.Block, error) {
 	}
 
 	b, err := cbs.getSg.Do(c.String(), func() (interface{}, error) {
-		prometheus.CacheGetMissCnt.Inc()
+		metrics.RecordInc(context.Background(), metrics.CacheGetMissCnt)
 		b, err := cbs.Blockstore.Get(c)
 		if err != nil {
 			return nil, err
@@ -67,14 +68,15 @@ func (cbs *CachedBlockstore) Get(c cid.Cid) (blocks.Block, error) {
 }
 
 func (cbs *CachedBlockstore) View(c cid.Cid, callback func([]byte) error) error {
-	prometheus.CacheViewCnt.Inc()
+	metrics.RecordInc(context.Background(), metrics.CacheViewCnt)
+
 	if cached, has := cbs.cache.Get(c); has {
 		if b, ok := cached.(blocks.Block); ok {
 			return callback(b.RawData())
 		}
 	}
 	b, err := cbs.getSg.Do(c.String(), func() (interface{}, error) {
-		prometheus.CacheViewMissCnt.Inc()
+		metrics.RecordInc(context.Background(), metrics.CacheViewMissCnt)
 		b, err := cbs.Blockstore.Get(c)
 		if err != nil {
 			return nil, err
@@ -92,12 +94,13 @@ func (cbs *CachedBlockstore) View(c cid.Cid, callback func([]byte) error) error 
 }
 
 func (cbs *CachedBlockstore) Has(c cid.Cid) (bool, error) {
-	prometheus.CacheHasCnt.Inc()
+	metrics.RecordInc(context.Background(), metrics.CacheHasCnt)
+
 	if has := cbs.cache.Contains(c); has {
 		return true, nil
 	}
 	b, err := cbs.hasSg.Do(c.String(), func() (interface{}, error) {
-		prometheus.CacheHasMissCnt.Inc()
+		metrics.RecordInc(context.Background(), metrics.CacheHasMissCnt)
 		b, err := cbs.Blockstore.Has(c)
 		if err != nil {
 			return false, err

@@ -1,7 +1,6 @@
 package main
 
 import (
-	_ "net/http/pprof"
 	"os"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -21,7 +20,6 @@ func main() {
 	logging.SetLogLevel("vm", "ERROR")
 
 	mcodec.Setup()
-
 	app := &cli.App{
 		Name:                 "bell",
 		Usage:                "chain info manager of Filecoin",

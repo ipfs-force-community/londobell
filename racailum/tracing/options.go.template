@@ -1,0 +1,37 @@
+package tracing
+
+import (
+	"os"
+)
+
+const defaultName = "londobell"
+
+{{ .Code }}
+
+func applyEnvOpts(opt *Options) {
+	{{ range $n := .Names -}}
+	if opt.{{ slice $n 3 }} != "" {
+		if set := os.Getenv({{ $n }}); set == "" {
+			os.Setenv({{ $n }}, opt.{{ slice $n 3 }})
+		}
+	}
+
+	{{ end -}}
+}
+
+type Options struct {
+	Enable  bool
+	Name    string
+	Sampler *float64
+
+	{{ range $n := .Names -}}
+	{{ slice $n 3 }} string
+	{{ end -}}
+}
+
+func DefaultOptions() Options {
+	return Options {
+		Enable: true,
+		Name: defaultName,
+	}
+}
