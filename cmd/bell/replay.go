@@ -4,16 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/filecoin-project/lotus/api"
-
 	"github.com/dtynn/dix"
+	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/urfave/cli/v2"
+	"go.uber.org/fx"
+
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/dep"
 	"github.com/ipfs-force-community/londobell/replaytool"
-
-	"github.com/urfave/cli/v2"
-	"go.uber.org/fx"
 )
 
 var replayCmd = &cli.Command{
@@ -29,14 +28,18 @@ var replayRunCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:     "message",
 			FilePath: "./example/message.txt",
+			Usage:    "the messages need to replay",
 		},
 		&cli.StringFlag{
-			Name:    "tipsetkey-cid-string",
-			Aliases: []string{"t"},
+			Name:     "tipsetkey-cids-string",
+			Aliases:  []string{"t"},
+			Usage:    "the cids string of tipsetkey for a tipset to replay messages",
+			Required: true,
 		},
 		&cli.StringFlag{
-			Name:    "filepath",
+			Name:    "output-filepath",
 			Aliases: []string{"f"},
+			Usage:   "the filepath to save replay results",
 		},
 	},
 
@@ -64,26 +67,26 @@ var replayRunCmd = &cli.Command{
 
 		err = json.Unmarshal([]byte(content), &msglist)
 		if err != nil {
-			return fmt.Errorf("unmarshall message err: %s", err)
+			return fmt.Errorf("unmarshall message err: %w", err)
 		}
 
 		//获取tipset
 		var ts *types.TipSet
-		if cctx.String("tipsetkey-cid-string") == "" {
-			return fmt.Errorf("param tipsetkey-cid-string is null")
-		}
-
-		tsk, err := parsetTipSetKey(cctx.String("tipsetkey-cid-string"))
+		tsk, err := parsetTipSetKey(cctx.String("tipsetkey-cids-string"))
 		if err != nil {
 			return fmt.Errorf("parse tsk err: %w", err)
 		}
 
 		ts, err = components.CS.LoadTipSet(tsk)
 		if err != nil {
-			return fmt.Errorf("failed to load tipset: %s: %s", tsk, err)
+			return fmt.Errorf("failed to load tipset for tipsetkey %s: %w", tsk, err)
 		}
 
-		filepath := cctx.String("filepath")
+		var filepath *string
+		output := cctx.String("output-filepath")
+		if output != "" {
+			filepath = &output
+		}
 
 		//基于tipset和消息cids重放
 		var result []*api.InvocResult

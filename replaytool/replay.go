@@ -3,23 +3,24 @@ package replaytool
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-
-	"github.com/ipfs/go-cid"
-
-	"github.com/filecoin-project/lotus/api"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/rand"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
+
 	"github.com/ipfs-force-community/londobell/common"
 )
 
-func Replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msglist []types.Message, filepath string) ([]*api.InvocResult, error) {
+var log = logging.Logger("replay")
+
+func Replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msglist []types.Message, filepath *string) ([]*api.InvocResult, error) {
 	tsExexc := filcns.NewTipSetExecutor()
 	blks := ts.Blocks()
 
@@ -41,7 +42,7 @@ func Replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msgli
 	fbmsgs := make([]filcns.FilecoinBlockMessages, 1)
 	blockMessages := make([]store.BlockMessages, 1)
 	blockMessages[0].BlsMessages = make([]types.ChainMsg, len(msglist))
-	cidSlice := make([]cid.Cid, len(msglist))
+	cidSlice := make([]cid.Cid, 0, len(msglist))
 
 	for i, msg := range msglist {
 		if _, ok := nonceMap[msg.From]; !ok {
@@ -49,13 +50,10 @@ func Replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msgli
 			if err != nil {
 				return nil, err
 			}
-
-			msg.Nonce = curNonce
-			nonceMap[msg.From] = curNonce + 1
-		} else {
-			msg.Nonce = nonceMap[msg.From]
-			nonceMap[msg.From]++
+			nonceMap[msg.From] = curNonce
 		}
+		msg.Nonce = nonceMap[msg.From]
+		nonceMap[msg.From]++
 
 		msglist[i] = msg
 		blockMessages[0].BlsMessages[i] = &msglist[i]
@@ -64,21 +62,21 @@ func Replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msgli
 
 	fbmsgs[0].BlockMessages = blockMessages[0]
 	fbmsgs[0].Miner = blks[0].Miner
-	fbmsgs[0].WinCount = blks[0].ElectionProof.WinCount
+	fbmsgs[0].WinCount = 1
 
 	var invocTrace []*api.InvocResult
 	em := InvocationTracer{
-		&invocTrace,
-		cidSlice,
+		trace: &invocTrace,
+		mcids: cidSlice,
 	}
 
 	_, _, err := tsExexc.ApplyBlocks(ctx, sm.(*stmgr.StateManager), parentEpoch, pstate, fbmsgs, blks[0].Height, r, &em, baseFee, ts)
 	if err != nil {
-		fmt.Printf("applyblock err:%v", err)
+		log.Errorf("applyblock err:%w", err)
 		return nil, err
 	}
 
-	if filepath == "" {
+	if filepath == nil {
 		return *em.trace, nil
 	}
 
@@ -87,7 +85,7 @@ func Replay(ctx context.Context, sm common.StateManager, ts *types.TipSet, msgli
 		return nil, err
 	}
 
-	err = common.WriteTofile(filepath, fileContent)
+	err = common.WriteTofile(*filepath, fileContent)
 	if err != nil {
 		return nil, err
 	}
