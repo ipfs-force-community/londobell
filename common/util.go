@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/filecoin-project/lotus/chain/types"
 )
@@ -58,4 +59,25 @@ func LoadLinkedTipSet(cs ChainStore, child types.TipSetKey) (*LinkedTipSet, erro
 		Parent: parentts,
 		Child:  childts,
 	}, nil
+}
+
+func WriteTofile(filepath string, fileContent []byte) error {
+	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	_, err = f.Write(fileContent)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.WriteString("\n")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

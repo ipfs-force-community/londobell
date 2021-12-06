@@ -28,6 +28,7 @@ func main() {
 			raCmd,
 			cfgCmd,
 			segmentCmd,
+			replayCmd,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{
