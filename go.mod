@@ -3,12 +3,13 @@ module github.com/ipfs-force-community/londobell
 go 1.16
 
 require (
-	contrib.go.opencensus.io/exporter/jaeger v0.2.1 // indirect
+	contrib.go.opencensus.io/exporter/jaeger v0.2.1
 	contrib.go.opencensus.io/exporter/prometheus v0.1.0
 	github.com/dtynn/dix v0.1.2
 	github.com/filecoin-project/go-address v0.0.5
 	github.com/filecoin-project/go-amt-ipld/v2 v2.1.1-0.20201006184820-924ee87a1349 // indirect
 	github.com/filecoin-project/go-bitfield v0.2.4
+	github.com/filecoin-project/go-jsonrpc v0.1.4-0.20210217175800-45ea43ac2bec
 	github.com/filecoin-project/go-state-types v0.1.1-0.20210915140513-d354ccf10379
 	github.com/filecoin-project/lotus v1.12.0
 	github.com/filecoin-project/specs-actors v0.9.14
@@ -27,7 +28,7 @@ require (
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipld/go-car v0.3.1-0.20210601190600-f512dac51e8e
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/prometheus/client_golang v1.10.0
+	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/robertkrimen/otto v0.0.0-20200922221731-ef014fd054ac
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/urfave/cli/v2 v2.2.0
@@ -36,6 +37,7 @@ require (
 	go.uber.org/fx v1.13.1
 	go.uber.org/zap v1.16.0
 	go4.org v0.0.0-20200411211856-f5505b9728dd
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 )
 

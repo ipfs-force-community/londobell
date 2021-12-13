@@ -194,66 +194,36 @@ var segmentShowCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		di := struct {
-			fx.In
-			SegMgr *segment.Manager
-		}{}
-
-		stopper, err := dix.New(
-			cctx.Context,
-			dep.Bell(cctx.Context, fxlog, &di),
-			dep.InjectRepoPath(cctx),
-		)
+		api, _, err := GetAPIV0(cctx)
 		if err != nil {
 			return err
 		}
-
-		defer stopper(cctx.Context) // nolint: errcheck
-
 		segname := cctx.String("name")
 		slog := log.With("seg", segname)
-
+		detail, err := api.SegmentDetail(cctx.Context, segname)
+		if err != nil {
+			return err
+		}
 		if cctx.Bool("info") {
-			info, has, err := di.SegMgr.LoadInfo(segname)
-			if err != nil {
-				return err
-			}
-
-			if has {
-				slog.Infof("info: %#v", info)
+			if detail.Info != nil {
+				slog.Infow("info", "dns-write", detail.Info.DSN.Write, "dns-read", detail.Info.DSN.Read)
 			} else {
-				slog.Info("info not found")
+				slog.Info("segment info not found")
 			}
 		}
-
 		if cctx.Bool("boundary") {
-			bound, has, err := di.SegMgr.LoadBoundary(segname)
-			if err != nil {
-				return err
-			}
-
-			if has {
+			if detail.Boundary != nil {
+				bound := detail.Boundary
 				slog.Infow("boundary", "hi-epoch", bound.Hi.Epoch, "hi-tsk", bound.Hi.TSK.String(), "lo-epoch", bound.Lo.Epoch, "lo-tsk", bound.Lo.TSK)
 			} else {
-				slog.Info("boundary not found")
+				slog.Info("segment boundary not found")
 			}
 		}
-
 		if cctx.Bool("active") {
-			activated, has, err := di.SegMgr.LoadActive()
-			if err != nil {
-				return err
-			}
-
-			if !has {
-				slog.Info("active segment not set")
+			if detail.Active == "" {
+				slog.Infof("active segment not found")
 			} else {
-				extra := ""
-				if activated != segname {
-					extra = fmt.Sprintf("(%s)", activated)
-				}
-
-				slog.Infof("current segment activated: %v%s", activated == segname, extra)
+				slog.Infof("current active: %s", detail.Active)
 			}
 		}
 		return nil
