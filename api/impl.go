@@ -10,6 +10,7 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
+	"github.com/ipfs-force-community/londobell/racailum/tracing"
 )
 
 var _ BellAPI = (*BellNodeAPI)(nil)
@@ -57,4 +58,11 @@ func (m *BellNodeAPI) SegmentDetail(ctx context.Context, name string) (*SegmentD
 func (m *BellNodeAPI) ShutDown(ctx context.Context) error {
 	close(m.ShutDownCh)
 	return nil
+}
+
+func (m *BellNodeAPI) SetSampleRate(ctx context.Context, rate float64) (old float64, err error) {
+	return tracing.SetSampleRate(rate)
+}
+func (m *BellNodeAPI) GetSampleRate(ctx context.Context) (float64, error) {
+	return tracing.GetSampleRate()
 }
