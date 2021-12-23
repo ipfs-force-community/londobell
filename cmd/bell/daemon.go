@@ -9,52 +9,47 @@ import (
 
 	"github.com/dtynn/dix"
 	"github.com/filecoin-project/lotus/node"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
-	"go.opencensus.io/stats"
 	"go.uber.org/fx"
 
+	"github.com/ipfs-force-community/londobell/api"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/dep"
-	"github.com/ipfs-force-community/londobell/metrics"
 	"github.com/ipfs-force-community/londobell/racailum"
 )
 
-var raCmd = &cli.Command{
-	Name: "ra",
+var daemonCmd = &cli.Command{
+	Name: "daemon",
 	Subcommands: []*cli.Command{
-		raRunCmd,
-		// raExtractCmd,
-		// raAggregateCmd,
-		// raDryCmd,
-		// raGrafanaCmd,
+		daemonStartCmd,
+		daemonStopCmd,
 	},
 }
 
-var raRunCmd = &cli.Command{
+var daemonStartCmd = &cli.Command{
 	Name: "run",
 	Action: func(cctx *cli.Context) error {
-		ctx, cancel := context.WithCancel(cctx.Context)
-		defer cancel()
-
+		ctx := context.Background()
+		shutdownCh := make(chan struct{})
 		var components struct {
 			fx.In
-			CS       common.ChainStore
-			Notifier common.HeadNotifier
-			Ra       *racailum.RaCailum
+			NodeAPI  api.BellNodeAPI
 			Cfg      racailum.Config
 			Mux      *http.ServeMux
+			Notifier common.HeadNotifier
+			Ra       *racailum.RaCailum
 		}
-
-		stopper, err := dix.New(
-			ctx,
+		stopper, err := dix.New(ctx,
 			dep.Bell(ctx, fxlog, &components),
-			dep.InjectRepoPath(cctx),
 			dep.InjectFullNode(cctx),
+			dep.InjectRepoPath(cctx),
+			dix.Override(new(dtypes.ShutdownChan), shutdownCh),
 		)
 		if err != nil {
 			return err
 		}
-
 		httpStoper, errCh := serveHTTP(components.Cfg.HTTP.Listen, components.Mux)
 		select {
 		case err = <-errCh:
@@ -62,56 +57,29 @@ var raRunCmd = &cli.Command{
 		case <-time.After(time.Duration(components.Cfg.HTTP.StableWait)):
 
 		}
-
 		if err != nil {
 			return fmt.Errorf("start http server: %w", err)
 		}
-
 		doneCh := node.MonitorShutdown(
-			ctx.Done(),
+			shutdownCh,
 			node.ShutdownHandler{Component: "http server", StopFunc: httpStoper},
 			node.ShutdownHandler{Component: "application", StopFunc: node.StopFunc(stopper)},
 		)
-
 		ch, err := components.Notifier.Sub(ctx)
 		if err != nil {
 			return fmt.Errorf("sub head change: %w", err)
 		}
-
-		// TODO: turn this code block into some Run func
-	HEAD_LOOP:
-		for {
-			select {
-			case <-doneCh:
-				log.Info("quit head-change loop")
-				return nil
-
-			case tsk, ok := <-ch:
-				if !ok {
-					log.Warn("tsk chan closed")
-					return nil
-				}
-				lstart := time.Now()
-				ts, err := components.CS.LoadTipSet(tsk)
-				stats.Record(ctx, metrics.LoadTipSetDuration.M(metrics.SinceInMilliseconds(lstart)))
-				if err != nil {
-					log.Errorf("failed to load tipset %s: %s", tsk, err)
-					continue HEAD_LOOP
-				}
-
-				log.Infow("incoming tipset", "tsk", tsk, "height", ts.Height())
-				estart := time.Now()
-				if err := components.Ra.Extract(ctx, ts); err != nil {
-					log.Errorf("failed to persist tipset: %s", err)
-					stats.Record(ctx, metrics.ExtractError.M(1))
-				} else {
-					stats.Record(ctx, metrics.ExtractError.M(0))
-					stats.Record(ctx, metrics.TipSetHeight.M(int64(ts.Height())))
-					stats.Record(ctx, metrics.ExtractDuration.M(metrics.SinceInMilliseconds(estart)))
-				}
-				log.Infow("done tipset extracting", "tsk", tsk, "height", ts.Height(), "elapsed", time.Now().Sub(estart).String())
-			}
+		go components.Ra.Run(ctx, doneCh, ch)
+		addr := components.Cfg.HTTP.RPCListen
+		if addr == "" {
+			addr = racailum.DefaultRPCListenAddr
 		}
+		endpoint, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			return fmt.Errorf("parse addr: %s, err: %v", addr, err)
+		}
+
+		return ServeRPC(&components.NodeAPI, stopper, endpoint, doneCh, 0)
 	},
 }
 
@@ -143,4 +111,15 @@ func serveHTTP(addr string, mux *http.ServeMux) (func(context.Context) error, <-
 	}()
 
 	return srv.Shutdown, errCh
+}
+
+var daemonStopCmd = &cli.Command{
+	Name: "stop",
+	Action: func(c *cli.Context) error {
+		api, _, err := GetAPIV0(c)
+		if err != nil {
+			return err
+		}
+		return api.ShutDown(c.Context)
+	},
 }

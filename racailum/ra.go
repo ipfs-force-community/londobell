@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	logging "github.com/ipfs/go-log/v2"
-
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
 	lconfig "github.com/filecoin-project/lotus/node/config"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	logging "github.com/ipfs/go-log/v2"
+	"go.opencensus.io/stats"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/metrics"
@@ -23,6 +24,7 @@ import (
 var log = logging.Logger("racailum")
 
 const DefaultHTTPListenAddr = ":15002"
+const DefaultRPCListenAddr = "/ip4/127.0.0.1/tcp/12345"
 
 // SegmentConfig contains info about a segment
 type SegmentConfig struct {
@@ -47,12 +49,14 @@ func DefaultConfig() Config {
 }
 
 type HTTPOptions struct {
+	RPCListen  string
 	Listen     string
 	StableWait lconfig.Duration
 }
 
 func DefaultHTTPOptions() HTTPOptions {
 	return HTTPOptions{
+		RPCListen:  DefaultRPCListenAddr,
 		Listen:     DefaultHTTPListenAddr,
 		StableWait: lconfig.Duration(5 * time.Second),
 	}
@@ -72,7 +76,7 @@ type Config struct {
 }
 
 // New returns an instance of *RaCailum
-func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.ChainStore, stm common.StateManager, segmgr *segment.Manager) (*RaCailum, error) {
+func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.ChainStore, stm common.StateManager, segmgr *segment.Manager, shutdownCh dtypes.ShutdownChan) (*RaCailum, error) {
 	vm.EnableGasTracing = cfg.EnableGasTracing
 
 	activeSegName, has, err := segmgr.LoadActive()
@@ -101,17 +105,16 @@ func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.Cha
 	//         }
 	//     }()
 	// }
-
 	log.Infow("ra sets sail", "gas-tracing", cfg.EnableGasTracing, "active-seg", activeSegName)
 	ra := &RaCailum{
-		cfg:       cfg,
-		sub:       sub,
-		activeSeg: activeSeg,
+		cfg:        cfg,
+		sub:        sub,
+		activeSeg:  activeSeg,
+		shutdownCh: shutdownCh,
 	}
 
 	ra.components.cs = cs
 	ra.components.stm = stm
-
 	// ra.gr = gr
 
 	return ra, nil
@@ -131,6 +134,8 @@ type RaCailum struct {
 
 	// gr        *grafana.Grafana
 	activeSeg *segment.Segment
+
+	shutdownCh dtypes.ShutdownChan
 }
 
 // Extract is used to extract from given tipset manually
@@ -152,6 +157,42 @@ func (r *RaCailum) Aggregate(ctx context.Context, lo, hi *types.TipSet) error {
 // DryState runs a dry extraction from given ts
 func (r *RaCailum) DryState(ctx context.Context, ts *common.LinkedTipSet) ([]*extract.Res, error) {
 	return r.activeSeg.DryExtract(ctx, ts)
+}
+
+func (r *RaCailum) Run(ctx context.Context, doneCh <-chan struct{}, tsCh <-chan types.TipSetKey) {
+HEAD_LOOP:
+	for {
+		select {
+		case <-doneCh:
+			log.Info("quit head-change loop")
+			return
+
+		case tsk, ok := <-tsCh:
+			if !ok {
+				log.Warn("tsk chan closed")
+				return
+			}
+			lstart := time.Now()
+			ts, err := r.components.cs.LoadTipSet(tsk)
+			stats.Record(ctx, metrics.LoadTipSetDuration.M(metrics.SinceInMilliseconds(lstart)))
+			if err != nil {
+				log.Errorf("failed to load tipset %s: %s", tsk, err)
+				continue HEAD_LOOP
+			}
+
+			log.Infow("incoming tipset", "tsk", tsk, "height", ts.Height())
+			estart := time.Now()
+			if err := r.Extract(ctx, ts); err != nil {
+				log.Errorf("failed to persist tipset: %s", err)
+				stats.Record(ctx, metrics.ExtractError.M(1))
+			} else {
+				stats.Record(ctx, metrics.ExtractError.M(0))
+				stats.Record(ctx, metrics.TipSetHeight.M(int64(ts.Height())))
+				stats.Record(ctx, metrics.ExtractDuration.M(metrics.SinceInMilliseconds(estart)))
+			}
+			log.Infow("done tipset extracting", "tsk", tsk, "height", ts.Height(), "elapsed", time.Now().Sub(estart).String())
+		}
+	}
 }
 
 // Grafana returns the instance of *Grafana

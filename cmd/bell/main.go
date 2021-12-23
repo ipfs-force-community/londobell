@@ -25,9 +25,9 @@ func main() {
 		Usage:                "chain info manager of Filecoin",
 		EnableBashCompletion: true,
 		Commands: []*cli.Command{
-			raCmd,
 			cfgCmd,
 			segmentCmd,
+			daemonCmd,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{

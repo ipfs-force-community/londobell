@@ -83,17 +83,18 @@ func ChainIOBlockstore(full v0api.FullNode) (dtypes.HotBlockstore, error) {
 
 type raIn struct {
 	fx.In
-	Ctx    GlobalContext
-	Cfg    racailum.Config
-	Sub    common.HeadNotifier
-	CS     common.ChainStore
-	Stm    common.StateManager
-	SegMgr *segment.Manager
+	Ctx        GlobalContext
+	Cfg        racailum.Config
+	Sub        common.HeadNotifier
+	CS         common.ChainStore
+	Stm        common.StateManager
+	SegMgr     *segment.Manager
+	ShutDownCh dtypes.ShutdownChan
 }
 
 // NewRaCailum constructs an instance of RaCailum
 func NewRaCailum(in raIn) (*racailum.RaCailum, error) {
-	return racailum.New(in.Ctx, in.Cfg, in.Sub, in.CS, in.Stm, in.SegMgr)
+	return racailum.New(in.Ctx, in.Cfg, in.Sub, in.CS, in.Stm, in.SegMgr, in.ShutDownCh)
 }
 
 // SegmentOpt is used to combine a group of option funcs
