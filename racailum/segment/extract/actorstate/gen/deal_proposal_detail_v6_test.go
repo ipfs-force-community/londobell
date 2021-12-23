@@ -32,7 +32,8 @@ func Test_extractDealProposalDetailedV6(t *testing.T) {
 	var out market6.State
 	err = actorStore.Get(ctx, headCid, &out)
 	require.NoError(t, err)
-	mockDAL := &MockDAL{localBs}
+	mockDAL := &MockDAL{}
+	mockDAL.On("ActorStore", ctx).Return(store.ActorStore(ctx, localBs), nil)
 	ectx, err := extract.NewCtx(ctx, mockDAL, &zap.SugaredLogger{}, &actor.Set{}, extract.DryOptions())
 	require.NoError(t, err)
 	res := extract.NewRes(0, 0)
@@ -40,6 +41,7 @@ func Test_extractDealProposalDetailedV6(t *testing.T) {
 		Actor: &types.Actor{Head: headCid},
 		Epoch: abi.ChainEpoch(455000)}, &out)
 	require.NoError(t, err)
+	require.NotEmpty(t, res.Docs)
 }
 
 func GenerateMarketData(t *testing.T) {

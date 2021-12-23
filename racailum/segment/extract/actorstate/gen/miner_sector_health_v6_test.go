@@ -30,7 +30,8 @@ func Test_extractMinerSectorHealthV6(t *testing.T) {
 	var out miner6.State
 	err = actorStore.Get(ctx,headerCId,&out)
 	require.NoError(t, err)
-	mockDAL := &MockDAL{localBs}
+	mockDAL := &MockDAL{}
+	mockDAL.On("ActorStore", ctx).Return(store.ActorStore(ctx, localBs), nil)
 	ectx, err := extract.NewCtx(ctx, mockDAL, &zap.SugaredLogger{}, &actor.Set{}, extract.DryOptions())
 	err = extractMinerSectorHealthV6(ectx,res,&common.ActorHead{
 		Actor: &types.Actor{Head: headerCId},
