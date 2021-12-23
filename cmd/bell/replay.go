@@ -28,7 +28,7 @@ var replayRunCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:     "message",
 			FilePath: "./example/message.txt",
-			Usage:    "the messages need to replay",
+			Usage:    "the messages need to replay, element type:types.Message, format:json; such as: [\n    {\n        \"Version\": 0,\n        \"To\": \"t025097\",\n        \"From\": \"t3qzco3zglo7m6eb7a3pyk7af5frixdienql4pcr5uznk4q7rncewdaslmjyhvkawtfmq5g6l5xqo2eg325oxa\",\n        \"Value\": \"8968584614744082163\",\n        \"GasLimit\": 7340372,\n        \"GasFeeCap\": \"100474\",\n        \"GasPremium\": \"99420\",\n        \"Method\": 6,\n        \"Params\": \"iggYXNgqWCkAAYLiA4HoAiCW3uq0UxjkifWqdNWZJ26Na2sOw79mv0WsMmPIGWtmchoABtiQgBoAHoQb9AAAAA==\"\n    },]",
 		},
 		&cli.StringFlag{
 			Name:     "tipsetkey-cids-string",
