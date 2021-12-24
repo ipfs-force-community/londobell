@@ -96,7 +96,6 @@ func GenerateRewardData(t *testing.T) {
 //	//     ActorAddress: t04
 //	//     Head: bafy2bzacedb7yvsktcclo3no4kl2hyex5gwaoog5wjw76gk6kudfjflmonnay //??
 //
-//	url := "ws://192.168.1.227:1234/rpc/v0"
 //	//url := os.Getenv("TEST_LOTUS_URL")
 //	ctx := context.Background()
 //	rootCid, _ := cid.Decode("bafy2bzacedb7yvsktcclo3no4kl2hyex5gwaoog5wjw76gk6kudfjflmonnay") //actorhead:actorstate??
