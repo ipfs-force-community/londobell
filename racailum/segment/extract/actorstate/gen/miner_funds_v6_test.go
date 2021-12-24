@@ -1,4 +1,5 @@
 package gen
+
 import (
 	"context"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -18,23 +19,23 @@ import (
 func Test_extractMinerFundsV6(t *testing.T) {
 	ctx := context.Background()
 	res := extract.NewRes(0, 0)
-	localBs, closer,err:= testutils.NewLocalBlockStore(ctx)
+	localBs, closer, err := testutils.NewLocalBlockStore(ctx)
 	require.NoError(t, err)
 	defer func() {
 		_ = closer()
 	}()
 	headerCId, _ := cid.Decode("bafy2bzacedjnglismll3py5nx6q6g2lha6xwovrncl6b53mrx5v6m4k4wuc6y")
-	actorStore := store.ActorStore(ctx,localBs)
+	actorStore := store.ActorStore(ctx, localBs)
 	var out miner6.State
-	err = actorStore.Get(ctx,headerCId,&out)
+	err = actorStore.Get(ctx, headerCId, &out)
 	require.NoError(t, err)
 	mockDAL := &MockDAL{}
 	mockDAL.On("ActorStore", ctx).Return(store.ActorStore(ctx, localBs), nil)
-	ectx, err := extract.NewCtx(ctx, mockDAL, &zap.SugaredLogger{}, &actor.Set{}, extract.DryOptions())
-	err = extractMinerFundsV6(ectx,res,&common.ActorHead{
+	ectx, _ := extract.NewCtx(ctx, mockDAL, &zap.SugaredLogger{}, &actor.Set{}, extract.DryOptions())
+	err = extractMinerFundsV6(ectx, res, &common.ActorHead{
 		Actor: &types.Actor{Head: headerCId},
 		Epoch: abi.ChainEpoch(455000),
-	},&out)
+	}, &out)
 
 	require.NoError(t, err)
 }
