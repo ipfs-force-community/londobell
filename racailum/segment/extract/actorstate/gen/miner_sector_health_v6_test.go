@@ -42,7 +42,7 @@ func Test_extractMinerSectorHealthV6(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_GenerateMinerSectorData(t *testing.T) {
+func GenerateMinerSectorData(t *testing.T) {
 	// Generate Data for:
 	// 		Network: calibration
 	// 		Epoch: 455000
