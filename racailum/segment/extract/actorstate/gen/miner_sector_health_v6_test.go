@@ -2,6 +2,9 @@ package gen
 
 import (
 	"context"
+	"os"
+	"testing"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -13,8 +16,6 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"os"
-	"testing"
 )
 
 func Test_extractMinerSectorHealthV6(t *testing.T) {

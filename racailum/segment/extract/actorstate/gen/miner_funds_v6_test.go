@@ -2,6 +2,8 @@ package gen
 
 import (
 	"context"
+	"testing"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -13,7 +15,6 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"testing"
 )
 
 func Test_extractMinerFundsV6(t *testing.T) {
