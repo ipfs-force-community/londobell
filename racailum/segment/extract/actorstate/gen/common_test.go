@@ -106,10 +106,34 @@ Head: bafy2bzacectvwb5snunyl2qybrs5hybtnz5l7xug73rf6sowrag7qh6ik2zta
 */
 const testMarketActorCid = "bafy2bzacectvwb5snunyl2qybrs5hybtnz5l7xug73rf6sowrag7qh6ik2zta"
 
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t02
+Head: bafy2bzacecy72ujmh4ywna4wdm4z5puv6v4664akuibwt7bzz55i74gwriwmo
+*/
+const testRewardActorCid = "bafy2bzacecy72ujmh4ywna4wdm4z5puv6v4664akuibwt7bzz55i74gwriwmo"
+
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t011092
+Head: bafy2bzaceaa3zevs2vazynsd5fjolq2sc2633hj6poly2xvscpc2n56cook4a
+*/
+const testMultisigActorCid = "bafy2bzaceaa3zevs2vazynsd5fjolq2sc2633hj6poly2xvscpc2n56cook4a"
+
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t06
+Head: bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte
+*/
+const testVerifRegActorCid = "bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte"
+
 func GenerateLocalData(t *testing.T) {
 	url := os.Getenv("TEST_LOTUS_URL")
 	ctx := context.Background()
-	for _, c := range []string{testPowerActorCid, testMarketActorCid} {
+	for _, c := range []string{testPowerActorCid, testMarketActorCid, testRewardActorCid, testMultisigActorCid, testVerifRegActorCid} {
 		rootCid, _ := cid.Decode(c)
 		rpcBS, err := testutils.NewApiBlockStore(ctx, url)
 		require.NoError(t, err)
