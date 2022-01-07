@@ -2,8 +2,10 @@ package gen
 
 import (
 	"context"
-	"os"
 	"testing"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/store"
@@ -18,7 +20,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func Test_extractMinerSectorHealthV6(t *testing.T) {
+func TestExtractMinerSectorHealthV6(t *testing.T) {
 	ctx := context.Background()
 	res := extract.NewRes(0, 0)
 	localBs, closer, err := testutils.NewLocalBlockStore(ctx)
@@ -40,22 +42,35 @@ func Test_extractMinerSectorHealthV6(t *testing.T) {
 	}, &out)
 
 	require.NoError(t, err)
+	require.Equal(t, 1, len(res.Docs))
+	resultMoc := MinerSectorHealthExpectResult()
+	cpw := res.Docs[0].(*model.MinerSectorHealth)
+	require.Equal(t, cpw, resultMoc)
 }
 
-func GenerateMinerSectorData(t *testing.T) {
-	// Generate Data for:
-	// 		Network: calibration
-	// 		Epoch: 455000
-	// 		ActorAddress: t025418
-	// 		Head: bafy2bzacedjnglismll3py5nx6q6g2lha6xwovrncl6b53mrx5v6m4k4wuc6y
-
-	url := os.Getenv("TEST_LOTUS_URL")
-	ctx := context.Background()
-	rootCid, _ := cid.Decode("bafy2bzacedjnglismll3py5nx6q6g2lha6xwovrncl6b53mrx5v6m4k4wuc6y")
-	rpcBS, err := testutils.NewApiBlockStore(ctx, url)
-	require.NoError(t, err)
-	localBS, _, err := testutils.NewLocalBlockStore(ctx)
-	require.NoError(t, err)
-	err = testutils.GenerateFullTree(ctx, rootCid, rpcBS, localBS)
-	require.NoError(t, err)
+func MinerSectorHealthExpectResult() *model.MinerSectorHealth {
+	var ds = model.MinerSectorHealth{}
+	addr1, _ := address.NewFromString("")
+	id, _ := cid.Decode("bafy2bzaceatoatxith2aex4t2rlotswi5h6t6z6ayrxaio3rlfeuu6vunnjt2")
+	path1, _ := cid.Decode("bafy2bzacedjnglismll3py5nx6q6g2lha6xwovrncl6b53mrx5v6m4k4wuc6y")
+	epoch := abi.ChainEpoch(455000)
+	ds = model.MinerSectorHealth{
+		ActorStateExBasic: model.ActorStateExBasic{ID: id, Path: []cid.Cid{path1}, Addr: addr1, Epoch: epoch},
+		Detail: model.MinerSectorHealthDetail{
+			Faults:                0,
+			Recoveries:            0,
+			Unproven:              0,
+			Active:                8,
+			ActiveSectorsQAPower:  abi.NewStoragePower(274877906944),
+			FaultsQAPower:         abi.NewStoragePower(0),
+			RecoveriesQAPower:     abi.NewStoragePower(0),
+			UnprovenQAPower:       abi.NewStoragePower(0),
+			ActiveSectorsRawPower: abi.NewStoragePower(274877906944),
+			FaultsRawPower:        abi.NewStoragePower(0),
+			RecoveriesRawPower:    abi.NewStoragePower(0),
+			UnprovenRawPower:      abi.NewStoragePower(0),
+			TerminatedSectors:     0,
+		},
+	}
+	return &ds
 }

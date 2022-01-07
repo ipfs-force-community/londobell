@@ -130,10 +130,18 @@ Head: bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte
 */
 const testVerifRegActorCid = "bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte"
 
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t025418
+Head: bafy2bzacedjnglismll3py5nx6q6g2lha6xwovrncl6b53mrx5v6m4k4wuc6y
+*/
+const testMinerSectorActorCid = "bafy2bzacedjnglismll3py5nx6q6g2lha6xwovrncl6b53mrx5v6m4k4wuc6y"
+
 func GenerateLocalData(t *testing.T) {
 	url := os.Getenv("TEST_LOTUS_URL")
 	ctx := context.Background()
-	for _, c := range []string{testPowerActorCid, testMarketActorCid, testRewardActorCid, testMultisigActorCid, testVerifRegActorCid} {
+	for _, c := range []string{testPowerActorCid, testMarketActorCid, testRewardActorCid, testMultisigActorCid, testVerifRegActorCid, testMinerSectorActorCid} {
 		rootCid, _ := cid.Decode(c)
 		rpcBS, err := testutils.NewApiBlockStore(ctx, url)
 		require.NoError(t, err)
