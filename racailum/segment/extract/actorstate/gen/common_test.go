@@ -2,8 +2,11 @@ package gen
 
 import (
 	"context"
+	"os"
+	"testing"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -14,6 +17,8 @@ import (
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
+
+	"github.com/ipfs-force-community/londobell/testutils"
 )
 
 type MockDAL struct {
@@ -83,4 +88,34 @@ func (m *MockDAL) GetGenesis() (*types.BlockHeader, error) {
 func (m *MockDAL) ChainBlockstore() bstore.Blockstore {
 	args := m.Called()
 	return args.Get(0).(bstore.Blockstore)
+}
+
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t04
+Head: bafy2bzacedb7yvsktcclo3no4kl2hyex5gwaoog5wjw76gk6kudfjflmonnay
+*/
+const testPowerActorCid = "bafy2bzacedb7yvsktcclo3no4kl2hyex5gwaoog5wjw76gk6kudfjflmonnay"
+
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t05
+Head: bafy2bzacectvwb5snunyl2qybrs5hybtnz5l7xug73rf6sowrag7qh6ik2zta
+*/
+const testMarketActorCid = "bafy2bzacectvwb5snunyl2qybrs5hybtnz5l7xug73rf6sowrag7qh6ik2zta"
+
+func GenerateLocalData(t *testing.T) {
+	url := os.Getenv("TEST_LOTUS_URL")
+	ctx := context.Background()
+	for _, c := range []string{testPowerActorCid, testMarketActorCid} {
+		rootCid, _ := cid.Decode(c)
+		rpcBS, err := testutils.NewApiBlockStore(ctx, url)
+		require.NoError(t, err)
+		localBS, _, err := testutils.NewLocalBlockStore(ctx)
+		require.NoError(t, err)
+		err = testutils.GenerateFullTree(ctx, rootCid, rpcBS, localBS)
+		require.NoError(t, err)
+	}
 }
