@@ -2,24 +2,27 @@ package gen
 
 import (
 	"context"
-	"os"
 	"testing"
+
+	"github.com/filecoin-project/go-address"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
 	verifreg6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/verifreg"
 	"github.com/ipfs/go-cid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/testutils"
 )
 
-func Test_extractVerifRegV6(t *testing.T) {
+func TestExtractVerifRegV6(t *testing.T) {
 	ctx := context.Background()
 	localBs, closer, err := testutils.NewLocalBlockStore(ctx)
 	require.NoError(t, err)
@@ -35,7 +38,7 @@ func Test_extractVerifRegV6(t *testing.T) {
 
 	res := extract.NewRes(0, 0)
 
-	headCid, _ := cid.Decode("bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte")
+	headCid, _ := cid.Decode(testVerifRegActorCid)
 	head := &common.ActorHead{
 		Actor: &types.Actor{
 			Head: headCid,
@@ -50,23 +53,38 @@ func Test_extractVerifRegV6(t *testing.T) {
 
 	err = extractVerifRegV6(ectx, res, head, &out)
 	require.NoError(t, err)
-	require.NotEmpty(t, res.Docs)
+	assert.Equal(t, 1, len(res.Docs))
+	ds := VerifiedRegistryResult()
+	pass := false
+	for _, doc := range res.Docs {
+		vr := doc.(*model.VerifiedRegistry)
+		if v, ok := ds[vr.Addr]; ok {
+			require.Equal(t, *v, *vr)
+			pass = true
+		}
+	}
+	require.Equal(t, true, pass)
 }
 
-func GenerateVerifiedRegistryData(t *testing.T) {
-	// Generate Data for:
-	//     Network: calibration
-	//     Epoch: 455000
-	//     ActorAddress: t06
-	//     Head: bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte
+func VerifiedRegistryResult() map[address.Address]*model.VerifiedRegistry {
+	ds := make(map[address.Address]*model.VerifiedRegistry, 1)
+	addr1, _ := address.NewFromString("f02284")
+	id, _ := cid.Decode("bafy2bzacebafpv56psbv5lfngxrh3ay5xts6wywu3wlfd5kzy54a5woszri6c")
+	path1, _ := cid.Decode("bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte")
+	path2, _ := cid.Decode("bafy2bzacednjxkxfyv4zhmxz6qobc3x22dxr3ikikp2np3ztmnwuhrofaqmae")
+	epoch := abi.ChainEpoch(455000)
 
-	url := os.Getenv("TEST_LOTUS_URL")
-	ctx := context.Background()
-	rootCid, _ := cid.Decode("bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte")
-	rpcBS, err := testutils.NewApiBlockStore(ctx, url)
-	require.NoError(t, err)
-	localBS, _, err := testutils.NewLocalBlockStore(ctx)
-	require.NoError(t, err)
-	err = testutils.GenerateFullTree(ctx, rootCid, rpcBS, localBS)
-	require.NoError(t, err)
+	ds[addr1] = &model.VerifiedRegistry{
+		ActorStateExBasic: model.ActorStateExBasic{
+			ID:    id,
+			Path:  []cid.Cid{path1, path2},
+			Addr:  addr1,
+			Epoch: epoch,
+		},
+		Detail: model.VerifiedRegistryDetail{
+			Type: "Verifier",
+			Cap:  abi.NewStoragePower(10000000),
+		},
+	}
+	return ds
 }
