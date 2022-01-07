@@ -2,8 +2,11 @@ package gen
 
 import (
 	"context"
+	"os"
+	"testing"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -14,6 +17,8 @@ import (
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
+
+	"github.com/ipfs-force-community/londobell/testutils"
 )
 
 type MockDAL struct {
@@ -83,4 +88,66 @@ func (m *MockDAL) GetGenesis() (*types.BlockHeader, error) {
 func (m *MockDAL) ChainBlockstore() bstore.Blockstore {
 	args := m.Called()
 	return args.Get(0).(bstore.Blockstore)
+}
+
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t04
+Head: bafy2bzacedb7yvsktcclo3no4kl2hyex5gwaoog5wjw76gk6kudfjflmonnay
+*/
+const testPowerActorCid = "bafy2bzacedb7yvsktcclo3no4kl2hyex5gwaoog5wjw76gk6kudfjflmonnay"
+
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t05
+Head: bafy2bzacectvwb5snunyl2qybrs5hybtnz5l7xug73rf6sowrag7qh6ik2zta
+*/
+const testMarketActorCid = "bafy2bzacectvwb5snunyl2qybrs5hybtnz5l7xug73rf6sowrag7qh6ik2zta"
+
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t02
+Head: bafy2bzacecy72ujmh4ywna4wdm4z5puv6v4664akuibwt7bzz55i74gwriwmo
+*/
+const testRewardActorCid = "bafy2bzacecy72ujmh4ywna4wdm4z5puv6v4664akuibwt7bzz55i74gwriwmo"
+
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t011092
+Head: bafy2bzaceaa3zevs2vazynsd5fjolq2sc2633hj6poly2xvscpc2n56cook4a
+*/
+const testMultisigActorCid = "bafy2bzaceaa3zevs2vazynsd5fjolq2sc2633hj6poly2xvscpc2n56cook4a"
+
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t06
+Head: bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte
+*/
+const testVerifRegActorCid = "bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte"
+
+/*
+Network: calibration
+Epoch: 455000
+ActorAddress: t025418
+Head: bafy2bzacedjnglismll3py5nx6q6g2lha6xwovrncl6b53mrx5v6m4k4wuc6y
+*/
+const testMinerSectorActorCid = "bafy2bzacedjnglismll3py5nx6q6g2lha6xwovrncl6b53mrx5v6m4k4wuc6y"
+
+func GenerateLocalData(t *testing.T) {
+	url := os.Getenv("TEST_LOTUS_URL")
+	ctx := context.Background()
+	for _, c := range []string{testPowerActorCid, testMarketActorCid, testRewardActorCid, testMultisigActorCid, testVerifRegActorCid, testMinerSectorActorCid} {
+		rootCid, _ := cid.Decode(c)
+		rpcBS, err := testutils.NewApiBlockStore(ctx, url)
+		require.NoError(t, err)
+		localBS, _, err := testutils.NewLocalBlockStore(ctx)
+		require.NoError(t, err)
+		err = testutils.GenerateFullTree(ctx, rootCid, rpcBS, localBS)
+		require.NoError(t, err)
+	}
 }
