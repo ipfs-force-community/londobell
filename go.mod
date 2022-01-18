@@ -21,15 +21,20 @@ require (
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-block-format v0.0.3
+	github.com/ipfs/go-blockservice v0.1.5
 	github.com/ipfs/go-cid v0.1.0
 	github.com/ipfs/go-datastore v0.4.5
 	github.com/ipfs/go-ds-leveldb v0.4.2
+	github.com/ipfs/go-ipfs-exchange-offline v0.0.1
+	github.com/ipfs/go-ipld-format v0.2.0
 	github.com/ipfs/go-log/v2 v2.3.0
+	github.com/ipfs/go-merkledag v0.3.2
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipld/go-car v0.3.1-0.20210601190600-f512dac51e8e
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/robertkrimen/otto v0.0.0-20200922221731-ef014fd054ac
+	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/urfave/cli/v2 v2.2.0
 	go.mongodb.org/mongo-driver v1.5.0
@@ -37,6 +42,7 @@ require (
 	go.uber.org/fx v1.13.1
 	go.uber.org/zap v1.16.0
 	go4.org v0.0.0-20200411211856-f5505b9728dd
+	golang.org/x/tools v0.1.8 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 )
