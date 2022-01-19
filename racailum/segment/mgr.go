@@ -1,6 +1,7 @@
 package segment
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -69,11 +70,11 @@ type Manager struct {
 }
 
 func (m *Manager) SetActive(name string) error {
-	return m.base.Put(segmentActiveKey, []byte(name))
+	return m.base.Put(context.TODO(), segmentActiveKey, []byte(name))
 }
 
 func (m *Manager) LoadActive() (string, bool, error) {
-	data, err := m.base.Get(segmentActiveKey)
+	data, err := m.base.Get(context.TODO(), segmentActiveKey)
 	if err == datastore.ErrNotFound {
 		return "", false, nil
 	}
@@ -91,11 +92,11 @@ func (m *Manager) SetBoundary(name string, b Boundary) error {
 		return fmt.Errorf("marshal boundary: %w", err)
 	}
 
-	return m.bound.Put(datastore.NewKey(name), data)
+	return m.bound.Put(context.TODO(), datastore.NewKey(name), data)
 }
 
 func (m *Manager) LoadBoundary(name string) (Boundary, bool, error) {
-	data, err := m.bound.Get(datastore.NewKey(name))
+	data, err := m.bound.Get(context.TODO(), datastore.NewKey(name))
 	if err == datastore.ErrNotFound {
 		return Boundary{}, false, nil
 	}
@@ -115,11 +116,11 @@ func (m *Manager) SetInfo(name string, info Info) error {
 		return fmt.Errorf("marshal info: %w", err)
 	}
 
-	return m.info.Put(datastore.NewKey(name), data)
+	return m.info.Put(context.TODO(), datastore.NewKey(name), data)
 }
 
 func (m *Manager) LoadInfo(name string) (Info, bool, error) {
-	data, err := m.info.Get(datastore.NewKey(name))
+	data, err := m.info.Get(context.TODO(), datastore.NewKey(name))
 	if err == datastore.ErrNotFound {
 		return Info{}, false, nil
 	}

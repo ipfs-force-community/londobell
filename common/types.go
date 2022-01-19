@@ -32,10 +32,10 @@ type DAL interface {
 
 // ChainStore is the abstraction of chain storage
 type ChainStore interface {
-	LoadTipSet(tsk types.TipSetKey) (*types.TipSet, error)
+	LoadTipSet(ctx context.Context, tsk types.TipSetKey) (*types.TipSet, error)
 	Weight(ctx context.Context, ts *types.TipSet) (types.BigInt, error)
 	ActorStore(ctx context.Context) adt.Store
-	GetGenesis() (*types.BlockHeader, error)
+	GetGenesis(ctx context.Context) (*types.BlockHeader, error)
 	ChainBlockstore() bstore.Blockstore
 }
 
@@ -43,7 +43,7 @@ type ChainStore interface {
 type StateManager interface {
 	ExecutionTrace(ctx context.Context, ts *types.TipSet) (cid.Cid, []*api.InvocResult, error)
 	ParentState(ts *types.TipSet) (*state.StateTree, error)
-	ParentStateTsk(tsk types.TipSetKey) (*state.StateTree, error)
+	ParentStateTsk(ctx context.Context, tsk types.TipSetKey) (*state.StateTree, error)
 	StateTree(st cid.Cid) (*state.StateTree, error)
 	LoadActor(ctx context.Context, addr address.Address, ts *types.TipSet) (*types.Actor, error)
 	LoadActorTsk(ctx context.Context, addr address.Address, tsk types.TipSetKey) (*types.Actor, error)

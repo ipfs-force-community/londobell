@@ -7,6 +7,7 @@ uint64	abi.MethodNum	github.com/filecoin-project/go-state-types/abi
 uint64	abi.PaddedPieceSize	github.com/filecoin-project/go-state-types/abi
 int64	abi.RegisteredPoStProof	github.com/filecoin-project/go-state-types/abi
 int64	abi.RegisteredSealProof	github.com/filecoin-project/go-state-types/abi
+int64	abi.RegisteredUpdateProof	github.com/filecoin-project/go-state-types/abi
 struct	abi.SectorID	github.com/filecoin-project/go-state-types/abi
 uint64	abi.SectorNumber	github.com/filecoin-project/go-state-types/abi
 struct	big.Int	github.com/filecoin-project/go-state-types/big
@@ -52,7 +53,6 @@ struct	multisig.TxnIDParams	github.com/filecoin-project/specs-actors/actors/buil
 struct	paych.ConstructorParams	github.com/filecoin-project/specs-actors/actors/builtin/paych
 struct	paych.Merge	github.com/filecoin-project/specs-actors/actors/builtin/paych
 struct	paych.ModVerifyParams	github.com/filecoin-project/specs-actors/actors/builtin/paych
-struct	paych.SignedVoucher	github.com/filecoin-project/specs-actors/actors/builtin/paych
 struct	power.EnrollCronEventParams	github.com/filecoin-project/specs-actors/actors/builtin/power
 struct	power.UpdateClaimedPowerParams	github.com/filecoin-project/specs-actors/actors/builtin/power
 struct	reward.AwardBlockRewardParams	github.com/filecoin-project/specs-actors/actors/builtin/reward
@@ -64,7 +64,6 @@ struct	proof.PoStProof	github.com/filecoin-project/specs-actors/actors/runtime/p
 struct	proof.SealVerifyInfo	github.com/filecoin-project/specs-actors/actors/runtime/proof
 struct	builtin.ApplyRewardParams	github.com/filecoin-project/specs-actors/v2/actors/builtin
 struct	multisig.ConstructorParams	github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig
-struct	paych.UpdateChannelStateParams	github.com/filecoin-project/specs-actors/v2/actors/builtin/paych
 struct	miner.DisputeWindowedPoStParams	github.com/filecoin-project/specs-actors/v3/actors/builtin/miner
 struct	builtin.ConfirmSectorProofsParams	github.com/filecoin-project/specs-actors/latest/actors/builtin
 struct	builtin.DeferredCronEventParams	github.com/filecoin-project/specs-actors/latest/actors/builtin
@@ -74,8 +73,14 @@ struct	market.SectorDeals	github.com/filecoin-project/specs-actors/latest/actors
 struct	market.VerifyDealsForActivationParams	github.com/filecoin-project/specs-actors/latest/actors/builtin/market
 struct	miner.PreCommitSectorBatchParams	github.com/filecoin-project/specs-actors/latest/actors/builtin/miner
 struct	miner.ProveCommitAggregateParams	github.com/filecoin-project/specs-actors/latest/actors/builtin/miner
+struct	miner.ProveReplicaUpdatesParams	github.com/filecoin-project/specs-actors/latest/actors/builtin/miner
+struct	miner.ReplicaUpdate	github.com/filecoin-project/specs-actors/latest/actors/builtin/miner
+struct	paych.SignedVoucher	github.com/filecoin-project/specs-actors/latest/actors/builtin/paych
+struct	paych.UpdateChannelStateParams	github.com/filecoin-project/specs-actors/latest/actors/builtin/paych
 struct	power.CreateMinerParams	github.com/filecoin-project/specs-actors/latest/actors/builtin/power
 struct	power.MinerConstructorParams	github.com/filecoin-project/specs-actors/latest/actors/builtin/power
+struct	verifreg.RemoveDataCapParams	github.com/filecoin-project/specs-actors/latest/actors/builtin/verifreg
+struct	verifreg.RemoveDataCapRequest	github.com/filecoin-project/specs-actors/latest/actors/builtin/verifreg
 interface	runtime.Runtime	github.com/filecoin-project/specs-actors/latest/actors/runtime
 struct	smoothing.FilterEstimate	github.com/filecoin-project/specs-actors/latest/actors/util/smoothing
 struct	cid.Cid	github.com/ipfs/go-cid

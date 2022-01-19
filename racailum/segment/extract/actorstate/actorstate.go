@@ -24,7 +24,7 @@ func ExtractRegular(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead) 
 }
 
 func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, enableActorStateDoc bool) error {
-	blkraw, err := ctx.D.ChainBlockstore().Get(head.Head)
+	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Head)
 	if err != nil {
 		return fmt.Errorf("load head block data for %s (%s): %w", head.Addr, head.Head, err)
 
