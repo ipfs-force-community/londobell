@@ -173,7 +173,7 @@ HEAD_LOOP:
 				return
 			}
 			lstart := time.Now()
-			ts, err := r.components.cs.LoadTipSet(tsk)
+			ts, err := r.components.cs.LoadTipSet(context.TODO(), tsk)
 			stats.Record(ctx, metrics.LoadTipSetDuration.M(metrics.SinceInMilliseconds(lstart)))
 			if err != nil {
 				log.Errorf("failed to load tipset %s: %s", tsk, err)

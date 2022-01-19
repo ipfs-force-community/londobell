@@ -25,16 +25,27 @@ type MockDAL struct {
 	mock.Mock
 }
 
+func (m *MockDAL) LoadTipSet(ctx context.Context, tsk types.TipSetKey) (*types.TipSet, error) {
+	args := m.Called(ctx, tsk)
+	return args.Get(0).(*types.TipSet), args.Error(1)
+}
+
+func (m *MockDAL) GetGenesis(ctx context.Context) (*types.BlockHeader, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(*types.BlockHeader), args.Error(1)
+}
+
+func (m *MockDAL) ParentStateTsk(ctx context.Context, tsk types.TipSetKey) (*state.StateTree, error) {
+	args := m.Called(ctx, tsk)
+	return args.Get(0).(*state.StateTree), args.Error(1)
+}
+
 func (m *MockDAL) ExecutionTrace(ctx context.Context, ts *types.TipSet) (cid.Cid, []*api.InvocResult, error) {
 	args := m.Called(ctx, ts)
 	return args.Get(0).(cid.Cid), args.Get(1).([]*api.InvocResult), args.Error(2)
 }
 func (m *MockDAL) ParentState(ts *types.TipSet) (*state.StateTree, error) {
 	args := m.Called(ts)
-	return args.Get(0).(*state.StateTree), args.Error(1)
-}
-func (m *MockDAL) ParentStateTsk(tsk types.TipSetKey) (*state.StateTree, error) {
-	args := m.Called(tsk)
 	return args.Get(0).(*state.StateTree), args.Error(1)
 }
 func (m *MockDAL) StateTree(st cid.Cid) (*state.StateTree, error) {
@@ -73,18 +84,12 @@ func (m *MockDAL) ActorStore(ctx context.Context) adt.Store {
 	args := m.Called(ctx)
 	return args.Get(0).(adt.Store)
 }
-func (m *MockDAL) LoadTipSet(tsk types.TipSetKey) (*types.TipSet, error) {
-	args := m.Called(tsk)
-	return args.Get(0).(*types.TipSet), args.Error(1)
-}
+
 func (m *MockDAL) Weight(ctx context.Context, ts *types.TipSet) (types.BigInt, error) {
 	args := m.Called(ctx, ts)
 	return args.Get(0).(types.BigInt), args.Error(1)
 }
-func (m *MockDAL) GetGenesis() (*types.BlockHeader, error) {
-	args := m.Called()
-	return args.Get(0).(*types.BlockHeader), args.Error(1)
-}
+
 func (m *MockDAL) ChainBlockstore() bstore.Blockstore {
 	args := m.Called()
 	return args.Get(0).(bstore.Blockstore)

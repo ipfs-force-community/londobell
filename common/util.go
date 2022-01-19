@@ -38,17 +38,17 @@ func FormatTipSet(ts *types.TipSet) string {
 
 // LoadLinkedTipSet attempts to load a tipset with its next
 func LoadLinkedTipSet(cs ChainStore, child types.TipSetKey) (*LinkedTipSet, error) {
-	childts, err := cs.LoadTipSet(child)
+	childts, err := cs.LoadTipSet(context.TODO(), child)
 	if err != nil {
 		return nil, fmt.Errorf("load child ts: %w", err)
 	}
 
-	ts, err := cs.LoadTipSet(childts.Parents())
+	ts, err := cs.LoadTipSet(context.TODO(), childts.Parents())
 	if err != nil {
 		return nil, fmt.Errorf("load ts: %w", err)
 	}
 
-	parentts, err := cs.LoadTipSet(ts.Parents())
+	parentts, err := cs.LoadTipSet(context.TODO(), ts.Parents())
 	if err != nil {
 		return nil, fmt.Errorf("load parent ts: %w", err)
 	}

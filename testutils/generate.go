@@ -82,7 +82,7 @@ func GenerateFullTree(ctx context.Context, root cid.Cid, sourceBs bstore.Blockst
 	if err != nil {
 		return err
 	}
-	err = localBs.PutMany(res)
+	err = localBs.PutMany(ctx, res)
 	if err != nil {
 		return err
 	}

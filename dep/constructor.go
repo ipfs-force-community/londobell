@@ -42,11 +42,11 @@ type WrapAPIBlockstore struct {
 	blockstore.Blockstore
 }
 
-func (a *WrapAPIBlockstore) Put(blocks.Block) error {
+func (a *WrapAPIBlockstore) Put(context.Context, blocks.Block) error {
 	return nil
 }
 
-func (a *WrapAPIBlockstore) PutMany([]blocks.Block) error {
+func (a *WrapAPIBlockstore) PutMany(context.Context, []blocks.Block) error {
 	return nil
 }
 
@@ -54,7 +54,7 @@ func (a *WrapAPIBlockstore) AllKeysChan(ctx context.Context) (<-chan cid.Cid, er
 	return nil, nil
 }
 
-func (a *WrapAPIBlockstore) DeleteBlock(cid.Cid) error {
+func (a *WrapAPIBlockstore) DeleteBlock(context.Context, cid.Cid) error {
 	return nil
 }
 
@@ -120,7 +120,7 @@ func InMemMetadataDS(lr repo.LockedRepo, g modules.Genesis) (dtypes.MetadataDS, 
 	if err != nil {
 		return nil, err
 	}
-	err = ds.Put(dstore.NewKey("0"), bh.Cid().Bytes())
+	err = ds.Put(context.TODO(), dstore.NewKey("0"), bh.Cid().Bytes())
 	return ds, err
 }
 
