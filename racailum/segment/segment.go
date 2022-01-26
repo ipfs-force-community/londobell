@@ -6,9 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ipfs-force-community/londobell/metrics"
 	"go.opencensus.io/stats"
+	"go.opencensus.io/tag"
 	"go.opencensus.io/trace"
+
+	"github.com/ipfs-force-community/londobell/metrics"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
@@ -150,15 +152,23 @@ func (s *Segment) Incoming(ctx context.Context, ts *types.TipSet) {
 func (s *Segment) Run(ctx context.Context) {
 	log.Info("start head watching loop start")
 	defer log.Info("stop head watching loop")
-
 	for {
+		bound := s.ReadBoundary()
+		_ = stats.RecordWithTags(ctx, []tag.Mutator{tag.Upsert(metrics.SegName, s.Name())}, metrics.UpperBoundary.M(int64(bound.Hi.Epoch)))
+		_ = stats.RecordWithTags(ctx, []tag.Mutator{tag.Upsert(metrics.SegName, s.Name())}, metrics.LowerBoundary.M(int64(bound.Lo.Epoch)))
 		select {
 		case <-ctx.Done():
 			return
-
 		case ts := <-s.headNotify:
+			estart := time.Now()
 			if err := s.Extract(ctx, ts); err != nil {
 				log.Errorw("failed to handle inocoming tipset", "tsk", ts.Key(), "tsh", ts.Height(), "err", err.Error())
+				_ = stats.RecordWithTags(ctx, []tag.Mutator{tag.Upsert(metrics.SegName, s.Name())}, metrics.ExtractError.M(1))
+			} else {
+				log.Infow("done tipset extracting", "tsk", ts, "height", ts.Height(), "elapsed", time.Now().Sub(estart).String())
+				_ = stats.RecordWithTags(ctx, []tag.Mutator{tag.Upsert(metrics.SegName, s.Name())}, metrics.ExtractError.M(0))
+				_ = stats.RecordWithTags(ctx, []tag.Mutator{tag.Upsert(metrics.SegName, s.Name())}, metrics.TipSetHeight.M(int64(ts.Height())))
+				_ = stats.RecordWithTags(ctx, []tag.Mutator{tag.Upsert(metrics.SegName, s.Name())}, metrics.ExtractDuration.M(metrics.SinceInMilliseconds(estart)))
 			}
 		}
 	}
@@ -250,12 +260,10 @@ func (s *Segment) updateBoundary(ctx context.Context, hi, lo *common.LinkedTipSe
 	prev := s.bound.Boundary
 
 	if hi != nil {
-		stats.Record(ctx, metrics.UpperBoundary.M(int64(hi.Height())))
 		s.bound.SetHi(hi)
 	}
 
 	if lo != nil {
-		stats.Record(ctx, metrics.LowerBoundary.M(int64(lo.Height())))
 		s.bound.SetLo(lo)
 	}
 

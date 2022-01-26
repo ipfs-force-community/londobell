@@ -135,12 +135,14 @@ type RaCailum struct {
 	// gr        *grafana.Grafana
 	activeSeg *segment.Segment
 
+	segProxy *segment.SegProxy
+
 	shutdownCh dtypes.ShutdownChan
 }
 
 // Extract is used to extract from given tipset manually
-func (r *RaCailum) Extract(ctx context.Context, ts *types.TipSet) error {
-	return r.activeSeg.Extract(ctx, ts)
+func (r *RaCailum) Extract(ctx context.Context, ts *types.TipSet) {
+	r.segProxy.Distribute(ctx, ts)
 }
 
 // Aggregate is used to trigger aggregations from given tipset boundaries manually
@@ -175,22 +177,14 @@ HEAD_LOOP:
 			lstart := time.Now()
 			ts, err := r.components.cs.LoadTipSet(tsk)
 			stats.Record(ctx, metrics.LoadTipSetDuration.M(metrics.SinceInMilliseconds(lstart)))
+
 			if err != nil {
 				log.Errorf("failed to load tipset %s: %s", tsk, err)
 				continue HEAD_LOOP
 			}
-
 			log.Infow("incoming tipset", "tsk", tsk, "height", ts.Height())
-			estart := time.Now()
-			if err := r.Extract(ctx, ts); err != nil {
-				log.Errorf("failed to persist tipset: %s", err)
-				stats.Record(ctx, metrics.ExtractError.M(1))
-			} else {
-				stats.Record(ctx, metrics.ExtractError.M(0))
-				stats.Record(ctx, metrics.TipSetHeight.M(int64(ts.Height())))
-				stats.Record(ctx, metrics.ExtractDuration.M(metrics.SinceInMilliseconds(estart)))
-			}
-			log.Infow("done tipset extracting", "tsk", tsk, "height", ts.Height(), "elapsed", time.Now().Sub(estart).String())
+
+			r.Extract(ctx, ts)
 		}
 	}
 }
