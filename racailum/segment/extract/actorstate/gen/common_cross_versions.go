@@ -17,6 +17,8 @@ import (
 
 	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
 
+	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
+
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
@@ -64,6 +66,13 @@ func init() {
 				Detail: &miner6.State{},
 			},
 		},
+
+		schema.Model{
+			Name: "actor-state: miner.State v7",
+			D: &model.ActorState{
+				Detail: &miner7.State{},
+			},
+		},
 	)
 }
 
@@ -90,6 +99,9 @@ func IsEmptyState(st interface{}) bool {
 
 	case *miner6.State:
 		return isEmptyMinerStateV6(st)
+
+	case *miner7.State:
+		return isEmptyMinerStateV7(st)
 
 	default:
 		return false

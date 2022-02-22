@@ -30,6 +30,9 @@ import (
 	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
 	adt6 "github.com/filecoin-project/specs-actors/v6/actors/util/adt"
 
+	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
+	adt7 "github.com/filecoin-project/specs-actors/v7/actors/util/adt"
+
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	cstore "github.com/filecoin-project/lotus/chain/store"
 )
@@ -78,6 +81,13 @@ func init() {
 
 	emptyMinerStateV6 = empty6
 
+	empty7, err := newEmptyMinerStateV7()
+	if err != nil {
+		panic(fmt.Errorf("construct empty miner state v7: %w", err))
+	}
+
+	emptyMinerStateV7 = empty7
+
 }
 
 var (
@@ -87,6 +97,7 @@ var (
 	emptyMinerStateV4 *miner4.State
 	emptyMinerStateV5 *miner5.State
 	emptyMinerStateV6 *miner6.State
+	emptyMinerStateV7 *miner7.State
 )
 
 func isEmptyMinerStateV0(mst *miner0.State) bool {
@@ -322,4 +333,31 @@ func newEmptyMinerStateV6() (*miner6.State, error) {
 	inMemStore := bstore.NewMemorySync()
 	adtStore := adt6.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
 	return miner6.ConstructState(adtStore, cid.Undef, 0, 0)
+}
+
+func isEmptyMinerStateV7(mst *miner7.State) bool {
+	earlyCount, err := mst.EarlyTerminations.Count()
+	if err != nil || earlyCount != 0 {
+		return false
+	}
+
+	return isEmptyOrZero(mst.PreCommitDeposits) &&
+		isEmptyOrZero(mst.LockedFunds) &&
+		isEmptyOrZero(mst.FeeDebt) &&
+		mst.VestingFunds.Equals(emptyMinerStateV7.VestingFunds) &&
+		isEmptyOrZero(mst.InitialPledge) &&
+		mst.PreCommittedSectors.Equals(emptyMinerStateV7.PreCommittedSectors) &&
+		mst.PreCommittedSectorsCleanUp.Equals(emptyMinerStateV7.PreCommittedSectorsCleanUp) &&
+		mst.AllocatedSectors.Equals(emptyMinerStateV7.AllocatedSectors) &&
+		mst.Sectors.Equals(emptyMinerStateV7.Sectors) &&
+		mst.Deadlines.Equals(emptyMinerStateV7.Deadlines)
+}
+
+// VERCHECK
+
+func newEmptyMinerStateV7() (*miner7.State, error) {
+	ctx := context.Background()
+	inMemStore := bstore.NewMemorySync()
+	adtStore := adt7.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
+	return miner7.ConstructState(adtStore, cid.Undef, 0, 0)
 }

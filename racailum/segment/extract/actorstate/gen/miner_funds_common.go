@@ -29,6 +29,9 @@ import (
 	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
 	adt6 "github.com/filecoin-project/specs-actors/v6/actors/util/adt"
 
+	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
+	adt7 "github.com/filecoin-project/specs-actors/v7/actors/util/adt"
+
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mir"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -257,6 +260,80 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 
 			return ps.ForEach(&part, func(partIdx int64) error {
 				expirations, err := miner6.LoadExpirationQueue(actStore, part.ExpirationsEpochs, quant, miner6.PartitionExpirationAmtBitwidth)
+				if err != nil {
+					return fmt.Errorf("failed to load expiration queue: %w", err)
+				}
+
+				for i := range tsRange {
+					popped, err := expirations.PopUntil(tsRange[i])
+					if err != nil {
+						return fmt.Errorf("failed to pop expiration queue until %d: %w", tsRange[i], err)
+					}
+
+					pledgeRelease[i] = popped.OnTimePledge
+				}
+
+				return nil
+			})
+		})
+
+		if err != nil {
+			return fmt.Errorf("process sector pledge failed")
+		}
+
+	case *miner7.State:
+		if err := mir.Mirror(&detail, st); err != nil {
+			return fmt.Errorf("mirroring *miner7.State: %w", err)
+		}
+
+		if isEmptyOrZero(detail.PreCommitDeposits) &&
+			isEmptyOrZero(detail.LockedFunds) &&
+			isEmptyOrZero(detail.FeeDebt) &&
+			isEmptyOrZero(detail.InitialPledge) {
+			return nil
+		}
+
+		if !st.VestingFunds.Equals(emptyMinerStateV7.VestingFunds) {
+			funds, err := st.LoadVestingFunds(adt7.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+			if err != nil {
+				return fmt.Errorf("load vesting funds: %w", err)
+			}
+
+			// assign vest in future
+			for _, v := range funds.Funds {
+				if v.Epoch < head.Epoch {
+					continue
+				}
+
+				for j := range tsRange {
+					if v.Epoch < tsRange[j] {
+						vestInFuture[j] = big.Add(vestInFuture[j], v.Amount)
+						break
+					}
+				}
+			}
+		}
+		actStore := ctx.D.ActorStore(ctx.C)
+		deadlines, err := st.LoadDeadlines(actStore)
+		if err != nil {
+			return fmt.Errorf("load deadlines failed: %w", err)
+		}
+
+		err = deadlines.ForEach(actStore, func(dlIdx uint64, dl *miner7.Deadline) error {
+			if dl == nil {
+				return nil
+			}
+
+			ps, err := dl.PartitionsArray(actStore)
+			if err != nil {
+				return fmt.Errorf("get dl partition failed: %w", err)
+			}
+			var part miner7.Partition
+			dlInfo := miner7.NewDeadlineInfo(st.CurrentProvingPeriodStart(head.Epoch), dlIdx, head.Epoch).NextNotElapsed()
+			quant := miner7.QuantSpecForDeadline(dlInfo)
+
+			return ps.ForEach(&part, func(partIdx int64) error {
+				expirations, err := miner7.LoadExpirationQueue(actStore, part.ExpirationsEpochs, quant, miner7.PartitionExpirationAmtBitwidth)
 				if err != nil {
 					return fmt.Errorf("failed to load expiration queue: %w", err)
 				}

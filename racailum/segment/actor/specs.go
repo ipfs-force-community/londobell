@@ -26,6 +26,9 @@ import (
 
 	exported6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/exported"
 	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
+
+	exported7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/exported"
+	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 )
 
 func init() {
@@ -51,6 +54,7 @@ var Specs = [][]rt.VMActor{
 	exported4.BuiltinActors(),
 	exported5.BuiltinActors(),
 	exported6.BuiltinActors(),
+	exported7.BuiltinActors(),
 }
 
 var WatchOuts = [][]interface{}{
@@ -77,5 +81,9 @@ var WatchOuts = [][]interface{}{
 	[]interface{}{
 		miner6.Deadline{},
 		miner6.Partition{},
+	},
+	[]interface{}{
+		miner7.Deadline{},
+		miner7.Partition{},
 	},
 }
