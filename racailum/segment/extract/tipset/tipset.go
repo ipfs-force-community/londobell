@@ -105,10 +105,10 @@ func init() {
 }
 
 var extractors = []extractor{
-	//{
-	//	name:   "tipset",
-	//	method: extractTipSet,
-	//},
+	{
+		name:   "tipset",
+		method: extractTipSet,
+	},
 	//{
 	//	name:   "block-header",
 	//	method: extractBlochHeaders,
