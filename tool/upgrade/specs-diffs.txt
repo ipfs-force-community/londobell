@@ -37,3 +37,9 @@ Specs v4 => v5:
 
 Specs v5 => v6:
 
+Specs v6 => v7:
+	> verifreg.Actor
+		+ RemoveDataCapProposalIDs: cid.Cid
+	> miner.Deadline
+		+ SectorsSnapshot: cid.Cid
+
