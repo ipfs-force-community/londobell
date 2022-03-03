@@ -61,6 +61,13 @@ MultisigBalanceV4
 MultisigBalanceV5
 MultisigBalanceV6
 MultisigBalanceV7
+PendingTxnsV0
+PendingTxnsV2
+PendingTxnsV3
+PendingTxnsV4
+PendingTxnsV5
+PendingTxnsV6
+PendingTxnsV7
 VerifRegV0
 VerifRegV2
 VerifRegV3

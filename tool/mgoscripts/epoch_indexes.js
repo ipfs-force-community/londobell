@@ -46,6 +46,8 @@ db.MiningProfitability.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.MultisigBalance.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
+db.PendingTxns.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
+
 db.Tipset.createIndex({"ChildEpoch":1}, {"sparse": true});
 
 db.VerifiedRegistry.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
