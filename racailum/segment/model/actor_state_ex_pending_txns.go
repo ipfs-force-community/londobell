@@ -21,7 +21,7 @@ type PendingTxnsDetail struct {
 }
 
 type PendingTxns struct {
-	ActorStateExBasic `bson:",inline"` //
+	ActorStateExBasic `bson:",inline"`
 	Detail            PendingTxnsDetail
 }
 
@@ -35,4 +35,12 @@ func (p *PendingTxns) EpochField() *string {
 
 func (p *PendingTxns) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(pendingTxnsEpochField, lower, upper), true
+}
+
+func (p *PendingTxns) Indexes() [][]string {
+	return [][]string{
+		[]string{"Addr"},
+		[]string{pendingTxnsEpochField, "Addr"},
+		[]string{pendingTxnsEpochField, "Addr", "Detail.TxnID"},
+	}
 }
