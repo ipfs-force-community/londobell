@@ -326,6 +326,24 @@
 }
 ```
 
+### PendingTxns
+
+```
+{
+	"Addr": "address.Address",
+	"Detail": {
+		"Approved": "[]address.Address",
+		"Params": "[]uint8",
+		"To": "address.Address",
+		"TxnID": "int64",
+		"Value": "big.Int"
+	},
+	"Epoch": "abi.ChainEpoch",
+	"Path": "[]cid.Cid",
+	"_id": "cid.Cid"
+}
+```
+
 ### Tipset
 
 ```

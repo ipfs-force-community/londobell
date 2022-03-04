@@ -1,0 +1,80 @@
+package gen
+
+import (
+    "fmt"
+
+    "github.com/filecoin-project/go-state-types/abi"
+    {{ if gt .Ver 2 -}}
+    builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
+    {{- end }}
+    multisig{{ .Ver }} "{{ .ImportPath }}/actors/builtin/multisig"
+    adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+    "github.com/ipfs-force-community/londobell/common"
+    "github.com/ipfs-force-community/londobell/racailum/segment/extract"
+    "github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
+    "github.com/ipfs-force-community/londobell/racailum/segment/model"
+    {{ if eq .Ver 0 -}}
+    "github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+    {{- end }}
+    "github.com/ipfs/go-cid"
+)
+
+func init() {
+    reg.MustRegisterRegularExtractor("PendingTxnsV{{ .Ver }}", extractPendingTxnsV{{ .Ver }})
+
+    {{ if eq .Ver 0 -}}
+    schema.Register(
+        schema.Model{
+            Name: "pending-txns",
+            D:     &model.PendingTxns{},
+        },
+    )
+    {{- end}}
+}
+
+
+func extractPendingTxnsV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *multisig{{ .Ver }}.State) error {
+    {{ if gt .Ver 2}}
+    pendingTxns, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), st.PendingTxns, builtin{{ .Ver }}.DefaultHamtBitwidth)
+    {{ else }}
+    pendingTxns, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), st.PendingTxns)
+    {{ end }}
+    if err != nil {
+        return fmt.Errorf("construct adt.Map for PendingTxns in *multisig{{ .Ver }}.State: %w", err)
+    }
+
+    out := &multisig{{ .Ver }}.Transaction{}
+    if err := pendingTxns.ForEach(out, func(key string) error {
+    		txnID, err := abi.ParseIntKey(key)
+    		if err != nil {
+    			return fmt.Errorf("parse txnid from key: %w", err)
+    		}
+
+    		id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
+    		if err != nil {
+    			return fmt.Errorf("gen regular id: %w", err)
+    		}
+
+    		res.Docs = append(res.Docs, &model.PendingTxns{
+    			ActorStateExBasic: model.ActorStateExBasic{
+    				ID:    id,
+    				Path:  []cid.Cid{head.Head, st.PendingTxns},
+    				Addr:  head.Addr,
+    				Epoch: head.Epoch,
+    			},
+    			Detail: model.PendingTxnsDetail{
+    				TxnID:    txnID,
+    				To:       out.To,
+    				Value:    out.Value,
+    				Params:   out.Params,
+    				Approved: out.Approved,
+    			},
+    		})
+
+    		return nil
+    	}); err != nil {
+    		return err
+    	}
+
+    	return nil
+}
