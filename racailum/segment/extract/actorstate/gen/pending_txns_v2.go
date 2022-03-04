@@ -25,6 +25,9 @@ func init() {
 }
 
 func extractPendingTxnsV2(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *multisig2.State) error {
+	if ticks := ctx.Opts.StateRegular.PendingTxnsTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
+		return nil
+	}
 
 	pendingTxns, err := adt2.AsMap(ctx.D.ActorStore(ctx.C), st.PendingTxns)
 
