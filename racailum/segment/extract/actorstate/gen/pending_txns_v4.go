@@ -25,6 +25,9 @@ func init() {
 }
 
 func extractPendingTxnsV4(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *multisig4.State) error {
+	if ticks := ctx.Opts.StateRegular.PendingTxnsTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
+		return nil
+	}
 
 	pendingTxns, err := adt4.AsMap(ctx.D.ActorStore(ctx.C), st.PendingTxns, builtin4.DefaultHamtBitwidth)
 
