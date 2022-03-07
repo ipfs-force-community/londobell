@@ -9,3 +9,5 @@
 .idea
 
 testdb/LOCK
+
+/lotus-api-adapter
