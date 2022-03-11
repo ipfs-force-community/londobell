@@ -32,7 +32,12 @@ var segmentUpdateCmd = &cli.Command{
 		},
 
 		&cli.StringFlag{
-			Name: "dsn-write",
+			Name:   "dsn-write",
+			Hidden: true,
+		},
+
+		&cli.StringSliceFlag{
+			Name: "dsn-write-slice",
 		},
 
 		&cli.StringFlag{
@@ -84,6 +89,12 @@ var segmentUpdateCmd = &cli.Command{
 		if dsn := cctx.String("dsn-write"); dsn != "" {
 			setInfo = true
 			info.DSN.Write = dsn
+		}
+
+		//多写数据库
+		if dsnSlice := cctx.StringSlice("dsn-write-slice"); len(dsnSlice) != 0 {
+			setInfo = true
+			info.DSN.NewWrite = dsnSlice
 		}
 
 		if cctx.IsSet("dsn-read") {
@@ -206,7 +217,7 @@ var segmentShowCmd = &cli.Command{
 		}
 		if cctx.Bool("info") {
 			if detail.Info != nil {
-				slog.Infow("info", "dns-write", detail.Info.DSN.Write, "dns-read", detail.Info.DSN.Read)
+				slog.Infow("info", "dns-write-slice", detail.Info.DSN.NewWrite, "dns-read", detail.Info.DSN.Read)
 			} else {
 				slog.Info("segment info not found")
 			}
