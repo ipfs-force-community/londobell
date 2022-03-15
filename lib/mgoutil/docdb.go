@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/xerrors"
 )
 
 // NewMgoDocDB returns an instance of MgoDocDB
@@ -124,4 +125,62 @@ func extractActualMgoErrors(err error) error {
 	}
 
 	return merr
+}
+
+// multi write dbs
+type MultiDB struct {
+	dbs []*MgoDocDB
+}
+
+func (m *MultiDB) Insert(ctx context.Context, col string, docs []interface{}) (int, error) {
+	var (
+		inserted int
+		err      error
+	)
+
+	for _, db := range m.dbs {
+		inserted, err = db.Insert(ctx, col, docs)
+		if err != nil {
+			return inserted, err
+		}
+	}
+
+	return inserted, nil
+}
+
+func (m *MultiDB) Delete(ctx context.Context, col string, filter interface{}) (int, error) {
+	var (
+		deleted int
+		err     error
+	)
+
+	for _, db := range m.dbs {
+		deleted, err = db.Delete(ctx, col, filter)
+		if err != nil {
+			return deleted, err
+		}
+	}
+
+	return deleted, nil
+}
+
+func (m *MultiDB) Aggregate(ctx context.Context, col string, pipeline interface{}, res interface{}) error {
+	var err error
+	for _, db := range m.dbs {
+		err = db.Aggregate(ctx, col, pipeline, res)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *MultiDB) SetDbs(db *MgoDocDB) error {
+	if db == nil {
+		return xerrors.New("multidb setdbs: db is nil")
+	}
+
+	m.dbs = append(m.dbs, db)
+	return nil
 }

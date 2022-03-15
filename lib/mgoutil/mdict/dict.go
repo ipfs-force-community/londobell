@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/xerrors"
 
 	"github.com/ipfs-force-community/londobell/common"
 )
@@ -134,4 +135,43 @@ func makeCachedItem(doc dictDoc) *cachedItem {
 	}
 
 	return cached
+}
+
+type Dicts struct {
+	dicts []*Dict
+}
+
+func (d *Dicts) AddEnum(ctx context.Context, ns string, entry ...string) error {
+	for _, dict := range d.dicts {
+		err := dict.AddEnum(ctx, ns, entry...)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *Dicts) LookupEnum(ctx context.Context, ns string, entry string) (int, error) {
+	var (
+		idx int
+		err error
+	)
+	for _, dict := range d.dicts {
+		idx, err = dict.LookupEnum(ctx, ns, entry)
+		if err != nil {
+			return idx, err
+		}
+	}
+
+	return idx, nil
+}
+
+func (d *Dicts) SetDicts(dict *Dict) error {
+	if dict == nil {
+		return xerrors.New("dicts setDicts: dict is nil")
+	}
+
+	d.dicts = append(d.dicts, dict)
+	return nil
 }

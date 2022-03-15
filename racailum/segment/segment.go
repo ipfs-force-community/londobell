@@ -56,24 +56,40 @@ func New(ctx context.Context, name string, opts Options, aggopt aggregate.Option
 		return nil, fmt.Errorf("info not found")
 	}
 
-	wcli, err := mgoutil.Connect(ctx, info.DSN.Write)
-	if err != nil {
-		return nil, fmt.Errorf("connect to write db: %w", err)
+	multiWdocs := &mgoutil.MultiDB{}
+	dicts := &mdict.Dicts{}
+
+	for _, write := range info.DSN.NewWrite {
+		wcli, err := mgoutil.Connect(ctx, write)
+		if err != nil {
+			return nil, fmt.Errorf("connect to write db: %w", err)
+		}
+
+		wdb := wcli.Database(name)
+
+		wdoc, err := mgoutil.NewMgoDocDB(ctx, wcli, wdb)
+		if err != nil {
+			return nil, fmt.Errorf("construct write doc db: %w", err)
+		}
+
+		dict, err := mdict.NewDict(wdb)
+		if err != nil {
+			return nil, fmt.Errorf("construct Dict: %w", err)
+		}
+
+		err = multiWdocs.SetDbs(wdoc)
+		if err != nil {
+			return nil, fmt.Errorf("multiwdocs setdbs: %w", err)
+		}
+
+		err = dicts.SetDicts(dict)
+		if err != nil {
+			return nil, fmt.Errorf("dicts setdicts: %w", err)
+		}
 	}
 
-	wdb := wcli.Database(name)
-
-	wdoc, err := mgoutil.NewMgoDocDB(ctx, wcli, wdb)
-	if err != nil {
-		return nil, fmt.Errorf("construct write doc db: %w", err)
-	}
-
-	dict, err := mdict.NewDict(wdb)
-	if err != nil {
-		return nil, fmt.Errorf("construct Dict: %w", err)
-	}
-
-	rdoc := wdoc
+	//rdoc := wdoc
+	var rdoc common.DocumentDB
 	if info.DSN.Read != "" {
 		rcli, err := mgoutil.Connect(ctx, info.DSN.Read)
 		if err != nil {
@@ -86,7 +102,7 @@ func New(ctx context.Context, name string, opts Options, aggopt aggregate.Option
 		}
 	}
 
-	agg, err := aggregate.New(aggopt, wdoc)
+	agg, err := aggregate.New(aggopt, multiWdocs)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +110,7 @@ func New(ctx context.Context, name string, opts Options, aggopt aggregate.Option
 	seg := &Segment{
 		name: name,
 		opts: opts,
-		db:   wdoc,
+		db:   multiWdocs,
 		rdb:  rdoc,
 		agg:  agg,
 		mgr:  mgr,
@@ -103,7 +119,7 @@ func New(ctx context.Context, name string, opts Options, aggopt aggregate.Option
 	seg.bound.Boundary = bound
 
 	seg.dal.ChainStore = cs
-	seg.dal.ChainDict = dict
+	seg.dal.ChainDict = dicts
 	seg.dal.StateManager = stm
 
 	return seg, nil
@@ -240,7 +256,12 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 
 // Aggregate tries to do aggregationg with given tipsets
 func (s *Segment) Aggregate(ctx context.Context, tss []*common.LinkedTipSet) error {
-	return s.agg.Aggregate(ctx, tss)
+	err := s.agg.Aggregate(ctx, tss)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Segment) updateBoundary(ctx context.Context, hi, lo *common.LinkedTipSet) error {

@@ -57,8 +57,9 @@ func NewManager(mds dtypes.MetadataDS) (*Manager, error) {
 
 type Info struct {
 	DSN struct {
-		Write string
-		Read  string
+		Write    string
+		Read     string
+		NewWrite []string
 	}
 }
 
