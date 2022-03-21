@@ -25,6 +25,7 @@ db.ExecTrace.createIndex({"Epoch":1,"Msg.To":1,"Msg.Method":1,"MsgRct.ExitCode":
 db.ExecTrace.createIndex({"Epoch":1,"Msg.To":1,"Seq":1}, {"sparse": true});
 db.ExecTrace.createIndex({"Epoch":1,"Depth":1}, {"sparse": true});
 db.ExecTrace.createIndex({"Cid":1}, {"sparse": true});
+db.ExecTrace.createIndex({"SignedCid":1}, {"sparse": true});
 
 // no indexes for FilSupply
 
@@ -35,6 +36,7 @@ db.Message.createIndex({"To":1,"Method":1}, {"sparse": true});
 db.Message.createIndex({"Detail.Method":1,"Detail.Actor":1}, {"sparse": true});
 db.Message.createIndex({"Detail.PackedHeight":1}, {"sparse": true});
 db.Message.createIndex({"Detail.PackedHeight":1,"Detail.Method":1}, {"sparse": true});
+db.Message.createIndex({"SignedCid":1}, {"sparse": true});
 
 db.MinerDealSector.createIndex({"Epoch":1,"Miner":1}, {"sparse": true});
 

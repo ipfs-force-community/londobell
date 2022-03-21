@@ -7,24 +7,20 @@ import (
 	"strings"
 	"time"
 
-	"go.opencensus.io/trace"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
-	"github.com/filecoin-project/lotus/chain/vm"
-	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
-	"github.com/ipfs/go-cid"
-
-	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
-	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
-
-	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
-	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
-
 	"github.com/filecoin-project/lotus/api"
+	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
 	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/chain/vm"
+	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
+	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
+	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
+	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
+	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
+	"github.com/ipfs/go-cid"
+	"go.opencensus.io/trace"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mir"
@@ -273,6 +269,19 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return fmt.Errorf("add gas trace names: %w", err)
 	}
 
+	// 得到块消息
+	//allbmsgs := make([]*types.Message, 0)
+	allsmsgs := make([]*types.SignedMessage, 0)
+	for _, b := range ts.TipSet.Blocks() {
+		_, smsgs, err := ctx.D.MessagesForBlock(b)
+		if err != nil {
+			elog.Errorf("get message for block err: %w", err)
+			break
+		}
+		//allbmsgs = append(allbmsgs, bmsgs...)
+		allsmsgs = append(allsmsgs, smsgs...)
+	}
+
 	dupmsgs := map[cid.Cid]struct{}{}
 
 	var msgcnt, tracecnt int
@@ -296,10 +305,63 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		mcid := msg.Cid()
+		var signedCid cid.Cid
+
+		for _, smsg := range allsmsgs {
+			if msg.From == smsg.Message.From && msg.Nonce == smsg.Message.Nonce {
+				signedCid = mcid
+				if mcid != smsg.Cid() {
+					signedCid = smsg.Cid()
+					elog.Infow("new messagecid", "newMcid", signedCid, "oldMcid", mcid)
+				}
+			}
+		}
+
 		if _, has := dupmsgs[mcid]; !has {
-			mmsg, err := model.NewMessage(mcid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
+			//if (msg.From.Protocol() == address.BLS || msg.From.Protocol() == address.SECP256K1) && len(p.seq) == 1 {
+			//newMcid := mcid
+			//tipset, _, found, err := ctx.D.SearchForMessage(ctx.C, ts.Child, mcid, api.LookbackNoLimit, true)
+
+			////打印tipset的message
+			//allbmsgs := make([]*types.Message, 0)
+			//allsmsgs := make([]*types.SignedMessage, 0)
+			//for _, b := range ts.Tipset.Blocks() {
+			//	bmsgs, smsgs, err := ctx.D.MessagesForBlock(b)
+			//	if err != nil {
+			//		elog.Errorf("get message for block err: %w", err)
+			//		break
+			//	}
+			//	allbmsgs = append(allbmsgs, bmsgs...)
+			//	allsmsgs = append(allsmsgs, smsgs...)
+			//}
+			//
+			//allBmessages := make([]types.Message, 0, len(allbmsgs))
+			//allSmessages := make([]types.Message, 0, len(allsmsgs))
+			//for _, bmsg := range allbmsgs {
+			//	allBmessages = append(allBmessages, *bmsg)
+			//}
+			//for _, smsg := range allsmsgs {
+			//	allSmessages = append(allSmessages, smsg.Message)
+			//}
+			//
+			//elog.Infow("message for tipset", "tipset.Height", ts.Height(), "bmsgs", allBmessages, "smsgs", allSmessages)
+
+			//	if err != nil {
+			//		elog.Errorf("cannot search message in tipset: %w, mcid: %v, msg: %+v, tipset: %+v, epoch: %d, SearchForMessage's result: [tipset: %+v, found: %s]", err, mcid, *msg, ts, ts.Height(), tipset, found.String())
+			//	} else {
+			//		if tipset != nil {
+			//			newMcid = found
+			//			if newMcid != mcid {
+			//				elog.Infow("new messagecid", "newMcid", newMcid, "oldMcid", mcid)
+			//				mcid = newMcid
+			//			}
+			//		}
+			//	}
+			//}
+
+			mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 			if err != nil {
-				elog.Errorw("convert to model.Message", "mcid", mcid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+				elog.Errorw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
 				res.Docs = append(res.Docs, mmsg)
 				msgcnt++
@@ -307,9 +369,9 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		met, meg, err := model.NewExecTrace(ctx.C, ctx.D, mcid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas) //todo:每个表插入同样内容？
+		met, meg, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas)
 		if err != nil {
-			elog.Errorw("convert to model.MessageExec", "mcid", mcid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+			elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 		} else {
 			tracecnt++
 			res.Docs = append(res.Docs, met)

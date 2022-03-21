@@ -183,6 +183,7 @@
 	},
 	"Seq": "[]int",
 	"SeqIndex": "[][]int",
+	"SignedCid": "cid.Cid",
 	"SubCallCount": "int",
 	"Ver": "string",
 	"_id": "string"
@@ -235,6 +236,7 @@
 		"PackedHeight": "abi.ChainEpoch",
 		"Params": "model.MessageParams"
 	},
+	"SignedCid": "cid.Cid",
 	"_id": "cid.Cid"
 }
 ```

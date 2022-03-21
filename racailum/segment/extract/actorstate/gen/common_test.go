@@ -61,6 +61,10 @@ func (m *MockDAL) GetVMCirculatingSupplyDetailed(ctx context.Context, height abi
 	args := m.Called(ctx, height, st)
 	return args.Get(0).(api.CirculatingSupply), args.Error(1)
 }
+func (m *MockDAL) SearchForMessage(ctx context.Context, head *types.TipSet, mcid cid.Cid, lookbackLimit abi.ChainEpoch, allowReplaced bool) (*types.TipSet, *types.MessageReceipt, cid.Cid, error) {
+	args := m.Called(ctx, head, mcid, lookbackLimit, allowReplaced)
+	return args.Get(0).(*types.TipSet), args.Get(1).(*types.MessageReceipt), args.Get(2).(cid.Cid), args.Error(3)
+}
 func (m *MockDAL) AddEnum(ctx context.Context, ns string, entry ...string) error {
 	args := m.Called(ctx, ns, entry)
 	return args.Error(0)
@@ -88,6 +92,10 @@ func (m *MockDAL) GetGenesis() (*types.BlockHeader, error) {
 func (m *MockDAL) ChainBlockstore() bstore.Blockstore {
 	args := m.Called()
 	return args.Get(0).(bstore.Blockstore)
+}
+func (m *MockDAL) MessagesForBlock(b *types.BlockHeader) ([]*types.Message, []*types.SignedMessage, error) {
+	args := m.Called(b)
+	return args.Get(0).([]*types.Message), args.Get(1).([]*types.SignedMessage), args.Error(2)
 }
 
 /*

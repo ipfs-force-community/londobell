@@ -37,6 +37,7 @@ type ChainStore interface {
 	ActorStore(ctx context.Context) adt.Store
 	GetGenesis() (*types.BlockHeader, error)
 	ChainBlockstore() bstore.Blockstore
+	MessagesForBlock(b *types.BlockHeader) ([]*types.Message, []*types.SignedMessage, error)
 }
 
 // StateManager manages the state on chain
@@ -50,6 +51,7 @@ type StateManager interface {
 	LoadActorRaw(_ context.Context, addr address.Address, st cid.Cid) (*types.Actor, error)
 	GetNtwkVersion(ctx context.Context, height abi.ChainEpoch) network.Version
 	GetVMCirculatingSupplyDetailed(ctx context.Context, height abi.ChainEpoch, st *state.StateTree) (api.CirculatingSupply, error)
+	SearchForMessage(ctx context.Context, head *types.TipSet, mcid cid.Cid, lookbackLimit abi.ChainEpoch, allowReplaced bool) (*types.TipSet, *types.MessageReceipt, cid.Cid, error)
 }
 
 // ChainDict is a dict for enums
