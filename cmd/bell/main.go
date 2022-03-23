@@ -29,6 +29,7 @@ func main() {
 			segmentCmd,
 			daemonCmd,
 			traceCmd,
+			compareCmd,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{
