@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/blockstore"
@@ -56,6 +57,20 @@ func (a *WrapAPIBlockstore) AllKeysChan(ctx context.Context) (<-chan cid.Cid, er
 
 func (a *WrapAPIBlockstore) DeleteBlock(cid.Cid) error {
 	return nil
+}
+
+func (a *WrapAPIBlockstore) Get(c cid.Cid) (blocks.Block, error) {
+	b, err := a.Blockstore.Get(c)
+	if err != nil {
+		if strings.Contains(err.Error(), "block not found") {
+			fmt.Printf("apt blockstore get failed: %s\n", err.Error())
+			return nil, blockstore.ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return b, nil
 }
 
 func ChainIOBlockstore(full v0api.FullNode) (dtypes.HotBlockstore, error) {
