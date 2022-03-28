@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -101,10 +102,10 @@ func init() {
 }
 
 var extractors = []extractor{
-	//{
-	//	name:   "tipset",
-	//	method: extractTipSet,
-	//},
+	{
+		name:   "tipset",
+		method: extractTipSet,
+	},
 	//{
 	//	name:   "block-header",
 	//	method: extractBlochHeaders,
@@ -269,17 +270,24 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return fmt.Errorf("add gas trace names: %w", err)
 	}
 
-	// 得到块消息
-	//allbmsgs := make([]*types.Message, 0)
+	// 得到SignedMessage
 	allsmsgs := make([]*types.SignedMessage, 0)
 	for _, b := range ts.TipSet.Blocks() {
 		_, smsgs, err := ctx.D.MessagesForBlock(b)
 		if err != nil {
-			elog.Errorf("get message for block err: %w", err)
-			break
+			return fmt.Errorf("get message for block err: %w", err)
 		}
-		//allbmsgs = append(allbmsgs, bmsgs...)
 		allsmsgs = append(allsmsgs, smsgs...)
+	}
+
+	allsmsgsMap := make(map[string]*types.SignedMessage)
+	for _, smsg := range allsmsgs {
+		// 只取第一条被执行的SignedMessage
+		key := smsg.Message.From.String() + "-" + strconv.FormatUint(smsg.Message.Nonce, 10)
+		if _, ok := allsmsgsMap[key]; ok {
+			continue
+		}
+		allsmsgsMap[key] = smsg
 	}
 
 	dupmsgs := map[cid.Cid]struct{}{}
@@ -307,58 +315,16 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		mcid := msg.Cid()
 		var signedCid cid.Cid
 
-		for _, smsg := range allsmsgs {
-			if msg.From == smsg.Message.From && msg.Nonce == smsg.Message.Nonce {
-				signedCid = mcid
-				if mcid != smsg.Cid() {
-					signedCid = smsg.Cid()
-					elog.Infow("new messagecid", "newMcid", signedCid, "oldMcid", mcid)
-				}
+		key := msg.From.String() + "-" + strconv.FormatUint(msg.Nonce, 10)
+		if smsg, ok := allsmsgsMap[key]; ok {
+			signedCid = mcid
+			if mcid != smsg.Cid() {
+				signedCid = smsg.Cid()
+				elog.Infow("new messagecid", "newMcid", signedCid, "oldMcid", mcid)
 			}
 		}
 
 		if _, has := dupmsgs[mcid]; !has {
-			//if (msg.From.Protocol() == address.BLS || msg.From.Protocol() == address.SECP256K1) && len(p.seq) == 1 {
-			//newMcid := mcid
-			//tipset, _, found, err := ctx.D.SearchForMessage(ctx.C, ts.Child, mcid, api.LookbackNoLimit, true)
-
-			////打印tipset的message
-			//allbmsgs := make([]*types.Message, 0)
-			//allsmsgs := make([]*types.SignedMessage, 0)
-			//for _, b := range ts.Tipset.Blocks() {
-			//	bmsgs, smsgs, err := ctx.D.MessagesForBlock(b)
-			//	if err != nil {
-			//		elog.Errorf("get message for block err: %w", err)
-			//		break
-			//	}
-			//	allbmsgs = append(allbmsgs, bmsgs...)
-			//	allsmsgs = append(allsmsgs, smsgs...)
-			//}
-			//
-			//allBmessages := make([]types.Message, 0, len(allbmsgs))
-			//allSmessages := make([]types.Message, 0, len(allsmsgs))
-			//for _, bmsg := range allbmsgs {
-			//	allBmessages = append(allBmessages, *bmsg)
-			//}
-			//for _, smsg := range allsmsgs {
-			//	allSmessages = append(allSmessages, smsg.Message)
-			//}
-			//
-			//elog.Infow("message for tipset", "tipset.Height", ts.Height(), "bmsgs", allBmessages, "smsgs", allSmessages)
-
-			//	if err != nil {
-			//		elog.Errorf("cannot search message in tipset: %w, mcid: %v, msg: %+v, tipset: %+v, epoch: %d, SearchForMessage's result: [tipset: %+v, found: %s]", err, mcid, *msg, ts, ts.Height(), tipset, found.String())
-			//	} else {
-			//		if tipset != nil {
-			//			newMcid = found
-			//			if newMcid != mcid {
-			//				elog.Infow("new messagecid", "newMcid", newMcid, "oldMcid", mcid)
-			//				mcid = newMcid
-			//			}
-			//		}
-			//	}
-			//}
-
 			mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 			if err != nil {
 				elog.Errorw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
