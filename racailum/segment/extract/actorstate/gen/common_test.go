@@ -11,12 +11,13 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/network"
+	"github.com/ipfs/go-cid"
+
 	"github.com/filecoin-project/lotus/api"
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/testutils"
 )
@@ -100,31 +101,31 @@ func (m *MockDAL) MessagesForBlock(b *types.BlockHeader) ([]*types.Message, []*t
 
 /*
 Network: calibration
-Epoch: 455000
+Epoch: 792000
 ActorAddress: t04
-Head: bafy2bzacedb7yvsktcclo3no4kl2hyex5gwaoog5wjw76gk6kudfjflmonnay
+Head: bafy2bzaceavqgbrf6tasxwsh33efuy5wepadh3bodjacseqdex2qpn7tlh5fk
 */
-const testPowerActorCid = "bafy2bzacedb7yvsktcclo3no4kl2hyex5gwaoog5wjw76gk6kudfjflmonnay"
+const testPowerActorCid = "bafy2bzaceavqgbrf6tasxwsh33efuy5wepadh3bodjacseqdex2qpn7tlh5fk"
 
 /*
 Network: calibration
-Epoch: 455000
+Epoch: 792000
 ActorAddress: t05
-Head: bafy2bzacectvwb5snunyl2qybrs5hybtnz5l7xug73rf6sowrag7qh6ik2zta
+Head: bafy2bzacebzk4bvrrzhyvzm2gfjymwk7yatpzr56uiwkdgfyzg4evpvgcihiw
 */
-const testMarketActorCid = "bafy2bzacectvwb5snunyl2qybrs5hybtnz5l7xug73rf6sowrag7qh6ik2zta"
+const testMarketActorCid = "bafy2bzacebzk4bvrrzhyvzm2gfjymwk7yatpzr56uiwkdgfyzg4evpvgcihiw"
 
 /*
 Network: calibration
-Epoch: 455000
+Epoch: 792000
 ActorAddress: t02
-Head: bafy2bzacecy72ujmh4ywna4wdm4z5puv6v4664akuibwt7bzz55i74gwriwmo
+Head: bafy2bzacebwol6ndjdyw7bwfvtctydbc32cik6xkm4wousgg7erejhogakpjq
 */
-const testRewardActorCid = "bafy2bzacecy72ujmh4ywna4wdm4z5puv6v4664akuibwt7bzz55i74gwriwmo"
+const testRewardActorCid = "bafy2bzacebwol6ndjdyw7bwfvtctydbc32cik6xkm4wousgg7erejhogakpjq"
 
 /*
 Network: calibration
-Epoch: 455000
+Epoch: 792000
 ActorAddress: t011092
 Head: bafy2bzaceaa3zevs2vazynsd5fjolq2sc2633hj6poly2xvscpc2n56cook4a
 */
@@ -132,28 +133,36 @@ const testMultisigActorCid = "bafy2bzaceaa3zevs2vazynsd5fjolq2sc2633hj6poly2xvsc
 
 /*
 Network: calibration
-Epoch: 455000
+Epoch: 792000
 ActorAddress: t06
-Head: bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte
+Head: bafy2bzaceajlkb4izlku6fosrdqm4h7vzxyrqveivmosta25appren7uqfsby
 */
-const testVerifRegActorCid = "bafy2bzacebcevlsbuj3yujjcxv2y23ntmqmaiy24hzcollevlipsurhm5vxte"
+const testVerifRegActorCid = "bafy2bzaceajlkb4izlku6fosrdqm4h7vzxyrqveivmosta25appren7uqfsby"
 
 /*
 Network: calibration
-Epoch: 455000
-ActorAddress: t025418
-Head: bafy2bzacedjnglismll3py5nx6q6g2lha6xwovrncl6b53mrx5v6m4k4wuc6y
+Epoch: 792000
+ActorAddress: t031582
+Head: bafy2bzaceauab37rktpgup3x6sh3rg5n37ddoxjck5r5gukmdqrqsipco7bm4
 */
-const testMinerSectorActorCid = "bafy2bzacedjnglismll3py5nx6q6g2lha6xwovrncl6b53mrx5v6m4k4wuc6y"
+const testMinerSectorActorCid = "bafy2bzacebtzupwrfw2fgmfqzafht4imbhbks2fkaqfs77ay2cc63au3jap3c"
+
+/*
+Network: calibration
+Epoch: 792000
+ActorAddress: t027502
+Head: bafy2bzacedmi47gmsb4wyhlpctizrv4bedex2frpi47leufximpkx37kvmrvk
+*/
+const testPendingTxnsActorCid = "bafy2bzacedmi47gmsb4wyhlpctizrv4bedex2frpi47leufximpkx37kvmrvk"
 
 func GenerateLocalData(t *testing.T) {
 	url := os.Getenv("TEST_LOTUS_URL")
 	ctx := context.Background()
-	for _, c := range []string{testPowerActorCid, testMarketActorCid, testRewardActorCid, testMultisigActorCid, testVerifRegActorCid, testMinerSectorActorCid} {
+	localBS, _, err := testutils.NewLocalBlockStore(ctx)
+	require.NoError(t, err)
+	for _, c := range []string{testPowerActorCid, testMarketActorCid, testRewardActorCid, testMultisigActorCid, testVerifRegActorCid, testMinerSectorActorCid, testPendingTxnsActorCid} {
 		rootCid, _ := cid.Decode(c)
 		rpcBS, err := testutils.NewApiBlockStore(ctx, url)
-		require.NoError(t, err)
-		localBS, _, err := testutils.NewLocalBlockStore(ctx)
 		require.NoError(t, err)
 		err = testutils.GenerateFullTree(ctx, rootCid, rpcBS, localBS)
 		require.NoError(t, err)

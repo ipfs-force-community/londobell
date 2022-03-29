@@ -272,6 +272,27 @@
 		"VestInFuture": "[]big.Int"
 	},
 	"Epoch": "abi.ChainEpoch",
+	"Info": {
+		"AvailableBalance": "big.Int",
+		"Balance": "big.Int",
+		"ConsensusFaultElapsed": "abi.ChainEpoch",
+		"ControlAddresses": "[]address.Address",
+		"FeeDebt": "big.Int",
+		"Multiaddrs": "[][]uint8",
+		"Owner": "address.Address",
+		"PeerID": "[]uint8",
+		"PendingOwnerAddress": "*address.Address",
+		"PendingWorkerKey": {
+			"EffectiveAt": "abi.ChainEpoch",
+			"NewWorker": "address.Address"
+		},
+		"PrecommitSectorCount": "uint64",
+		"SectorSize": "abi.SectorSize",
+		"State": null,
+		"WindowPoStPartitionSectors": "uint64",
+		"WindowPoStProofType": "abi.RegisteredPoStProof",
+		"Worker": "address.Address"
+	},
 	"Path": "[]cid.Cid",
 	"_id": "cid.Cid"
 }

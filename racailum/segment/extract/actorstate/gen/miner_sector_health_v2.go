@@ -53,6 +53,8 @@ func extractMinerSectorHealthV2(ctx *extract.Ctx, res *extract.Res, head *common
 			return fmt.Errorf("get dl partition failed: %w", err)
 		}
 		detail.TerminatedSectors += dl.TotalSectors - dl.LiveSectors
+		detail.All += dl.TotalSectors
+		detail.Live += dl.LiveSectors
 		var part miner2.Partition
 		return ps.ForEach(&part, func(partIdx int64) error {
 			detail.ActiveSectorsQAPower = big.Add(detail.ActiveSectorsQAPower, part.ActivePower().QA)

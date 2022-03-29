@@ -1,6 +1,7 @@
 package model
 
 import (
+	addr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -25,10 +26,35 @@ type MinerFundsDetail struct {
 	PledgeRelease []abi.TokenAmount `mir:"-"`
 }
 
+type WorkerKeyChange struct {
+	NewWorker   addr.Address
+	EffectiveAt abi.ChainEpoch
+}
+
+type MinerInfo struct {
+	Owner                      addr.Address
+	Worker                     addr.Address
+	ControlAddresses           []addr.Address
+	PendingWorkerKey           WorkerKeyChange
+	PeerID                     abi.PeerID
+	Multiaddrs                 []abi.Multiaddrs
+	WindowPoStProofType        abi.RegisteredPoStProof
+	SectorSize                 abi.SectorSize
+	WindowPoStPartitionSectors uint64
+	ConsensusFaultElapsed      abi.ChainEpoch // 低版本没有？
+	PendingOwnerAddress        *addr.Address  //
+	Balance                    abi.TokenAmount
+	AvailableBalance           abi.TokenAmount
+	FeeDebt                    abi.TokenAmount
+	PrecommitSectorCount       uint64
+	State                      interface{}
+}
+
 // MinerFunds shows funding details for miner
 type MinerFunds struct {
 	ActorStateExBasic `bson:",inline"`
 	Detail            MinerFundsDetail
+	Info              MinerInfo
 }
 
 // CollectionName impl common.Document
