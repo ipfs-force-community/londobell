@@ -4,27 +4,24 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
-	"go.opencensus.io/trace"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
-	"github.com/filecoin-project/lotus/chain/vm"
-	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
-	"github.com/ipfs/go-cid"
-
-	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
-	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
-
-	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
-	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
-
 	"github.com/filecoin-project/lotus/api"
+	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
 	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/chain/vm"
+	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
+	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
+	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
+	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
+	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
+	"github.com/ipfs/go-cid"
+	"go.opencensus.io/trace"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mir"
@@ -105,10 +102,10 @@ func init() {
 }
 
 var extractors = []extractor{
-	//{
-	//	name:   "tipset",
-	//	method: extractTipSet,
-	//},
+	{
+		name:   "tipset",
+		method: extractTipSet,
+	},
 	//{
 	//	name:   "block-header",
 	//	method: extractBlochHeaders,
@@ -273,6 +270,26 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return fmt.Errorf("add gas trace names: %w", err)
 	}
 
+	// 得到SignedMessage
+	allsmsgs := make([]*types.SignedMessage, 0)
+	for _, b := range ts.TipSet.Blocks() {
+		_, smsgs, err := ctx.D.MessagesForBlock(b)
+		if err != nil {
+			return fmt.Errorf("get message for block err: %w", err)
+		}
+		allsmsgs = append(allsmsgs, smsgs...)
+	}
+
+	allsmsgsMap := make(map[string]*types.SignedMessage)
+	for _, smsg := range allsmsgs {
+		// 只取第一条被执行的SignedMessage
+		key := smsg.Message.From.String() + "-" + strconv.FormatUint(smsg.Message.Nonce, 10)
+		if _, ok := allsmsgsMap[key]; ok {
+			continue
+		}
+		allsmsgsMap[key] = smsg
+	}
+
 	dupmsgs := map[cid.Cid]struct{}{}
 
 	var msgcnt, tracecnt int
@@ -296,10 +313,21 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		mcid := msg.Cid()
+		var signedCid cid.Cid
+
+		key := msg.From.String() + "-" + strconv.FormatUint(msg.Nonce, 10)
+		if smsg, ok := allsmsgsMap[key]; ok {
+			signedCid = mcid
+			if mcid != smsg.Cid() {
+				signedCid = smsg.Cid()
+				elog.Infow("new messagecid", "newMcid", signedCid, "oldMcid", mcid)
+			}
+		}
+
 		if _, has := dupmsgs[mcid]; !has {
-			mmsg, err := model.NewMessage(mcid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
+			mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 			if err != nil {
-				elog.Errorw("convert to model.Message", "mcid", mcid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+				elog.Errorw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
 				res.Docs = append(res.Docs, mmsg)
 				msgcnt++
@@ -307,9 +335,9 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		met, meg, err := model.NewExecTrace(ctx.C, ctx.D, mcid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas) //todo:每个表插入同样内容？
+		met, meg, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas)
 		if err != nil {
-			elog.Errorw("convert to model.MessageExec", "mcid", mcid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+			elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 		} else {
 			tracecnt++
 			res.Docs = append(res.Docs, met)

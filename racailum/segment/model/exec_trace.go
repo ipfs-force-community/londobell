@@ -44,6 +44,7 @@ func NewExecTrace(
 	ctx context.Context,
 	dal common.DAL,
 	mcid cid.Cid,
+	signedCid cid.Cid,
 	epoch abi.ChainEpoch,
 	seq []int,
 	raw *common.ExecutionTraceCompact,
@@ -52,6 +53,7 @@ func NewExecTrace(
 ) (*ExecTrace, *ExecGas, error) {
 	me := &ExecTrace{
 		Cid:          mcid,
+		SignedCid:    signedCid,
 		Epoch:        epoch,
 		Seq:          seq,
 		Depth:        len(seq),
@@ -112,10 +114,11 @@ type ExecTraceReturn cbor.Er
 type ExecTrace struct {
 	ID string `mir:"-" bson:"_id"`
 
-	Cid   cid.Cid        `mir:"-"`
-	Epoch abi.ChainEpoch `mir:"-"`
-	Seq   []int          `mir:"-"`
-	Depth int            `mir:"-"`
+	Cid       cid.Cid        `mir:"-"`
+	SignedCid cid.Cid        `mir:"-" bson:"SignedCid,omitempty"`
+	Epoch     abi.ChainEpoch `mir:"-"`
+	Seq       []int          `mir:"-"`
+	Depth     int            `mir:"-"`
 
 	Ver string `mir:"-"`
 
@@ -147,6 +150,7 @@ func (et *ExecTrace) Indexes() [][]string {
 		[]string{execTraceEpochField, "Msg.To", "Seq"},
 		[]string{execTraceEpochField, "Depth"},
 		[]string{"Cid"},
+		[]string{"SignedCid"},
 	}
 }
 
