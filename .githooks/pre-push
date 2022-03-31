@@ -2,5 +2,5 @@
 set -e
 
 make lint
-make test
+#make test
 ./tool/scripts/check-gens.sh
