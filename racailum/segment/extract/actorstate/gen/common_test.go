@@ -147,7 +147,7 @@ Head: bafy2bzaceauab37rktpgup3x6sh3rg5n37ddoxjck5r5gukmdqrqsipco7bm4
 */
 const testMinerSectorActorCid = "bafy2bzaceauab37rktpgup3x6sh3rg5n37ddoxjck5r5gukmdqrqsipco7bm4"
 
-func GenerateLocalData(t *testing.T) {
+func Test_GenerateLocalData(t *testing.T) {
 	url := os.Getenv("TEST_LOTUS_URL")
 	ctx := context.Background()
 	for _, c := range []string{testPowerActorCid, testMarketActorCid, testRewardActorCid, testMultisigActorCid, testVerifRegActorCid, testMinerSectorActorCid} {
