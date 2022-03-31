@@ -150,11 +150,11 @@ const testMinerSectorActorCid = "bafy2bzaceauab37rktpgup3x6sh3rg5n37ddoxjck5r5gu
 func Test_GenerateLocalData(t *testing.T) {
 	url := os.Getenv("TEST_LOTUS_URL")
 	ctx := context.Background()
+	localBS, _, err := testutils.NewLocalBlockStore(ctx)
+	require.NoError(t, err)
 	for _, c := range []string{testPowerActorCid, testMarketActorCid, testRewardActorCid, testMultisigActorCid, testVerifRegActorCid, testMinerSectorActorCid} {
 		rootCid, _ := cid.Decode(c)
 		rpcBS, err := testutils.NewApiBlockStore(ctx, url)
-		require.NoError(t, err)
-		localBS, _, err := testutils.NewLocalBlockStore(ctx)
 		require.NoError(t, err)
 		err = testutils.GenerateFullTree(ctx, rootCid, rpcBS, localBS)
 		require.NoError(t, err)
