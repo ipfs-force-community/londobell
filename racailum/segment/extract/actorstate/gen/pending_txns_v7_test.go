@@ -56,7 +56,7 @@ func TestExtractPendingTxnsV7(t *testing.T) {
 	err = extractPendingTxnsV7(ectx, res, head, &out)
 	require.NoError(t, err)
 	assert.Equal(t, 2, len(res.Docs))
-	ds := PendingTxnsResult()
+	ds := PendingTxnsExpectResult()
 	for _, doc := range res.Docs {
 		vr := doc.(*model.PendingTxns)
 		if v, ok := ds[vr.Addr]; ok {
@@ -65,7 +65,7 @@ func TestExtractPendingTxnsV7(t *testing.T) {
 	}
 }
 
-func PendingTxnsResult() map[address.Address]*model.PendingTxns {
+func PendingTxnsExpectResult() map[address.Address]*model.PendingTxns {
 	ds := make(map[address.Address]*model.PendingTxns, 1)
 	addr1, _ := address.NewFromString("f027502")
 	id, _ := cid.Decode("bafy2bzacecy4r7vnw745sczvd4emqozfaijw6j45nmihj6vx4bs5xdtvjdubq")

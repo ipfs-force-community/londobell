@@ -36,9 +36,9 @@ func init() {
 }
 
 func extractVerifRegV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg{{ .Ver }}.State) error {
-	if ticks := ctx.Opts.StateRegular.VerifRegTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
-		return nil
-	}
+    if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.VerifRegTicks, ctx, head.Epoch) {
+        return nil
+    }
 
 	mapRoots := []struct {
 		name string

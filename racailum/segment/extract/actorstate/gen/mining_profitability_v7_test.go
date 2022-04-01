@@ -70,7 +70,7 @@ func TestMiningProfitabilityV7(t *testing.T) {
 	err = extractMiningProfitabilityV7(ectx, res, head, &out)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(res.Docs))
-	ds := MiningProfitabilityResult()
+	ds := MiningProfitabilityExpectResult()
 	for _, doc := range res.Docs {
 		mp := doc.(*model.MiningProfitability)
 		if v, ok := ds[mp.Addr]; ok {
@@ -79,7 +79,7 @@ func TestMiningProfitabilityV7(t *testing.T) {
 	}
 }
 
-func MiningProfitabilityResult() map[address.Address]*model.MiningProfitability {
+func MiningProfitabilityExpectResult() map[address.Address]*model.MiningProfitability {
 	ds := make(map[address.Address]*model.MiningProfitability, 1)
 	addr1, _ := address.NewFromString("f02")
 	id, _ := cid.Decode("bafy2bzacebxxbma2ssuiyxkzy4czl6rtonhbzy4yugk7febzzgccgwe5cpzgw")

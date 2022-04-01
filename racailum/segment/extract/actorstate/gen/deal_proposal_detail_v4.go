@@ -25,7 +25,7 @@ func init() {
 }
 
 func extractDealProposalDetailedV4(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market4.State) error {
-	if ticks := ctx.Opts.StateRegular.DealProposalDetailTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
+	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalDetailTicks, ctx, head.Epoch) {
 		return nil
 	}
 

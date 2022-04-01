@@ -55,7 +55,7 @@ func TestExtractVerifRegV7(t *testing.T) {
 	err = extractVerifRegV7(ectx, res, head, &out)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(res.Docs))
-	ds := VerifiedRegistryResult()
+	ds := VerifiedRegistryExpectResult()
 	for _, doc := range res.Docs {
 		vr := doc.(*model.VerifiedRegistry)
 		if v, ok := ds[vr.Addr]; ok {
@@ -64,7 +64,7 @@ func TestExtractVerifRegV7(t *testing.T) {
 	}
 }
 
-func VerifiedRegistryResult() map[address.Address]*model.VerifiedRegistry {
+func VerifiedRegistryExpectResult() map[address.Address]*model.VerifiedRegistry {
 	ds := make(map[address.Address]*model.VerifiedRegistry, 1)
 	addr1, _ := address.NewFromString("f02284")
 	id, _ := cid.Decode("bafy2bzaceczy2vh7cmzdyfiabqorlruytlyer7vrdyvs6pmjsboxkcocptugu")

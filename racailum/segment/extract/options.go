@@ -82,3 +82,11 @@ type ActorStateRegularOptions struct {
 	ActorBalance             int
 	PendingTxnsTicks         int
 }
+
+func IsExtract(tickOption int, ctx *Ctx, curEpoch abi.ChainEpoch) bool {
+	if tickOption > 0 && curEpoch%(abi.ChainEpoch(tickOption)*ctx.Opts.StateRegular.Interval) != 0 {
+		return false
+	}
+
+	return true
+}

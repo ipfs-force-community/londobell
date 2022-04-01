@@ -26,7 +26,7 @@ func init() {
 }
 
 func extractVerifRegV2(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg2.State) error {
-	if ticks := ctx.Opts.StateRegular.VerifRegTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
+	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.VerifRegTicks, ctx, head.Epoch) {
 		return nil
 	}
 

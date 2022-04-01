@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
@@ -33,9 +32,9 @@ func init() {
 }
 
 func extractDealProposalSummaryV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market{{ .Ver }}.State) error {
-	if ticks := ctx.Opts.StateRegular.DealProposalSummaryTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
-		return nil
-	}
+	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalSummaryTicks, ctx, head.Epoch) {
+        return nil
+    }
 
 	deals, err := market{{ .Ver }}.AsDealProposalArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
 	if err != nil {

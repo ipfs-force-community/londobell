@@ -31,9 +31,9 @@ func init() {
 }
 
 func extractMarketFundsV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market{{ .Ver }}.State) error {
-	if ticks := ctx.Opts.StateRegular.MarketFundsTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
-		return nil
-	}
+	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MarketFundsTicks, ctx, head.Epoch) {
+        return nil
+    }
 
 	var detail model.MarketFundsDetail
 	if err := mir.Mirror(&detail, st); err != nil {

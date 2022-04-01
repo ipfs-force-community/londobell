@@ -58,7 +58,7 @@ func TestExtractMultisigBalanceV7(t *testing.T) {
 	err = extractMultisigBalanceV7(ectx, res, head, &out)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(res.Docs))
-	ds := MultisigBalanceResult()
+	ds := MultisigBalanceExpectResult()
 	for _, doc := range res.Docs {
 		mb := doc.(*model.MultisigBalance)
 		if v, ok := ds[mb.Addr]; ok {
@@ -67,7 +67,7 @@ func TestExtractMultisigBalanceV7(t *testing.T) {
 	}
 }
 
-func MultisigBalanceResult() map[address.Address]*model.MultisigBalance {
+func MultisigBalanceExpectResult() map[address.Address]*model.MultisigBalance {
 	ds := make(map[address.Address]*model.MultisigBalance, 1)
 	addr1, _ := address.NewFromString("f011092")
 	id, _ := cid.Decode("bafy2bzaceckrfp24w77ef535gngwsvpyqbnudkhfenmvfnxkgdhyb6pcneunw")
