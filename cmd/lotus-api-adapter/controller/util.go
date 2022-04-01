@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	logging "github.com/ipfs/go-log/v2"
+
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
 )
@@ -17,6 +19,7 @@ var (
 	Loc, _      = time.LoadLocation("Asia/Shanghai")
 	baseTime, _ = time.Parse(time.RFC3339, mainnetBeginTime)
 	API         v0api.FullNode
+	log         = logging.Logger("racailum")
 )
 
 func CalcTimeByEpoch(height uint64) time.Time {

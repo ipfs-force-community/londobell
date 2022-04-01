@@ -7,9 +7,6 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/lotus/blockstore"
-	"github.com/filecoin-project/lotus/chain/store"
-	"github.com/filecoin-project/lotus/chain/types"
 	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
 	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
 	builtin2 "github.com/filecoin-project/specs-actors/v2/actors/builtin"
@@ -26,6 +23,10 @@ import (
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 	"github.com/gin-gonic/gin"
 
+	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/chain/store"
+	"github.com/filecoin-project/lotus/chain/types"
+
 	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/model"
 )
 
@@ -34,6 +35,7 @@ func GetSectorInfo(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
+		log.Errorf("[GetSectorInfo] bind json SectorReq err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -47,6 +49,7 @@ func GetSectorInfo(c *gin.Context) {
 	if req.Epoch == 0 {
 		ts, err = API.ChainHead(ctx)
 		if err != nil {
+			log.Errorf("[GetSectorInfo] api ChainHead err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -55,6 +58,7 @@ func GetSectorInfo(c *gin.Context) {
 	} else {
 		ts, err = API.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
 		if err != nil {
+			log.Errorf("[GetSectorInfo] api ChainGetTipSetByHeight err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -64,6 +68,7 @@ func GetSectorInfo(c *gin.Context) {
 
 	maddr, err := address.NewFromString(req.Miner)
 	if err != nil {
+		log.Errorf("[GetSectorInfo] address.NewFromString err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -72,6 +77,7 @@ func GetSectorInfo(c *gin.Context) {
 
 	mact, err := API.StateGetActor(ctx, maddr, ts.Key())
 	if err != nil {
+		log.Errorf("[GetSectorInfo] api StateGetActor err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -87,6 +93,7 @@ func GetSectorInfo(c *gin.Context) {
 		state := miner0.State{}
 		err = stor.Get(ctx, mact.Head, &state)
 		if err != nil {
+			log.Errorf("[GetSectorInfo] stor.Get miner0.State err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -107,6 +114,7 @@ func GetSectorInfo(c *gin.Context) {
 
 			resData.Size, err = info.SealProof.SectorSize()
 			if err != nil {
+				log.Errorf("[GetSectorInfo] miner0 SectorSize err: %w", err)
 				res.Code = model.Fail
 				res.Msg = err.Error()
 				c.JSON(http.StatusOK, res)
@@ -129,6 +137,7 @@ func GetSectorInfo(c *gin.Context) {
 		state := miner2.State{}
 		err = stor.Get(ctx, mact.Head, &state)
 		if err != nil {
+			log.Errorf("[GetSectorInfo] stor.Get miner2.State err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -149,6 +158,7 @@ func GetSectorInfo(c *gin.Context) {
 
 			resData.Size, err = info.SealProof.SectorSize()
 			if err != nil {
+				log.Errorf("[GetSectorInfo] miner2 SectorSize err: %w", err)
 				res.Code = model.Fail
 				res.Msg = err.Error()
 				c.JSON(http.StatusOK, res)
@@ -171,6 +181,7 @@ func GetSectorInfo(c *gin.Context) {
 		state := miner3.State{}
 		err = stor.Get(ctx, mact.Head, &state)
 		if err != nil {
+			log.Errorf("[GetSectorInfo] stor.Get miner3.State err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -191,6 +202,7 @@ func GetSectorInfo(c *gin.Context) {
 
 			resData.Size, err = info.SealProof.SectorSize()
 			if err != nil {
+				log.Errorf("[GetSectorInfo] miner3 SectorSize err: %w", err)
 				res.Code = model.Fail
 				res.Msg = err.Error()
 				c.JSON(http.StatusOK, res)
@@ -213,6 +225,7 @@ func GetSectorInfo(c *gin.Context) {
 		state := miner4.State{}
 		err = stor.Get(ctx, mact.Head, &state)
 		if err != nil {
+			log.Errorf("[GetSectorInfo] stor.Get miner4.State err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -233,6 +246,7 @@ func GetSectorInfo(c *gin.Context) {
 
 			resData.Size, err = info.SealProof.SectorSize()
 			if err != nil {
+				log.Errorf("[GetSectorInfo] miner4 SectorSize err: %w", err)
 				res.Code = model.Fail
 				res.Msg = err.Error()
 				c.JSON(http.StatusOK, res)
@@ -255,6 +269,7 @@ func GetSectorInfo(c *gin.Context) {
 		state := miner5.State{}
 		err = stor.Get(ctx, mact.Head, &state)
 		if err != nil {
+			log.Errorf("[GetSectorInfo] stor.Get miner5.State err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -275,6 +290,7 @@ func GetSectorInfo(c *gin.Context) {
 
 			resData.Size, err = info.SealProof.SectorSize()
 			if err != nil {
+				log.Errorf("[GetSectorInfo] miner5 SectorSize err: %w", err)
 				res.Code = model.Fail
 				res.Msg = err.Error()
 				c.JSON(http.StatusOK, res)
@@ -297,6 +313,7 @@ func GetSectorInfo(c *gin.Context) {
 		state := miner6.State{}
 		err = stor.Get(ctx, mact.Head, &state)
 		if err != nil {
+			log.Errorf("[GetSectorInfo] stor.Get miner6.State err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -317,6 +334,7 @@ func GetSectorInfo(c *gin.Context) {
 
 			resData.Size, err = info.SealProof.SectorSize()
 			if err != nil {
+				log.Errorf("[GetSectorInfo] miner6 SectorSize err: %w", err)
 				res.Code = model.Fail
 				res.Msg = err.Error()
 				c.JSON(http.StatusOK, res)
@@ -339,6 +357,7 @@ func GetSectorInfo(c *gin.Context) {
 		state := miner7.State{}
 		err = stor.Get(ctx, mact.Head, &state)
 		if err != nil {
+			log.Errorf("[GetSectorInfo] stor.Get miner7.State err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -359,6 +378,7 @@ func GetSectorInfo(c *gin.Context) {
 
 			resData.Size, err = info.SealProof.SectorSize()
 			if err != nil {
+				log.Errorf("[GetSectorInfo] miner7 SectorSize err: %w", err)
 				res.Code = model.Fail
 				res.Msg = err.Error()
 				c.JSON(http.StatusOK, res)
@@ -379,6 +399,7 @@ func GetSectorInfo(c *gin.Context) {
 		})
 	}
 	if err != nil {
+		log.Errorf("[GetSectorInfo] state.ForEachSector err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)

@@ -6,6 +6,8 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/gin-gonic/gin"
+
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/account"
@@ -19,7 +21,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/model"
 )
@@ -29,6 +30,7 @@ func GetActorInfo(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
+		log.Errorf("[GetActorInfo] bind json ActorReq err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -42,6 +44,7 @@ func GetActorInfo(c *gin.Context) {
 	if req.Epoch == 0 {
 		ts, err = API.ChainHead(ctx)
 		if err != nil {
+			log.Errorf("[GetActorInfo] api ChainHead err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -50,6 +53,7 @@ func GetActorInfo(c *gin.Context) {
 	} else {
 		ts, err = API.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
 		if err != nil {
+			log.Errorf("[GetActorInfo] api ChainGetTipSetByHeight err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -59,6 +63,7 @@ func GetActorInfo(c *gin.Context) {
 
 	addr, err := address.NewFromString(req.ActorID)
 	if err != nil {
+		log.Errorf("[GetActorInfo] NewFromString err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -67,6 +72,7 @@ func GetActorInfo(c *gin.Context) {
 
 	k, err := API.StateLookupID(ctx, addr, ts.Key())
 	if err != nil {
+		log.Errorf("[GetActorInfo] api StateLookupID err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -79,6 +85,7 @@ func GetActorInfo(c *gin.Context) {
 
 	act, err := API.StateGetActor(ctx, addr, ts.Key())
 	if err != nil {
+		log.Errorf("[GetActorInfo] api StateGetActor err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -92,6 +99,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "account"
 		st, err := account.Load(stor, act)
 		if err != nil {
+			log.Errorf("[GetActorInfo] account.Load err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -102,6 +110,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "multisig"
 		st, err := multisig.Load(stor, act)
 		if err != nil {
+			log.Errorf("[GetActorInfo] multisig.Load err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -112,6 +121,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "power"
 		st, err := power.Load(stor, act)
 		if err != nil {
+			log.Errorf("[GetActorInfo] power.Load err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -122,6 +132,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "reward"
 		st, err := reward.Load(stor, act)
 		if err != nil {
+			log.Errorf("[GetActorInfo] reward.Load err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -132,6 +143,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "init"
 		st, err := init_.Load(stor, act)
 		if err != nil {
+			log.Errorf("[GetActorInfo] init_.Load err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -142,6 +154,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "market"
 		st, err := market.Load(stor, act)
 		if err != nil {
+			log.Errorf("[GetActorInfo] market.Load err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -152,6 +165,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "verify"
 		st, err := verifreg.Load(stor, act)
 		if err != nil {
+			log.Errorf("[GetActorInfo] verifreg.Load err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -163,6 +177,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "system"
 		st, err := MakeSystemState(stor, act.Code)
 		if err != nil {
+			log.Errorf("[GetActorInfo] MakeSystemState err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -173,6 +188,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "miner"
 		st, err := miner.Load(stor, act)
 		if err != nil {
+			log.Errorf("[GetActorInfo] miner.Load err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -183,6 +199,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "paych"
 		st, err := paych.Load(stor, act)
 		if err != nil {
+			log.Errorf("[GetActorInfo] paych.Load err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)

@@ -6,13 +6,14 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/gin-gonic/gin"
+
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/reward"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/model"
 )
@@ -22,6 +23,7 @@ func GetEpochInfo(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
+		log.Errorf("[GetEpochInfo] bind json EpochReq err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -36,6 +38,7 @@ func GetEpochInfo(c *gin.Context) {
 	if req.Epoch == 0 {
 		ts, err = API.ChainHead(ctx)
 		if err != nil {
+			log.Errorf("[GetEpochInfo] api ChainHead err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -44,6 +47,7 @@ func GetEpochInfo(c *gin.Context) {
 	} else {
 		ts, err = API.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
 		if err != nil {
+			log.Errorf("[GetEpochInfo] api ChainGetTipSetByHeight err: %w", err)
 			res.Code = model.Fail
 			res.Msg = err.Error()
 			c.JSON(http.StatusOK, res)
@@ -58,6 +62,7 @@ func GetEpochInfo(c *gin.Context) {
 
 	pact, err := API.StateGetActor(ctx, power.Address, ts.Key())
 	if err != nil {
+		log.Errorf("[GetEpochInfo] api StateGetActor err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -68,6 +73,7 @@ func GetEpochInfo(c *gin.Context) {
 
 	pst, err := power.Load(stor, pact)
 	if err != nil {
+		log.Errorf("[GetEpochInfo] load pst err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -76,6 +82,7 @@ func GetEpochInfo(c *gin.Context) {
 
 	pc, err := pst.TotalPower()
 	if err != nil {
+		log.Errorf("[GetEpochInfo] get TotalPower err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -84,6 +91,7 @@ func GetEpochInfo(c *gin.Context) {
 
 	ract, err := API.StateGetActor(ctx, reward.Address, ts.Key())
 	if err != nil {
+		log.Errorf("[GetEpochInfo] api StateGetActor err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -92,6 +100,7 @@ func GetEpochInfo(c *gin.Context) {
 
 	rst, err := reward.Load(stor, ract)
 	if err != nil {
+		log.Errorf("[GetEpochInfo] load rst err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -100,6 +109,7 @@ func GetEpochInfo(c *gin.Context) {
 
 	currentTotalStoragePowerReward, err := rst.TotalStoragePowerReward()
 	if err != nil {
+		log.Errorf("[GetEpochInfo] get TotalStoragePowerReward err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -108,6 +118,7 @@ func GetEpochInfo(c *gin.Context) {
 
 	parentTs, err := API.ChainGetTipSet(ctx, types.NewTipSetKey(ts.Blocks()[0].Parents...))
 	if err != nil {
+		log.Errorf("[GetEpochInfo] api ChainGetTipSet err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -117,6 +128,7 @@ func GetEpochInfo(c *gin.Context) {
 	parentRoot := parentTs.ParentState()
 	parentTree, err := state.LoadStateTree(stor, parentRoot)
 	if err != nil {
+		log.Errorf("[GetEpochInfo] LoadStateTree err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -125,6 +137,7 @@ func GetEpochInfo(c *gin.Context) {
 
 	pract, err := parentTree.GetActor(reward.Address)
 	if err != nil {
+		log.Errorf("[GetEpochInfo] GetActor err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -133,6 +146,7 @@ func GetEpochInfo(c *gin.Context) {
 
 	prst, err := reward.Load(stor, pract)
 	if err != nil {
+		log.Errorf("[GetEpochInfo] load prst err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
@@ -141,6 +155,7 @@ func GetEpochInfo(c *gin.Context) {
 
 	parentTotalStoragePowerReward, err := prst.TotalStoragePowerReward()
 	if err != nil {
+		log.Errorf("[GetEpochInfo] TotalStoragePowerReward err: %w", err)
 		res.Code = model.Fail
 		res.Msg = err.Error()
 		c.JSON(http.StatusOK, res)
