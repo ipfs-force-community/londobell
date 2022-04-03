@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/ipfs-force-community/londobell/metrics"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+
 	"go.opencensus.io/stats"
 	"go.opencensus.io/trace"
 
@@ -247,6 +250,10 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		return err
 	}
 
+	if err := s.SaveFinalHeight(ctx, tipsets[len(tipsets)-1]); err != nil {
+		return err
+	}
+
 	if err := s.updateBoundary(ctx, tipsets[len(tipsets)-1], nil); err != nil {
 		return err
 	}
@@ -314,4 +321,25 @@ func (s *Segment) Name() string {
 // ReadDB returns the read only db instance of the segment
 func (s *Segment) ReadDB() common.DocumentDB {
 	return s.rdb
+}
+
+// SaveFinalHeight saves final height
+func (s *Segment) SaveFinalHeight(ctx context.Context, hi *common.LinkedTipSet) error {
+	elog := log.With("finalHeight", hi.Height())
+	elog.Info("save final height")
+	res := extract.NewRes(0, 0)
+	docs := make([][]common.Document, 1)
+
+	doc, err := model.NewFinalHeight(hi)
+	if err != nil {
+		return err
+	}
+
+	res.Docs = append(res.Docs, doc)
+	docs[0] = res.Docs
+	if err := s.insertMany(ctx, elog, docs); err != nil {
+		return fmt.Errorf("SaveFinalHeight err: %w", err)
+	}
+
+	return nil
 }

@@ -99,6 +99,10 @@ func init() {
 			Name: "fil-supply",
 			D:    &model.FilSupply{},
 		},
+		schema.Model{
+			Name: "final-height",
+			D:    &model.FinalHeight{},
+		},
 	)
 }
 

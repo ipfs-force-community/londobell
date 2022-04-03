@@ -29,6 +29,8 @@ db.ExecTrace.createIndex({"SignedCid":1}, {"sparse": true});
 
 // no indexes for FilSupply
 
+db.FinalHeight.createIndex({"Cids":1}, {"sparse": true});
+
 db.MarketFunds.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.Message.createIndex({"From":1,"Nonce":1}, {"sparse": true});
