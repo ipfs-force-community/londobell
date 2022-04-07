@@ -807,6 +807,41 @@
 		]
 	},
 	"Epoch": 0,
+	"Info": {
+		"AvailableBalance": "340282591298641078465964189926313473653",
+		"Balance": "1073741824",
+		"ConsensusFaultElapsed": 0,
+		"ControlAddresses": [
+			"073366"
+		],
+		"FeeDebt": "1024",
+		"Multiaddrs": [
+			{
+				"$binary": {
+					"base64": "SGVsbG8=",
+					"subType": "00"
+				}
+			}
+		],
+		"Owner": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+		"PeerID": {
+			"$binary": {
+				"base64": "SGVsbG8=",
+				"subType": "00"
+			}
+		},
+		"PendingOwnerAddress": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+		"PendingWorkerKey": {
+			"EffectiveAt": 0,
+			"NewWorker": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq"
+		},
+		"PrecommitSectorCount": 0,
+		"SectorSize": 0,
+		"State": null,
+		"WindowPoStPartitionSectors": 0,
+		"WindowPoStProofType": 0,
+		"Worker": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla"
+	},
 	"Path": [
 		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],

@@ -12,6 +12,13 @@ import (
 	adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
 
 	{{ end }}
+
+    {{ range $vi := .Vers }}
+	{{ if gt .Ver 2 -}}
+    builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
+    {{- end }}
+    {{ end }}
+
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mir"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -37,15 +44,16 @@ func NewTokenAmountArr(length int) []abi.TokenAmount {
 }
 
 func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st interface{}) error {
-	if ticks := ctx.Opts.StateRegular.MinerFundsTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
-		return nil
-	}
+	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerFundsTicks, ctx, head.Epoch) {
+        return nil
+    }
 
 	tsRange := NormalEpochRange(head)
 	vestInFuture := NewTokenAmountArr(len(tsRange))
 	pledgeRelease := NewTokenAmountArr(len(tsRange))
 
 	var detail model.MinerFundsDetail
+	var mInfo = model.MinerInfo{}
 	sum := abi.NewTokenAmount(0)
 
 	switch st := st.(type) {
@@ -66,6 +74,50 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 				sum = big.Add(sum, v.Amount)
 			}
 		}
+
+		info, err := st.GetInfo(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+        if err != nil {
+            return fmt.Errorf("load miner info: %w", err)
+        }
+
+        mInfo.Owner = info.Owner
+        mInfo.Worker = info.Worker
+        mInfo.ControlAddresses = info.ControlAddresses
+        if info.PendingWorkerKey != nil {
+            mInfo.PendingWorkerKey.NewWorker = info.PendingWorkerKey.NewWorker
+            mInfo.PendingWorkerKey.EffectiveAt = info.PendingWorkerKey.EffectiveAt
+        }
+        mInfo.PeerID = info.PeerId
+        mInfo.Multiaddrs = info.Multiaddrs
+        mInfo.SectorSize = info.SectorSize
+        mInfo.WindowPoStPartitionSectors = info.WindowPoStPartitionSectors
+
+        {{ if ge .Ver 2 -}}
+        mInfo.ConsensusFaultElapsed = info.ConsensusFaultElapsed
+        mInfo.PendingOwnerAddress = info.PendingOwnerAddress
+        mInfo.FeeDebt = st.FeeDebt
+        {{ end }}
+
+        mInfo.Balance = head.Balance
+        mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
+
+        {{ if lt .Ver 3 -}}
+        precommitted, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors)
+        {{ else }}
+        precommitted, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin{{ .Ver }}.DefaultHamtBitwidth)
+        {{ end }}
+        if err != nil {
+            return fmt.Errorf("load state PreCommittedSectors: %w", err)
+        }
+
+        var precommit miner{{ .Ver }}.SectorPreCommitOnChainInfo
+        precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+            mInfo.PrecommitSectorCount++
+            return nil
+        })
+
+        mInfo.State = st
+
 
 	{{ else }}
 	case *miner{{ .Ver }}.State:
@@ -141,6 +193,43 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		if err != nil {
 			return fmt.Errorf("process sector pledge failed")
 		}
+
+		info, err := st.GetInfo(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+        if err != nil {
+            return fmt.Errorf("load miner info: %w", err)
+        }
+
+        mInfo.Owner = info.Owner
+        mInfo.Worker = info.Worker
+        mInfo.ControlAddresses = info.ControlAddresses
+        if info.PendingWorkerKey != nil {
+            mInfo.PendingWorkerKey.NewWorker = info.PendingWorkerKey.NewWorker
+            mInfo.PendingWorkerKey.EffectiveAt = info.PendingWorkerKey.EffectiveAt
+        }
+        mInfo.PeerID = info.PeerId
+        mInfo.Multiaddrs = info.Multiaddrs
+        mInfo.WindowPoStProofType = info.WindowPoStProofType
+        mInfo.SectorSize = info.SectorSize
+        mInfo.WindowPoStPartitionSectors = info.WindowPoStPartitionSectors
+        mInfo.ConsensusFaultElapsed = info.ConsensusFaultElapsed
+        mInfo.PendingOwnerAddress = info.PendingOwnerAddress
+
+        mInfo.Balance = head.Balance
+        mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
+        mInfo.FeeDebt = st.FeeDebt
+
+        precommitted, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin{{ .Ver }}.DefaultHamtBitwidth)
+        if err != nil {
+            return fmt.Errorf("load state PreCommittedSectors: %w", err)
+        }
+
+        var precommit miner{{ .Ver }}.SectorPreCommitOnChainInfo
+        precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+            mInfo.PrecommitSectorCount++
+            return nil
+        })
+
+        mInfo.State = st
 	{{ end }}
 	{{ end }}
 	}
@@ -168,6 +257,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			Epoch: head.Epoch,
 		},
 		Detail: detail,
+		Info:   mInfo,
 	})
 
 	return nil

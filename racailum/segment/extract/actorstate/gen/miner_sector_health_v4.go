@@ -23,7 +23,7 @@ func init() {
 }
 
 func extractMinerSectorHealthV4(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner4.State) error {
-	if ticks := ctx.Opts.StateRegular.MinerSectorHeathTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
+	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerSectorHeathTicks, ctx, head.Epoch) {
 		return nil
 	}
 
@@ -57,6 +57,8 @@ func extractMinerSectorHealthV4(ctx *extract.Ctx, res *extract.Res, head *common
 			return fmt.Errorf("get dl partition failed: %w", err)
 		}
 		detail.TerminatedSectors += dl.TotalSectors - dl.LiveSectors
+		detail.All += dl.TotalSectors
+		detail.Live += dl.LiveSectors
 		var part miner4.Partition
 		return ps.ForEach(&part, func(partIdx int64) error {
 			detail.ActiveSectorsQAPower = big.Add(detail.ActiveSectorsQAPower, part.ActivePower().QA)

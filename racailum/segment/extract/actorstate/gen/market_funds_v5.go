@@ -25,7 +25,7 @@ func init() {
 }
 
 func extractMarketFundsV5(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market5.State) error {
-	if ticks := ctx.Opts.StateRegular.MarketFundsTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
+	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MarketFundsTicks, ctx, head.Epoch) {
 		return nil
 	}
 

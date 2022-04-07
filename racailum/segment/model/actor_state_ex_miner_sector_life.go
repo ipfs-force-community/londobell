@@ -19,6 +19,8 @@ type MinerSectorHealthDetail struct {
 	Recoveries uint64
 	Unproven   uint64
 	Active     uint64
+	Live       uint64
+	All        uint64
 
 	ActiveSectorsQAPower abi.StoragePower
 	FaultsQAPower        abi.StoragePower

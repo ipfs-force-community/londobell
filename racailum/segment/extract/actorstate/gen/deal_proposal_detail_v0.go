@@ -38,7 +38,7 @@ func init() {
 }
 
 func extractDealProposalDetailedV0(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market0.State) error {
-	if ticks := ctx.Opts.StateRegular.DealProposalDetailTicks; ticks > 0 && head.Epoch%(abi.ChainEpoch(ticks)*ctx.Opts.StateRegular.Interval) != 0 {
+	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalDetailTicks, ctx, head.Epoch) {
 		return nil
 	}
 
