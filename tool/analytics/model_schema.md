@@ -206,6 +206,15 @@
 }
 ```
 
+### FinalHeight
+
+```
+{
+	"Cids": "[]cid.Cid",
+	"_id": "abi.ChainEpoch"
+}
+```
+
 ### MarketFunds
 
 ```
