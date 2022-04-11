@@ -15,6 +15,7 @@ func main() {
 		Usage: "chain data",
 		Commands: []*cli.Command{
 			daemonCmd,
+			testCmd,
 		},
 	}
 
