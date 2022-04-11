@@ -51,8 +51,8 @@ var testCmd = &cli.Command{
 		b2.BLSAggregate = b.BLSAggregate
 		b2.Timestamp = b.Timestamp + 1
 		b2.BlockSig = b.BlockSig
-		b.ForkSignaling = b.ForkSignaling
-		b.ParentBaseFee = b.ParentBaseFee
+		b2.ForkSignaling = b.ForkSignaling
+		b2.ParentBaseFee = b.ParentBaseFee
 
 		fmt.Println(cids[0])
 		fmt.Println(b2.Cid())
