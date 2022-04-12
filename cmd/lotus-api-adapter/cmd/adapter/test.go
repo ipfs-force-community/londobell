@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/urfave/cli/v2"
@@ -56,6 +57,7 @@ var testCmd = &cli.Command{
 
 		fmt.Println(cids[0])
 		fmt.Println(b2.Cid())
+		fmt.Println(bytes.Compare(b.ElectionProof.VRFProof, b.Ticket.VRFProof))
 
 		return nil
 	},
