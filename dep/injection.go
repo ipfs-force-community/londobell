@@ -5,13 +5,15 @@ import (
 	"net/http"
 
 	"github.com/dtynn/dix"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/cliex"
+	"github.com/ipfs-force-community/londobell/racailum"
+	"github.com/ipfs-force-community/londobell/racailum/segment"
 	metricsi "github.com/ipfs/go-metrics-interface"
 	"go.uber.org/fx"
 
-	"github.com/filecoin-project/lotus/chain/beacon"
-
 	"github.com/filecoin-project/lotus/build"
-
+	"github.com/filecoin-project/lotus/chain/beacon"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
@@ -22,11 +24,6 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/filecoin-project/lotus/node/repo"
-
-	"github.com/ipfs-force-community/londobell/common"
-	"github.com/ipfs-force-community/londobell/lib/cliex"
-	"github.com/ipfs-force-community/londobell/racailum"
-	"github.com/ipfs-force-community/londobell/racailum/segment"
 )
 
 var (
@@ -45,20 +42,20 @@ const (
 	invokePopulate
 )
 
-func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Option {
-	return dix.Options(
-		dix.Override(new(GlobalContext), ctx),
+func ContextModule(ctx context.Context) dix.Option {
+	return dix.Options(dix.Override(new(GlobalContext), ctx),
 		dix.Override(new(*http.ServeMux), http.NewServeMux()),
-		dix.Override(new(helpers.MetricsCtx), metricsi.CtxScope(ctx, "bell")),
+		dix.Override(new(helpers.MetricsCtx), metricsi.CtxScope(ctx, "bell")))
+}
 
-		dix.If(logger != nil, dix.Logger(logger)),
-		dix.If(len(target) > 0, dix.Populate(invokePopulate, target...)),
-
-		dix.Override(new(racailum.Config), LoadRaConfig),
+func SegmentManager() dix.Option {
+	return dix.Options(dix.Override(new(racailum.Config), LoadRaConfig),
 		dix.Override(new(SegmentMetaDS), OpenSegmentDS),
-		dix.Override(new(*segment.Manager), NewSegmentManager),
+		dix.Override(new(*segment.Manager), NewSegmentManager))
+}
 
-		dix.Override(new(vm.SyscallBuilder), vm.Syscalls(ffiwrapper.ProofVerifier)),
+func StateManager() dix.Option {
+	return dix.Options(dix.Override(new(vm.SyscallBuilder), vm.Syscalls(ffiwrapper.ProofVerifier)),
 		dix.Override(new(journal.Journal), journal.NilJournal),
 		dix.Override(new(store.WeightFunc), filcns.Weight),
 		dix.Override(new(*store.ChainStore), modules.ChainStore),
@@ -69,24 +66,67 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 		dix.Override(new(stmgr.UpgradeSchedule), filcns.DefaultUpgradeSchedule),
 		dix.Override(new(*stmgr.StateManager), stmgr.NewStateManager),
 		dix.Override(new(modules.Genesis), modules.LoadGenesis(build.MaybeGenesis())),
-		dix.Override(new(common.HeadNotifier), cliex.NewHeadSub),
-		dix.Override(new(*racailum.RaCailum), NewRaCailum),
-		dix.Override(new(repo.Repo), repo.NewMemory(nil)),
-		dix.Override(new(repo.LockedRepo), LockedRepo),
-		dix.Override(new(dtypes.MetadataDS), InMemMetadataDS),
-
-		dix.Override(new(dtypes.HotBlockstore), ChainIOBlockstore),
 		dix.Override(new(dtypes.ChainBlockstore), dix.From(new(dtypes.HotBlockstore))),
 		dix.Override(new(dtypes.StateBlockstore), dix.From(new(dtypes.HotBlockstore))),
 		dix.Override(new(dtypes.BaseBlockstore), dix.From(new(dtypes.HotBlockstore))),
 		dix.Override(new(dtypes.ExposedBlockstore), dix.From(new(dtypes.HotBlockstore))),
-
 		dix.Override(new(common.ChainStore), dix.From(new(*store.ChainStore))),
-		dix.Override(new(common.StateManager), dix.From(new(*stmgr.StateManager))),
+		dix.Override(new(common.StateManager), dix.From(new(*stmgr.StateManager))))
+}
+
+func OnlineDataSource() dix.Option {
+	return dix.Options(
+		dix.Override(new(dtypes.HotBlockstore), ChainIOBlockstore),
+		dix.Override(new(repo.Repo), repo.NewMemory(nil)),
+		dix.Override(new(repo.LockedRepo), LockedRepo),
+		dix.Override(new(dtypes.MetadataDS), InMemMetadataDS))
+}
+
+func OfflineDataSource() dix.Option {
+	return dix.Options(
+		// Notice: we may need to use other datastore someday. It depends on
+		// the origin data structs.
+		dix.Override(new(dtypes.HotBlockstore), modules.BadgerHotBlockstore),
+		dix.Override(new(dtypes.MetadataDS), modules.Datastore(true)),
+	)
+}
+
+func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Option {
+	return dix.Options(
+		ContextModule(ctx),
+
+		dix.If(logger != nil, dix.Logger(logger)),
+		dix.If(len(target) > 0, dix.Populate(invokePopulate, target...)),
+
+		SegmentManager(),
+
+		StateManager(),
+
+		OnlineDataSource(),
+
+		// londo bell module
+		dix.Override(new(*racailum.RaCailum), NewRaCailum),
+		dix.Override(new(common.HeadNotifier), cliex.NewHeadSub),
 
 		dix.Override(invokeSetupDebug, SetupPprof),
 		dix.Override(invokeSetupMetrics, SetupMetric),
 		dix.Override(invokeSetupTracing, SetupTracing),
 		dix.Override(invokeSetupGrafana, SetupGrafana),
+	)
+}
+
+func OfflineRaCalium(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Option {
+	return dix.Options(
+		ContextModule(ctx),
+
+		dix.If(logger != nil, dix.Logger(logger)),
+		dix.If(len(target) > 0, dix.Populate(invokePopulate, target...)),
+		SegmentManager(),
+		StateManager(),
+
+		OfflineDataSource(),
+
+		dix.Override(new(*racailum.RaCailum), NewRaCailum),
+		dix.Override(new(common.HeadNotifier), nil),
 	)
 }

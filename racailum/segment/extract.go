@@ -25,8 +25,8 @@ type persistCtx struct {
 	asyncPersistWaitGroup multierror.Group
 }
 
-func (s *Segment) extractTipSets(ctx context.Context, tss []*common.LinkedTipSet) error {
-	ctx, span := trace.StartSpan(ctx, "segment.extractTipSets")
+func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet) error {
+	ctx, span := trace.StartSpan(ctx, "segment.ExtractTipSets")
 	defer span.End()
 
 	if len(tss) == 0 {

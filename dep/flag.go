@@ -13,7 +13,9 @@ import (
 
 	"github.com/filecoin-project/lotus/api/v0api"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
+	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/filecoin-project/lotus/node/repo"
 )
 
 // common flags
@@ -26,6 +28,12 @@ var (
 		Name:  "bell-repo",
 		Usage: "repo path for bell",
 		Value: "~/.bell",
+	}
+
+	OfflineChainStorageRepoFlag = &cli.StringFlag{
+		Name:  "chain-storage-repo",
+		Usage: "repo path of chain storage",
+		Value: "~/.lotus",
 	}
 )
 
@@ -64,6 +72,26 @@ func InjectRepoPath(cctx *cli.Context) dix.Option {
 	return dix.Override(new(RepoPath), func() (RepoPath, error) {
 		return GetRepoPath(cctx)
 	})
+}
+
+func InjectChainRepo(cctx *cli.Context) dix.Option {
+	r, err := repo.NewFS(cctx.String(OfflineChainStorageRepoFlag.Name))
+	if err != nil {
+		panic(fmt.Errorf("opening fs repo: %w", err))
+	}
+	exist, err := r.Exists()
+	if err != nil {
+		panic(fmt.Errorf("check chain store repo exist failed: %w", err))
+	}
+
+	if !exist {
+		panic(fmt.Errorf("chain store repo not exist,check the path %s", cctx.String(OfflineChainStorageRepoFlag.Name)))
+	}
+	lr, err := r.Lock(repo.FullNode)
+	if err != nil {
+		panic(fmt.Errorf("lock repo failed: %w", err))
+	}
+	return dix.Override(new(repo.LockedRepo), modules.LockedRepo(lr))
 }
 
 func ConfigFilePath(rpath RepoPath) string {
