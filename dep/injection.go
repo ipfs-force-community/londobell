@@ -86,7 +86,8 @@ func OfflineDataSource() dix.Option {
 	return dix.Options(
 		// Notice: we may need to use other datastore someday. It depends on
 		// the origin data structs.
-		dix.Override(new(dtypes.HotBlockstore), modules.BadgerHotBlockstore),
+		dix.Override(new(dtypes.AfterGenesisSet), modules.SetGenesis),
+		dix.Override(new(dtypes.HotBlockstore), modules.UniversalBlockstore),
 		dix.Override(new(dtypes.MetadataDS), modules.Datastore(true)),
 	)
 }
@@ -127,6 +128,6 @@ func OfflineRaCalium(ctx context.Context, logger fx.Printer, target ...interface
 		OfflineDataSource(),
 
 		dix.Override(new(*racailum.RaCailum), NewRaCailum),
-		dix.Override(new(common.HeadNotifier), nil),
+		dix.Override(new(common.HeadNotifier), func() (common.HeadNotifier, error) { return nil, nil }),
 	)
 }
