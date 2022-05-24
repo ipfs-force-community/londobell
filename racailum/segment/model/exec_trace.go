@@ -47,6 +47,7 @@ func NewExecTrace(
 	signedCid cid.Cid,
 	epoch abi.ChainEpoch,
 	seq []int,
+	meth string,
 	raw *common.ExecutionTraceCompact,
 	returnObj cbor.Er,
 	cost *api.MsgGasCost,
@@ -57,6 +58,7 @@ func NewExecTrace(
 		Epoch:        epoch,
 		Seq:          seq,
 		Depth:        len(seq),
+		Method:       meth,
 		Ver:          build.CurrentCommit,
 		SubCallCount: len(raw.Subcalls),
 		GasCost:      cost,
@@ -119,6 +121,7 @@ type ExecTrace struct {
 	Epoch     abi.ChainEpoch `mir:"-"`
 	Seq       []int          `mir:"-"`
 	Depth     int            `mir:"-"`
+	Method    string         `mir:"-"`
 
 	Ver string `mir:"-"`
 
@@ -147,6 +150,7 @@ type ExecTrace struct {
 func (et *ExecTrace) Indexes() [][]string {
 	return [][]string{
 		[]string{execTraceEpochField, "Msg.To", "Msg.Method", "MsgRct.ExitCode"},
+		[]string{execTraceEpochField, "Msg.To", "Method", "MsgRct.ExitCode"},
 		[]string{execTraceEpochField, "Msg.To", "Seq"},
 		[]string{execTraceEpochField, "Depth"},
 		[]string{"Cid"},
