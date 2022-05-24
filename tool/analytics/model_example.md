@@ -575,6 +575,7 @@
 		"Refund": "1073741824",
 		"TotalCost": "340282591298641078465964189926313473653"
 	},
+	"Method": "",
 	"Msg": {
 		"From": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 		"Method": 2,

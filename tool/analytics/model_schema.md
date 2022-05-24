@@ -171,6 +171,7 @@
 		"Refund": "big.Int",
 		"TotalCost": "big.Int"
 	},
+	"Method": "string",
 	"Msg": {
 		"From": "address.Address",
 		"Method": "abi.MethodNum",
