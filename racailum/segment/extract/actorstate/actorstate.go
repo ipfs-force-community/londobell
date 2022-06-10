@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/filecoin-project/go-state-types/cbor"
+
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -24,7 +25,7 @@ func ExtractRegular(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead) 
 }
 
 func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, enableActorStateDoc bool) error {
-	blkraw, err := ctx.D.ChainBlockstore().Get(head.Head)
+	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Head)
 	if err != nil {
 		return fmt.Errorf("load head block data for %s (%s): %w", head.Addr, head.Head, err)
 

@@ -5,11 +5,12 @@ import (
 
 	blocks "github.com/ipfs/go-block-format"
 
-	"github.com/filecoin-project/lotus/blockstore"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/ipfs-force-community/londobell/metrics"
 	"github.com/ipfs/go-cid"
 	"go4.org/syncutil/singleflight"
+
+	"github.com/filecoin-project/lotus/blockstore"
 )
 
 var _ blockstore.Blockstore = (*CachedBlockstore)(nil)
@@ -41,7 +42,7 @@ type CachedBlockstore struct {
 	hasSg *singleflight.Group
 }
 
-func (cbs *CachedBlockstore) Get(c cid.Cid) (blocks.Block, error) {
+func (cbs *CachedBlockstore) Get(ctx context.Context, c cid.Cid) (blocks.Block, error) {
 	metrics.RecordInc(context.Background(), metrics.CacheGetCnt)
 	if cached, has := cbs.cache.Get(c); has {
 		if b, ok := cached.(blocks.Block); ok {
@@ -51,7 +52,7 @@ func (cbs *CachedBlockstore) Get(c cid.Cid) (blocks.Block, error) {
 
 	b, err := cbs.getSg.Do(c.String(), func() (interface{}, error) {
 		metrics.RecordInc(context.Background(), metrics.CacheGetMissCnt)
-		b, err := cbs.Blockstore.Get(c)
+		b, err := cbs.Blockstore.Get(ctx, c)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +68,7 @@ func (cbs *CachedBlockstore) Get(c cid.Cid) (blocks.Block, error) {
 	return b.(blocks.Block), nil
 }
 
-func (cbs *CachedBlockstore) View(c cid.Cid, callback func([]byte) error) error {
+func (cbs *CachedBlockstore) View(ctx context.Context, c cid.Cid, callback func([]byte) error) error {
 	metrics.RecordInc(context.Background(), metrics.CacheViewCnt)
 
 	if cached, has := cbs.cache.Get(c); has {
@@ -77,7 +78,7 @@ func (cbs *CachedBlockstore) View(c cid.Cid, callback func([]byte) error) error 
 	}
 	b, err := cbs.getSg.Do(c.String(), func() (interface{}, error) {
 		metrics.RecordInc(context.Background(), metrics.CacheViewMissCnt)
-		b, err := cbs.Blockstore.Get(c)
+		b, err := cbs.Blockstore.Get(ctx, c)
 		if err != nil {
 			return nil, err
 		}
@@ -93,7 +94,7 @@ func (cbs *CachedBlockstore) View(c cid.Cid, callback func([]byte) error) error 
 	return callback(b.(blocks.Block).RawData())
 }
 
-func (cbs *CachedBlockstore) Has(c cid.Cid) (bool, error) {
+func (cbs *CachedBlockstore) Has(ctx context.Context, c cid.Cid) (bool, error) {
 	metrics.RecordInc(context.Background(), metrics.CacheHasCnt)
 
 	if has := cbs.cache.Contains(c); has {
@@ -101,7 +102,7 @@ func (cbs *CachedBlockstore) Has(c cid.Cid) (bool, error) {
 	}
 	b, err := cbs.hasSg.Do(c.String(), func() (interface{}, error) {
 		metrics.RecordInc(context.Background(), metrics.CacheHasMissCnt)
-		b, err := cbs.Blockstore.Has(c)
+		b, err := cbs.Blockstore.Has(ctx, c)
 		if err != nil {
 			return false, err
 		}

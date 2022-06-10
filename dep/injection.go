@@ -62,13 +62,7 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 		dix.Override(new(*store.ChainStore), modules.ChainStore),
 		dix.Override(new(stmgr.Executor), filcns.NewTipSetExecutor),
 		dix.Override(new(dtypes.DrandSchedule), modules.BuiltinDrandConfig),
-		dix.Override(new(beacon.Schedule), func(cs *store.ChainStore, dc dtypes.DrandSchedule) (beacon.Schedule, error) {
-			rbp := modules.RandomBeaconParams{
-				Cs:          cs,
-				DrandConfig: dc,
-			}
-			return modules.RandomSchedule(rbp, dtypes.AfterGenesisSet{})
-		}),
+		dix.Override(new(beacon.Schedule), modules.RandomSchedule),
 		dix.Override(new(stmgr.UpgradeSchedule), filcns.DefaultUpgradeSchedule),
 		dix.Override(new(*stmgr.StateManager), stmgr.NewStateManager),
 		dix.Override(new(modules.Genesis), modules.LoadGenesis(build.MaybeGenesis())),

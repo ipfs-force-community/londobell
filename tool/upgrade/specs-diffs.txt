@@ -43,3 +43,7 @@ Specs v6 => v7:
 	> miner.Deadline
 		+ SectorsSnapshot: cid.Cid
 
+Specs v7 => v8:
+	> system.Actor
+		+ BuiltinActors: cid.Cid
+

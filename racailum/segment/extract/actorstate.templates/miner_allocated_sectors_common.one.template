@@ -28,7 +28,7 @@ func extractAllocatedSectors(ctx *extract.Ctx, res *extract.Res, head *common.Ac
 	}
 
 	var allocatedSectors bitfield.BitField
-	if err := extractCborObject(ctx.D, root, &allocatedSectors); err != nil {
+	if err := extractCborObject(ctx.C, ctx.D, root, &allocatedSectors); err != nil {
 		return err
 
 	}

@@ -3,10 +3,12 @@ package tracing
 import (
 	"net/http"
 
-	"contrib.go.opencensus.io/exporter/jaeger"
-	"github.com/filecoin-project/lotus/lib/tracing"
 	logging "github.com/ipfs/go-log/v2"
 	"go.opencensus.io/trace"
+
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/filecoin-project/lotus/lib/tracing"
 )
 
 var log = logging.Logger("ra-tracing")
@@ -15,7 +17,7 @@ var log = logging.Logger("ra-tracing")
 // necessary to add lock?
 var curRate float64
 
-func Setup(opt *Options, mux *http.ServeMux) *jaeger.Exporter {
+func Setup(opt *Options, mux *http.ServeMux) *tracesdk.TracerProvider {
 	if !opt.Enable || opt.Name == "" {
 		return nil
 	}

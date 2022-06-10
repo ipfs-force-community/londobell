@@ -32,24 +32,24 @@ type DAL interface {
 
 // ChainStore is the abstraction of chain storage
 type ChainStore interface {
-	LoadTipSet(tsk types.TipSetKey) (*types.TipSet, error)
+	LoadTipSet(ctx context.Context, tsk types.TipSetKey) (*types.TipSet, error)
 	Weight(ctx context.Context, ts *types.TipSet) (types.BigInt, error)
 	ActorStore(ctx context.Context) adt.Store
-	GetGenesis() (*types.BlockHeader, error)
+	GetGenesis(ctx context.Context) (*types.BlockHeader, error)
 	ChainBlockstore() bstore.Blockstore
-	MessagesForBlock(b *types.BlockHeader) ([]*types.Message, []*types.SignedMessage, error)
+	MessagesForBlock(ctx context.Context, b *types.BlockHeader) ([]*types.Message, []*types.SignedMessage, error)
 }
 
 // StateManager manages the state on chain
 type StateManager interface {
 	ExecutionTrace(ctx context.Context, ts *types.TipSet) (cid.Cid, []*api.InvocResult, error)
 	ParentState(ts *types.TipSet) (*state.StateTree, error)
-	ParentStateTsk(tsk types.TipSetKey) (*state.StateTree, error)
+	ParentStateTsk(ctx context.Context, tsk types.TipSetKey) (*state.StateTree, error)
 	StateTree(st cid.Cid) (*state.StateTree, error)
 	LoadActor(ctx context.Context, addr address.Address, ts *types.TipSet) (*types.Actor, error)
 	LoadActorTsk(ctx context.Context, addr address.Address, tsk types.TipSetKey) (*types.Actor, error)
 	LoadActorRaw(_ context.Context, addr address.Address, st cid.Cid) (*types.Actor, error)
-	GetNtwkVersion(ctx context.Context, height abi.ChainEpoch) network.Version
+	GetNetworkVersion(ctx context.Context, height abi.ChainEpoch) network.Version
 	GetVMCirculatingSupplyDetailed(ctx context.Context, height abi.ChainEpoch, st *state.StateTree) (api.CirculatingSupply, error)
 	SearchForMessage(ctx context.Context, head *types.TipSet, mcid cid.Cid, lookbackLimit abi.ChainEpoch, allowReplaced bool) (*types.TipSet, *types.MessageReceipt, cid.Cid, error)
 }

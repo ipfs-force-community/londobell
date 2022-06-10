@@ -60,6 +60,7 @@ func extractDealProposalDetailedV0(ctx *extract.Ctx, res *extract.Res, head *com
 
 	var out market0.DealProposal
 	var dealProposals []model.DealProposal
+
 	err = deals.ForEach(&out, func(idx int64) error {
 		if _, ok := details[out.Provider]; !ok {
 			details[out.Provider] = &model.DealProposalDetail{
@@ -94,6 +95,7 @@ func extractDealProposalDetailedV0(ctx *extract.Ctx, res *extract.Res, head *com
 			Epoch:        head.Epoch,
 			DealProposal: out,
 		})
+
 		return nil
 	})
 

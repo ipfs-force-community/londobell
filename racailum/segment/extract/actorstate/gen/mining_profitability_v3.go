@@ -32,7 +32,7 @@ func init() {
 // see https://github.com/filecoin-project/specs-actors/blob/v3.1.1/actors/builtin/miner/miner_actor.go#L976-L988
 // and https://github.com/filecoin-project/specs-actors/blob/v3.1.1/actors/builtin/miner/monies.go#L86-L91
 func extractMiningProfitabilityV3(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward3.State) error {
-	blkraw, err := ctx.D.ChainBlockstore().Get(head.Global.Power.Head)
+	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Global.Power.Head)
 	if err != nil {
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
 	}

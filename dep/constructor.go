@@ -7,18 +7,19 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/filecoin-project/lotus/api/v0api"
-	"github.com/filecoin-project/lotus/blockstore"
-	"github.com/filecoin-project/lotus/node/config"
-	"github.com/filecoin-project/lotus/node/modules"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
-	"github.com/filecoin-project/lotus/node/repo"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	dstore "github.com/ipfs/go-datastore"
 	levelds "github.com/ipfs/go-ds-leveldb"
 	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 	"go.uber.org/fx"
+
+	"github.com/filecoin-project/lotus/api/v0api"
+	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/node/config"
+	"github.com/filecoin-project/lotus/node/modules"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/filecoin-project/lotus/node/repo"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/bsex"
@@ -42,11 +43,11 @@ type WrapAPIBlockstore struct {
 	blockstore.Blockstore
 }
 
-func (a *WrapAPIBlockstore) Put(blocks.Block) error {
+func (a *WrapAPIBlockstore) Put(context.Context, blocks.Block) error {
 	return nil
 }
 
-func (a *WrapAPIBlockstore) PutMany([]blocks.Block) error {
+func (a *WrapAPIBlockstore) PutMany(context.Context, []blocks.Block) error {
 	return nil
 }
 
@@ -54,7 +55,7 @@ func (a *WrapAPIBlockstore) AllKeysChan(ctx context.Context) (<-chan cid.Cid, er
 	return nil, nil
 }
 
-func (a *WrapAPIBlockstore) DeleteBlock(cid.Cid) error {
+func (a *WrapAPIBlockstore) DeleteBlock(context.Context, cid.Cid) error {
 	return nil
 }
 
@@ -120,7 +121,7 @@ func InMemMetadataDS(lr repo.LockedRepo, g modules.Genesis) (dtypes.MetadataDS, 
 	if err != nil {
 		return nil, err
 	}
-	err = ds.Put(dstore.NewKey("0"), bh.Cid().Bytes())
+	err = ds.Put(context.Background(), dstore.NewKey("0"), bh.Cid().Bytes())
 	return ds, err
 }
 
@@ -172,7 +173,7 @@ func SetupTracing(lc fx.Lifecycle, cfg racailum.Config, mux *http.ServeMux) erro
 
 	lc.Append(fx.Hook{
 		OnStop: func(context.Context) error {
-			je.Flush()
+			je.ForceFlush(context.Background())
 			return nil
 		},
 	})
