@@ -12,7 +12,7 @@ upgrade() {
 
 	echo "upgrade go package"
 	go get -v github.com/filecoin-project/lotus@$1
-	go mod tidy
+	go mod tidy -compat=1.17
 
 	echo "init submodule"
 	rm -rf ./tmp-clone

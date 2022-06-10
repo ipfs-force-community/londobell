@@ -5,6 +5,10 @@ import (
 	"reflect"
 
 	"github.com/filecoin-project/go-state-types/cbor"
+	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
+
+	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -17,6 +21,7 @@ import (
 )
 
 var GenRegularHeadID = gen.GenRegularHeadID
+var log = logging.Logger("actorstate")
 
 // ExtractRegular tries to take all data out of specified actor state head
 func ExtractRegular(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead) error {
@@ -24,7 +29,7 @@ func ExtractRegular(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead) 
 }
 
 func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, enableActorStateDoc bool) error {
-	blkraw, err := ctx.D.ChainBlockstore().Get(head.Head)
+	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Head)
 	if err != nil {
 		return fmt.Errorf("load head block data for %s (%s): %w", head.Addr, head.Head, err)
 
@@ -41,7 +46,26 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 		return nil
 	}
 
-	state, err := vm.DumpActorState(reg.ActorReg, head.Actor, blkraw.RawData())
+	actor := head.Actor
+	actorVersion, err := actors.VersionForNetwork(ctx.D.GetNetworkVersion(ctx.C, head.Epoch))
+	if err != nil {
+		return fmt.Errorf("get network.Version for height(%v): %w", head.Epoch, err)
+	}
+
+	var realCode cid.Cid
+	if actorVersion >= actors.Version8 {
+		name := actors.CanonicalName(builtin.ActorNameByCode(head.Code))
+
+		var ok bool
+		realCode, ok = actors.GetActorCodeID(actorVersion, name)
+		if ok {
+			actor.Code = realCode
+		}
+
+		log.Infow("update code", "head.Code", head.Code, "actor.Code", actor.Code, "name", name, "realCode", realCode)
+	}
+
+	state, err := vm.DumpActorState(reg.ActorReg, actor, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 

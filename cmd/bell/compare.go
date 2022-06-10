@@ -90,12 +90,12 @@ var compareCmd = &cli.Command{
 			return err
 		}
 
-		startTs, err := di.CS.LoadTipSet(stsk)
+		startTs, err := di.CS.LoadTipSet(cctx.Context, stsk)
 		if err != nil {
 			return err
 		}
 
-		endTs, err := di.CS.LoadTipSet(etsk)
+		endTs, err := di.CS.LoadTipSet(cctx.Context, etsk)
 		if err != nil {
 			return err
 		}
@@ -113,7 +113,7 @@ var compareCmd = &cli.Command{
 			}
 
 			curEpoch := parentTs.Height() - 1
-			curTs, err := di.CS.LoadTipSet(parentTs.Parents())
+			curTs, err := di.CS.LoadTipSet(cctx.Context, parentTs.Parents())
 			if err != nil {
 				return err
 			}
@@ -156,7 +156,7 @@ var compareCmd = &cli.Command{
 
 		for _, ts := range tss {
 			for _, b := range ts.Blocks() {
-				bmsgs, smsgs, err := di.CS.MessagesForBlock(b)
+				bmsgs, smsgs, err := di.CS.MessagesForBlock(cctx.Context, b)
 				if err != nil {
 					return fmt.Errorf("get message for block [%v] err: %w ", b.Cid(), err)
 				}

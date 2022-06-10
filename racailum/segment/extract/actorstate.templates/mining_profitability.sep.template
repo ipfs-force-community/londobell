@@ -61,7 +61,7 @@ func init() {
 // and https://github.com/filecoin-project/specs-actors/blob/v6.0.0/actors/builtin/miner/monies.go#L99-L104
 {{- end }}
 func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward{{ .Ver }}.State) error {
-	blkraw, err := ctx.D.ChainBlockstore().Get(head.Global.Power.Head)
+	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Global.Power.Head)
 	if err != nil {
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
 	}
@@ -96,7 +96,7 @@ func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, h
 		InitialStoragePledge:      storagePledge,
 		ProjectionOfInitialPledge: storagePledge, // TODO: projection is just equal to the init storage power here, correct me if I'm wrong
 		{{ if eq .Ver 0 -}}
-		ProjectionOfFaultFee:      miner{{ .Ver }}.PledgePenaltyForDeclaredFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, ctx.D.GetNtwkVersion(ctx.C, head.Epoch)),
+		ProjectionOfFaultFee:      miner{{ .Ver }}.PledgePenaltyForDeclaredFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, ctx.D.GetNetworkVersion(ctx.C, head.Epoch)),
 		Mined:                     st.TotalMined,
 		{{- else -}}
 		ProjectionOfFaultFee:      miner{{ .Ver }}.PledgePenaltyForContinuedFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower),

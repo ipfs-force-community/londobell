@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	logging "github.com/ipfs/go-log/v2"
+	"go.opencensus.io/stats"
+
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
 	lconfig "github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
-	logging "github.com/ipfs/go-log/v2"
-	"go.opencensus.io/stats"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/metrics"
@@ -77,7 +78,7 @@ type Config struct {
 
 // New returns an instance of *RaCailum
 func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.ChainStore, stm common.StateManager, segmgr *segment.Manager, shutdownCh dtypes.ShutdownChan) (*RaCailum, error) {
-	vm.EnableGasTracing = cfg.EnableGasTracing
+	vm.EnableDetailedTracing = cfg.EnableGasTracing
 
 	activeSegName, has, err := segmgr.LoadActive()
 	if err != nil {
@@ -173,7 +174,7 @@ HEAD_LOOP:
 				return
 			}
 			lstart := time.Now()
-			ts, err := r.components.cs.LoadTipSet(tsk)
+			ts, err := r.components.cs.LoadTipSet(ctx, tsk)
 			stats.Record(ctx, metrics.LoadTipSetDuration.M(metrics.SinceInMilliseconds(lstart)))
 			if err != nil {
 				log.Errorf("failed to load tipset %s: %s", tsk, err)

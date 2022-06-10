@@ -216,7 +216,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	start := time.Now()
 	st, rawinvocs, err := ctx.D.ExecutionTrace(ctx.C, ts.TipSet)
 	if err != nil {
-		return fmt.Errorf("tipset execution: %w", err)
+		return fmt.Errorf("tipset %v execution: %w", ts.TipSet.Height().String(), err)
 	}
 	elapsed := time.Now().Sub(start)
 
@@ -278,7 +278,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	// 得到SignedMessage
 	allsmsgs := make([]*types.SignedMessage, 0)
 	for _, b := range ts.TipSet.Blocks() {
-		_, smsgs, err := ctx.D.MessagesForBlock(b)
+		_, smsgs, err := ctx.D.MessagesForBlock(ctx.C, b)
 		if err != nil {
 			return fmt.Errorf("get message for block err: %w", err)
 		}

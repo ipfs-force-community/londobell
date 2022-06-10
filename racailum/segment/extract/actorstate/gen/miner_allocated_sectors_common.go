@@ -31,13 +31,14 @@ func extractAllocatedSectors(ctx *extract.Ctx, res *extract.Res, head *common.Ac
 		root.Equals(emptyMinerStateV4.AllocatedSectors) ||
 		root.Equals(emptyMinerStateV5.AllocatedSectors) ||
 		root.Equals(emptyMinerStateV6.AllocatedSectors) ||
-		root.Equals(emptyMinerStateV7.AllocatedSectors) {
+		root.Equals(emptyMinerStateV7.AllocatedSectors) ||
+		root.Equals(emptyMinerStateV8.AllocatedSectors) {
 
 		return nil
 	}
 
 	var allocatedSectors bitfield.BitField
-	if err := extractCborObject(ctx.D, root, &allocatedSectors); err != nil {
+	if err := extractCborObject(ctx.C, ctx.D, root, &allocatedSectors); err != nil {
 		return err
 
 	}

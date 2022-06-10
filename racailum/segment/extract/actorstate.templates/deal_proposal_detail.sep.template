@@ -59,7 +59,12 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
 	details := map[address.Address]*model.DealProposalDetail{}
 
 	var out market{{ .Ver }}.DealProposal
+	{{ if lt .Ver 8 -}}
 	var dealProposals []model.DealProposal
+	{{- else }}
+	var dealProposals []model.DealProposalV8
+	{{- end }}
+
 	err = deals.ForEach(&out, func(idx int64) error {
 		if _, ok := details[out.Provider]; !ok {
 			details[out.Provider] = &model.DealProposalDetail{
@@ -89,11 +94,19 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
 			details[out.Provider].Detail.UnVerifiedDealEndCount++
 		}
 
+        {{ if lt .Ver 8}}
 		dealProposals = append(dealProposals, model.DealProposal{
 			ID:           idx,
 			Epoch:        head.Epoch,
 			DealProposal: out,
 		})
+		{{ else }}
+		dealProposals = append(dealProposals, model.DealProposalV8{
+            ID:           idx,
+            Epoch:        head.Epoch,
+            DealProposal: out,
+        })
+        {{ end }}
 		return nil
 	})
 

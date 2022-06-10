@@ -1,7 +1,10 @@
 package segment
 
 import (
+	"context"
+
 	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/filecoin-project/lotus/chain/types"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -68,7 +71,7 @@ func traverseTipSets(cs common.ChainStore, curts *types.TipSet, traverseFn func(
 		}
 
 		parentTSK := curts.Parents()
-		parentTS, err := cs.LoadTipSet(parentTSK)
+		parentTS, err := cs.LoadTipSet(context.Background(), parentTSK)
 		if err != nil {
 			return count, err
 		}

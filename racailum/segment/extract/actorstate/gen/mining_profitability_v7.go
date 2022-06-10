@@ -31,7 +31,7 @@ func init() {
 // VERCHECK
 
 func extractMiningProfitabilityV7(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward7.State) error {
-	blkraw, err := ctx.D.ChainBlockstore().Get(head.Global.Power.Head)
+	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Global.Power.Head)
 	if err != nil {
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
 	}
