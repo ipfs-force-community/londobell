@@ -64,7 +64,7 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 		dix.Override(new(*store.ChainStore), modules.ChainStore),
 		dix.Override(new(stmgr.Executor), filcns.NewTipSetExecutor),
 		dix.Override(new(dtypes.DrandSchedule), modules.BuiltinDrandConfig),
-		dix.Override(new(beacon.Schedule), modules.RandomSchedule),
+		dix.Override(new(beacon.Schedule), RandomSchedule),
 		dix.Override(new(stmgr.UpgradeSchedule), filcns.DefaultUpgradeSchedule),
 		dix.Override(new(*stmgr.StateManager), stmgr.NewStateManager),
 		dix.Override(new(modules.Genesis), LoadGenesis(build.MaybeGenesis())),
