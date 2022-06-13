@@ -9,6 +9,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/filecoin-project/lotus/build"
+
 	"github.com/filecoin-project/lotus/chain/beacon"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/stmgr"
@@ -66,7 +67,7 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 		dix.Override(new(beacon.Schedule), modules.RandomSchedule),
 		dix.Override(new(stmgr.UpgradeSchedule), filcns.DefaultUpgradeSchedule),
 		dix.Override(new(*stmgr.StateManager), stmgr.NewStateManager),
-		dix.Override(new(modules.Genesis), modules.LoadGenesis(build.MaybeGenesis())),
+		dix.Override(new(modules.Genesis), LoadGenesis(build.MaybeGenesis())),
 		dix.Override(new(common.HeadNotifier), cliex.NewHeadSub),
 		dix.Override(new(*racailum.RaCailum), NewRaCailum),
 		dix.Override(new(repo.Repo), repo.NewMemory(nil)),
