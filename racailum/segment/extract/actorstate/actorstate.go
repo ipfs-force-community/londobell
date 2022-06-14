@@ -6,6 +6,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
@@ -20,6 +21,7 @@ import (
 )
 
 var GenRegularHeadID = gen.GenRegularHeadID
+var log = logging.Logger("actorstate")
 
 // ExtractRegular tries to take all data out of specified actor state head
 func ExtractRegular(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead) error {
@@ -59,6 +61,8 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 		if ok {
 			actor.Code = realCode
 		}
+
+		log.Infow("update code", "head.Code", head.Code, "actor.Code", actor.Code, "name", name, "realCode", realCode)
 	}
 
 	state, err := vm.DumpActorState(reg.ActorReg, actor, blkraw.RawData())
