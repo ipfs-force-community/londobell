@@ -5,7 +5,9 @@ import (
 	"reflect"
 
 	"github.com/filecoin-project/go-state-types/cbor"
+	"github.com/ipfs/go-cid"
 
+	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -42,7 +44,24 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 		return nil
 	}
 
-	state, err := vm.DumpActorState(reg.ActorReg, head.Actor, blkraw.RawData())
+	actor := head.Actor
+	actorVersion, err := actors.VersionForNetwork(ctx.D.GetNetworkVersion(ctx.C, head.Epoch))
+	if err != nil {
+		return fmt.Errorf("get network.Version for height(%v): %w", head.Epoch, err)
+	}
+
+	var realCode cid.Cid
+	if actorVersion >= actors.Version8 {
+		name := actors.CanonicalName(builtin.ActorNameByCode(head.Code))
+
+		var ok bool
+		realCode, ok = actors.GetActorCodeID(actorVersion, name)
+		if ok {
+			actor.Code = realCode
+		}
+	}
+
+	state, err := vm.DumpActorState(reg.ActorReg, actor, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 
