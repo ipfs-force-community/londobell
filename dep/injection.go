@@ -57,7 +57,6 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 		dix.Override(new(SegmentMetaDS), OpenSegmentDS),
 		dix.Override(new(*segment.Manager), NewSegmentManager),
 
-		dix.Override(new(dtypes.BuiltinActorsLoaded), modules.LoadBuiltinActors),
 		dix.Override(new(vm.SyscallBuilder), vm.Syscalls(ffiwrapper.ProofVerifier)),
 		dix.Override(new(journal.Journal), journal.NilJournal),
 		dix.Override(new(store.WeightFunc), filcns.Weight),
@@ -67,7 +66,7 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 		dix.Override(new(beacon.Schedule), RandomSchedule),
 		dix.Override(new(stmgr.UpgradeSchedule), filcns.DefaultUpgradeSchedule),
 		dix.Override(new(*stmgr.StateManager), stmgr.NewStateManager),
-		dix.Override(new(modules.Genesis), LoadGenesis(build.MaybeGenesis())),
+		dix.Override(new(modules.Genesis), modules.LoadGenesis(build.MaybeGenesis())),
 		dix.Override(new(common.HeadNotifier), cliex.NewHeadSub),
 		dix.Override(new(*racailum.RaCailum), NewRaCailum),
 		dix.Override(new(repo.Repo), repo.NewMemory(nil)),

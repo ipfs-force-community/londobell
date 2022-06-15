@@ -3,21 +3,21 @@ module github.com/ipfs-force-community/londobell
 go 1.17
 
 require (
-	contrib.go.opencensus.io/exporter/jaeger v0.2.1
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
 	github.com/dtynn/dix v0.1.2
 	github.com/filecoin-project/go-address v0.0.6
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-jsonrpc v0.1.5
-	github.com/filecoin-project/go-state-types v0.1.7
-	github.com/filecoin-project/lotus v1.16.0-pre-rc
-	github.com/filecoin-project/specs-actors v0.9.15-0.20220514164640-94e0d5e123bd
+	github.com/filecoin-project/go-state-types v0.1.9
+	github.com/filecoin-project/lotus v1.16.0-rc1
+	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v3 v3.1.2
 	github.com/filecoin-project/specs-actors/v4 v4.0.2
-	github.com/filecoin-project/specs-actors/v5 v5.0.6-0.20220514165557-0b29a778685b
-	github.com/filecoin-project/specs-actors/v6 v6.0.2-0.20220511204807-569c6d12432b
-	github.com/filecoin-project/specs-actors/v7 v7.0.1-0.20220511223846-637436c27154
+	github.com/filecoin-project/specs-actors/v5 v5.0.6
+	github.com/filecoin-project/specs-actors/v6 v6.0.2
+	github.com/filecoin-project/specs-actors/v7 v7.0.1
+	github.com/filecoin-project/specs-actors/v8 v8.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-block-format v0.0.3
@@ -34,11 +34,12 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/robertkrimen/otto v0.0.0-20200922221731-ef014fd054ac
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/urfave/cli/v2 v2.3.0
 	go.mongodb.org/mongo-driver v1.5.0
 	go.opencensus.io v0.23.0
+	go.opentelemetry.io/otel/sdk v1.2.0
 	go.uber.org/fx v1.15.0
 	go.uber.org/zap v1.21.0
 	go4.org v0.0.0-20200411211856-f5505b9728dd
@@ -112,8 +113,8 @@ require (
 	github.com/filecoin-project/go-statestore v0.2.0 // indirect
 	github.com/filecoin-project/go-storedcounter v0.1.0 // indirect
 	github.com/filecoin-project/index-provider v0.5.0 // indirect
-	github.com/filecoin-project/specs-actors/v8 v8.0.0-20220422153930-0afe155bfffa // indirect
-	github.com/filecoin-project/specs-storage v0.4.0 // indirect
+	github.com/filecoin-project/pubsub v1.0.0 // indirect
+	github.com/filecoin-project/specs-storage v0.4.1 // indirect
 	github.com/filecoin-project/storetheindex v0.3.5 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
@@ -199,7 +200,7 @@ require (
 	github.com/libp2p/go-conn-security-multistream v0.3.0 // indirect
 	github.com/libp2p/go-eventbus v0.2.1 // indirect
 	github.com/libp2p/go-flow-metrics v0.0.3 // indirect
-	github.com/libp2p/go-libp2p v0.19.0 // indirect
+	github.com/libp2p/go-libp2p v0.19.4 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-blankhost v0.3.0 // indirect
 	github.com/libp2p/go-libp2p-connmgr v0.3.1 // indirect
@@ -233,8 +234,8 @@ require (
 	github.com/libp2p/go-stream-muxer-multistream v0.4.0 // indirect
 	github.com/libp2p/go-tcp-transport v0.5.1 // indirect
 	github.com/libp2p/go-ws-transport v0.6.0 // indirect
-	github.com/libp2p/go-yamux/v3 v3.1.1 // indirect
-	github.com/lucas-clemente/quic-go v0.27.0 // indirect
+	github.com/libp2p/go-yamux/v3 v3.1.2 // indirect
+	github.com/lucas-clemente/quic-go v0.27.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.0.3 // indirect
 	github.com/magefile/mage v1.9.0 // indirect
 	github.com/marten-seemann/qtls-go1-16 v0.1.5 // indirect
@@ -287,7 +288,6 @@ require (
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/stretchr/objx v0.1.1 // indirect
-	github.com/uber/jaeger-client-go v2.25.0+incompatible // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.0.1 // indirect
 	github.com/whyrusleeping/bencher v0.0.0-20190829221104-bb6607aa8bba // indirect
@@ -297,7 +297,6 @@ require (
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/whyrusleeping/ledger-filecoin-go v0.9.1-0.20201010031517-c3dcc1bddce4 // indirect
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 // indirect
-	github.com/whyrusleeping/pubsub v0.0.0-20190708150250-92bcb0691325 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v0.0.0-20180714160509-73f8eece6fdc // indirect
@@ -308,7 +307,6 @@ require (
 	go.opentelemetry.io/otel/bridge/opencensus v0.25.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.2.0 // indirect
 	go.opentelemetry.io/otel/metric v0.25.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.2.0 // indirect
 	go.opentelemetry.io/otel/sdk/export/metric v0.25.0 // indirect
 	go.opentelemetry.io/otel/trace v1.3.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
@@ -323,7 +321,6 @@ require (
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.10 // indirect
-	google.golang.org/api v0.30.0 // indirect
 	google.golang.org/genproto v0.0.0-20210917145530-b395a37504d4 // indirect
 	google.golang.org/grpc v1.45.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
