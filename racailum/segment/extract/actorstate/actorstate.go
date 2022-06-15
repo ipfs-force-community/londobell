@@ -62,7 +62,7 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 			actor.Code = realCode
 		}
 
-		log.Infow("update code", "head.Code: %v", head.Code, "actor.Code: %v", actor.Code, "name: %v", name)
+		log.Infow("update code", "head.Code", head.Code, "actor.Code", actor.Code, "name", name, "realCode", realCode)
 	}
 
 	state, err := vm.DumpActorState(reg.ActorReg, actor, blkraw.RawData())
