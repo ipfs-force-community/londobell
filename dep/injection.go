@@ -8,9 +8,10 @@ import (
 	metricsi "github.com/ipfs/go-metrics-interface"
 	"go.uber.org/fx"
 
+	"github.com/filecoin-project/lotus/chain/beacon"
+
 	"github.com/filecoin-project/lotus/build"
 
-	"github.com/filecoin-project/lotus/chain/beacon"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
@@ -63,7 +64,8 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 		dix.Override(new(*store.ChainStore), modules.ChainStore),
 		dix.Override(new(stmgr.Executor), filcns.NewTipSetExecutor),
 		dix.Override(new(dtypes.DrandSchedule), modules.BuiltinDrandConfig),
-		dix.Override(new(beacon.Schedule), RandomSchedule),
+		dix.Override(new(dtypes.AfterGenesisSet), NewAfterGenesisSet),
+		dix.Override(new(beacon.Schedule), modules.RandomSchedule),
 		dix.Override(new(stmgr.UpgradeSchedule), filcns.DefaultUpgradeSchedule),
 		dix.Override(new(*stmgr.StateManager), stmgr.NewStateManager),
 		dix.Override(new(modules.Genesis), modules.LoadGenesis(build.MaybeGenesis())),
@@ -87,4 +89,8 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 		dix.Override(invokeSetupTracing, SetupTracing),
 		dix.Override(invokeSetupGrafana, SetupGrafana),
 	)
+}
+
+func NewAfterGenesisSet() dtypes.AfterGenesisSet {
+	return dtypes.AfterGenesisSet{}
 }
