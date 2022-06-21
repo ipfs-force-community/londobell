@@ -7,8 +7,10 @@ package gen
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/ipfs/go-cid"
 
 	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
@@ -24,8 +26,7 @@ import (
 )
 
 func init() {
-	reg.MustRegisterRegularExtractor("ClaimedPowerV6", extractClaimedPowerV6)
-
+	reg.MustRegisterRegularExtractor("ClaimedPowerV6", reflect.TypeOf(&power6.State{}), wrapExtractClaimedPowerV6)
 	schema.Register(
 		schema.Model{
 			Name: "claimed-power-v6",
@@ -34,6 +35,10 @@ func init() {
 			},
 		},
 	)
+}
+func wrapExtractClaimedPowerV6(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, cb cbor.Er) error {
+	pst := cb.(*power6.State)
+	return extractClaimedPowerV6(ctx, res, head, pst)
 }
 
 func extractClaimedPowerV6(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *power6.State) error { // nolint: deadcode
