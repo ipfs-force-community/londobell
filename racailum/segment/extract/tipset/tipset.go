@@ -216,7 +216,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	start := time.Now()
 	st, rawinvocs, err := ctx.D.ExecutionTrace(ctx.C, ts.TipSet)
 	if err != nil {
-		return fmt.Errorf("tipset execution: %w", err)
+		return fmt.Errorf("tipset %v execution: %w", ts.TipSet.Height().String(), err)
 	}
 	elapsed := time.Now().Sub(start)
 
