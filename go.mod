@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
+	github.com/buger/goterm v1.0.3
 	github.com/dtynn/dix v0.1.2
 	github.com/filecoin-project/go-address v0.0.6
 	github.com/filecoin-project/go-bitfield v0.2.4
