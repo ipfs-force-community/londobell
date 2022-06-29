@@ -58,6 +58,10 @@ build-bell-calib: $(BUILD_DEPS)
 	rm -rf ./bell
 	go build $(GOFLAGS) -o bell ./cmd/bell
 
+build-bell-butterfly: GOFLAGS+=-tags=butterflynet
+build-bell-butterfly: $(BUILD_DEPS)
+	rm -rf ./bell
+	go build $(GOFLAGS) -o bell ./cmd/bell
 
 dist-clean:
 	git clean -xdff

@@ -12,13 +12,14 @@ import (
 	badgerbs "github.com/filecoin-project/lotus/blockstore/badger"
 	"github.com/filecoin-project/lotus/node/repo"
 
-	bstore "github.com/filecoin-project/lotus/blockstore"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
 	ipld "github.com/ipfs/go-ipld-format"
 	"github.com/ipfs/go-merkledag"
+
+	bstore "github.com/filecoin-project/lotus/blockstore"
 )
 
 func NewApiBlockStore(ctx context.Context, url string) (bstore.Blockstore, error) {
@@ -82,7 +83,7 @@ func GenerateFullTree(ctx context.Context, root cid.Cid, sourceBs bstore.Blockst
 	if err != nil {
 		return err
 	}
-	err = localBs.PutMany(res)
+	err = localBs.PutMany(ctx, res)
 	if err != nil {
 		return err
 	}

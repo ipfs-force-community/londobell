@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -10,16 +11,16 @@ import (
 
 	"github.com/dtynn/dix"
 	"github.com/filecoin-project/go-jsonrpc"
-	"github.com/filecoin-project/lotus/chain/types"
-	lcli "github.com/filecoin-project/lotus/cli"
-	cliutil "github.com/filecoin-project/lotus/cli/util"
-	"github.com/filecoin-project/lotus/metrics"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/urfave/cli/v2"
 	"go.opencensus.io/tag"
-	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/lotus/chain/types"
+	lcli "github.com/filecoin-project/lotus/cli"
+	cliutil "github.com/filecoin-project/lotus/cli/util"
+	"github.com/filecoin-project/lotus/metrics"
 
 	"github.com/ipfs-force-community/londobell/api"
 	"github.com/ipfs-force-community/londobell/dep"
@@ -89,7 +90,7 @@ func ServeRPC(a api.BellAPI, stop dix.StopFunc, addr multiaddr.Multiaddr, shutdo
 	http.Handle("/rpc/v0", rpcServer)
 	lst, err := manet.Listen(addr)
 	if err != nil {
-		return xerrors.Errorf("could not listen: %w", err)
+		return fmt.Errorf("could not listen: %w", err)
 	}
 
 	srv := &http.Server{

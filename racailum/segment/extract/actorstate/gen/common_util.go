@@ -6,6 +6,7 @@ package gen
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 
@@ -30,8 +31,8 @@ func isEmptyOrZero(n big.Int) bool {
 	return n.Int == nil || n.Equals(bigZero)
 }
 
-func extractCborObject(dal common.DAL, c cid.Cid, out cbor.Er) error {
-	blk, err := dal.ChainBlockstore().Get(c)
+func extractCborObject(ctx context.Context, dal common.DAL, c cid.Cid, out cbor.Er) error {
+	blk, err := dal.ChainBlockstore().Get(ctx, c)
 	if err != nil {
 		return err
 	}

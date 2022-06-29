@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 
 	"github.com/dtynn/dix"
-	"github.com/filecoin-project/lotus/api/v0api"
-	cliutil "github.com/filecoin-project/lotus/cli/util"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
+
+	"github.com/filecoin-project/lotus/api/v0api"
+	cliutil "github.com/filecoin-project/lotus/cli/util"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 // common flags
@@ -70,4 +72,8 @@ func ConfigFilePath(rpath RepoPath) string {
 
 func SegmentMetaDSPath(rpath RepoPath) string {
 	return filepath.Join(string(rpath), "segment")
+}
+
+func NewAfterGenesisSet() dtypes.AfterGenesisSet {
+	return dtypes.AfterGenesisSet{}
 }

@@ -3,8 +3,9 @@ package testutils
 import (
 	"context"
 
-	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/ipfs/go-cid"
+
+	"github.com/filecoin-project/lotus/blockstore"
 )
 
 type MockChainIO struct {
@@ -12,7 +13,7 @@ type MockChainIO struct {
 }
 
 func (cio *MockChainIO) ChainReadObj(ctx context.Context, obj cid.Cid) ([]byte, error) {
-	blk, err := cio.Get(obj)
+	blk, err := cio.Get(ctx, obj)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -20,7 +21,7 @@ func (cio *MockChainIO) ChainReadObj(ctx context.Context, obj cid.Cid) ([]byte, 
 }
 
 func (cio *MockChainIO) ChainHasObj(ctx context.Context, obj cid.Cid) (bool, error) {
-	_, err := cio.Get(obj)
+	_, err := cio.Get(ctx, obj)
 	if err != nil {
 		return false, err
 	}
