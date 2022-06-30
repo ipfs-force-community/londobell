@@ -92,3 +92,6 @@ build-adapter-calib: GOFLAGS+=-tags=calibnet
 build-adapter-calib: $(BUILD_DEPS)
 	rm -rf ./lotus-api-adapter
 	go build $(GOFLAGS) -o lotus-api-adapter ./cmd/lotus-api-adapter/cmd/adapter
+
+gen-types:
+	go run tool/gentypes/main.go

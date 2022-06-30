@@ -31,7 +31,6 @@ func GetSectorPower(cctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
 	reader = bytes.NewBuffer(body)
 
 	url := "http://106.14.10.70:12345/sector"
