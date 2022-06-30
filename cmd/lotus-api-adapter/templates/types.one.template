@@ -1,0 +1,95 @@
+package controller
+
+import (
+	"fmt"
+
+	"github.com/filecoin-project/go-address"
+	{{ range $vi := .Vers -}}
+	builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
+	{{ end -}}
+	"github.com/ipfs/go-cid"
+
+    "github.com/filecoin-project/lotus/chain/actors"
+    "github.com/filecoin-project/lotus/chain/actors/adt"
+    "github.com/filecoin-project/lotus/chain/actors/builtin/system"
+)
+
+func IsStoragePowerActor(c cid.Cid) bool {
+    {{ range $vi := .Vers -}}
+    if c == builtin{{ .Ver }}.StoragePowerActorCodeID {
+    		return true
+    }
+    {{ end -}}
+
+    return false
+}
+
+func IsRewardActor(c cid.Cid) bool {
+    {{ range $vi := .Vers -}}
+	if c == builtin{{ .Ver }}.RewardActorCodeID {
+		return true
+	}
+	{{ end -}}
+
+	return false
+}
+
+func IsInitActor(c cid.Cid) bool {
+    {{ range $vi := .Vers -}}
+	if c == builtin{{ .Ver }}.InitActorCodeID {
+		return true
+	}
+	{{ end -}}
+
+	return false
+}
+
+func IsStorageMarketActor(c cid.Cid) bool {
+    {{ range $vi := .Vers -}}
+    if c == builtin{{ .Ver }}.StorageMarketActorCodeID {
+    	return true
+    }
+    {{ end -}}
+
+    return false
+}
+
+func IsVerifiedRegistryActor(c cid.Cid) bool {
+    {{ range $vi := .Vers -}}
+    if c == builtin{{ .Ver }}.VerifiedRegistryActorCodeID {
+    	return true
+    }
+    {{ end -}}
+
+    return false
+}
+
+func IsSystemActor(c cid.Cid) bool {
+    {{ range $vi := .Vers -}}
+    if c == builtin{{ .Ver }}.SystemActorCodeID {
+        return true
+    }
+    {{ end -}}
+
+    return false
+}
+
+func IsBurntFundsActor(addr address.Address) bool {
+    {{ range $vi := .Vers -}}
+    if addr == builtin{{ .Ver }}.BurntFundsActorAddr {
+        return true
+    }
+    {{ end -}}
+
+    return false
+}
+
+func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
+    {{ range $vi := .Vers -}}
+    if c == builtin{{ .Ver }}.SystemActorCodeID {
+        return system.MakeState(store, actors.Version{{ .Ver }}, cid.Undef)
+    }
+    {{ end -}}
+
+    return nil, fmt.Errorf("not system actor code: %v", c)
+}

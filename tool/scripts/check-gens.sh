@@ -5,6 +5,7 @@ make gen-index
 make gen-model
 make gen-diff
 make gen-extractor
+make gen-types
 
 echo "check for file changes"
 commit=$(git describe --always --match=NeVeRmAtCh --dirty)

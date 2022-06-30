@@ -8,6 +8,7 @@
 基于此，我们拟定清单如下：
 - [ ] 执行 `./tool/scripts/upgrade-lotus.sh <target version>` 将本库的lotus升级为指定版本
 - [ ] 执行 `make gen-extractor`，沿用之前的逻辑生成出新版本的 extractor 代码
+- [ ] 执行 `make gen-types`, 沿用之前的逻辑生成出新版本的 types 代码   
 - [ ] 尝试执行 `make build-bell`，并解决可能出现的编译器错误，此时的编译错误通常由以下 lotus 内部的变化导致：
   - 重命名
   - 代码结构调整
