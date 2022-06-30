@@ -21,20 +21,18 @@ func GetSectorPower(cctx *cli.Context) error {
 	mAddr := cctx.String("miner")
 	sector := cctx.Uint64("sector")
 
-	params := map[string]interface{}{
+	var params = map[string]interface{}{
 		"miner": mAddr,
 		"epoch": cctx.Int64("epoch"),
 	}
 	var reader io.Reader
 
-	if params != nil {
-		body, err := json.Marshal(params)
-		if err != nil {
-			return err
-		}
-
-		reader = bytes.NewBuffer(body)
+	body, err := json.Marshal(params)
+	if err != nil {
+		return err
 	}
+
+	reader = bytes.NewBuffer(body)
 
 	url := "http://106.14.10.70:12345/sector"
 	req, err := http.NewRequest("POST", url, reader)

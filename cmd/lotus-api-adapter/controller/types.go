@@ -1,10 +1,9 @@
 package controller
 
 import (
+	"fmt"
+
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/adt"
-	"github.com/filecoin-project/lotus/chain/actors/builtin/system"
 	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
 	builtin2 "github.com/filecoin-project/specs-actors/v2/actors/builtin"
 	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
@@ -12,8 +11,12 @@ import (
 	builtin5 "github.com/filecoin-project/specs-actors/v5/actors/builtin"
 	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
+	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
 	"github.com/ipfs/go-cid"
-	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/adt"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/system"
 )
 
 func IsStoragePowerActor(c cid.Cid) bool {
@@ -42,6 +45,10 @@ func IsStoragePowerActor(c cid.Cid) bool {
 	}
 
 	if c == builtin7.StoragePowerActorCodeID {
+		return true
+	}
+
+	if c == builtin8.StoragePowerActorCodeID {
 		return true
 	}
 
@@ -77,6 +84,10 @@ func IsRewardActor(c cid.Cid) bool {
 		return true
 	}
 
+	if c == builtin8.RewardActorCodeID {
+		return true
+	}
+
 	return false
 }
 
@@ -106,6 +117,10 @@ func IsInitActor(c cid.Cid) bool {
 	}
 
 	if c == builtin7.InitActorCodeID {
+		return true
+	}
+
+	if c == builtin8.InitActorCodeID {
 		return true
 	}
 
@@ -141,6 +156,10 @@ func IsStorageMarketActor(c cid.Cid) bool {
 		return true
 	}
 
+	if c == builtin8.StorageMarketActorCodeID {
+		return true
+	}
+
 	return false
 }
 
@@ -170,6 +189,10 @@ func IsVerifiedRegistryActor(c cid.Cid) bool {
 	}
 
 	if c == builtin7.VerifiedRegistryActorCodeID {
+		return true
+	}
+
+	if c == builtin8.VerifiedRegistryActorCodeID {
 		return true
 	}
 
@@ -205,6 +228,10 @@ func IsSystemActor(c cid.Cid) bool {
 		return true
 	}
 
+	if c == builtin8.SystemActorCodeID {
+		return true
+	}
+
 	return false
 }
 
@@ -237,37 +264,45 @@ func IsBurntFundsActor(addr address.Address) bool {
 		return true
 	}
 
+	if addr == builtin8.BurntFundsActorAddr {
+		return true
+	}
+
 	return false
 }
 
 func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
 	if c == builtin0.SystemActorCodeID {
-		return system.MakeState(store, actors.Version0)
+		return system.MakeState(store, actors.Version0, cid.Undef)
 	}
 
 	if c == builtin2.SystemActorCodeID {
-		return system.MakeState(store, actors.Version2)
+		return system.MakeState(store, actors.Version2, cid.Undef)
 	}
 
 	if c == builtin3.SystemActorCodeID {
-		return system.MakeState(store, actors.Version3)
+		return system.MakeState(store, actors.Version3, cid.Undef)
 	}
 
 	if c == builtin4.SystemActorCodeID {
-		return system.MakeState(store, actors.Version4)
+		return system.MakeState(store, actors.Version4, cid.Undef)
 	}
 
 	if c == builtin5.SystemActorCodeID {
-		return system.MakeState(store, actors.Version5)
+		return system.MakeState(store, actors.Version5, cid.Undef)
 	}
 
 	if c == builtin6.SystemActorCodeID {
-		return system.MakeState(store, actors.Version6)
+		return system.MakeState(store, actors.Version6, cid.Undef)
 	}
 
 	if c == builtin7.SystemActorCodeID {
-		return system.MakeState(store, actors.Version7)
+		return system.MakeState(store, actors.Version7, cid.Undef)
 	}
 
-	return nil, xerrors.Errorf("not system actor code: %v", c)
+	if c == builtin8.SystemActorCodeID {
+		return system.MakeState(store, actors.Version8, cid.Undef)
+	}
+
+	return nil, fmt.Errorf("not system actor code: %v", c)
 }

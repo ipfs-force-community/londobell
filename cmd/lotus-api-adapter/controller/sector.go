@@ -21,6 +21,8 @@ import (
 	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
+	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
+	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
 	"github.com/gin-gonic/gin"
 
 	"github.com/filecoin-project/lotus/blockstore"
@@ -379,6 +381,50 @@ func GetSectorInfo(c *gin.Context) {
 			resData.Size, err = info.SealProof.SectorSize()
 			if err != nil {
 				log.Errorf("[GetSectorInfo] miner7 SectorSize err: %w", err)
+				res.Code = model.Fail
+				res.Msg = err.Error()
+				c.JSON(http.StatusOK, res)
+				return
+			}
+
+			resData.Activation = info.Activation
+			resData.Expiration = info.Expiration
+			resData.Pledge = info.InitialPledge
+			resData.DealWeight = info.DealWeight
+			resData.VerifiedDealWeight = info.VerifiedDealWeight
+			resData.ExpectedDayReward = info.ExpectedDayReward
+			resData.ExpectedStoragePledge = info.ExpectedStoragePledge
+			resData.ReplaceSectorAge = info.ReplacedSectorAge
+			resData.ReplaceDayReward = info.ReplacedDayReward
+
+			resDatas = append(resDatas, resData)
+		})
+	case builtin8.StorageMinerActorCodeID:
+		state := miner8.State{}
+		err = stor.Get(ctx, mact.Head, &state)
+		if err != nil {
+			log.Errorf("[GetSectorInfo] stor.Get miner8.State err: %w", err)
+			res.Code = model.Fail
+			res.Msg = err.Error()
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		err = state.ForEachSector(stor, func(info *miner8.SectorOnChainInfo) {
+			resData := model.SectorRes{}
+			resData.Miner = maddr
+			resData.Date = CalcTimeByEpoch(uint64(info.Expiration))
+			resData.SectorNumber = info.SectorNumber
+
+			if info.SealProof >= 0 && info.SealProof <= 4 {
+				resData.Version = "V1"
+			} else {
+				resData.Version = "V1_1"
+			}
+
+			resData.Size, err = info.SealProof.SectorSize()
+			if err != nil {
+				log.Errorf("[GetSectorInfo] miner8 SectorSize err: %w", err)
 				res.Code = model.Fail
 				res.Msg = err.Error()
 				c.JSON(http.StatusOK, res)
