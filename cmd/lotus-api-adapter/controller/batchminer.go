@@ -7,11 +7,6 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/blockstore"
-	"github.com/filecoin-project/lotus/chain/actors/builtin"
-	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
-	"github.com/filecoin-project/lotus/chain/store"
-	"github.com/filecoin-project/lotus/chain/types"
 	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
 	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
 	adt0 "github.com/filecoin-project/specs-actors/actors/util/adt"
@@ -32,8 +27,17 @@ import (
 	adt6 "github.com/filecoin-project/specs-actors/v6/actors/util/adt"
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
-	"github.com/filecoin-project/specs-actors/v7/actors/util/adt"
+	adt7 "github.com/filecoin-project/specs-actors/v7/actors/util/adt"
+	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
+	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
+	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
 	"github.com/gin-gonic/gin"
+
+	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	"github.com/filecoin-project/lotus/chain/store"
+	"github.com/filecoin-project/lotus/chain/types"
 
 	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/model"
 )
@@ -795,7 +799,7 @@ func GetBatchMinersInfo(c *gin.Context) {
 				return
 			}
 
-			precommitted, err := adt.AsMap(stor, state.PreCommittedSectors, builtin7.DefaultHamtBitwidth)
+			precommitted, err := adt7.AsMap(stor, state.PreCommittedSectors, builtin7.DefaultHamtBitwidth)
 			if err != nil {
 				res.Code = model.Fail
 				res.Msg = err.Error()
@@ -804,6 +808,100 @@ func GetBatchMinersInfo(c *gin.Context) {
 			}
 
 			var precommit miner7.SectorPreCommitOnChainInfo
+			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+				precommitSectorCount++
+				return nil
+			})
+
+			resData.State = state
+		case builtin8.StorageMinerActorCodeID:
+			state := miner8.State{}
+			err = stor.Get(ctx, mact.Head, &state)
+			if err != nil {
+				res.Code = model.Fail
+				res.Msg = err.Error()
+				c.JSON(http.StatusOK, res)
+				return
+			}
+
+			dls, err := state.LoadDeadlines(stor)
+			if err != nil {
+				res.Code = model.Fail
+				res.Msg = err.Error()
+				c.JSON(http.StatusOK, res)
+				return
+			}
+
+			err = dls.ForEach(stor, func(dlIdx uint64, dl *miner8.Deadline) error {
+				partitions, err := dl.PartitionsArray(stor)
+				if err != nil {
+					return err
+				}
+				var part miner8.Partition
+				return partitions.ForEach(&part, func(partIdx int64) error {
+					sc, err := part.Sectors.Count()
+					if err != nil {
+						return err
+					}
+					sectorCount += sc
+
+					fc, err := part.Faults.Count()
+					if err != nil {
+						return err
+					}
+					faultSectorCount += fc
+
+					active, err := part.ActiveSectors()
+					if err != nil {
+						return err
+					}
+					ac, err := active.Count()
+					if err != nil {
+						return err
+					}
+					activeSectorCount += ac
+
+					live, err := part.LiveSectors()
+					if err != nil {
+						return err
+					}
+					lc, err := live.Count()
+					if err != nil {
+						return err
+					}
+					liveSectorCount += lc
+
+					rc, err := part.Recoveries.Count()
+					if err != nil {
+						return err
+					}
+					recoverSectorCount += rc
+
+					tc, err := part.Terminated.Count()
+					if err != nil {
+						return err
+					}
+					terminateSectorCount += tc
+
+					return nil
+				})
+			})
+			if err != nil {
+				res.Code = model.Fail
+				res.Msg = err.Error()
+				c.JSON(http.StatusOK, res)
+				return
+			}
+
+			precommitted, err := adt8.AsMap(stor, state.PreCommittedSectors, builtin8.DefaultHamtBitwidth)
+			if err != nil {
+				res.Code = model.Fail
+				res.Msg = err.Error()
+				c.JSON(http.StatusOK, res)
+				return
+			}
+
+			var precommit miner8.SectorPreCommitOnChainInfo
 			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
 				precommitSectorCount++
 				return nil
@@ -823,7 +921,7 @@ func GetBatchMinersInfo(c *gin.Context) {
 		resData.Balance = mact.Balance
 		resData.AvailableBalance = availableBalance
 		resData.VestingFunds = lockedFunds.VestingFunds
-		resData.LockedFunds = lockedFunds.PreCommitDeposits //todo:不算init_pledge?
+		resData.LockedFunds = lockedFunds.PreCommitDeposits
 		resData.InitialPledgeRequirement = lockedFunds.InitialPledgeRequirement
 		resData.SectorCount = sectorCount
 		resData.FaultSectorCount = faultSectorCount

@@ -70,13 +70,30 @@ func GetActorInfo(c *gin.Context) {
 		return
 	}
 
-	k, err := API.StateLookupID(ctx, addr, ts.Key())
-	if err != nil {
-		log.Errorf("[GetActorInfo] api StateLookupID err: %w", err)
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
-		return
+	var actorID address.Address
+	var actorAddr address.Address
+
+	if addr.Protocol() == address.ID {
+		actorID = addr
+		actorAddr, err = API.StateAccountKey(ctx, addr, ts.Key())
+		if err != nil {
+			log.Errorf("[GetActorInfo] api StateAccountKey err: %w", err)
+			res.Code = model.Fail
+			res.Msg = err.Error()
+			c.JSON(http.StatusOK, res)
+			return
+		}
+	} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 {
+		actorID, err = API.StateLookupID(ctx, addr, ts.Key())
+		if err != nil {
+			log.Errorf("[GetActorInfo] api StateLookupID err: %w", err)
+			res.Code = model.Fail
+			res.Msg = err.Error()
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		actorAddr = addr
 	}
 
 	var actorType string
@@ -211,8 +228,8 @@ func GetActorInfo(c *gin.Context) {
 	}
 
 	resData := model.ActorRes{
-		ActorID:   addr,
-		ActorAddr: k.String(),
+		ActorID:   actorID,
+		ActorAddr: actorAddr.String(),
 		Epoch:     ts.Height(),
 		BlockTime: CalcTimeByEpoch(uint64(ts.Height())),
 		ActorType: actorType,
