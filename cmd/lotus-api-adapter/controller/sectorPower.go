@@ -6,6 +6,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v8/miner"
 	"github.com/gin-gonic/gin"
 
 	"github.com/filecoin-project/lotus/chain/types"
@@ -65,15 +66,7 @@ func GetSectorPowerInfo(c *gin.Context) {
 		log.Errorf("[GetSectorPowerInfo] API.StateSectorGetInfo err: %w", err)
 	}
 
-	resData.Miner = maddr
-	resData.Date = CalcTimeByEpoch(uint64(si.Expiration))
-	resData.SectorNumber = si.SectorNumber
-	if si.SealProof >= 0 && si.SealProof <= 4 {
-		resData.Version = "V1"
-	} else {
-		resData.Version = "V1_1"
-	}
-	resData.Size, err = si.SealProof.SectorSize()
+	size, err := si.SealProof.SectorSize()
 	if err != nil {
 		log.Errorf("[GetSectorPowerInfo] SectorSize err: %w", err)
 		res.Code = model.Fail
@@ -81,15 +74,12 @@ func GetSectorPowerInfo(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	resData.Activation = si.Activation
-	resData.Expiration = si.Expiration
-	resData.Pledge = si.InitialPledge
-	resData.DealWeight = si.DealWeight
-	resData.VerifiedDealWeight = si.VerifiedDealWeight
-	resData.ExpectedDayReward = si.ExpectedDayReward
-	resData.ExpectedStoragePledge = si.ExpectedStoragePledge
-	resData.ReplaceSectorAge = si.ReplacedSectorAge
-	resData.ReplaceDayReward = si.ReplacedDayReward
+
+	qualityAdjPower := miner.QAPowerForWeight(size, si.Expiration-si.Activation, si.DealWeight, si.VerifiedDealWeight)
+	resData.Miner = req.Miner
+	resData.Epoch = req.Epoch
+	resData.Sector = req.Sector
+	resData.QualityAdjPower = qualityAdjPower
 
 	res.Data = resData
 	c.JSON(http.StatusOK, res)
