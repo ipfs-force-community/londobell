@@ -37,6 +37,7 @@ func RegisterApi(router *gin.Engine) {
 		group.POST("/miner", controller.GetMinerInfo)
 		group.POST("/sector", controller.GetSectorInfo)
 		group.POST("/batchminers", controller.GetBatchMinersInfo)
+		group.POST("/sectorpower", controller.GetSectorPowerInfo)
 	}
 }
 
