@@ -1,7 +1,10 @@
 package server
 
 import (
+	"fmt"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/controller"
@@ -21,10 +24,21 @@ func Run(cctx *cli.Context) error {
 	}
 
 	RegisterApi(router)
-	err = router.Run(":" + cctx.String("port"))
-	if err != nil {
-		return err
+	s := &http.Server{
+		Addr:         fmt.Sprintf(":%s", cctx.String("port")),
+		Handler:      router,
+		ReadTimeout:  time.Minute,
+		WriteTimeout: time.Minute,
 	}
+
+	if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
+
+	//err = router.Run(":" + cctx.String("port"))
+	//if err != nil {
+	//	return err
+	//}
 
 	return nil
 }
@@ -37,6 +51,7 @@ func RegisterApi(router *gin.Engine) {
 		group.POST("/miner", controller.GetMinerInfo)
 		group.POST("/sector", controller.GetSectorInfo)
 		group.POST("/batchminers", controller.GetBatchMinersInfo)
+		group.POST("/sectorpower", controller.GetSectorPowerInfo)
 	}
 }
 
