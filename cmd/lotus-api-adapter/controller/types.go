@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/builtin"
 	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
 	builtin2 "github.com/filecoin-project/specs-actors/v2/actors/builtin"
 	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
@@ -15,7 +16,6 @@ import (
 	builtin5 "github.com/filecoin-project/specs-actors/v5/actors/builtin"
 	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
-	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/chain/actors"
@@ -24,6 +24,13 @@ import (
 )
 
 func IsStoragePowerActor(c cid.Cid) bool {
+	if name, _, ok := actors.GetActorMetaByCode(c); ok {
+		if name != actors.PowerKey {
+			return false
+		}
+		return true
+	}
+
 	if c == builtin0.StoragePowerActorCodeID {
 		return true
 	}
@@ -45,14 +52,18 @@ func IsStoragePowerActor(c cid.Cid) bool {
 	if c == builtin7.StoragePowerActorCodeID {
 		return true
 	}
-	if c == builtin8.StoragePowerActorCodeID {
-		return true
-	}
 
 	return false
 }
 
 func IsRewardActor(c cid.Cid) bool {
+	if name, _, ok := actors.GetActorMetaByCode(c); ok {
+		if name != actors.RewardKey {
+			return false
+		}
+		return true
+	}
+
 	if c == builtin0.RewardActorCodeID {
 		return true
 	}
@@ -74,14 +85,18 @@ func IsRewardActor(c cid.Cid) bool {
 	if c == builtin7.RewardActorCodeID {
 		return true
 	}
-	if c == builtin8.RewardActorCodeID {
-		return true
-	}
 
 	return false
 }
 
 func IsInitActor(c cid.Cid) bool {
+	if name, _, ok := actors.GetActorMetaByCode(c); ok {
+		if name != actors.InitKey {
+			return false
+		}
+		return true
+	}
+
 	if c == builtin0.InitActorCodeID {
 		return true
 	}
@@ -103,14 +118,18 @@ func IsInitActor(c cid.Cid) bool {
 	if c == builtin7.InitActorCodeID {
 		return true
 	}
-	if c == builtin8.InitActorCodeID {
-		return true
-	}
 
 	return false
 }
 
 func IsStorageMarketActor(c cid.Cid) bool {
+	if name, _, ok := actors.GetActorMetaByCode(c); ok {
+		if name != actors.MarketKey {
+			return false
+		}
+		return true
+	}
+
 	if c == builtin0.StorageMarketActorCodeID {
 		return true
 	}
@@ -132,14 +151,18 @@ func IsStorageMarketActor(c cid.Cid) bool {
 	if c == builtin7.StorageMarketActorCodeID {
 		return true
 	}
-	if c == builtin8.StorageMarketActorCodeID {
-		return true
-	}
 
 	return false
 }
 
 func IsVerifiedRegistryActor(c cid.Cid) bool {
+	if name, _, ok := actors.GetActorMetaByCode(c); ok {
+		if name != actors.VerifregKey {
+			return false
+		}
+		return true
+	}
+
 	if c == builtin0.VerifiedRegistryActorCodeID {
 		return true
 	}
@@ -161,14 +184,18 @@ func IsVerifiedRegistryActor(c cid.Cid) bool {
 	if c == builtin7.VerifiedRegistryActorCodeID {
 		return true
 	}
-	if c == builtin8.VerifiedRegistryActorCodeID {
-		return true
-	}
 
 	return false
 }
 
 func IsSystemActor(c cid.Cid) bool {
+	if name, _, ok := actors.GetActorMetaByCode(c); ok {
+		if name != actors.SystemKey {
+			return false
+		}
+		return true
+	}
+
 	if c == builtin0.SystemActorCodeID {
 		return true
 	}
@@ -190,36 +217,12 @@ func IsSystemActor(c cid.Cid) bool {
 	if c == builtin7.SystemActorCodeID {
 		return true
 	}
-	if c == builtin8.SystemActorCodeID {
-		return true
-	}
 
 	return false
 }
 
 func IsBurntFundsActor(addr address.Address) bool {
-	if addr == builtin0.BurntFundsActorAddr {
-		return true
-	}
-	if addr == builtin2.BurntFundsActorAddr {
-		return true
-	}
-	if addr == builtin3.BurntFundsActorAddr {
-		return true
-	}
-	if addr == builtin4.BurntFundsActorAddr {
-		return true
-	}
-	if addr == builtin5.BurntFundsActorAddr {
-		return true
-	}
-	if addr == builtin6.BurntFundsActorAddr {
-		return true
-	}
-	if addr == builtin7.BurntFundsActorAddr {
-		return true
-	}
-	if addr == builtin8.BurntFundsActorAddr {
+	if addr == builtin.BurntFundsActorAddr {
 		return true
 	}
 
@@ -227,6 +230,19 @@ func IsBurntFundsActor(addr address.Address) bool {
 }
 
 func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
+	if name, av, ok := actors.GetActorMetaByCode(c); ok {
+		if name != actors.SystemKey {
+			return nil, fmt.Errorf("actor code is not system: %s", name)
+		}
+
+		switch av {
+
+		case actors.Version8:
+			return system.MakeState(store, actors.Version8, cid.Undef)
+
+		}
+	}
+
 	if c == builtin0.SystemActorCodeID {
 		return system.MakeState(store, actors.Version0, cid.Undef)
 	}
@@ -247,9 +263,6 @@ func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
 	}
 	if c == builtin7.SystemActorCodeID {
 		return system.MakeState(store, actors.Version7, cid.Undef)
-	}
-	if c == builtin8.SystemActorCodeID {
-		return system.MakeState(store, actors.Version8, cid.Undef)
 	}
 
 	return nil, fmt.Errorf("not system actor code: %v", c)
