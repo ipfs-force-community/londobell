@@ -40,7 +40,7 @@ func Run(cctx *cli.Context) error {
 	//	return err
 	//}
 
-	return nil
+	return err
 }
 
 func RegisterApi(router *gin.Engine) {
