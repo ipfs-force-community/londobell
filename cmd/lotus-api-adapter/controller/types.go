@@ -48,6 +48,7 @@ func IsStoragePowerActor(c cid.Cid) bool {
 	if c == builtin8.StoragePowerActorCodeID {
 		return true
 	}
+
 	return false
 }
 
@@ -76,6 +77,7 @@ func IsRewardActor(c cid.Cid) bool {
 	if c == builtin8.RewardActorCodeID {
 		return true
 	}
+
 	return false
 }
 
@@ -104,6 +106,7 @@ func IsInitActor(c cid.Cid) bool {
 	if c == builtin8.InitActorCodeID {
 		return true
 	}
+
 	return false
 }
 
@@ -132,6 +135,7 @@ func IsStorageMarketActor(c cid.Cid) bool {
 	if c == builtin8.StorageMarketActorCodeID {
 		return true
 	}
+
 	return false
 }
 
@@ -160,6 +164,7 @@ func IsVerifiedRegistryActor(c cid.Cid) bool {
 	if c == builtin8.VerifiedRegistryActorCodeID {
 		return true
 	}
+
 	return false
 }
 
@@ -188,6 +193,7 @@ func IsSystemActor(c cid.Cid) bool {
 	if c == builtin8.SystemActorCodeID {
 		return true
 	}
+
 	return false
 }
 
@@ -216,6 +222,7 @@ func IsBurntFundsActor(addr address.Address) bool {
 	if addr == builtin8.BurntFundsActorAddr {
 		return true
 	}
+
 	return false
 }
 
@@ -244,5 +251,6 @@ func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
 	if c == builtin8.SystemActorCodeID {
 		return system.MakeState(store, actors.Version8, cid.Undef)
 	}
+
 	return nil, fmt.Errorf("not system actor code: %v", c)
 }
