@@ -75,14 +75,6 @@ func GetActorInfo(c *gin.Context) {
 
 	if addr.Protocol() == address.ID {
 		actorID = addr
-		actorAddr, err = API.StateAccountKey(ctx, addr, ts.Key())
-		if err != nil {
-			log.Errorf("[GetActorInfo] api StateAccountKey err: %w", err)
-			res.Code = model.Fail
-			res.Msg = err.Error()
-			c.JSON(http.StatusOK, res)
-			return
-		}
 	} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 {
 		actorID, err = API.StateLookupID(ctx, addr, ts.Key())
 		if err != nil {
@@ -123,6 +115,15 @@ func GetActorInfo(c *gin.Context) {
 			return
 		}
 		state = st.GetState()
+
+		actorAddr, err = API.StateAccountKey(ctx, addr, ts.Key())
+		if err != nil {
+			log.Errorf("[GetActorInfo] api StateAccountKey err: %w", err)
+			res.Code = model.Fail
+			res.Msg = err.Error()
+			c.JSON(http.StatusOK, res)
+			return
+		}
 	case builtin.IsMultisigActor(act.Code):
 		actorType = "multisig"
 		st, err := multisig.Load(stor, act)

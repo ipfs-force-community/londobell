@@ -19,7 +19,7 @@ func IsStoragePowerActor(c cid.Cid) bool {
     if c == builtin{{ .Ver }}.StoragePowerActorCodeID {
     		return true
     }
-    {{ end -}}
+    {{ end }}
 
     return false
 }
@@ -29,7 +29,7 @@ func IsRewardActor(c cid.Cid) bool {
 	if c == builtin{{ .Ver }}.RewardActorCodeID {
 		return true
 	}
-	{{ end -}}
+	{{ end }}
 
 	return false
 }
@@ -39,7 +39,7 @@ func IsInitActor(c cid.Cid) bool {
 	if c == builtin{{ .Ver }}.InitActorCodeID {
 		return true
 	}
-	{{ end -}}
+	{{ end }}
 
 	return false
 }
@@ -49,7 +49,7 @@ func IsStorageMarketActor(c cid.Cid) bool {
     if c == builtin{{ .Ver }}.StorageMarketActorCodeID {
     	return true
     }
-    {{ end -}}
+    {{ end }}
 
     return false
 }
@@ -59,7 +59,7 @@ func IsVerifiedRegistryActor(c cid.Cid) bool {
     if c == builtin{{ .Ver }}.VerifiedRegistryActorCodeID {
     	return true
     }
-    {{ end -}}
+    {{ end }}
 
     return false
 }
@@ -69,7 +69,7 @@ func IsSystemActor(c cid.Cid) bool {
     if c == builtin{{ .Ver }}.SystemActorCodeID {
         return true
     }
-    {{ end -}}
+    {{ end }}
 
     return false
 }
@@ -79,7 +79,7 @@ func IsBurntFundsActor(addr address.Address) bool {
     if addr == builtin{{ .Ver }}.BurntFundsActorAddr {
         return true
     }
-    {{ end -}}
+    {{ end }}
 
     return false
 }
@@ -89,7 +89,7 @@ func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
     if c == builtin{{ .Ver }}.SystemActorCodeID {
         return system.MakeState(store, actors.Version{{ .Ver }}, cid.Undef)
     }
-    {{ end -}}
+    {{ end }}
 
     return nil, fmt.Errorf("not system actor code: %v", c)
 }
