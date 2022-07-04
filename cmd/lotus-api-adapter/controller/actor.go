@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/filecoin-project/go-address"
@@ -93,45 +92,46 @@ func GetActorInfo(c *gin.Context) {
 
 	stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(API))
 
-	iact, err := API.StateGetActor(ctx, init_.Address, ts.Key())
-	if err != nil {
-		log.Errorf("[GetActorInfo] api StateGetActor err: %w", err)
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
-		return
-	}
-
-	ist, err := init_.Load(stor, iact)
-	if err != nil {
-		log.Errorf("[GetActorInfo] init_.Load err: %w", err)
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
-		return
-	}
-
-	err = ist.ForEachActor(func(id abi.ActorID, addr address.Address) error {
-		idAddr, err := address.NewIDAddress(uint64(id))
-		if err != nil {
-			return fmt.Errorf("[GetActorInfo] address.NewIDAddress: %w", err)
-		}
-
-		if idAddr == actorID {
-			log.Errorf("idAddr: %v, actorID: %v", idAddr, actorID)
-			actorAddr = addr
-			return nil
-		}
-
-		return nil
-	})
-	if err != nil {
-		log.Errorf("[GetActorInfo] ist.ForEachActor err: %w", err)
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
-		return
-	}
+	////too slow!!
+	//iact, err := API.StateGetActor(ctx, init_.Address, ts.Key())
+	//if err != nil {
+	//	log.Errorf("[GetActorInfo] api StateGetActor err: %w", err)
+	//	res.Code = model.Fail
+	//	res.Msg = err.Error()
+	//	c.JSON(http.StatusOK, res)
+	//	return
+	//}
+	//
+	//ist, err := init_.Load(stor, iact)
+	//if err != nil {
+	//	log.Errorf("[GetActorInfo] init_.Load err: %w", err)
+	//	res.Code = model.Fail
+	//	res.Msg = err.Error()
+	//	c.JSON(http.StatusOK, res)
+	//	return
+	//}
+	//
+	//err = ist.ForEachActor(func(id abi.ActorID, addr address.Address) error {
+	//	idAddr, err := address.NewIDAddress(uint64(id))
+	//	if err != nil {
+	//		return fmt.Errorf("[GetActorInfo] address.NewIDAddress: %w", err)
+	//	}
+	//
+	//	if idAddr == actorID {
+	//		log.Infof("idAddr: %v, actorID: %v", idAddr, actorID)
+	//		actorAddr = addr
+	//		return nil
+	//	}
+	//
+	//	return nil
+	//})
+	//if err != nil {
+	//	log.Errorf("[GetActorInfo] ist.ForEachActor err: %w", err)
+	//	res.Code = model.Fail
+	//	res.Msg = err.Error()
+	//	c.JSON(http.StatusOK, res)
+	//	return
+	//}
 
 	act, err := API.StateGetActor(ctx, addr, ts.Key())
 	if err != nil {
@@ -157,14 +157,14 @@ func GetActorInfo(c *gin.Context) {
 		}
 		state = st.GetState()
 
-		//actorAddr, err = API.StateAccountKey(ctx, addr, ts.Key())
-		//if err != nil {
-		//	log.Errorf("[GetActorInfo] api StateAccountKey err: %w", err)
-		//	res.Code = model.Fail
-		//	res.Msg = err.Error()
-		//	c.JSON(http.StatusOK, res)
-		//	return
-		//}
+		actorAddr, err = API.StateAccountKey(ctx, addr, ts.Key())
+		if err != nil {
+			log.Errorf("[GetActorInfo] api StateAccountKey err: %w", err)
+			res.Code = model.Fail
+			res.Msg = err.Error()
+			c.JSON(http.StatusOK, res)
+			return
+		}
 	case builtin.IsMultisigActor(act.Code):
 		actorType = "multisig"
 		st, err := multisig.Load(stor, act)
