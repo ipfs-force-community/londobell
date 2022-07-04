@@ -118,7 +118,9 @@ func GetActorInfo(c *gin.Context) {
 		}
 
 		if idAddr == actorID {
+			log.Errorf("idAddr: %v, actorID: %v", idAddr, actorID)
 			actorAddr = addr
+			return nil
 		}
 
 		return nil
