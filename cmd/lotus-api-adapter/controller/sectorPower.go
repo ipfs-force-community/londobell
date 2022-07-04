@@ -76,8 +76,8 @@ func GetSectorPowerInfo(c *gin.Context) {
 	}
 
 	qualityAdjPower := miner.QAPowerForWeight(size, si.Expiration-si.Activation, si.DealWeight, si.VerifiedDealWeight)
-	resData.Miner = req.Miner
-	resData.Epoch = req.Epoch
+	resData.Miner = maddr
+	resData.Epoch = ts.Height()
 	resData.Sector = req.Sector
 	resData.QualityAdjPower = qualityAdjPower
 
