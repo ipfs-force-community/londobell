@@ -64,6 +64,10 @@ func GetSectorPowerInfo(c *gin.Context) {
 	si, err := API.StateSectorGetInfo(ctx, maddr, abi.SectorNumber(req.Sector), ts.Key())
 	if err != nil {
 		log.Errorf("[GetSectorPowerInfo] API.StateSectorGetInfo err: %w", err)
+		res.Code = model.Fail
+		res.Msg = err.Error()
+		c.JSON(http.StatusOK, res)
+		return
 	}
 
 	size, err := si.SealProof.SectorSize()
