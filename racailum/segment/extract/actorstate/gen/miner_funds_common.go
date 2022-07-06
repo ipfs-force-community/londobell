@@ -32,8 +32,10 @@ import (
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 	adt7 "github.com/filecoin-project/specs-actors/v7/actors/util/adt"
 
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
+	gstStore "github.com/filecoin-project/go-state-types/store"
+	miner8state "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
 
 	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
 
@@ -45,7 +47,7 @@ import (
 
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
 
-	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
+	builtin8 "github.com/filecoin-project/go-state-types/builtin"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mir"
@@ -643,7 +645,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		}
 
 		if !st.VestingFunds.Equals(emptyMinerStateV8.VestingFunds) {
-			funds, err := st.LoadVestingFunds(adt8.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+			funds, err := st.LoadVestingFunds(gstStore.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
 				return fmt.Errorf("load vesting funds: %w", err)
 			}
@@ -678,11 +680,11 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 				return fmt.Errorf("get dl partition failed: %w", err)
 			}
 			var part miner8.Partition
-			dlInfo := miner8.NewDeadlineInfo(st.CurrentProvingPeriodStart(head.Epoch), dlIdx, head.Epoch).NextNotElapsed()
-			quant := miner8.QuantSpecForDeadline(dlInfo)
+			dlInfo := miner8.NewDeadlineInfo(miner8state.NewDeadlineInfoFromOffsetAndEpoch(st.ProvingPeriodStart, head.Epoch).PeriodStart, dlIdx, head.Epoch).NextNotElapsed()
+			quant := miner8state.QuantSpecForDeadline(dlInfo)
 
 			return ps.ForEach(&part, func(partIdx int64) error {
-				expirations, err := miner8.LoadExpirationQueue(actStore, part.ExpirationsEpochs, quant, miner8.PartitionExpirationAmtBitwidth)
+				expirations, err := miner8state.LoadExpirationQueue(actStore, part.ExpirationsEpochs, quant, miner8.PartitionExpirationAmtBitwidth)
 				if err != nil {
 					return fmt.Errorf("failed to load expiration queue: %w", err)
 				}
@@ -704,7 +706,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			return fmt.Errorf("process sector pledge failed")
 		}
 
-		info, err := st.GetInfo(adt8.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+		info, err := st.GetInfo(gstStore.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 		if err != nil {
 			return fmt.Errorf("load miner info: %w", err)
 		}

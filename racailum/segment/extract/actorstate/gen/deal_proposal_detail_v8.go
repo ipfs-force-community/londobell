@@ -9,8 +9,9 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	market8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/market"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	market8 "github.com/filecoin-project/go-state-types/builtin/v8/market"
+	gstStore "github.com/filecoin-project/go-state-types/store"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -29,14 +30,19 @@ func extractDealProposalDetailedV8(ctx *extract.Ctx, res *extract.Res, head *com
 		return nil
 	}
 
-	deals, err := market8.AsDealProposalArray(adt8.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
+	deals, err := market8.AsDealProposalArray(gstStore.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
 	if err != nil {
 		return fmt.Errorf("load deal proposal array: %w", err)
 	}
 
-	dealsStateArr, err := market8.AsDealStateArray(adt8.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.States)
+	state, err := market.Load(ctx.D.ActorStore(ctx.C), head.Actor)
 	if err != nil {
-		return fmt.Errorf("load deal state array: %w", err)
+		return fmt.Errorf("failed to load market actor state: %w", err)
+	}
+
+	states, err := state.States()
+	if err != nil {
+		return err
 	}
 	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
@@ -61,7 +67,7 @@ func extractDealProposalDetailedV8(ctx *extract.Ctx, res *extract.Res, head *com
 			}
 		}
 
-		dealState, found, err := dealsStateArr.Get(abi.DealID(idx))
+		dealState, found, err := states.Get(abi.DealID(idx))
 		if err != nil {
 			return fmt.Errorf("load deal state failed: %w", err)
 		}

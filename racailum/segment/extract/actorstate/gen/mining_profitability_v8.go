@@ -10,10 +10,11 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
-	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
-	power8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/power"
-	reward8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/reward"
+	builtin8 "github.com/filecoin-project/go-state-types/builtin"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	power8 "github.com/filecoin-project/go-state-types/builtin/v8/power"
+	reward8 "github.com/filecoin-project/go-state-types/builtin/v8/reward"
+	miner8state "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
 
 	"github.com/filecoin-project/lotus/chain/vm"
 
@@ -60,7 +61,7 @@ func extractMiningProfitabilityV8(ctx *extract.Ctx, res *extract.Res, head *comm
 		InitialConsensusPledge:    consensusPledge,
 		InitialStoragePledge:      storagePledge,
 		ProjectionOfInitialPledge: storagePledge, // TODO: projection is just equal to the init storage power here, correct me if I'm wrong
-		ProjectionOfFaultFee:      miner8.PledgePenaltyForContinuedFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower),
+		ProjectionOfFaultFee:      miner8.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner8state.ContinuedFaultProjectionPeriod),
 		Mined:                     st.TotalStoragePowerReward,
 	}
 

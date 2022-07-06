@@ -5,8 +5,14 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	{{- if eq .Ver 8 }}
+	market8 "github.com/filecoin-project/go-state-types/builtin/v8/market"
+	gstStore "github.com/filecoin-project/go-state-types/store"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
+	{{ else }}
 	market{{ .Ver }} "{{ .ImportPath }}/actors/builtin/market"
 	adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+	{{ end -}}
 	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -42,15 +48,32 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
         return nil
     }
 
-	deals, err := market{{ .Ver }}.AsDealProposalArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
+    {{ if eq .Ver 8 }}
+    deals, err := market{{ .Ver }}.AsDealProposalArray(gstStore.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
+    {{ else }}
+    deals, err := market{{ .Ver }}.AsDealProposalArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
+    {{ end -}}
 	if err != nil {
 		return fmt.Errorf("load deal proposal array: %w", err)
 	}
 
-	dealsStateArr, err := market{{ .Ver }}.AsDealStateArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.States)
-	if err != nil {
-		return fmt.Errorf("load deal state array: %w", err)
-	}
+    {{ if eq .Ver 8 }}
+	state, err := market.Load(ctx.D.ActorStore(ctx.C), head.Actor)
+    if err != nil {
+        return fmt.Errorf("failed to load market actor state: %w", err)
+    }
+
+    states, err := state.States()
+    if err != nil {
+        return err
+    }
+    {{ else }}
+    dealsStateArr, err := market{{ .Ver }}.AsDealStateArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.States)
+    if err != nil {
+        return fmt.Errorf("load deal state array: %w", err)
+    }
+    {{ end -}}
+
 	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
 		return fmt.Errorf("ge regular id: %w", err)
@@ -77,7 +100,11 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
 			}
 		}
 
+        {{ if eq .Ver 8 }}
+		dealState, found, err := states.Get(abi.DealID(idx))
+		{{ else }}
 		dealState, found, err := dealsStateArr.Get(abi.DealID(idx))
+		{{ end -}}
 		if err != nil {
 			return fmt.Errorf("load deal state failed: %w", err)
 		}

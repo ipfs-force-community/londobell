@@ -6,10 +6,18 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
+    {{ if eq .Ver 8 }}
+    builtin8 "github.com/filecoin-project/go-state-types/builtin"
+    miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+    power8 "github.com/filecoin-project/go-state-types/builtin/v8/power"
+    reward8 "github.com/filecoin-project/go-state-types/builtin/v8/reward"
+    miner8state "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
+    {{ else }}
 	builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
 	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
 	power{{ .Ver }} "{{ .ImportPath }}/actors/builtin/power"
 	reward{{ .Ver }} "{{ .ImportPath }}/actors/builtin/reward"
+	{{ end }}
 
 	"github.com/filecoin-project/lotus/chain/vm"
 
@@ -99,7 +107,11 @@ func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, h
 		ProjectionOfFaultFee:      miner{{ .Ver }}.PledgePenaltyForDeclaredFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, ctx.D.GetNetworkVersion(ctx.C, head.Epoch)),
 		Mined:                     st.TotalMined,
 		{{- else -}}
+		{{ if eq .Ver 8 -}}
+		ProjectionOfFaultFee:      miner8.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower,  miner8state.ContinuedFaultProjectionPeriod),
+		{{- else -}}
 		ProjectionOfFaultFee:      miner{{ .Ver }}.PledgePenaltyForContinuedFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower),
+		{{- end }}
 		Mined:                     st.TotalStoragePowerReward,
 		{{- end}}
 	}

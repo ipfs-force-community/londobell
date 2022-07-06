@@ -10,28 +10,36 @@ import (
 	"github.com/filecoin-project/go-state-types/rt"
 	"github.com/filecoin-project/lotus/chain/actors"
 	exported0 "github.com/filecoin-project/specs-actors/actors/builtin/exported"
+
 	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
 
 	exported2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/exported"
+
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 
 	exported3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/exported"
+
 	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
 
 	exported4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/exported"
+
 	miner4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/miner"
 
 	exported5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/exported"
+
 	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
 
 	exported6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/exported"
+
 	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
 
 	exported7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/exported"
+
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 
 	exported8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/exported"
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
+
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
 )
 
 func init() {

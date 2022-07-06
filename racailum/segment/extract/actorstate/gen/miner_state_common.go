@@ -33,8 +33,9 @@ import (
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 	adt7 "github.com/filecoin-project/specs-actors/v7/actors/util/adt"
 
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	gstStore "github.com/filecoin-project/go-state-types/store"
+	miner8state "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
 
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	cstore "github.com/filecoin-project/lotus/chain/store"
@@ -396,6 +397,27 @@ func isEmptyMinerStateV8(mst *miner8.State) bool {
 func newEmptyMinerStateV8() (*miner8.State, error) {
 	ctx := context.Background()
 	inMemStore := bstore.NewMemorySync()
-	adtStore := adt8.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
-	return miner8.ConstructState(adtStore, cid.Undef, 0, 0)
+	adtStore := gstStore.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
+	st, err := miner8state.ConstructState(adtStore, cid.Undef, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return &miner8.State{
+		Info:                       st.Info,
+		PreCommitDeposits:          st.PreCommitDeposits,
+		LockedFunds:                st.LockedFunds,
+		FeeDebt:                    st.FeeDebt,
+		VestingFunds:               st.VestingFunds,
+		InitialPledge:              st.InitialPledge,
+		PreCommittedSectors:        st.PreCommittedSectors,
+		PreCommittedSectorsCleanUp: st.PreCommittedSectorsCleanUp,
+		AllocatedSectors:           st.AllocatedSectors,
+		Sectors:                    st.Sectors,
+		ProvingPeriodStart:         st.ProvingPeriodStart,
+		CurrentDeadline:            st.CurrentDeadline,
+		Deadlines:                  st.Deadlines,
+		EarlyTerminations:          st.EarlyTerminations,
+		DeadlineCronActive:         st.DeadlineCronActive,
+	}, nil
 }

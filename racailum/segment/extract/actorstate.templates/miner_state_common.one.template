@@ -9,8 +9,14 @@ import (
 	"github.com/filecoin-project/go-bitfield"
 
 	{{ range $vinfo := .Vers }}
+	{{ if eq $vinfo.Ver 8 }}
+    miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+    gstStore "github.com/filecoin-project/go-state-types/store"
+    miner8state "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
+    {{ else }}
 	miner{{ $vinfo.Ver }} "{{ $vinfo.ImportPath }}/actors/builtin/miner"
 	adt{{ $vinfo.Ver }} "{{ $vinfo.ImportPath }}/actors/util/adt"
+	{{ end }}
 
 	{{ end }}
 
@@ -75,8 +81,34 @@ func isEmptyMinerStateV{{ $vinfo.Ver }}(mst *miner{{ $vinfo.Ver }}.State) bool {
 func newEmptyMinerStateV{{ $vinfo.Ver }}() (*miner{{ $vinfo.Ver }}.State, error) {
 	ctx := context.Background()
 	inMemStore := bstore.NewMemorySync()
+	{{- if eq $vinfo.Ver 8 }}
+    adtStore := gstStore.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
+    st, err := miner8state.ConstructState(adtStore, cid.Undef, 0, 0)
+    if err != nil {
+        return nil, err
+    }
+
+    return &miner{{ $vinfo.Ver }}.State{
+        Info:                       st.Info,
+        PreCommitDeposits:          st.PreCommitDeposits,
+        LockedFunds:                st.LockedFunds,
+        FeeDebt:                    st.FeeDebt,
+        VestingFunds:               st.VestingFunds,
+        InitialPledge:              st.InitialPledge,
+        PreCommittedSectors:        st.PreCommittedSectors,
+        PreCommittedSectorsCleanUp: st.PreCommittedSectorsCleanUp,
+        AllocatedSectors:           st.AllocatedSectors,
+        Sectors:                    st.Sectors,
+        ProvingPeriodStart:         st.ProvingPeriodStart,
+        CurrentDeadline:            st.CurrentDeadline,
+        Deadlines:                  st.Deadlines,
+        EarlyTerminations:          st.EarlyTerminations,
+        DeadlineCronActive:         st.DeadlineCronActive,
+    }, nil
+    {{ else }}
 	adtStore := adt{{ $vinfo.Ver }}.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
 	return miner{{ $vinfo.Ver }}.ConstructState(adtStore, cid.Undef, 0, 0)
+	{{ end -}}
 }
 {{ else }}
 func isEmptyMinerStateV{{ $vinfo.Ver }}(mst *miner{{ $vinfo.Ver }}.State) bool {

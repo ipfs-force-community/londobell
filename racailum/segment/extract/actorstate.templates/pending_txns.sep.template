@@ -5,10 +5,19 @@ import (
 
     "github.com/filecoin-project/go-state-types/abi"
     {{ if gt .Ver 2 -}}
+    {{ if eq .Ver 8 -}}
+    builtin8 "github.com/filecoin-project/go-state-types/builtin"
+    {{- else -}}
     builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
     {{- end }}
+    {{- end }}
+    {{- if eq .Ver 8 }}
+    multisig8 "github.com/filecoin-project/go-state-types/builtin/v8/multisig"
+    adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
+    {{ else }}
     multisig{{ .Ver }} "{{ .ImportPath }}/actors/builtin/multisig"
     adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+    {{ end -}}
     "github.com/ipfs-force-community/londobell/common"
     "github.com/ipfs-force-community/londobell/racailum/segment/extract"
     "github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"

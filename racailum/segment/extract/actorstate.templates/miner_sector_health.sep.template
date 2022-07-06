@@ -5,7 +5,11 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	{{- if eq .Ver 8 }}
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	{{ else }}
 	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
+	{{ end -}}
 	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -59,14 +63,22 @@ func extractMinerSectorHealthV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, hea
         detail.Live += dl.LiveSectors
 		var part miner{{ .Ver }}.Partition
 		return ps.ForEach(&part, func(partIdx int64) error {
-			detail.ActiveSectorsQAPower = big.Add(detail.ActiveSectorsQAPower, part.ActivePower().QA)
+		    {{- if eq .Ver 8 }}
+			detail.ActiveSectorsQAPower = big.Add(detail.ActiveSectorsQAPower,part.LivePower.Sub(part.FaultyPower).Sub(part.UnprovenPower).QA)
+			{{ else }}
+			detail.ActiveSectorsQAPower = big.Add(detail.ActiveSectorsQAPower,part.ActivePower().QA)
+			{{ end -}}
 			detail.FaultsQAPower = big.Add(detail.FaultsQAPower, part.FaultyPower.QA)
 			detail.RecoveriesQAPower = big.Add(detail.RecoveriesQAPower, part.RecoveringPower.QA)
 			{{ if gt .Ver 0 -}}
 			detail.UnprovenQAPower = big.Add(detail.UnprovenQAPower, part.UnprovenPower.QA)
 			{{- end }}
 
+            {{ if eq .Ver 8 }}
+			detail.ActiveSectorsRawPower = big.Add(detail.ActiveSectorsRawPower, part.LivePower.Sub(part.FaultyPower).Sub(part.UnprovenPower).Raw)
+			{{ else }}
 			detail.ActiveSectorsRawPower = big.Add(detail.ActiveSectorsRawPower, part.ActivePower().Raw)
+			{{ end -}}
 			detail.FaultsRawPower = big.Add(detail.FaultsRawPower, part.FaultyPower.Raw)
 			detail.RecoveriesRawPower = big.Add(detail.RecoveriesRawPower, part.RecoveringPower.Raw)
 			{{ if gt .Ver 0 -}}

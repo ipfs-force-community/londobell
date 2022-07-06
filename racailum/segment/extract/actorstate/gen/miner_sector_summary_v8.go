@@ -11,9 +11,9 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
-	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	builtin8 "github.com/filecoin-project/go-state-types/builtin"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	gstStore "github.com/filecoin-project/go-state-types/store"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -82,7 +82,7 @@ func extractMinerSectorSummaryV8(ctx *extract.Ctx, res *extract.Res, head *commo
 	summaries = append(summaries, last)
 	summariesInDays = append(summariesInDays, last)
 
-	sectors, err := miner8.LoadSectors(adt8.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Sectors)
+	sectors, err := miner8.LoadSectors(gstStore.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Sectors)
 	if err != nil {
 		return fmt.Errorf("load sectors from adt store: %w", err)
 	}
@@ -130,7 +130,7 @@ func extractMinerSectorSummaryV8(ctx *extract.Ctx, res *extract.Res, head *commo
 				DealWeight:         out.DealWeight,
 				VerifiedDealWeight: out.VerifiedDealWeight,
 				InitialPledge:      out.InitialPledge,
-				QAPower:            miner8.QAPowerForSector(sectorSize, &out),
+				QAPower:            miner8.QAPowerForWeight(sectorSize, out.Expiration-out.Activation, out.DealWeight, out.VerifiedDealWeight),
 				Miner:              head.Addr,
 			})
 		}

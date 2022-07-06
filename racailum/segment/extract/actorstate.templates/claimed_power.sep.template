@@ -7,11 +7,19 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 
-	{{ if gt .Ver 2 }}
+    {{ if eq .Ver 8 }}
+    builtin8 "github.com/filecoin-project/go-state-types/builtin"
+	{{ else if gt .Ver 2 }}
 	builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
 	{{ end }}
+
+	{{ if eq .Ver 8 }}
+	power8 "github.com/filecoin-project/go-state-types/builtin/v8/power"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
+	{{ else }}
 	power{{ .Ver }} "{{ .ImportPath }}/actors/builtin/power"
 	adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+	{{ end }}
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"

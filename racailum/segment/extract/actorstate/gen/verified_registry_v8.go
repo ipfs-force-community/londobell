@@ -11,9 +11,9 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 
-	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
-	verifreg8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/verifreg"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	builtin8 "github.com/filecoin-project/go-state-types/builtin"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
+	verifreg8 "github.com/filecoin-project/go-state-types/builtin/v8/verifreg"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"

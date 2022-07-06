@@ -19,7 +19,7 @@ import (
 
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
 
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"

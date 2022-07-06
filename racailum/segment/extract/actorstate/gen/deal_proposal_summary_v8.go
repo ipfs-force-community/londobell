@@ -11,8 +11,8 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
-	market8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/market"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	market8 "github.com/filecoin-project/go-state-types/builtin/v8/market"
+	gstStore "github.com/filecoin-project/go-state-types/store"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -30,7 +30,7 @@ func extractDealProposalSummaryV8(ctx *extract.Ctx, res *extract.Res, head *comm
 		return nil
 	}
 
-	deals, err := market8.AsDealProposalArray(adt8.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
+	deals, err := market8.AsDealProposalArray(gstStore.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
 	if err != nil {
 		return fmt.Errorf("load deal proposal array: %w", err)
 	}

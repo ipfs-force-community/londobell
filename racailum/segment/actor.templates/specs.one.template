@@ -7,7 +7,11 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors"
 	{{ range $vi := .Vers -}}
 	exported{{ .Ver }} "{{ .ImportPath }}/actors/builtin/exported"
+	{{ if eq .Ver 8 }}
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	{{ else }}
 	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
+	{{ end }}
 
 	{{ end }}
 )
