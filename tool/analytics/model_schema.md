@@ -9,6 +9,7 @@
 	"Code": "string",
 	"Epoch": "abi.ChainEpoch",
 	"Path": "[]cid.Cid",
+	"RobustAddress": "address.Address",
 	"_id": "cid.Cid"
 }
 ```

@@ -426,9 +426,10 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 				Addr:  addr,
 				Epoch: height,
 			},
-			Addresses: addresses,
-			Balance:   act.Balance,
-			Code:      actType,
+			Addresses:     addresses,
+			RobustAddress: robustMap[addr],
+			Balance:       act.Balance,
+			Code:          actType,
 		})
 		return nil
 	})

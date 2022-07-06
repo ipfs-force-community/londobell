@@ -35,9 +35,10 @@ func EmptyActorBalance() ActorBalance {
 type ActorBalance struct {
 	ActorStateExBasic `bson:",inline"`
 
-	Addresses []address.Address
-	Balance   abi.TokenAmount
-	Code      string
+	Addresses     []address.Address
+	RobustAddress address.Address
+	Balance       abi.TokenAmount
+	Code          string
 }
 
 // CollectionName impl CollectionName
