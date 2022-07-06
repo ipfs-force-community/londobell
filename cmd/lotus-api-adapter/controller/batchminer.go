@@ -8,14 +8,13 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/gin-gonic/gin"
+	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/model"
 
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
-
-	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/model"
 )
 
 func GetBatchMinersInfo(c *gin.Context) {

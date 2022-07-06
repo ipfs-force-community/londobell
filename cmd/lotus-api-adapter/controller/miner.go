@@ -7,6 +7,9 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	builtin8 "github.com/filecoin-project/go-state-types/builtin"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
 	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
 	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
 	adt0 "github.com/filecoin-project/specs-actors/actors/util/adt"
@@ -28,21 +31,16 @@ import (
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 	adt7 "github.com/filecoin-project/specs-actors/v7/actors/util/adt"
-	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
 	"github.com/gin-gonic/gin"
-
-	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/model"
 
 	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
-
-	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/model"
 )
 
 func GetMinerInfo(c *gin.Context) {
