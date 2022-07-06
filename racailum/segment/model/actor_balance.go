@@ -61,5 +61,7 @@ func (a *ActorBalance) Indexes() [][]string {
 		[]string{"Addresses"},
 		[]string{"Code"},
 		[]string{"Addresses", "Code"},
+		[]string{"Addr"},
+		[]string{"RobustAddress"},
 	}
 }
