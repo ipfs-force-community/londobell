@@ -81,30 +81,30 @@ func NewExecTrace(
 
 	me.genID()
 
-	var mg *ExecGas
+	//var mg *ExecGas
+	//
+	//if len(raw.GasCharges) > 0 {
+	//	mg = &ExecGas{
+	//		Epoch:   epoch,
+	//		Charges: make([]common.GasTraceCompact, len(raw.GasCharges)),
+	//	}
+	//
+	//	for i := range raw.GasCharges {
+	//		charge := raw.GasCharges[i]
+	//
+	//		nameIdx, err := dal.LookupEnum(ctx, NSGasTraceNames, charge.Name)
+	//		if err != nil {
+	//			return nil, nil, fmt.Errorf("lookup for gas-trace-name index for %s in dict: %w", charge.Name, err)
+	//		}
+	//
+	//		charge.Name = fmt.Sprintf("$%d", nameIdx)
+	//		mg.Charges[i] = charge
+	//	}
+	//
+	//	mg.ID = me.ID
+	//}
 
-	if len(raw.GasCharges) > 0 {
-		mg = &ExecGas{
-			Epoch:   epoch,
-			Charges: make([]common.GasTraceCompact, len(raw.GasCharges)),
-		}
-
-		for i := range raw.GasCharges {
-			charge := raw.GasCharges[i]
-
-			nameIdx, err := dal.LookupEnum(ctx, NSGasTraceNames, charge.Name)
-			if err != nil {
-				return nil, nil, fmt.Errorf("lookup for gas-trace-name index for %s in dict: %w", charge.Name, err)
-			}
-
-			charge.Name = fmt.Sprintf("$%d", nameIdx)
-			mg.Charges[i] = charge
-		}
-
-		mg.ID = me.ID
-	}
-
-	return me, mg, nil
+	return me, nil, nil
 }
 
 // ExecTraceReturn is a type alias
