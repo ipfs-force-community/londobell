@@ -5,23 +5,19 @@ import (
 	"reflect"
 
 	"github.com/filecoin-project/go-state-types/cbor"
-	"github.com/ipfs/go-cid"
-	logging "github.com/ipfs/go-log/v2"
-
-	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/builtin"
-
-	"github.com/filecoin-project/lotus/chain/vm"
-
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/gen"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/ipfs/go-cid"
+
+	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/vm"
 )
 
 var GenRegularHeadID = gen.GenRegularHeadID
-var log = logging.Logger("actorstate")
 
 // ExtractRegular tries to take all data out of specified actor state head
 func ExtractRegular(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead) error {
@@ -61,8 +57,6 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 		if ok {
 			actor.Code = realCode
 		}
-
-		log.Infow("update code", "head.Code", head.Code, "actor.Code", actor.Code, "name", name, "realCode", realCode)
 	}
 
 	state, err := vm.DumpActorState(reg.ActorReg, actor, blkraw.RawData())
