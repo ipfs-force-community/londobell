@@ -124,20 +124,11 @@ var compareCmd = &cli.Command{
 			return fmt.Errorf("traverseTipSets err: %w", err)
 		}
 
-		//log.Infof("get [%d, %d] tipset: %+v", startEpoch, endEpoch, tss)
-
 		database := rcli.Database(cctx.String("name"))
 		tipsetResults, err := getTipset(cctx.Context, startEpoch, endEpoch, database)
 		if err != nil {
 			return fmt.Errorf("get tipset from db err: %w", err)
 		}
-
-		//tipsetKeys := make([]string, 0, len(tipsetResults))
-		//for _, tipset := range tipsetResults {
-		//	tipsetKeys = append(tipsetKeys, tipset.Cids...)
-		//}
-		//
-		//log.Infof("get [%d, %d] tipsetResults from db: %+v", startEpoch, endEpoch, tipsetKeys)
 
 		tequal := compareTipset(tss, tipsetResults)
 		if !tequal {
@@ -162,30 +153,10 @@ var compareCmd = &cli.Command{
 			}
 		}
 
-		//bmessages := struct {
-		//	BlsMessages   []*types.Message
-		//	SecpkMessages []*types.SignedMessage
-		//}{}
-		//bmessages.BlsMessages = allBmsgs
-		//bmessages.SecpkMessages = allSmsgs
-
-		//out, err := json.MarshalIndent(bmessages, "", "  ")
-		//if err != nil {
-		//	return err
-		//}
-		//log.Infof("get [%d, %d] block messages: %s", startEpoch, endEpoch, string(out))
-
 		messageResultsMap, err := getMessageMap(cctx.Context, startEpoch, endEpoch, database)
 		if err != nil {
 			return fmt.Errorf("get message from db err: %w", err)
 		}
-
-		//messageResults := make([]Message, 0, len(messageResultsMap))
-		//for _, message := range messageResultsMap {
-		//	messageResults = append(messageResults, message)
-		//}
-		//
-		//log.Infof("get [%d, %d] messageResultsMap from db: %+v", startEpoch, endEpoch, messageResults)
 
 		mequal := compareMessage(allBmsgs, allSmsgs, messageResultsMap)
 		if !mequal {
