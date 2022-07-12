@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -15,12 +14,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/fx"
 
-	"github.com/filecoin-project/lotus/chain/types"
-
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/dep"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
+
+	"github.com/filecoin-project/lotus/chain/types"
 )
 
 //只看块消息
@@ -104,31 +103,28 @@ var compareCmd = &cli.Command{
 		tss := make([]*types.TipSet, 0, length)
 		tss = append(tss, endTs)
 
-		var startEpoch, endEpoch = endTs.Height(), endTs.Height()
+		var startEpoch, endEpoch = startTs.Height(), endTs.Height()
 
-		parentTs := endTs
-		for i := int64(1); i < length; i++ {
-			if endTs.Height() == 0 {
-				break
+		var prev *types.TipSet
+		_, err = segment.TraverseTipSets(di.CS, endTs, func(walked *types.TipSet, walkedEpoch abi.ChainEpoch) (bool, error) {
+			if walkedEpoch < startEpoch {
+				return false, nil
 			}
 
-			curEpoch := parentTs.Height() - 1
-			curTs, err := di.CS.LoadTipSet(cctx.Context, parentTs.Parents())
-			if err != nil {
-				return err
+			if prev != nil {
+				tss = append(tss, walked)
 			}
 
-			// 跳过空块
-			if curTs.Height() != curEpoch {
-				i++
-			}
+			prev = walked
 
-			tss = append(tss, curTs)
-			startEpoch = curTs.Height()
-			parentTs = curTs
+			return true, nil
+		})
+
+		if err != nil {
+			return fmt.Errorf("traverseTipSets err: %w", err)
 		}
 
-		log.Infof("get [%d, %d] tipset: %+v", startEpoch, endEpoch, tss)
+		//log.Infof("get [%d, %d] tipset: %+v", startEpoch, endEpoch, tss)
 
 		database := rcli.Database(cctx.String("name"))
 		tipsetResults, err := getTipset(cctx.Context, startEpoch, endEpoch, database)
@@ -136,12 +132,12 @@ var compareCmd = &cli.Command{
 			return fmt.Errorf("get tipset from db err: %w", err)
 		}
 
-		tipsetKeys := make([]string, 0, len(tipsetResults))
-		for _, tipset := range tipsetResults {
-			tipsetKeys = append(tipsetKeys, tipset.Cids...)
-		}
-
-		log.Infof("get [%d, %d] tipsetResults from db: %+v", startEpoch, endEpoch, tipsetKeys)
+		//tipsetKeys := make([]string, 0, len(tipsetResults))
+		//for _, tipset := range tipsetResults {
+		//	tipsetKeys = append(tipsetKeys, tipset.Cids...)
+		//}
+		//
+		//log.Infof("get [%d, %d] tipsetResults from db: %+v", startEpoch, endEpoch, tipsetKeys)
 
 		tequal := compareTipset(tss, tipsetResults)
 		if !tequal {
@@ -166,31 +162,30 @@ var compareCmd = &cli.Command{
 			}
 		}
 
-		bmessages := struct {
-			BlsMessages   []*types.Message
-			SecpkMessages []*types.SignedMessage
-		}{}
+		//bmessages := struct {
+		//	BlsMessages   []*types.Message
+		//	SecpkMessages []*types.SignedMessage
+		//}{}
+		//bmessages.BlsMessages = allBmsgs
+		//bmessages.SecpkMessages = allSmsgs
 
-		bmessages.BlsMessages = allBmsgs
-		bmessages.SecpkMessages = allSmsgs
-
-		out, err := json.MarshalIndent(bmessages, "", "  ")
-		if err != nil {
-			return err
-		}
-		log.Infof("get [%d, %d] block messages: %s", startEpoch, endEpoch, string(out))
+		//out, err := json.MarshalIndent(bmessages, "", "  ")
+		//if err != nil {
+		//	return err
+		//}
+		//log.Infof("get [%d, %d] block messages: %s", startEpoch, endEpoch, string(out))
 
 		messageResultsMap, err := getMessageMap(cctx.Context, startEpoch, endEpoch, database)
 		if err != nil {
 			return fmt.Errorf("get message from db err: %w", err)
 		}
 
-		messageResults := make([]Message, 0, len(messageResultsMap))
-		for _, message := range messageResultsMap {
-			messageResults = append(messageResults, message)
-		}
-
-		log.Infof("get [%d, %d] messageResultsMap from db: %+v", startEpoch, endEpoch, messageResults)
+		//messageResults := make([]Message, 0, len(messageResultsMap))
+		//for _, message := range messageResultsMap {
+		//	messageResults = append(messageResults, message)
+		//}
+		//
+		//log.Infof("get [%d, %d] messageResultsMap from db: %+v", startEpoch, endEpoch, messageResults)
 
 		mequal := compareMessage(allBmsgs, allSmsgs, messageResultsMap)
 		if !mequal {
@@ -246,6 +241,7 @@ func getTipset(ctx context.Context, startEpoch, endEpoch abi.ChainEpoch, databas
 // todo:开多个协程比较一段高度
 func compareTipset(tss []*types.TipSet, tipsetResults []*Tipset) bool {
 	if len(tss) != len(tipsetResults) {
+		log.Errorw("len(tss) != len(tipsetResults)", "len(tss)", len(tss), "len(tipsetResults)", len(tipsetResults))
 		return false
 	}
 	for i, ts := range tss {
@@ -323,10 +319,10 @@ func getMessageMap(ctx context.Context, startEpoch, endEpoch abi.ChainEpoch, dat
 	messageResultsMap := make(map[string]Message, len(messageResults))
 	for _, message := range messageResults {
 		if message.SignedCid != "" {
-			log.Infof("message.SignedCid is not null, message.SignedCid: %v", message.SignedCid)
+			//	log.Infof("message.SignedCid is not null, message.SignedCid: %v", message.SignedCid)
 			messageResultsMap[message.SignedCid] = message
 		} else {
-			log.Infof("message.SignedCid is null, message.Cid: %v", message.Cid)
+			//	log.Infof("message.SignedCid is null, message.Cid: %v", message.Cid)
 			messageResultsMap[message.Cid] = message
 		}
 	}

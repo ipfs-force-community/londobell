@@ -25,7 +25,7 @@ func ExtractLinkedTipSets(cs common.ChainStore, from *types.TipSet, lower *abi.C
 
 	tss := make([]*common.LinkedTipSet, 0, int(h-destEpoch))
 	var prev *types.TipSet
-	_, err := traverseTipSets(cs, from, func(walked *types.TipSet, walkedEpoch abi.ChainEpoch) (bool, error) {
+	_, err := TraverseTipSets(cs, from, func(walked *types.TipSet, walkedEpoch abi.ChainEpoch) (bool, error) {
 		if walkedEpoch < destEpoch {
 			return false, nil
 		}
@@ -55,7 +55,7 @@ func ExtractLinkedTipSets(cs common.ChainStore, from *types.TipSet, lower *abi.C
 	return tss, nil
 }
 
-func traverseTipSets(cs common.ChainStore, curts *types.TipSet, traverseFn func(*types.TipSet, abi.ChainEpoch) (bool, error)) (int, error) {
+func TraverseTipSets(cs common.ChainStore, curts *types.TipSet, traverseFn func(*types.TipSet, abi.ChainEpoch) (bool, error)) (int, error) {
 	count := 0
 
 	for {
