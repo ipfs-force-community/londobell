@@ -8,8 +8,9 @@ import (
 // DefaultOptions returns defaults
 func DefaultOptions() Options {
 	return Options{
-		TipSet:       defaultTipSetOptions(),
-		StateRegular: defaultActorStateRegularOptions(),
+		TipSet:        defaultTipSetOptions(),
+		StateRegular:  defaultActorStateRegularOptions(),
+		EnabelExtract: defaultEnableExtractOptions(),
 	}
 }
 
@@ -22,8 +23,9 @@ func DryOptions() Options {
 
 // Options for differect extracting jobs
 type Options struct {
-	TipSet       TipSetOptions
-	StateRegular ActorStateRegularOptions
+	TipSet        TipSetOptions
+	StateRegular  ActorStateRegularOptions
+	EnabelExtract EnableExtractOptions
 }
 
 func defaultTipSetOptions() TipSetOptions {
@@ -89,4 +91,24 @@ func IsExtract(tickOption int, ctx *Ctx, curEpoch abi.ChainEpoch) bool {
 	}
 
 	return true
+}
+
+type EnableExtractOptions struct {
+	EnableExtractTrace        bool
+	EnableExtractMessage      bool
+	EnableExtractTipset       bool
+	EnableExtractState        bool
+	EnableExtractFilSupply    bool
+	EnableExtractActorBalance bool
+}
+
+func defaultEnableExtractOptions() EnableExtractOptions {
+	return EnableExtractOptions{
+		EnableExtractTrace:        true,
+		EnableExtractMessage:      true,
+		EnableExtractTipset:       true,
+		EnableExtractState:        true,
+		EnableExtractFilSupply:    true,
+		EnableExtractActorBalance: true,
+	}
 }

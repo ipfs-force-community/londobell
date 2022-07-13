@@ -15,6 +15,13 @@ import (
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
 	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/mir"
+	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 	"github.com/ipfs/go-cid"
 	"go.opencensus.io/trace"
 
@@ -23,14 +30,6 @@ import (
 	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
-
-	"github.com/ipfs-force-community/londobell/common"
-	"github.com/ipfs-force-community/londobell/lib/mir"
-	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
-	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
-	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate"
-	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 func init() {
@@ -150,6 +149,10 @@ func Extract(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error 
 }
 
 func extractTipSet(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error { // nolint: deadcode
+	if !ctx.Opts.EnabelExtract.EnableExtractTipset {
+		return nil
+	}
+
 	doc, err := model.NewTipSet(ts)
 	if err != nil {
 		return err
@@ -210,6 +213,10 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	if isExpensive(ctx.C, ctx.D, ts) {
 		// TODO: extract simple invoc results here
 		elog.Warn("ignore expensive epoch exec trace")
+		return nil
+	}
+
+	if !ctx.Opts.EnabelExtract.EnableExtractTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage {
 		return nil
 	}
 
@@ -329,26 +336,30 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		if _, has := dupmsgs[mcid]; !has {
-			mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
-			if err != nil {
-				elog.Errorw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
-			} else {
-				res.Docs = append(res.Docs, mmsg)
-				msgcnt++
-				dupmsgs[mcid] = struct{}{}
+		if ctx.Opts.EnabelExtract.EnableExtractMessage {
+			if _, has := dupmsgs[mcid]; !has {
+				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
+				if err != nil {
+					elog.Errorw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+				} else {
+					res.Docs = append(res.Docs, mmsg)
+					msgcnt++
+					dupmsgs[mcid] = struct{}{}
+				}
 			}
 		}
 
-		met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas)
-		if err != nil {
-			elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
-		} else {
-			tracecnt++
-			res.Docs = append(res.Docs, met)
-			//if meg != nil && len(meg.Charges) > 0 {
-			//	res.Docs = append(res.Docs, meg)
-			//}
+		if ctx.Opts.EnabelExtract.EnableExtractTrace {
+			met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas)
+			if err != nil {
+				elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+			} else {
+				tracecnt++
+				res.Docs = append(res.Docs, met)
+				//if meg != nil && len(meg.Charges) > 0 {
+				//	res.Docs = append(res.Docs, meg)
+				//}
+			}
 		}
 	}
 
@@ -362,7 +373,7 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 	height := ts.Height()
-	if !extract.IsZeroHour(height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorBalance, ctx, height) {
+	if !extract.IsZeroHour(height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorBalance, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractActorBalance {
 		return nil
 	}
 
@@ -451,7 +462,7 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	forRegular := ctx.Opts.StateRegular.Interval > 0 && height%ctx.Opts.StateRegular.Interval == 0
 
-	if !forRegular {
+	if !forRegular || !ctx.Opts.EnabelExtract.EnableExtractState && !ctx.Opts.EnabelExtract.EnableExtractFilSupply {
 		return nil
 	}
 
@@ -466,46 +477,50 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return fmt.Errorf("get vm circulating supply: %w", err)
 	}
 
-	count := 0
-	actors := []*common.ActorHead{}
-	var powerActor *types.Actor
-	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
-		count++
-		if addr == builtin.SystemActorAddr || addr == builtin.CronActorAddr {
+	if ctx.Opts.EnabelExtract.EnableExtractState {
+		count := 0
+		actors := []*common.ActorHead{}
+		var powerActor *types.Actor
+		err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
+			count++
+			if addr == builtin.SystemActorAddr || addr == builtin.CronActorAddr {
+				return nil
+			}
+
+			if addr == builtin.StoragePowerActorAddr {
+				powerActor = act
+			}
+
+			actors = append(actors, &common.ActorHead{
+				Actor:             act,
+				CirculatingSupply: &supply,
+				Addr:              addr,
+				Epoch:             height,
+			})
+
 			return nil
-		}
-
-		if addr == builtin.StoragePowerActorAddr {
-			powerActor = act
-		}
-
-		actors = append(actors, &common.ActorHead{
-			Actor:             act,
-			CirculatingSupply: &supply,
-			Addr:              addr,
-			Epoch:             height,
 		})
 
-		return nil
-	})
+		if err != nil {
+			return fmt.Errorf("walk through all actors: %w", err)
+		}
 
-	if err != nil {
-		return fmt.Errorf("walk through all actors: %w", err)
+		elog := ctx.L.With("epoch", height)
+		elog.Infow("actor heads extracted", "count", count, "valuable", len(actors))
+
+		for ai := range actors {
+			actors[ai].Global.Power = powerActor
+		}
+
+		res.RegularStates = actors
 	}
 
-	elog := ctx.L.With("epoch", height)
-	elog.Infow("actor heads extracted", "count", count, "valuable", len(actors))
-
-	for ai := range actors {
-		actors[ai].Global.Power = powerActor
+	if ctx.Opts.EnabelExtract.EnableExtractFilSupply {
+		res.Docs = append(res.Docs, &model.FilSupply{
+			Epoch:             height,
+			CirculatingSupply: supply,
+		})
 	}
-
-	res.RegularStates = actors
-
-	res.Docs = append(res.Docs, &model.FilSupply{
-		Epoch:             height,
-		CirculatingSupply: supply,
-	})
 
 	return nil
 }

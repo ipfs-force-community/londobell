@@ -37,15 +37,15 @@ type SegmentConfig struct {
 // DefaultConfig returns the default config
 func DefaultConfig() Config {
 	return Config{
-		HTTP:             DefaultHTTPOptions(),
-		Grafana:          grafana.DefaultOptions(),
-		Aggregate:        aggregate.DefaultOptions(),
-		Segment:          segment.DefaultOptions(),
-		Metrics:          metrics.DefaultOptions(),
-		Tracing:          tracing.DefaultOptions(),
-		EnableGasTracing: false,
-		EnableGrafana:    true,
-		EnableDebug:      true,
+		HTTP:          DefaultHTTPOptions(),
+		Grafana:       grafana.DefaultOptions(),
+		Aggregate:     aggregate.DefaultOptions(),
+		Segment:       segment.DefaultOptions(),
+		Metrics:       metrics.DefaultOptions(),
+		Tracing:       tracing.DefaultOptions(),
+		EnableTracing: true,
+		EnableGrafana: true,
+		EnableDebug:   true,
 	}
 }
 
@@ -65,20 +65,20 @@ func DefaultHTTPOptions() HTTPOptions {
 
 // Config of RaCailum
 type Config struct {
-	HTTP             HTTPOptions
-	Grafana          grafana.Options
-	Aggregate        aggregate.Options
-	Segment          segment.Options
-	Metrics          metrics.Options
-	Tracing          tracing.Options
-	EnableGasTracing bool
-	EnableGrafana    bool
-	EnableDebug      bool
+	HTTP          HTTPOptions
+	Grafana       grafana.Options
+	Aggregate     aggregate.Options
+	Segment       segment.Options
+	Metrics       metrics.Options
+	Tracing       tracing.Options
+	EnableTracing bool
+	EnableGrafana bool
+	EnableDebug   bool
 }
 
 // New returns an instance of *RaCailum
 func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.ChainStore, stm common.StateManager, segmgr *segment.Manager, shutdownCh dtypes.ShutdownChan) (*RaCailum, error) {
-	vm.EnableDetailedTracing = cfg.EnableGasTracing
+	vm.EnableDetailedTracing = cfg.EnableTracing
 
 	activeSegName, has, err := segmgr.LoadActive()
 	if err != nil {
@@ -106,7 +106,7 @@ func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.Cha
 	//         }
 	//     }()
 	// }
-	log.Infow("ra sets sail", "gas-tracing", cfg.EnableGasTracing, "active-seg", activeSegName)
+	log.Infow("ra sets sail", "tracing", cfg.EnableTracing, "active-seg", activeSegName)
 	ra := &RaCailum{
 		cfg:        cfg,
 		sub:        sub,
