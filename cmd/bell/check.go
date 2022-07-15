@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"math"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -66,19 +68,12 @@ var checkCmd = &cli.Command{
 			return nil
 		}
 
-		allTableList := []string{"ActorBalance", "ActorState", "ClaimedPower", "DealProposal", "DealProposalDetail", "DealProposalSummary", "ExecTrace", "FilSupply", "MarketFunds",
-			"Message", "MinerDealSector", "MinerFunds", "MinerSectorHealth", "MinerSectorSummary", "MiningProfitability", "MultisigBalance", "PendingTxns", "Tipset", "VerifiedRegistry" /*, "FinalHeight"*/}
-		stateTableList := []string{"ActorState", "ClaimedPower", "DealProposal", "DealProposalDetail", "DealProposalSummary", "MarketFunds",
-			"MinerDealSector", "MinerFunds", "MinerSectorHealth", "MinerSectorSummary", "MiningProfitability", "MultisigBalance", "PendingTxns"}
-		noTicksTableList := []string{"ActorState", "ClaimedPower", "FilSupply", "MiningProfitability", "MultisigBalance"}
-		//implicitMessageTableList := []string{"ExecTrace", "Message"}
-
 		ticksMap := make(map[string]int)
 		zeroHourMap := make(map[string]bool)
 		enableExtractMap := make(map[string]bool)
 
 		//读取每张表的配置（抽取间隔、是否抽取）是否零点抽取、child-lo高度
-		err = getExtractConfig(cctx, &enableTracing, &interval, allTableList, stateTableList, noTicksTableList, ticksMap, zeroHourMap, enableExtractMap)
+		allTableList, err := getExtractConfig(cctx, &enableTracing, &interval, ticksMap, zeroHourMap, enableExtractMap)
 		if err != nil {
 			clog.Errorf("get extract config: %v", err)
 			return err
@@ -163,64 +158,73 @@ var checkCmd = &cli.Command{
 	},
 }
 
-func getExtractConfig(cctx *cli.Context, enableTracing *bool, interval *abi.ChainEpoch, allTableList, stateTableList, noTicksTableList []string, ticksMap map[string]int, zeroHourMap, enableExtractMap map[string]bool) error {
+func getExtractConfig(cctx *cli.Context, enableTracing *bool, interval *abi.ChainEpoch, ticksMap map[string]int, zeroHourMap, enableExtractMap map[string]bool) ([]string, error) {
 	rpath, err := dep.GetRepoPath(cctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	config, err := dep.LoadRaConfig(rpath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	for _, nt := range noTicksTableList {
-		ticksMap[nt] = 1
+	allTableList := make([]string, len(config.Segment.AllToCheckTableList))
+
+	for i, table := range config.Segment.AllToCheckTableList {
+		allTableList[i] = table
+		if table == "ExecTrace" || table == "Message" || table == "Tipset" {
+			ticksMap[table] = 0
+		} else {
+			ticksMap[table] = 1
+		}
+
+		zeroHourMap[table] = false
+		enableExtractMap[table] = config.Segment.Extract.ExtractOptions.EnabelExtract.EnableExtractState
 	}
 
-	for _, at := range allTableList {
-		zeroHourMap[at] = false
+	//反射
+	stateRegularType := reflect.TypeOf(config.Segment.Extract.ExtractOptions.StateRegular)
+	stateRegularValue := reflect.ValueOf(config.Segment.Extract.ExtractOptions.StateRegular)
+	for i := 0; i < stateRegularType.NumField(); i++ {
+		name := stateRegularType.Field(i).Name
+		if name == "Interval" {
+			continue
+		}
+
+		name = strings.TrimSuffix(name, "Ticks")
+		ticksMap[name] = int(stateRegularValue.Field(i).Int())
+		if name == "DealProposalDetail" {
+			ticksMap["DealProposal"] = int(stateRegularValue.Field(i).Int())
+		}
+		if name == "MinerSectorSummary" {
+			ticksMap["MinerDealSector"] = int(stateRegularValue.Field(i).Int())
+		}
 	}
 
-	for _, st := range stateTableList {
-		enableExtractMap[st] = config.Segment.Extract.ExtractOptions.EnabelExtract.EnableExtractState
+	zeroHourExtractType := reflect.TypeOf(config.Segment.Extract.ExtractOptions.ZeroHourExtract)
+	zeroHourExtractValue := reflect.ValueOf(config.Segment.Extract.ExtractOptions.ZeroHourExtract)
+	for i := 0; i < zeroHourExtractType.NumField(); i++ {
+		name := zeroHourExtractType.Field(i).Name
+		zeroHourMap[name] = zeroHourExtractValue.Field(i).Bool()
+	}
+
+	enabelExtractType := reflect.TypeOf(config.Segment.Extract.ExtractOptions.EnabelExtract)
+	enabelExtractValue := reflect.ValueOf(config.Segment.Extract.ExtractOptions.EnabelExtract)
+	for i := 0; i < enabelExtractType.NumField(); i++ {
+		name := enabelExtractType.Field(i).Name
+		if name == "EnableExtractState" {
+			continue
+		}
+
+		name = strings.TrimPrefix(name, "EnableExtract")
+		enableExtractMap[name] = enabelExtractValue.Field(i).Bool()
 	}
 
 	*enableTracing = config.EnableTracing
-
 	*interval = config.Segment.Extract.ExtractOptions.StateRegular.Interval
-	ticksMap["ActorBalance"] = config.Segment.Extract.ExtractOptions.StateRegular.ActorBalance
-	ticksMap["DealProposal"] = config.Segment.Extract.ExtractOptions.StateRegular.DealProposalDetailTicks
-	ticksMap["DealProposalDetail"] = config.Segment.Extract.ExtractOptions.StateRegular.DealProposalDetailTicks
-	ticksMap["DealProposalSummary"] = config.Segment.Extract.ExtractOptions.StateRegular.DealProposalSummaryTicks
-	ticksMap["MarketFunds"] = config.Segment.Extract.ExtractOptions.StateRegular.MinerFundsTicks
-	ticksMap["MinerDealSector"] = config.Segment.Extract.ExtractOptions.StateRegular.MinerSectorSummaryTicks
-	ticksMap["MinerFunds"] = config.Segment.Extract.ExtractOptions.StateRegular.MarketFundsTicks
-	ticksMap["MinerSectorHealth"] = config.Segment.Extract.ExtractOptions.StateRegular.MinerSectorHeathTicks
-	ticksMap["MinerSectorSummary"] = config.Segment.Extract.ExtractOptions.StateRegular.MinerSectorSummaryTicks
-	ticksMap["PendingTxns"] = config.Segment.Extract.ExtractOptions.StateRegular.PendingTxnsTicks
-	ticksMap["VerifiedRegistry"] = config.Segment.Extract.ExtractOptions.StateRegular.VerifRegTicks
 
-	zeroHourMap["ActorBalance"] = true
-	zeroHourMap["DealProposal"] = true
-	zeroHourMap["DealProposalDetail"] = true
-	zeroHourMap["DealProposalSummary"] = true
-	zeroHourMap["MarketFunds"] = true
-	zeroHourMap["MinerDealSector"] = true
-	zeroHourMap["MinerFunds"] = true
-	zeroHourMap["MinerSectorHealth"] = true
-	zeroHourMap["MinerSectorSummary"] = true
-	zeroHourMap["PendingTxns"] = true
-	zeroHourMap["VerifiedRegistry"] = true
-
-	enableExtractMap["ActorBalance"] = config.Segment.Extract.ExtractOptions.EnabelExtract.EnableExtractActorBalance
-	enableExtractMap["ExecTrace"] = config.Segment.Extract.ExtractOptions.EnabelExtract.EnableExtractTrace
-	enableExtractMap["FilSupply"] = config.Segment.Extract.ExtractOptions.EnabelExtract.EnableExtractFilSupply
-	enableExtractMap["Message"] = config.Segment.Extract.ExtractOptions.EnabelExtract.EnableExtractMessage
-	enableExtractMap["Tipset"] = config.Segment.Extract.ExtractOptions.EnabelExtract.EnableExtractTipset
-	enableExtractMap["VerifiedRegistry"] = config.Segment.Extract.ExtractOptions.EnabelExtract.EnableExtractTipset
-
-	return nil
+	return allTableList, nil
 }
 
 //得到最早入库时间
@@ -264,7 +268,7 @@ func getStartEpoch(tableName string, interval abi.ChainEpoch, loEpoch abi.ChainE
 //基本检查：检查是否有数据
 func checkHasData(ctx context.Context, database *mongo.Database, tableName string, enableExtractMap map[string]bool, epoch abi.ChainEpoch) (bool, error) {
 	if !enableExtractMap[tableName] {
-		log.Infow("checkHasData", "table %v not enable extract", tableName)
+		log.Infow("checkHasData", "table cannot be extracted", tableName)
 		return true, nil
 	}
 

@@ -8,9 +8,10 @@ import (
 // DefaultOptions returns defaults
 func DefaultOptions() Options {
 	return Options{
-		TipSet:        defaultTipSetOptions(),
-		StateRegular:  defaultActorStateRegularOptions(),
-		EnabelExtract: defaultEnableExtractOptions(),
+		TipSet:          defaultTipSetOptions(),
+		StateRegular:    defaultActorStateRegularOptions(),
+		EnabelExtract:   defaultEnableExtractOptions(),
+		ZeroHourExtract: defaultZeroHourExtractOptions(),
 	}
 }
 
@@ -23,9 +24,10 @@ func DryOptions() Options {
 
 // Options for differect extracting jobs
 type Options struct {
-	TipSet        TipSetOptions
-	StateRegular  ActorStateRegularOptions
-	EnabelExtract EnableExtractOptions
+	TipSet          TipSetOptions
+	StateRegular    ActorStateRegularOptions
+	EnabelExtract   EnableExtractOptions
+	ZeroHourExtract ZeroHourExtractOptions
 }
 
 func defaultTipSetOptions() TipSetOptions {
@@ -45,13 +47,13 @@ func defaultActorStateRegularOptions() ActorStateRegularOptions {
 	return ActorStateRegularOptions{
 		Interval:                 builtin.EpochsInHour, // 1h
 		MinerFundsTicks:          4,                    // 4h
-		VerifRegTicks:            4,                    // 4h
+		VerifiedRegistryTicks:    4,                    // 4h
 		MinerSectorSummaryTicks:  24,                   // 24h
 		DealProposalSummaryTicks: 12,                   // 12h
 		MarketFundsTicks:         24,                   // 24h
 		MinerSectorHeathTicks:    1,                    // 1h
 		DealProposalDetailTicks:  12,                   // 12h
-		ActorBalance:             24,                   // 24h
+		ActorBalanceTicks:        24,                   // 24h
 		PendingTxnsTicks:         1,                    // 1h
 	}
 }
@@ -60,13 +62,13 @@ func dryActorStateRegularOptions() ActorStateRegularOptions {
 	return ActorStateRegularOptions{
 		Interval:                 1,
 		MinerFundsTicks:          1,
-		VerifRegTicks:            1,
+		VerifiedRegistryTicks:    1,
 		MinerSectorSummaryTicks:  1,
 		DealProposalSummaryTicks: 1,
 		MarketFundsTicks:         1,
 		MinerSectorHeathTicks:    1,
 		DealProposalDetailTicks:  1,
-		ActorBalance:             1,
+		ActorBalanceTicks:        1,
 		PendingTxnsTicks:         1,
 	}
 }
@@ -75,13 +77,13 @@ func dryActorStateRegularOptions() ActorStateRegularOptions {
 type ActorStateRegularOptions struct {
 	Interval                 abi.ChainEpoch
 	MinerFundsTicks          int
-	VerifRegTicks            int
+	VerifiedRegistryTicks    int
 	MinerSectorSummaryTicks  int
 	DealProposalSummaryTicks int
 	DealProposalDetailTicks  int
 	MarketFundsTicks         int
 	MinerSectorHeathTicks    int
-	ActorBalance             int
+	ActorBalanceTicks        int
 	PendingTxnsTicks         int
 }
 
@@ -94,7 +96,7 @@ func IsExtract(tickOption int, ctx *Ctx, curEpoch abi.ChainEpoch) bool {
 }
 
 type EnableExtractOptions struct {
-	EnableExtractTrace        bool
+	EnableExtractExecTrace    bool
 	EnableExtractMessage      bool
 	EnableExtractTipset       bool
 	EnableExtractState        bool
@@ -104,11 +106,41 @@ type EnableExtractOptions struct {
 
 func defaultEnableExtractOptions() EnableExtractOptions {
 	return EnableExtractOptions{
-		EnableExtractTrace:        true,
+		EnableExtractExecTrace:    true,
 		EnableExtractMessage:      true,
 		EnableExtractTipset:       true,
 		EnableExtractState:        true,
 		EnableExtractFilSupply:    true,
 		EnableExtractActorBalance: true,
+	}
+}
+
+type ZeroHourExtractOptions struct {
+	ActorBalance        bool
+	DealProposal        bool
+	DealProposalDetail  bool
+	DealProposalSummary bool
+	MarketFunds         bool
+	MinerDealSector     bool
+	MinerFunds          bool
+	MinerSectorHealth   bool
+	MinerSectorSummary  bool
+	PendingTxns         bool
+	VerifiedRegistry    bool
+}
+
+func defaultZeroHourExtractOptions() ZeroHourExtractOptions {
+	return ZeroHourExtractOptions{
+		ActorBalance:        true,
+		DealProposal:        true,
+		DealProposalDetail:  true,
+		DealProposalSummary: true,
+		MarketFunds:         true,
+		MinerDealSector:     true,
+		MinerFunds:          true,
+		MinerSectorHealth:   true,
+		MinerSectorSummary:  true,
+		PendingTxns:         true,
+		VerifiedRegistry:    true,
 	}
 }

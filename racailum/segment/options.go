@@ -32,6 +32,8 @@ type Options struct {
 	Persist persistOptions
 
 	Aggregate aggregate.Options
+
+	AllToCheckTableList []string
 }
 
 // DefaultOptions returns a default instance of the Options
@@ -53,6 +55,28 @@ func DefaultOptions() Options {
 		Persist: persistOptions{
 			Async:            true,
 			BatchInsertLimit: 4 << 10,
+		},
+
+		AllToCheckTableList: []string{
+			"ActorBalance",
+			"ActorState",
+			"ClaimedPower",
+			"DealProposal",
+			"DealProposalDetail",
+			"DealProposalSummary",
+			"ExecTrace",
+			"FilSupply",
+			"MarketFunds",
+			"Message",
+			"MinerDealSector",
+			"MinerFunds",
+			"MinerSectorHealth",
+			"MinerSectorSummary",
+			"MiningProfitability",
+			"MultisigBalance",
+			"PendingTxns",
+			"Tipset",
+			"VerifiedRegistry",
 		},
 	}
 
