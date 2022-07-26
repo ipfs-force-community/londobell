@@ -1,0 +1,48 @@
+## 检查londobell数据库数据完整性
+- [ ] 根据 `入表间隔`, `是否零点抽取`，`是否抽取`,`child-lo高度`，得到最早一次入库高度，该高度有数据即可
+    - ActorBalance
+    - ActorState
+    - ClaimPower
+    - DealProposal
+    - DealProposalDetail
+    - DealProposalSummary
+    - ExecTrace
+    - FilSupply
+    - MarketFunds
+    - Message
+    - MinerDealSector
+    - MinerFunds
+    - MinerSectorHealth
+    - MinerSectorSummary
+    - MiningProfitability
+    - MultisigBalance
+    - PendingTxns
+    - Tipset
+    - VerifiedRegistry
+
+- [ ] child-lo高度有`隐式消息`: depth>1
+    - ExecTrace
+
+- [ ] 有数据即可
+    - FinalHeight
+  
+- [ ] 切换后保证旧库数据连贯：`child-lo高度`前，各表对应的`最高抽取高度`有数据
+  - ActorBalance
+  - ActorState
+  - ClaimPower
+  - DealProposal
+  - DealProposalDetail
+  - DealProposalSummary
+  - ExecTrace
+  - FilSupply
+  - MarketFunds
+  - Message
+  - MinerDealSector
+  - MinerFunds
+  - MinerSectorHealth
+  - MinerSectorSummary
+  - MiningProfitability
+  - MultisigBalance
+  - PendingTxns
+  - Tipset
+  - VerifiedRegistry

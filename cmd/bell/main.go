@@ -30,6 +30,7 @@ func main() {
 			daemonCmd,
 			traceCmd,
 			compareCmd,
+			checkCmd,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{

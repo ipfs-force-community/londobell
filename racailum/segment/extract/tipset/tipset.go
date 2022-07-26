@@ -216,7 +216,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return nil
 	}
 
-	if !ctx.Opts.EnabelExtract.EnableExtractTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage {
+	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage {
 		return nil
 	}
 
@@ -349,7 +349,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractTrace {
+		if ctx.Opts.EnabelExtract.EnableExtractExecTrace {
 			met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas)
 			if err != nil {
 				elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
@@ -373,7 +373,7 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 	height := ts.Height()
-	if !extract.IsZeroHour(height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorBalance, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractActorBalance {
+	if !extract.IsZeroHour(height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorBalanceTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractActorBalance {
 		return nil
 	}
 
