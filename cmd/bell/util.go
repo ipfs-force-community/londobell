@@ -9,6 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	cliutil "github.com/filecoin-project/lotus/cli/util"
+	"github.com/ipfs-force-community/londobell/racailum"
+
 	"github.com/dtynn/dix"
 	"github.com/filecoin-project/go-jsonrpc"
 	logging "github.com/ipfs/go-log/v2"
@@ -19,12 +22,10 @@ import (
 
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	cliutil "github.com/filecoin-project/lotus/cli/util"
 	"github.com/filecoin-project/lotus/metrics"
 
 	"github.com/ipfs-force-community/londobell/api"
 	"github.com/ipfs-force-community/londobell/dep"
-	"github.com/ipfs-force-community/londobell/racailum"
 )
 
 var (
@@ -130,4 +131,30 @@ func ServeRPC(a api.BellAPI, stop dix.StopFunc, addr multiaddr.Multiaddr, shutdo
 		return nil
 	}
 	return err
+}
+
+func GetTriggerSpan(ctx *cli.Context) (uint, error) {
+	rpath, err := dep.GetRepoPath(ctx)
+	if err != nil {
+		return 0, err
+	}
+	cfg, err := dep.LoadRaConfig(rpath)
+	if err != nil {
+		return 0, err
+	}
+
+	return cfg.TriggerSpan, nil
+}
+
+func GetTempDBCapacity(ctx *cli.Context) (uint, error) {
+	rpath, err := dep.GetRepoPath(ctx)
+	if err != nil {
+		return 0, err
+	}
+	cfg, err := dep.LoadRaConfig(rpath)
+	if err != nil {
+		return 0, err
+	}
+
+	return cfg.TempDBCapacity, nil
 }

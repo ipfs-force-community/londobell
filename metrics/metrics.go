@@ -22,6 +22,8 @@ var (
 	LowerBoundary       = stats.Int64("lower_boundary", "lower boundary of segment", stats.UnitDimensionless)
 	UpperBoundary       = stats.Int64("upper_boundary", "upper boundary of segment", stats.UnitDimensionless)
 	OutdatedFinalHeight = stats.Int64("outdated_final_height", "outdated finalHeight of extract", stats.UnitDimensionless)
+	GetTipSetError      = stats.Int64("get_tipset_error_status", "Status of get tipset", stats.UnitDimensionless)
+	TempDBCapacityError = stats.Int64("tempdb_capacity_error_status", "Status of tempdb capacity", stats.UnitDimensionless)
 
 	CacheGetCnt      = stats.Int64("cache_get_ops_total", "Cache get count", stats.UnitDimensionless)
 	CacheGetMissCnt  = stats.Int64("cache_get_miss_ops_total", "Cache get miss count", stats.UnitDimensionless)
@@ -68,6 +70,16 @@ var DefaultViews = []*view.View{
 	{
 		Name:        OutdatedFinalHeight.Name(),
 		Measure:     OutdatedFinalHeight,
+		Aggregation: view.LastValue(),
+	},
+	{
+		Name:        GetTipSetError.Name(),
+		Measure:     GetTipSetError,
+		Aggregation: view.LastValue(),
+	},
+	{
+		Name:        TempDBCapacityError.Name(),
+		Measure:     TempDBCapacityError,
 		Aggregation: view.LastValue(),
 	},
 }

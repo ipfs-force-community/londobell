@@ -37,16 +37,18 @@ type SegmentConfig struct {
 // DefaultConfig returns the default config
 func DefaultConfig() Config {
 	return Config{
-		HTTP:          DefaultHTTPOptions(),
-		Grafana:       grafana.DefaultOptions(),
-		Aggregate:     aggregate.DefaultOptions(),
-		Segment:       segment.DefaultOptions(),
-		Metrics:       metrics.DefaultOptions(),
-		Tracing:       tracing.DefaultOptions(),
-		EnableTracing: true,
-		EnableGrafana: true,
-		EnableDebug:   true,
-		OutdatedGap:   5760,
+		HTTP:           DefaultHTTPOptions(),
+		Grafana:        grafana.DefaultOptions(),
+		Aggregate:      aggregate.DefaultOptions(),
+		Segment:        segment.DefaultOptions(),
+		Metrics:        metrics.DefaultOptions(),
+		Tracing:        tracing.DefaultOptions(),
+		EnableTracing:  true,
+		EnableGrafana:  true,
+		EnableDebug:    true,
+		OutdatedGap:    240,
+		TriggerSpan:    240, // 2h
+		TempDBCapacity: 240,
 	}
 }
 
@@ -66,16 +68,18 @@ func DefaultHTTPOptions() HTTPOptions {
 
 // Config of RaCailum
 type Config struct {
-	HTTP          HTTPOptions
-	Grafana       grafana.Options
-	Aggregate     aggregate.Options
-	Segment       segment.Options
-	Metrics       metrics.Options
-	Tracing       tracing.Options
-	EnableTracing bool
-	EnableGrafana bool
-	EnableDebug   bool
-	OutdatedGap   int64
+	HTTP           HTTPOptions
+	Grafana        grafana.Options
+	Aggregate      aggregate.Options
+	Segment        segment.Options
+	Metrics        metrics.Options
+	Tracing        tracing.Options
+	EnableTracing  bool
+	EnableGrafana  bool
+	EnableDebug    bool
+	OutdatedGap    int64
+	TriggerSpan    uint
+	TempDBCapacity uint
 }
 
 // New returns an instance of *RaCailum
@@ -152,7 +156,7 @@ func (r *RaCailum) WalkExtract(ctx context.Context, from types.TipSetKey, hi abi
 	if err != nil {
 		return fmt.Errorf("load ts failed, is it exist in this db? : %w", err)
 	}
-	tipsets, err := segment.ExtractLinkedTipSets(r.components.cs, ts, &hi)
+	tipsets, err := segment.ExtractLinkedTipSets(r.components.cs, ts, &hi, false)
 	if err != nil {
 		return fmt.Errorf("extract linked tipsets failed: %w", err)
 	}
@@ -163,7 +167,7 @@ func (r *RaCailum) WalkExtract(ctx context.Context, from types.TipSetKey, hi abi
 
 	tipsets = tipsets[1:]
 
-	if err := r.activeSeg.ExtractTipSets(ctx, tipsets); err != nil {
+	if err := r.activeSeg.ExtractTipSets(ctx, tipsets, false); err != nil {
 		return err
 	}
 
@@ -176,7 +180,7 @@ func (r *RaCailum) WalkExtract(ctx context.Context, from types.TipSetKey, hi abi
 // Aggregate is used to trigger aggregations from given tipset boundaries manually
 func (r *RaCailum) Aggregate(ctx context.Context, lo, hi *types.TipSet) error {
 	loEpoch := lo.Height()
-	tss, err := segment.ExtractLinkedTipSets(r.components.cs, hi, &loEpoch)
+	tss, err := segment.ExtractLinkedTipSets(r.components.cs, hi, &loEpoch, false)
 	if err != nil {
 		return fmt.Errorf("load tipsets: %w", err)
 	}
@@ -185,8 +189,8 @@ func (r *RaCailum) Aggregate(ctx context.Context, lo, hi *types.TipSet) error {
 }
 
 // DryState runs a dry extraction from given ts
-func (r *RaCailum) DryState(ctx context.Context, ts *common.LinkedTipSet) ([]*extract.Res, error) {
-	return r.activeSeg.DryExtract(ctx, ts)
+func (r *RaCailum) DryState(ctx context.Context, ts *common.LinkedTipSet, allowNilChild bool) ([]*extract.Res, error) {
+	return r.activeSeg.DryExtract(ctx, ts, allowNilChild)
 }
 
 func (r *RaCailum) Run(ctx context.Context, doneCh <-chan struct{}, tsCh <-chan types.TipSetKey) {

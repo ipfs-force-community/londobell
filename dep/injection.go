@@ -26,6 +26,8 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/filecoin-project/lotus/node/repo"
+
+	"github.com/ipfs-force-community/londobell/tmpbell"
 )
 
 var (
@@ -111,6 +113,7 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 
 		// londo bell module
 		dix.Override(new(*racailum.RaCailum), NewRaCailum),
+		dix.Override(new(*tmpbell.TmpBell), NewTmpBell), //tmp db
 		dix.Override(new(common.HeadNotifier), cliex.NewHeadSub),
 
 		dix.Override(invokeSetupDebug, SetupPprof),

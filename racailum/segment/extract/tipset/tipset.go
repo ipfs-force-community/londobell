@@ -131,17 +131,21 @@ var extractors = []extractor{
 
 type extractor struct {
 	name   string
-	method func(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error
+	method func(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, allowNilChild bool) error
 }
 
 // Extract tries to take all data out of specified tipset
-func Extract(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
+func Extract(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, allowNilChild bool) error {
 	tlog := ctx.L.With("epoch", ts.Height())
 
 	for ei := range extractors {
 		start := time.Now()
-		if err := extractors[ei].method(ctx, res, ts); err != nil {
+		if err := extractors[ei].method(ctx, res, ts, allowNilChild); err != nil {
 			return fmt.Errorf("extracting %s: %w", extractors[ei].name, err)
+		}
+
+		if allowNilChild && extractors[ei].name == "tipset" {
+			continue
 		}
 		tlog.Infow("tipset extractor done", "name", extractors[ei].name, "elapsed", time.Now().Sub(start).String())
 	}
@@ -149,15 +153,35 @@ func Extract(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error 
 	return nil
 }
 
-func extractTipSet(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error { // nolint: deadcode
+func extractTipSet(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error { // nolint: deadcode
 	if !ctx.Opts.EnabelExtract.EnableExtractTipset {
+		return nil
+	}
+	if tmp {
 		return nil
 	}
 
 	doc, err := model.NewTipSet(ts)
 	if err != nil {
 		return err
+	}
 
+	res.Docs = append(res.Docs, doc)
+	return nil
+}
+
+func extractTipSetForTmp(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, st cid.Cid) error { // nolint: deadcode
+	weight, err := ctx.D.Weight(ctx.C, ts.TipSet)
+	if err != nil {
+		return fmt.Errorf("get weight of tipset failed: %v", err)
+	}
+	baseFee, err := ctx.D.ComputeBaseFee(ctx.C, ts.TipSet)
+	if err != nil {
+		return fmt.Errorf("get basefee of tipset failed: %v", err)
+	}
+	doc, err := model.NewTipSetWithoutChild(ts, weight, baseFee, st)
+	if err != nil {
+		return err
 	}
 
 	res.Docs = append(res.Docs, doc)
@@ -210,12 +234,12 @@ func copyIndexes(src []int) []int {
 	return dst
 }
 
-func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
+func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
 	_, span := trace.StartSpan(ctx.C, "extractor.extractExecTrace")
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 
-	if ts.Child == nil {
+	if !tmp && ts.Child == nil {
 		return fmt.Errorf("child is required for a *LinkedTipSet@%d", ts.Height())
 	}
 
@@ -234,12 +258,19 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	start := time.Now()
 	st, rawinvocs, err := ctx.D.ExecutionTrace(ctx.C, ts.TipSet)
 	if err != nil {
-		return fmt.Errorf("tipset %v execution: %w", ts.TipSet.Height().String(), err)
+		return fmt.Errorf("tipset.Height: %v, tipset.Cids: %v, pstate: %v, tipset execution failed: %w", ts.TipSet.Height().String(), ts.TipSet.Cids(), ts.TipSet.Blocks()[0].ParentStateRoot, err)
 	}
+
+	if tmp {
+		elog.Infof("tipset execution successfully, tipset.Height: %v, tipset.Cids: %v, state: %v, pstate: %v", ts.TipSet.Height().String(), ts.TipSet.Cids(), st.String(), ts.TipSet.Blocks()[0].ParentStateRoot)
+	}
+
 	elapsed := time.Now().Sub(start)
 
-	if expect := ts.State(); st != expect {
-		return fmt.Errorf("exec state of tipset %v mismatched, expect: %v, got: %v", ts.TipSet.Height(), expect, st)
+	if ts.Child != nil {
+		if expect := ts.State(); st != expect {
+			return fmt.Errorf("exec state of tipset %v mismatched, expect: %v, got: %v", ts.TipSet.Height(), expect, st)
+		}
 	}
 
 	var invocs []common.InvocResultCompact
@@ -248,6 +279,17 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	}
 
 	elog.Infow("get exec invocs", "st", st, "count", len(invocs), "elapsed", elapsed.String())
+
+	if tmp {
+		// todo: call TipSetState to get Receipts?
+		tstart := time.Now()
+		err = extractTipSetForTmp(ctx, res, ts, st)
+		if err != nil {
+			return fmt.Errorf("extract tipset failed: %v", err)
+		}
+		elog.Infow("tipset extractor done", "name", "tipset", "elapsed", time.Now().Sub(tstart).String())
+	}
+
 	etraces := make([]persistExecTrace, 0, len(invocs)*4)
 	gasTraceNames := map[string]struct{}{}
 
@@ -379,7 +421,11 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	return nil
 }
 
-func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
+func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if tmp {
+		return nil
+	}
+
 	_, span := trace.StartSpan(ctx.C, "extractor.extractActorBalance")
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
@@ -465,7 +511,11 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	return nil
 }
 
-func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {
+func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if tmp {
+		return nil
+	}
+
 	_, span := trace.StartSpan(ctx.C, "extractor.extractActorHead")
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()

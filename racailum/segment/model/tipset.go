@@ -31,6 +31,19 @@ func NewTipSet(ts *common.LinkedTipSet) (*TipSet, error) {
 	}, nil
 }
 
+func NewTipSetWithoutChild(ts *common.LinkedTipSet, weight types.BigInt, baseFee abi.TokenAmount, st cid.Cid) (*TipSet, error) {
+	return &TipSet{
+		Epoch:        ts.Height(),
+		Cids:         ts.Key().Cids(),
+		MinTimestamp: ts.MinTimestamp(),
+		//ChildEpoch:   0,
+		State:    st,
+		Receipts: cid.Undef, //
+		Weight:   weight,
+		BaseFee:  baseFee,
+	}, nil
+}
+
 // TipSet contains the basic info about a tipset on the heaviest chain
 type TipSet struct {
 	Epoch        abi.ChainEpoch `bson:"_id"`

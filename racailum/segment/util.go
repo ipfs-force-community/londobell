@@ -10,8 +10,8 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 )
 
-// ExtractLinkedTipSets extracts linked tipsets within range [lower, from)
-func ExtractLinkedTipSets(cs common.ChainStore, from *types.TipSet, lower *abi.ChainEpoch) ([]*common.LinkedTipSet, error) {
+// ExtractLinkedTipSets extracts linked tipsets within range [lower, from); range [lower, from] if tmp is true
+func ExtractLinkedTipSets(cs common.ChainStore, from *types.TipSet, lower *abi.ChainEpoch, tmp bool) ([]*common.LinkedTipSet, error) {
 	var destEpoch abi.ChainEpoch
 
 	if lower != nil {
@@ -23,18 +23,30 @@ func ExtractLinkedTipSets(cs common.ChainStore, from *types.TipSet, lower *abi.C
 		return nil, nil
 	}
 
-	tss := make([]*common.LinkedTipSet, 0, int(h-destEpoch))
+	length := int(h - destEpoch)
+	if tmp {
+		length = int(h-destEpoch) + 1
+	}
+	tss := make([]*common.LinkedTipSet, 0, length)
 	var prev *types.TipSet
 	_, err := TraverseTipSets(cs, from, func(walked *types.TipSet, walkedEpoch abi.ChainEpoch) (bool, error) {
 		if walkedEpoch < destEpoch {
 			return false, nil
 		}
 
-		if prev != nil {
+		if tmp {
+			// allow nil child
 			tss = append(tss, &common.LinkedTipSet{
 				TipSet: walked,
 				Child:  prev,
 			})
+		} else {
+			if prev != nil {
+				tss = append(tss, &common.LinkedTipSet{
+					TipSet: walked,
+					Child:  prev,
+				})
+			}
 		}
 
 		prev = walked
