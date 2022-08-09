@@ -144,7 +144,7 @@ func (r *RaCailum) Extract(ctx context.Context, ts *types.TipSet) error {
 	return r.activeSeg.Extract(ctx, ts)
 }
 
-// OfflineExtract is used to extract from given tipset key
+// OfflineExtract is used to extract from given tipset key (hi, from)
 func (r *RaCailum) WalkExtract(ctx context.Context, from types.TipSetKey, hi abi.ChainEpoch) error {
 	ts, err := r.components.cs.LoadTipSet(ctx, from)
 	if err != nil {
@@ -154,6 +154,12 @@ func (r *RaCailum) WalkExtract(ctx context.Context, from types.TipSetKey, hi abi
 	if err != nil {
 		return fmt.Errorf("extract linked tipsets failed: %w", err)
 	}
+
+	for i := 1; i < len(tipsets); i++ {
+		tipsets[i].Parent = tipsets[i-1].TipSet
+	}
+
+	tipsets = tipsets[1:]
 
 	if err := r.activeSeg.ExtractTipSets(ctx, tipsets); err != nil {
 		return err

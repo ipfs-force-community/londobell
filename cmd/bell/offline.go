@@ -28,12 +28,12 @@ var extractorCmd = &cli.Command{
 		&cli.Int64Flag{
 			Name:     "start-height",
 			Required: true,
-			Usage:    "start height of start epoch",
+			Usage:    "start height of start epoch (not inclusive)",
 		},
 		&cli.StringFlag{
 			Name:     "end-key",
 			Required: true,
-			Usage:    "tipSetKey of end epoch, Separated by ',' ",
+			Usage:    "tipSetKey of end epoch, Separated by ',' (not inclusive)",
 		},
 		&cli.BoolFlag{
 			Name:  "local",
