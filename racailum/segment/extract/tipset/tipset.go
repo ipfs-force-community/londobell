@@ -228,7 +228,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	elapsed := time.Now().Sub(start)
 
 	if expect := ts.State(); st != expect {
-		elog.Errorw("exec state mismatched", "expect", expect, "got", st)
+		return fmt.Errorf("exec state of tipset %v mismatched, expect: %v, got: %v", ts.TipSet.Height(), expect, st)
 	}
 
 	var invocs []common.InvocResultCompact
