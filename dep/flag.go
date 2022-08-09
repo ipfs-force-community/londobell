@@ -75,23 +75,27 @@ func InjectRepoPath(cctx *cli.Context) dix.Option {
 }
 
 func InjectChainRepo(cctx *cli.Context) dix.Option {
-	r, err := repo.NewFS(cctx.String(OfflineChainStorageRepoFlag.Name))
-	if err != nil {
-		panic(fmt.Errorf("opening fs repo: %w", err))
-	}
-	exist, err := r.Exists()
-	if err != nil {
-		panic(fmt.Errorf("check chain store repo exist failed: %w", err))
-	}
+	return dix.Override(new(repo.LockedRepo), func() func(lc fx.Lifecycle) repo.LockedRepo {
+		r, err := repo.NewFS(cctx.String(OfflineChainStorageRepoFlag.Name))
+		if err != nil {
+			panic(fmt.Errorf("opening fs repo: %w", err))
+		}
+		exist, err := r.Exists()
+		if err != nil {
+			panic(fmt.Errorf("check chain store repo exist failed: %w", err))
+		}
 
-	if !exist {
-		panic(fmt.Errorf("chain store repo not exist,check the path %s", cctx.String(OfflineChainStorageRepoFlag.Name)))
-	}
-	lr, err := r.Lock(repo.FullNode)
-	if err != nil {
-		panic(fmt.Errorf("lock repo failed: %w", err))
-	}
-	return dix.Override(new(repo.LockedRepo), modules.LockedRepo(lr))
+		if !exist {
+			panic(fmt.Errorf("chain store repo not exist,check the path %s", cctx.String(OfflineChainStorageRepoFlag.Name)))
+		}
+		lr, err := r.Lock(repo.FullNode)
+		if err != nil {
+			panic(fmt.Errorf("lock repo failed: %w", err))
+		}
+
+		return modules.LockedRepo(lr)
+
+	})
 }
 
 func ConfigFilePath(rpath RepoPath) string {
