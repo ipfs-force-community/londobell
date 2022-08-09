@@ -49,7 +49,7 @@ var extractorCmd = &cli.Command{
 			Ra *racailum.RaCailum
 		}
 		_, err := dix.New(ctx,
-			dep.WalkRaCalium(cctx, fxlog, cctx.Bool("local"), &components),
+			dep.WalkRaCalium(cctx, fxlog, &components),
 			dep.InjectRepoPath(cctx),
 			dix.Override(new(dtypes.ShutdownChan), shutdownCh),
 		)

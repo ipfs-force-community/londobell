@@ -117,7 +117,7 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 	)
 }
 
-func WalkRaCalium(cctx *cli.Context, logger fx.Printer, local bool, target ...interface{}) dix.Option {
+func WalkRaCalium(cctx *cli.Context, logger fx.Printer, target ...interface{}) dix.Option {
 	return dix.Options(
 		ContextModule(context.Background()),
 
@@ -126,9 +126,13 @@ func WalkRaCalium(cctx *cli.Context, logger fx.Printer, local bool, target ...in
 		SegmentManager(),
 		StateManager(),
 
-		dix.If(local, InjectChainRepo(cctx), OfflineDataSource()),
+		dix.ApplyIf(func(s *dix.Settings) bool {
+			return cctx.Bool("local")
+		}, InjectChainRepo(cctx), OfflineDataSource()),
 
-		dix.If(!local, InjectFullNode(cctx), OnlineDataSource()),
+		dix.ApplyIf(func(s *dix.Settings) bool {
+			return !cctx.Bool("local")
+		}, InjectFullNode(cctx), OnlineDataSource()),
 
 		dix.Override(new(*racailum.RaCailum), NewRaCailum),
 		dix.Override(new(common.HeadNotifier), func() (common.HeadNotifier, error) { return nil, nil }),
