@@ -10,6 +10,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
 	metricsi "github.com/ipfs/go-metrics-interface"
+	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
 
 	"github.com/filecoin-project/lotus/build"
@@ -116,32 +117,18 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 	)
 }
 
-func OfflineRaCalium(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Option {
+func WalkRaCalium(cctx *cli.Context, logger fx.Printer, local bool, target ...interface{}) dix.Option {
 	return dix.Options(
-		ContextModule(ctx),
+		ContextModule(context.Background()),
 
 		dix.If(logger != nil, dix.Logger(logger)),
 		dix.If(len(target) > 0, dix.Populate(invokePopulate, target...)),
 		SegmentManager(),
 		StateManager(),
 
-		OfflineDataSource(),
+		dix.If(local, InjectChainRepo(cctx), OfflineDataSource()),
 
-		dix.Override(new(*racailum.RaCailum), NewRaCailum),
-		dix.Override(new(common.HeadNotifier), func() (common.HeadNotifier, error) { return nil, nil }),
-	)
-}
-
-func OnlineRaCalium(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Option {
-	return dix.Options(
-		ContextModule(ctx),
-
-		dix.If(logger != nil, dix.Logger(logger)),
-		dix.If(len(target) > 0, dix.Populate(invokePopulate, target...)),
-		SegmentManager(),
-		StateManager(),
-
-		OnlineDataSource(),
+		dix.If(!local, InjectFullNode(cctx), OnlineDataSource()),
 
 		dix.Override(new(*racailum.RaCailum), NewRaCailum),
 		dix.Override(new(common.HeadNotifier), func() (common.HeadNotifier, error) { return nil, nil }),

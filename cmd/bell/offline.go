@@ -36,9 +36,9 @@ var extractorCmd = &cli.Command{
 			Usage:    "tipSetKey of end epoch, Separated by ',' ",
 		},
 		&cli.BoolFlag{
-			Name:  "offline",
+			Name:  "local",
 			Value: true,
-			Usage: "online when false",
+			Usage: "local or remote",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -49,18 +49,7 @@ var extractorCmd = &cli.Command{
 			Ra *racailum.RaCailum
 		}
 		_, err := dix.New(ctx,
-			dix.ApplyIf(func(s *dix.Settings) bool {
-				return cctx.Bool("offline")
-			}, dep.InjectChainRepo(cctx)),
-			dix.ApplyIf(func(s *dix.Settings) bool {
-				return !cctx.Bool("offline")
-			}, dep.InjectFullNode(cctx)),
-			dix.ApplyIf(func(s *dix.Settings) bool {
-				return cctx.Bool("offline")
-			}, dep.OfflineRaCalium(ctx, fxlog, &components)),
-			dix.ApplyIf(func(s *dix.Settings) bool {
-				return !cctx.Bool("offline")
-			}, dep.OnlineRaCalium(ctx, fxlog, &components)),
+			dep.WalkRaCalium(cctx, fxlog, cctx.Bool("local"), &components),
 			dep.InjectRepoPath(cctx),
 			dix.Override(new(dtypes.ShutdownChan), shutdownCh),
 		)
@@ -71,6 +60,6 @@ var extractorCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		return components.Ra.OfflineExtract(ctx, ts, abi.ChainEpoch(cctx.Int64("start-height")))
+		return components.Ra.WalkExtract(ctx, ts, abi.ChainEpoch(cctx.Int64("start-height")))
 	},
 }

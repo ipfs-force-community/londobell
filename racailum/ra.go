@@ -145,7 +145,7 @@ func (r *RaCailum) Extract(ctx context.Context, ts *types.TipSet) error {
 }
 
 // OfflineExtract is used to extract from given tipset key
-func (r *RaCailum) OfflineExtract(ctx context.Context, from types.TipSetKey, hi abi.ChainEpoch) error {
+func (r *RaCailum) WalkExtract(ctx context.Context, from types.TipSetKey, hi abi.ChainEpoch) error {
 	ts, err := r.components.cs.LoadTipSet(ctx, from)
 	if err != nil {
 		return fmt.Errorf("load ts failed, is it exist in this db? : %w", err)
