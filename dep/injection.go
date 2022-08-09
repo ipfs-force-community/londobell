@@ -131,3 +131,19 @@ func OfflineRaCalium(ctx context.Context, logger fx.Printer, target ...interface
 		dix.Override(new(common.HeadNotifier), func() (common.HeadNotifier, error) { return nil, nil }),
 	)
 }
+
+func OnlineRaCalium(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Option {
+	return dix.Options(
+		ContextModule(ctx),
+
+		dix.If(logger != nil, dix.Logger(logger)),
+		dix.If(len(target) > 0, dix.Populate(invokePopulate, target...)),
+		SegmentManager(),
+		StateManager(),
+
+		OnlineDataSource(),
+
+		dix.Override(new(*racailum.RaCailum), NewRaCailum),
+		dix.Override(new(common.HeadNotifier), func() (common.HeadNotifier, error) { return nil, nil }),
+	)
+}

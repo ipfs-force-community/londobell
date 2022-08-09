@@ -5,9 +5,10 @@ import (
 
 	"github.com/dtynn/dix"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
+
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 
 	"github.com/ipfs-force-community/londobell/dep"
 	"github.com/ipfs-force-community/londobell/racailum"
@@ -34,6 +35,11 @@ var extractorCmd = &cli.Command{
 			Required: true,
 			Usage:    "tipSetKey of end epoch, Separated by ',' ",
 		},
+		&cli.BoolFlag{
+			Name:  "offline",
+			Value: true,
+			Usage: "online when false",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := context.Background()
@@ -43,8 +49,18 @@ var extractorCmd = &cli.Command{
 			Ra *racailum.RaCailum
 		}
 		_, err := dix.New(ctx,
-			dep.InjectChainRepo(cctx),
-			dep.OfflineRaCalium(ctx, fxlog, &components),
+			dix.ApplyIf(func(s *dix.Settings) bool {
+				return cctx.Bool("offline")
+			}, dep.InjectChainRepo(cctx)),
+			dix.ApplyIf(func(s *dix.Settings) bool {
+				return !cctx.Bool("offline")
+			}, dep.InjectFullNode(cctx)),
+			dix.ApplyIf(func(s *dix.Settings) bool {
+				return cctx.Bool("offline")
+			}, dep.OfflineRaCalium(ctx, fxlog, &components)),
+			dix.ApplyIf(func(s *dix.Settings) bool {
+				return !cctx.Bool("offline")
+			}, dep.OnlineRaCalium(ctx, fxlog, &components)),
 			dep.InjectRepoPath(cctx),
 			dix.Override(new(dtypes.ShutdownChan), shutdownCh),
 		)
