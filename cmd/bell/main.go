@@ -31,11 +31,13 @@ func main() {
 			traceCmd,
 			compareCmd,
 			checkCmd,
+			offlineCmd,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{
 			dep.RepoFlag,
 			dep.FullNodeAPIFlag,
+			dep.OfflineChainStorageRepoFlag,
 		},
 	}
 

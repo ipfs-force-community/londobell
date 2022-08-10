@@ -5,14 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	logging "github.com/ipfs/go-log/v2"
-	"go.opencensus.io/stats"
-
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/chain/vm"
-	lconfig "github.com/filecoin-project/lotus/node/config"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
-
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/metrics"
 	"github.com/ipfs-force-community/londobell/racailum/grafana"
@@ -20,6 +13,13 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/aggregate"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/tracing"
+	logging "github.com/ipfs/go-log/v2"
+	"go.opencensus.io/stats"
+
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/chain/vm"
+	lconfig "github.com/filecoin-project/lotus/node/config"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 var log = logging.Logger("racailum")
@@ -142,6 +142,33 @@ type RaCailum struct {
 // Extract is used to extract from given tipset manually
 func (r *RaCailum) Extract(ctx context.Context, ts *types.TipSet) error {
 	return r.activeSeg.Extract(ctx, ts)
+}
+
+// OfflineExtract is used to extract from given tipset key (hi, from)
+func (r *RaCailum) WalkExtract(ctx context.Context, from types.TipSetKey, hi abi.ChainEpoch) error {
+	ts, err := r.components.cs.LoadTipSet(ctx, from)
+	if err != nil {
+		return fmt.Errorf("load ts failed, is it exist in this db? : %w", err)
+	}
+	tipsets, err := segment.ExtractLinkedTipSets(r.components.cs, ts, &hi)
+	if err != nil {
+		return fmt.Errorf("extract linked tipsets failed: %w", err)
+	}
+
+	for i := 1; i < len(tipsets); i++ {
+		tipsets[i].Parent = tipsets[i-1].TipSet
+	}
+
+	tipsets = tipsets[1:]
+
+	if err := r.activeSeg.ExtractTipSets(ctx, tipsets); err != nil {
+		return err
+	}
+
+	if err := r.activeSeg.Aggregate(ctx, tipsets); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Aggregate is used to trigger aggregations from given tipset boundaries manually

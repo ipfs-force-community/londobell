@@ -242,7 +242,7 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		return nil
 	}
 
-	if err := s.extractTipSets(ctx, tipsets); err != nil {
+	if err := s.ExtractTipSets(ctx, tipsets); err != nil {
 		return err
 	}
 
