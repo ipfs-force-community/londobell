@@ -19,8 +19,8 @@ type verInfo struct {
 }
 
 const (
-	in  = "./cmd/lotus-api-adapter/templates/types.one.template"
-	out = "./cmd/lotus-api-adapter/controller/types.go"
+	in  = "./cmd/londobell-api/templates/types.one.template"
+	out = "./cmd/londobell-api/controller/adapter/types.go"
 )
 
 func main() {
