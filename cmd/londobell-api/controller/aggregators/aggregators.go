@@ -17,7 +17,7 @@ var (
 	wincountZlAggregator       []byte
 )
 
-func init() {
+func InitAggregators() {
 	// todo: 定期重新读取，无感知变化 or 每次变化重启
 	addressAggregator = pool_monitor.GetAddressAggregator()
 	aggPreNetfeeAggregator = pool_monitor.GetAggPreNetfeeAggregator()

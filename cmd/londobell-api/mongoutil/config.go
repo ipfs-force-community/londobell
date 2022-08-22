@@ -23,7 +23,7 @@ type DBConfig struct {
 	Name string `json:"name"`
 }
 
-func init() {
+func InitDB() {
 	file, err := os.Open("./cmd/londobell-api/mongoutil/config.json")
 	defer file.Close() //nolint:staticcheck
 	if err != nil {

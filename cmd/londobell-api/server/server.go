@@ -40,6 +40,8 @@ func Run(cctx *cli.Context, useAPI bool) error {
 
 		RegisterAdapterApi(router)
 	} else {
+		aggregators.InitAggregators()
+		mongoutil.InitDB()
 		mongoutil.Client, err = mongo.Connect(ctx, options.Client().ApplyURI(mongoutil.DbConfig.URL).SetRegistry(bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{})).Build()))
 		if err != nil {
 			return err
