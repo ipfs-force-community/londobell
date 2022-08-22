@@ -1,4 +1,4 @@
-package controller
+package adapter
 
 import (
 	"context"
@@ -19,7 +19,7 @@ var (
 	Loc, _      = time.LoadLocation("Asia/Shanghai")
 	baseTime, _ = time.Parse(time.RFC3339, mainnetBeginTime)
 	API         v0api.FullNode
-	log         = logging.Logger("racailum")
+	log         = logging.Logger("adapter")
 )
 
 func CalcTimeByEpoch(height uint64) time.Time {

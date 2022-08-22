@@ -1,4 +1,4 @@
-package controller
+package adapter
 
 import (
 	"context"
@@ -32,7 +32,9 @@ import (
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 	adt7 "github.com/filecoin-project/specs-actors/v7/actors/util/adt"
 	"github.com/gin-gonic/gin"
-	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/model"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors"
@@ -44,21 +46,18 @@ import (
 )
 
 func GetMinerInfo(c *gin.Context) {
+	alog := log.With("method", "GetMinerInfo")
 	req := model.MinerReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
 	maddr, err := address.NewFromString(req.Miner)
 	if err != nil {
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
@@ -69,74 +68,56 @@ func GetMinerInfo(c *gin.Context) {
 	if req.Epoch == 0 {
 		ts, err = API.ChainHead(ctx)
 		if err != nil {
-			res.Code = model.Fail
-			res.Msg = err.Error()
-			c.JSON(http.StatusOK, res)
+			util.ReturnOnErr(c, alog, err)
 			return
 		}
 	} else {
 		ts, err = API.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
 		if err != nil {
-			res.Code = model.Fail
-			res.Msg = err.Error()
-			c.JSON(http.StatusOK, res)
+			util.ReturnOnErr(c, alog, err)
 			return
 		}
 	}
 
 	mi, err := API.StateMinerInfo(ctx, maddr, ts.Key())
 	if err != nil {
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
 	power, err := API.StateMinerPower(ctx, maddr, ts.Key())
 	if err != nil {
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
 	mact, err := API.StateGetActor(ctx, maddr, ts.Key())
 	if err != nil {
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
 	if !builtin.IsStorageMinerActor(mact.Code) {
-		res.Code = model.Fail
-		res.Msg = "provided address does not correspond to a miner actor"
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, fmt.Errorf("provided address does not correspond to a miner actor"))
 		return
 	}
 
 	availableBalance, err := API.StateMinerAvailableBalance(ctx, maddr, ts.Key())
 	if err != nil {
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
 	stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(API))
 	mas, err := miner.Load(stor, mact)
 	if err != nil {
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
 	lockedFunds, err := mas.LockedFunds()
 	if err != nil {
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
@@ -158,9 +139,8 @@ func GetMinerInfo(c *gin.Context) {
 
 	err = getMinerResByCode(ctx, mact, stor, resData)
 	if err != nil {
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
+		return
 	}
 
 	res.Data = resData

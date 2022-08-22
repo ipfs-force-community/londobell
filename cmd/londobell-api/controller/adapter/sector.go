@@ -1,4 +1,4 @@
-package controller
+package adapter
 
 import (
 	"context"
@@ -11,18 +11,17 @@ import (
 
 	"github.com/filecoin-project/lotus/chain/types"
 
-	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/model"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
 
 func GetSectorInfo(c *gin.Context) {
+	alog := log.With("method", "GetSectorInfo")
 	req := model.SectorReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		log.Errorf("[GetSectorInfo] bind json SectorReq err: %w", err)
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
@@ -33,29 +32,20 @@ func GetSectorInfo(c *gin.Context) {
 	if req.Epoch == 0 {
 		ts, err = API.ChainHead(ctx)
 		if err != nil {
-			log.Errorf("[GetSectorInfo] api ChainHead err: %w", err)
-			res.Code = model.Fail
-			res.Msg = err.Error()
-			c.JSON(http.StatusOK, res)
+			util.ReturnOnErr(c, alog, err)
 			return
 		}
 	} else {
 		ts, err = API.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
 		if err != nil {
-			log.Errorf("[GetSectorInfo] api ChainGetTipSetByHeight err: %w", err)
-			res.Code = model.Fail
-			res.Msg = err.Error()
-			c.JSON(http.StatusOK, res)
+			util.ReturnOnErr(c, alog, err)
 			return
 		}
 	}
 
 	maddr, err := address.NewFromString(req.Miner)
 	if err != nil {
-		log.Errorf("[GetSectorInfo] address.NewFromString err: %w", err)
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
@@ -63,10 +53,7 @@ func GetSectorInfo(c *gin.Context) {
 
 	sectors, err := API.StateMinerSectors(ctx, maddr, nil, ts.Key())
 	if err != nil {
-		log.Errorf("[GetSectorInfo] api ChainGetTipSetByHeight err: %w", err)
-		res.Code = model.Fail
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
+		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
@@ -84,10 +71,7 @@ func GetSectorInfo(c *gin.Context) {
 
 		resData.Size, err = info.SealProof.SectorSize()
 		if err != nil {
-			log.Errorf("[GetSectorInfo] miner0 SectorSize err: %w", err)
-			res.Code = model.Fail
-			res.Msg = err.Error()
-			c.JSON(http.StatusOK, res)
+			util.ReturnOnErr(c, alog, err)
 			return
 		}
 

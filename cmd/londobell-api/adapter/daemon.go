@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/urfave/cli/v2"
 
-	"github.com/ipfs-force-community/londobell/cmd/lotus-api-adapter/server"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/server"
 )
 
 var daemonCmd = &cli.Command{
@@ -16,7 +16,7 @@ var daemonCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		err := server.Run(cctx)
+		err := server.Run(cctx, true)
 		if err != nil {
 			return err
 		}
