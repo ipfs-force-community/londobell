@@ -229,6 +229,7 @@ func GetActorInfo(c *gin.Context) {
 		Balance:   act.Balance,
 		Code:      act.Code,
 		Head:      act.Head,
+		Nonce:     act.Nonce,
 		State:     state,
 	}
 
