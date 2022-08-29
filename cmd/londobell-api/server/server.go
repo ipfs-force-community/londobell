@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/dtynn/dix"
 	"github.com/gin-gonic/gin"
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
@@ -18,6 +19,7 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	"github.com/ipfs-force-community/londobell/dep"
 )
 
 func Run(cctx *cli.Context, useAPI bool) error {
@@ -37,6 +39,13 @@ func Run(cctx *cli.Context, useAPI bool) error {
 		if err != nil {
 			return err
 		}
+
+		stopper, err := dix.New(ctx, dep.Bell(ctx, adapter.Fxlog, &adapter.Components), dep.InjectRepoPath(cctx), dep.InjectFullNode(cctx))
+		if err != nil {
+			return err
+		}
+
+		defer stopper(ctx) //nolint:errcheck
 
 		RegisterAdapterApi(router)
 	} else {
@@ -86,6 +95,7 @@ func RegisterAdapterApi(router *gin.Engine) {
 		group.POST("/sector", adapter.GetSectorInfo)
 		group.POST("/batchminers", adapter.GetBatchMinersInfo)
 		group.POST("/sectorpower", adapter.GetSectorPowerInfo)
+		group.POST("/precommit_deposit_toburn", adapter.GetPreCommitDepositToBurnInfo)
 	}
 }
 
