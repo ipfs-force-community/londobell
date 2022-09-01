@@ -3,30 +3,29 @@ package adapter
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
+
+	"github.com/ipfs-force-community/londobell/buildnet"
 
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
-const (
-	mainnetBeginTime = "2020-08-25T06:00:00+08:00" // 高度0时的时间
-)
-
 var (
-	Loc, _      = time.LoadLocation("Asia/Shanghai")
-	baseTime, _ = time.Parse(time.RFC3339, mainnetBeginTime)
-	API         v0api.FullNode
-	log         = logging.Logger("adapter")
+	API v0api.FullNode
+	log = logging.Logger("adapter")
 )
 
-func CalcTimeByEpoch(height uint64) time.Time {
-	return time.Unix(baseTime.Unix()+int64(height)*30, 0).In(Loc)
+type Candidate struct {
+	ts     *types.TipSet
+	gap    abi.ChainEpoch
+	weight types.BigInt
+	api    v0api.FullNode
+	url    string
 }
 
 func GetFullNodeAPI(ctx context.Context, url string) (v0api.FullNode, error) {
@@ -40,15 +39,9 @@ func GetFullNodeAPI(ctx context.Context, url string) (v0api.FullNode, error) {
 func ChooseAPI(cctx *cli.Context) error {
 	urls := cctx.StringSlice("apis")
 
-	candidates := make([]struct {
-		ts     *types.TipSet
-		gap    abi.ChainEpoch
-		weight types.BigInt
-		api    v0api.FullNode
-		url    string
-	}, 0, len(urls))
+	candidates := make([]Candidate, 0, len(urls))
 
-	curEpoch := abi.ChainEpoch((time.Now().Unix() - baseTime.Unix()) / 30)
+	curEpoch := buildnet.GetCurEpoch()
 	for _, url := range urls {
 		api, err := GetFullNodeAPI(cctx.Context, url)
 		if err != nil {
@@ -68,13 +61,7 @@ func ChooseAPI(cctx *cli.Context) error {
 			continue
 		}
 
-		candidates = append(candidates, struct {
-			ts     *types.TipSet
-			gap    abi.ChainEpoch
-			weight types.BigInt
-			api    v0api.FullNode
-			url    string
-		}{ts: headTs, gap: curEpoch - headTs.Height(), weight: headWeight, api: api, url: url})
+		candidates = append(candidates, Candidate{ts: headTs, gap: curEpoch - headTs.Height(), weight: headWeight, api: api, url: url})
 	}
 
 	if len(candidates) == 0 {
@@ -87,10 +74,6 @@ func ChooseAPI(cctx *cli.Context) error {
 
 	candidate := candidates[0]
 	for i := 1; i < len(candidates); i++ {
-		if candidates[i].ts.Equals(candidate.ts) {
-			continue
-		}
-
 		// choose unforked node which has more weight
 		if types.BigCmp(candidates[i].weight, candidate.weight) > 0 {
 			candidate = candidates[i]
