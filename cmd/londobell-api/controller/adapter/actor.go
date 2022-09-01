@@ -22,9 +22,9 @@ import (
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
 
-	"github.com/ipfs-force-community/londobell/buildnet"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 func GetActorInfo(c *gin.Context) {
@@ -225,7 +225,7 @@ func GetActorInfo(c *gin.Context) {
 		ActorID:   actorID,
 		ActorAddr: actorAddr.String(),
 		Epoch:     ts.Height(),
-		BlockTime: buildnet.CalcTimeByEpoch(uint64(ts.Height())),
+		BlockTime: common.CalcTimeByEpoch(uint64(ts.Height())),
 		ActorType: actorType,
 		Balance:   act.Balance,
 		Code:      act.Code,

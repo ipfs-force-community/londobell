@@ -8,7 +8,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 
-	"github.com/ipfs-force-community/londobell/buildnet"
+	"github.com/ipfs-force-community/londobell/common"
 
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -41,7 +41,7 @@ func ChooseAPI(cctx *cli.Context) error {
 
 	candidates := make([]Candidate, 0, len(urls))
 
-	curEpoch := buildnet.GetCurEpoch()
+	curEpoch := common.GetCurEpoch()
 	for _, url := range urls {
 		api, err := GetFullNodeAPI(cctx.Context, url)
 		if err != nil {
