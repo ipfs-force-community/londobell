@@ -5,11 +5,14 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/lotus/lib/lotuslog"
 )
 
-var log = logging.Logger("data")
+var log = logging.Logger("lotus-api-adapter")
 
 func main() {
+	lotuslog.SetupLogLevels()
 	app := &cli.App{
 		Name:  "lotus-api-adapter",
 		Usage: "chain data",

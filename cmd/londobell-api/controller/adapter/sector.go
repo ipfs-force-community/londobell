@@ -13,6 +13,7 @@ import (
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 func GetSectorInfo(c *gin.Context) {
@@ -60,7 +61,7 @@ func GetSectorInfo(c *gin.Context) {
 	for _, info := range sectors {
 		resData := model.SectorRes{}
 		resData.Miner = maddr
-		resData.Date = CalcTimeByEpoch(uint64(info.Expiration))
+		resData.Date = common.CalcTimeByEpoch(uint64(info.Expiration))
 		resData.SectorNumber = info.SectorNumber
 
 		if info.SealProof >= 0 && info.SealProof <= 4 {

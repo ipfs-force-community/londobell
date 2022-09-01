@@ -3,12 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"reflect"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
@@ -19,6 +19,8 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
 )
+
+var log = logging.Logger("server")
 
 func Run(cctx *cli.Context, useAPI bool) error {
 	router := gin.New()
@@ -33,10 +35,19 @@ func Run(cctx *cli.Context, useAPI bool) error {
 	)
 
 	if useAPI {
-		err = adapter.GetFullNodeAPI(ctx)
-		if err != nil {
-			return err
-		}
+		tick := time.NewTicker(15 * time.Second)
+		defer tick.Stop()
+		go func() {
+			for {
+				select {
+				case <-tick.C:
+					err = adapter.ChooseAPI(cctx)
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
+			}
+		}()
 
 		RegisterAdapterApi(router)
 	} else {
