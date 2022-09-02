@@ -108,6 +108,7 @@ func RegisterAdapterApi(router *gin.Engine) {
 		group.POST("/sector", adapter.GetSectorInfo)
 		group.POST("/batchminers", adapter.GetBatchMinersInfo)
 		group.POST("/sectorpower", adapter.GetSectorPowerInfo)
+		group.POST("/precommit_deposit_toburn", adapter.GetPreCommitDepositToBurnInfo)
 	}
 }
 
