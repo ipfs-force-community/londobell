@@ -15,7 +15,10 @@ var daemonCmd = &cli.Command{
 			Name:  "port",
 			Usage: "1234",
 		},
-
+		&cli.StringSliceFlag{
+			Name:  "apis",
+			Usage: "ws://127.0.0.1:1234/rpc/v0",
+		},
 		dep.RepoFlag,
 		dep.FullNodeAPIFlag,
 	},

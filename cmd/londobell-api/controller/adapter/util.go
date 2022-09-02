@@ -18,12 +18,14 @@ const (
 )
 
 var (
+	API v0api.FullNode
+	log = logging.Logger("adapter")
+)
+
+var (
 	Loc, _      = time.LoadLocation("Asia/Shanghai")
 	baseTime, _ = time.Parse(time.RFC3339, mainnetBeginTime)
-	API         v0api.FullNode
-	log         = logging.Logger("adapter")
-
-	Fxlog = &fxlogger{
+	Fxlog       = &fxlogger{
 		ZapEventLogger: log,
 	}
 	Components StateComponents
