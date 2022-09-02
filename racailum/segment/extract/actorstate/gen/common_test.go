@@ -98,6 +98,10 @@ func (m *MockDAL) MessagesForBlock(ctx context.Context, b *types.BlockHeader) ([
 	args := m.Called(ctx, b)
 	return args.Get(0).([]*types.Message), args.Get(1).([]*types.SignedMessage), args.Error(2)
 }
+func (m *MockDAL) ComputeBaseFee(ctx context.Context, ts *types.TipSet) (abi.TokenAmount, error) {
+	args := m.Called(ctx, ts)
+	return args.Get(0).(abi.TokenAmount), args.Error(1)
+}
 
 /*
 Network: calibration

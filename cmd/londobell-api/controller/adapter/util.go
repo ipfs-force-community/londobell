@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/ipfs-force-community/londobell/common"
 	logging "github.com/ipfs/go-log/v2"
+	"go.uber.org/fx"
 
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -22,6 +24,21 @@ type Candidate struct {
 	weight types.BigInt
 	api    v0api.FullNode
 	url    string
+}
+
+type StateComponents struct {
+	fx.In
+	SM   common.StateManager
+	CS   common.ChainStore
+	Full v0api.FullNode
+}
+
+type fxlogger struct {
+	*logging.ZapEventLogger
+}
+
+func (l *fxlogger) Printf(msg string, args ...interface{}) {
+	l.ZapEventLogger.Debugf(msg, args...)
 }
 
 func GetFullNodeAPI(ctx context.Context, url string) (v0api.FullNode, error) {
