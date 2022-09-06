@@ -36,18 +36,16 @@ func GetBatchMinersInfo(c *gin.Context) {
 	defer cancel()
 
 	var ts *types.TipSet
+	api := API.GetAppropriateAPI()
 	if req.Epoch == 0 {
-		ts, err = API.ChainHead(ctx)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
+		ts, err = api.ChainHead(ctx)
 	} else {
-		ts, err = API.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
+		ts, err = api.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
+	}
+
+	if err != nil {
+		util.ReturnOnErr(c, alog, err)
+		return
 	}
 
 	for _, Miner := range req.Miners {
@@ -57,19 +55,19 @@ func GetBatchMinersInfo(c *gin.Context) {
 			return
 		}
 
-		mi, err := API.StateMinerInfo(ctx, maddr, ts.Key())
+		mi, err := api.StateMinerInfo(ctx, maddr, ts.Key())
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
 		}
 
-		power, err := API.StateMinerPower(ctx, maddr, ts.Key())
+		power, err := api.StateMinerPower(ctx, maddr, ts.Key())
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
 		}
 
-		mact, err := API.StateGetActor(ctx, maddr, ts.Key())
+		mact, err := api.StateGetActor(ctx, maddr, ts.Key())
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
@@ -80,13 +78,13 @@ func GetBatchMinersInfo(c *gin.Context) {
 			return
 		}
 
-		availableBalance, err := API.StateMinerAvailableBalance(ctx, maddr, ts.Key())
+		availableBalance, err := api.StateMinerAvailableBalance(ctx, maddr, ts.Key())
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
 		}
 
-		stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(API))
+		stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(api))
 		mas, err := miner.Load(stor, mact)
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)

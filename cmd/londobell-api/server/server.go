@@ -20,7 +20,9 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
 )
 
-var log = logging.Logger("server")
+var (
+	log = logging.Logger("server")
+)
 
 func Run(cctx *cli.Context, useAPI bool) error {
 	router := gin.New()
@@ -35,13 +37,14 @@ func Run(cctx *cli.Context, useAPI bool) error {
 	)
 
 	if useAPI {
+		adapter.API = adapter.NewAppropriateAPI(cctx.StringSlice("apis"))
 		tick := time.NewTicker(15 * time.Second)
 		defer tick.Stop()
 		go func() {
 			for {
 				select {
 				case <-tick.C:
-					err = adapter.ChooseAPI(cctx)
+					err = adapter.API.Choose(ctx)
 					if err != nil {
 						log.Fatal(err)
 					}

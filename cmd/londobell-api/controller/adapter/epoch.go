@@ -34,19 +34,17 @@ func GetEpochInfo(c *gin.Context) {
 	defer cancel()
 
 	var ts *types.TipSet
+	api := API.GetAppropriateAPI()
 
 	if req.Epoch == 0 {
-		ts, err = API.ChainHead(ctx)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
+		ts, err = api.ChainHead(ctx)
 	} else {
-		ts, err = API.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
+		ts, err = api.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
+	}
+
+	if err != nil {
+		util.ReturnOnErr(c, alog, err)
+		return
 	}
 
 	var winCount int64
@@ -54,13 +52,13 @@ func GetEpochInfo(c *gin.Context) {
 		winCount += b.ElectionProof.WinCount
 	}
 
-	pact, err := API.StateGetActor(ctx, power.Address, ts.Key())
+	pact, err := api.StateGetActor(ctx, power.Address, ts.Key())
 	if err != nil {
 		util.ReturnOnErr(c, alog, err)
 		return
 	}
 
-	stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(API))
+	stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(api))
 
 	pst, err := power.Load(stor, pact)
 	if err != nil {
@@ -74,7 +72,7 @@ func GetEpochInfo(c *gin.Context) {
 		return
 	}
 
-	ract, err := API.StateGetActor(ctx, reward.Address, ts.Key())
+	ract, err := api.StateGetActor(ctx, reward.Address, ts.Key())
 	if err != nil {
 		util.ReturnOnErr(c, alog, err)
 		return
@@ -92,7 +90,7 @@ func GetEpochInfo(c *gin.Context) {
 		return
 	}
 
-	parentTs, err := API.ChainGetTipSet(ctx, types.NewTipSetKey(ts.Blocks()[0].Parents...))
+	parentTs, err := api.ChainGetTipSet(ctx, types.NewTipSetKey(ts.Blocks()[0].Parents...))
 	if err != nil {
 		util.ReturnOnErr(c, alog, err)
 		return
