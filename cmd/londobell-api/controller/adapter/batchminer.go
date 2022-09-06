@@ -39,16 +39,13 @@ func GetBatchMinersInfo(c *gin.Context) {
 	api := API.GetAppropriateAPI()
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
 	} else {
 		ts, err = api.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
+	}
+
+	if err != nil {
+		util.ReturnOnErr(c, alog, err)
+		return
 	}
 
 	for _, Miner := range req.Miners {
