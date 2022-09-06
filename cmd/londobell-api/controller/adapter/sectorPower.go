@@ -29,14 +29,15 @@ func GetSectorPowerInfo(c *gin.Context) {
 	defer cancel()
 
 	var ts *types.TipSet
+	api := API.GetAppropriateAPI()
 	if req.Epoch == 0 {
-		ts, err = API.ChainHead(ctx)
+		ts, err = api.ChainHead(ctx)
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
 		}
 	} else {
-		ts, err = API.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
+		ts, err = api.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
@@ -51,7 +52,7 @@ func GetSectorPowerInfo(c *gin.Context) {
 
 	resData := model.SectorPowerRes{}
 
-	si, err := API.StateSectorGetInfo(ctx, maddr, abi.SectorNumber(req.Sector), ts.Key())
+	si, err := api.StateSectorGetInfo(ctx, maddr, abi.SectorNumber(req.Sector), ts.Key())
 	if err != nil {
 		util.ReturnOnErr(c, alog, err)
 		return

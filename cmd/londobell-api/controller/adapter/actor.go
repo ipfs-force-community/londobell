@@ -41,14 +41,16 @@ func GetActorInfo(c *gin.Context) {
 	defer cancel()
 
 	var ts *types.TipSet
+	api := API.GetAppropriateAPI()
+
 	if req.Epoch == 0 {
-		ts, err = API.ChainHead(ctx)
+		ts, err = api.ChainHead(ctx)
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
 		}
 	} else {
-		ts, err = API.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
+		ts, err = api.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
@@ -67,7 +69,7 @@ func GetActorInfo(c *gin.Context) {
 	if addr.Protocol() == address.ID {
 		actorID = addr
 	} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 {
-		actorID, err = API.StateLookupID(ctx, addr, ts.Key())
+		actorID, err = api.StateLookupID(ctx, addr, ts.Key())
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
@@ -78,10 +80,10 @@ func GetActorInfo(c *gin.Context) {
 
 	var actorType string
 
-	stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(API))
+	stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(api))
 
 	////too slow!!
-	//iact, err := API.StateGetActor(ctx, init_.Address, ts.Key())
+	//iact, err := api.StateGetActor(ctx, init_.Address, ts.Key())
 	//if err != nil {
 	//	log.Errorf("[GetActorInfo] api StateGetActor err: %w", err)
 	//	res.Code = model.Fail
@@ -121,7 +123,7 @@ func GetActorInfo(c *gin.Context) {
 	//	return
 	//}
 
-	act, err := API.StateGetActor(ctx, addr, ts.Key())
+	act, err := api.StateGetActor(ctx, addr, ts.Key())
 	if err != nil {
 		util.ReturnOnErr(c, alog, err)
 		return
@@ -139,7 +141,7 @@ func GetActorInfo(c *gin.Context) {
 		}
 		state = st.GetState()
 
-		actorAddr, err = API.StateAccountKey(ctx, addr, ts.Key())
+		actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return

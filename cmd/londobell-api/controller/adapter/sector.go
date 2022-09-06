@@ -30,14 +30,15 @@ func GetSectorInfo(c *gin.Context) {
 	defer cancel()
 
 	var ts *types.TipSet
+	api := API.GetAppropriateAPI()
 	if req.Epoch == 0 {
-		ts, err = API.ChainHead(ctx)
+		ts, err = api.ChainHead(ctx)
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
 		}
 	} else {
-		ts, err = API.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
+		ts, err = api.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
@@ -52,7 +53,7 @@ func GetSectorInfo(c *gin.Context) {
 
 	resDatas := make([]model.SectorRes, 0)
 
-	sectors, err := API.StateMinerSectors(ctx, maddr, nil, ts.Key())
+	sectors, err := api.StateMinerSectors(ctx, maddr, nil, ts.Key())
 	if err != nil {
 		util.ReturnOnErr(c, alog, err)
 		return
