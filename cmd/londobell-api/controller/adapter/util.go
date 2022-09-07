@@ -3,6 +3,7 @@ package adapter
 import (
 	"context"
 
+	"github.com/dtynn/dix"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs-force-community/londobell/common"
 	logging "github.com/ipfs/go-log/v2"
@@ -14,8 +15,12 @@ import (
 )
 
 var (
-	API *AppropriateAPI
-	log = logging.Logger("adapter")
+	API   *AppropriateAPI
+	log   = logging.Logger("adapter")
+	Fxlog = &fxlogger{
+		ZapEventLogger: log,
+	}
+	Components StateComponents
 )
 
 type Candidate struct {
@@ -47,4 +52,10 @@ func GetFullNodeAPI(ctx context.Context, url string) (v0api.FullNode, error) {
 		return nil, err
 	}
 	return api, nil
+}
+
+func InjectAppropriateFullNode() dix.Option {
+	return dix.Override(new(v0api.FullNode), func(lc fx.Lifecycle) v0api.FullNode {
+		return API.GetAppropriateAPI()
+	})
 }
