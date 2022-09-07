@@ -120,7 +120,7 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 	// curEpoch is null round
 	if curTs.Height() < curEpoch {
 		var msgs []*types.Message
-		pstate, _, err = stmgr.ComputeState(ctx, sm, curTs.Height(), msgs, curTs) //todo: Components.Full.StateCompute(ctx, curTs.Height(), msgs, curTs.Key())
+		pstate, _, err = stmgr.ComputeState(ctx, sm, curTs.Height(), msgs, curTs)
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
@@ -164,14 +164,14 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 				util.ReturnOnErr(c, alog, err)
 				return
 			}
-
-			pstate, err = sm.HandleStateForks(ctx, pstate, i, nil, curTs)
-			if err != nil {
-				util.ReturnOnErr(c, alog, err)
-				return
-			}
-			log.Infof("state at height %v is %v", i, pstate)
 		}
+
+		pstate, err = sm.HandleStateForks(ctx, pstate, i, nil, curTs)
+		if err != nil {
+			util.ReturnOnErr(c, alog, err)
+			return
+		}
+		log.Infof("state at height %v is %v", i, pstate)
 	}
 
 	parentSt, err := sm.StateTree(pstate)
@@ -194,7 +194,7 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 	// todo: 限制allMiners数量
 	for _, miner := range allMiners {
 		mact, err := parentSt.GetActor(miner)
-		if err != nil { //todo
+		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
 		}
