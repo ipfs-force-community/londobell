@@ -7,6 +7,6 @@ import (
 
 type MinerBlockRewardRes struct {
 	Epoch            abi.ChainEpoch       `bson:"_id" json:"_id"`
-	TotalBlockReward primitive.Decimal128 `bson:"totalBlockReward" json:"totalBlockReward"`
-	BlockCount       int                  `bson:"blockcount" json:"blockcount"`
+	TotalBlockReward primitive.Decimal128 `bson:"totalBlockReward" json:"TotalBlockReward"`
+	BlockCount       int                  `bson:"blockcount" json:"BlockCount"`
 }
