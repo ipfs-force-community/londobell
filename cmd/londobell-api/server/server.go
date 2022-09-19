@@ -117,6 +117,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/multisig_message", aggregators.GetMultisigMessage)
 		group.POST("/punishment", aggregators.GetPunishment)
 		group.POST("/wincount", aggregators.GetWinCount)
+		group.POST("/traces", aggregators.GetTraces)
 	}
 }
 
