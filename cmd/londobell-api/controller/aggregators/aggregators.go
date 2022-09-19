@@ -14,6 +14,7 @@ var (
 	multisigMessageAggregator  []byte
 	punishmentAggregator       []byte
 	wincountZlAggregator       []byte
+	tracesAggregator           []byte
 )
 
 func InitAggregators() {
@@ -29,4 +30,5 @@ func InitAggregators() {
 	multisigMessageAggregator = monitor.GetMultisigMessageAggregator()
 	punishmentAggregator = monitor.GetPunishmentAggregator()
 	wincountZlAggregator = monitor.GetWincountZlAggregator()
+	tracesAggregator = monitor.GetTracesAggregator()
 }
