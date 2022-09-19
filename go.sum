@@ -662,10 +662,12 @@ github.com/icza/mighty v0.0.0-20180919140131-cfd07d671de6 h1:8UsGZ2rr2ksmEru6lTo
 github.com/icza/mighty v0.0.0-20180919140131-cfd07d671de6/go.mod h1:xQig96I1VNBDIWGCdTt54nHt6EeI639SmHycLYL7FkA=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d/go.mod h1:qj24IKcXYK6Iy9ceXlo3Tc+vtHo9lIhSX5JddghvEPo=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220916081504-5dc59c2eadd5 h1:LPrLVDN8LHHagz2uPzVJ8XPKGBKDS0BI6L6OJnjWtd4=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220916081504-5dc59c2eadd5/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220919015723-57e04a667723 h1:CubqXxmvzfL4xbX0OldYL2Hy/8mtQ/9Jqo0f5AFB3ak=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220919015723-57e04a667723/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
+github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220816021025-88abfd4b3409 h1:846V5m8cIqbLB/O9kBlVF3u/h+yayFow6ayZUypAZPo=
+github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220816021025-88abfd4b3409/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
+github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220919085641-d5f011aba0b3 h1:wI2ziNeOLjBBpFn/RDy94XLZGyNxNQm0hI2pNr9NWIc=
+github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220919085641-d5f011aba0b3/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
+github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220920053240-90b2b610de51 h1:kwmSW50KJbtB6LvpDU00sS0cV6y3yCqSCaZh/2qxYn8=
+github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220920053240-90b2b610de51/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
 github.com/ipfs/bbloom v0.0.1/go.mod h1:oqo8CVWsJFMOZqTglBG4wydCE4IQA/G2/SEofB0rjUI=
 github.com/ipfs/bbloom v0.0.4 h1:Gi+8EGJ2y5qiD5FbsbpX/TMNcJw8gSqr7eyjHa4Fhvs=
 github.com/ipfs/bbloom v0.0.4/go.mod h1:cS9YprKXpoZ9lT0n/Mw/a6/aFV6DTjTLYHeA+gyqMG0=

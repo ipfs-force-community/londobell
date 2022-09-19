@@ -67,6 +67,7 @@ func Run(cctx *cli.Context, useAPI bool) error {
 		mongoutil.ActorBalanceCol = db.Collection("ActorBalance")
 		mongoutil.FinalHeightCol = db.Collection("FinalHeight")
 		mongoutil.MinerSectorHealthCol = db.Collection("MinerSectorHealth")
+		mongoutil.TipSetCol = db.Collection("Tipset")
 
 		RegisterAggregatorsApi(router)
 	}
@@ -118,6 +119,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/punishment", aggregators.GetPunishment)
 		group.POST("/wincount", aggregators.GetWinCount)
 		group.POST("/traces", aggregators.GetTraces)
+		group.POST("/child_epoch", aggregators.GetChildEpoch)
 	}
 }
 

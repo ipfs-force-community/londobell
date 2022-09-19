@@ -154,7 +154,7 @@ require (
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
 	github.com/icza/backscanner v0.0.0-20210726202459-ac2ffc679f94 // indirect
-	github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220919015723-57e04a667723 // indirect
+	github.com/ipfs-force-community/londobell-aggregators v0.0.0-20220920053240-90b2b610de51 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.0.0 // indirect
 	github.com/ipfs/go-bitswap v0.5.1 // indirect
