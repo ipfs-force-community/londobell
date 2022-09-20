@@ -14,6 +14,7 @@ var (
 	ActorBalanceCol      *mongo.Collection
 	FinalHeightCol       *mongo.Collection
 	MinerSectorHealthCol *mongo.Collection
+	TipSetCol            *mongo.Collection
 
 	DbConfig *DBConfig
 )

@@ -15,6 +15,7 @@ var (
 	punishmentAggregator       []byte
 	wincountZlAggregator       []byte
 	tracesAggregator           []byte
+	childEpochAggregator       []byte
 )
 
 func InitAggregators() {
@@ -31,4 +32,5 @@ func InitAggregators() {
 	punishmentAggregator = monitor.GetPunishmentAggregator()
 	wincountZlAggregator = monitor.GetWincountZlAggregator()
 	tracesAggregator = monitor.GetTracesAggregator()
+	childEpochAggregator = monitor.GetChildEpochAggregator()
 }
