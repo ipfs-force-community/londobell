@@ -86,3 +86,7 @@ func CalcTimeByEpoch(height uint64) time.Time {
 func GetCurEpoch() abi.ChainEpoch {
 	return abi.ChainEpoch((time.Now().Unix() - BaseTime.Unix()) / 30)
 }
+
+func AddAddressPrefix(addr string) string {
+	return buildnet.NetPrefix + addr
+}
