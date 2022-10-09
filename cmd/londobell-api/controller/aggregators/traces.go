@@ -15,7 +15,7 @@ func GetTraces(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	alog := log.With("method", "GetAddress")
+	alog := log.With("method", "GetTraces")
 	req := model.CommonReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)

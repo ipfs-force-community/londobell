@@ -15,7 +15,7 @@ func GetChildEpoch(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	alog := log.With("method", "GetWinCount")
+	alog := log.With("method", "GetChildEpoch")
 	req := model.CommonReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)

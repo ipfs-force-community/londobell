@@ -17,4 +17,5 @@ type TraceRes struct {
 	SubCallCount int
 	Detail       interface{}
 	GasCost      interface{}
+	Message      interface{} `bson:"message" json:"Message"`
 }
