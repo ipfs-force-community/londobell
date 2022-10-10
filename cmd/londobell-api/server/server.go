@@ -96,6 +96,7 @@ func RegisterAdapterApi(router *gin.Engine) {
 	group := router.Group("/adapter").Use()
 	{
 		group.POST("/actors", adapter.GetActorsInfo)
+		group.POST("/actor_ids", adapter.GetActorIDs)
 		group.POST("/epoch", adapter.GetEpochInfo)
 		group.POST("/miner", adapter.GetMinerInfo)
 		group.POST("/sector", adapter.GetSectorInfo)
