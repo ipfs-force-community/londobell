@@ -29,6 +29,8 @@ func Run(cctx *cli.Context, useAPI bool) error {
 	router.Use(CrosHandler())
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
+	//var uriLimiters = limiter.NewUriLimiter().AddBucketByConf()
+	//router.Use(limiter.RateLimiter(uriLimiters))
 	router.GET("/ping", Pong)
 
 	var (

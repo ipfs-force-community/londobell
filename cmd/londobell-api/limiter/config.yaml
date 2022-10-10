@@ -1,0 +1,5 @@
+rules:
+  - /adapter/actors:
+      interval: 1
+      capacity: 1
+      quantum: 2
