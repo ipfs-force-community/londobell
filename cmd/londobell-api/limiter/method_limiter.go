@@ -12,20 +12,20 @@ import (
 	"github.com/spf13/viper"
 )
 
-type UriLimiter struct {
+type URILimiter struct {
 	*Limiter
 	Rule *LimitConfRules
 }
 
-func NewUriLimiter() LimiterIface {
-	return &UriLimiter{
+func NewUriLimiter() Iface {
+	return &URILimiter{
 		Limiter: &Limiter{
 			limiterBuckets: make(map[string]*ratelimit.Bucket),
 		},
 	}
 }
 
-func (l *UriLimiter) Key(c *gin.Context) string {
+func (l *URILimiter) Key(c *gin.Context) string {
 	uri := c.Request.RequestURI
 	index := strings.Index(uri, "?")
 	if index == -1 {
@@ -34,19 +34,19 @@ func (l *UriLimiter) Key(c *gin.Context) string {
 	return uri[:index]
 }
 
-func (l *UriLimiter) GetBucket(key string) (*ratelimit.Bucket, bool) {
+func (l *URILimiter) GetBucket(key string) (*ratelimit.Bucket, bool) {
 	fmt.Println(key, l.limiterBuckets)
 	bucket, ok := l.limiterBuckets[key]
 	return bucket, ok
 }
 
-func (l *UriLimiter) AddBucketsByUri(uri string, fillInterval, capacity, quantum int64) LimiterIface {
+func (l *URILimiter) AddBucketsByUri(uri string, fillInterval, capacity, quantum int64) Iface {
 	bucket := ratelimit.NewBucketWithQuantum(time.Second*time.Duration(fillInterval), capacity, quantum)
 	l.limiterBuckets[uri] = bucket
 	return l
 }
 
-func (l *UriLimiter) getConf() *LimitConfRules {
+func (l *URILimiter) getConf() *LimitConfRules {
 	once := sync.Once{}
 	rule := &LimitConfRules{}
 	once.Do(func() {
@@ -64,7 +64,7 @@ func (l *UriLimiter) getConf() *LimitConfRules {
 	return rule
 }
 
-func (l *UriLimiter) AddBucketByConf() LimiterIface {
+func (l *URILimiter) AddBucketByConf() Iface {
 	rule := l.getConf()
 	for k, v := range rule.Rules {
 		l.AddBucketsByUri(k, v.Interval, v.Capacity, v.Quantum)

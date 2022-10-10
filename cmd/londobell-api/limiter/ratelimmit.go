@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RateLimiter(l LimiterIface) gin.HandlerFunc {
+func RateLimiter(l Iface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := l.Key(c)
 

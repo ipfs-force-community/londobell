@@ -5,11 +5,11 @@ import (
 	"github.com/juju/ratelimit"
 )
 
-type LimiterIface interface {
+type Iface interface {
 	Key(c *gin.Context) string
 	GetBucket(key string) (*ratelimit.Bucket, bool)
-	AddBucketsByUri(uri string, fillInterval, capacity, quantum int64) LimiterIface
-	AddBucketByConf() LimiterIface
+	AddBucketsByUri(uri string, fillInterval, capacity, quantum int64) Iface
+	AddBucketByConf() Iface
 }
 
 type Limiter struct {
