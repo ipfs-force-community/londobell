@@ -95,7 +95,7 @@ func RegisterAdapterApi(router *gin.Engine) {
 	// todo: 更新文档
 	group := router.Group("/adapter").Use()
 	{
-		group.POST("/actor", adapter.GetActorInfo)
+		group.POST("/actors", adapter.GetActorsInfo)
 		group.POST("/epoch", adapter.GetEpochInfo)
 		group.POST("/miner", adapter.GetMinerInfo)
 		group.POST("/sector", adapter.GetSectorInfo)

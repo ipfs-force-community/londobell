@@ -27,8 +27,8 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 )
 
-func GetActorInfo(c *gin.Context) {
-	alog := log.With("method", "GetActorInfo")
+func GetActorsInfo(c *gin.Context) {
+	alog := log.With("method", "GetActorsInfo")
 	req := model.ActorReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
@@ -40,7 +40,12 @@ func GetActorInfo(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var ts *types.TipSet
+	var (
+		ts        *types.TipSet
+		addrs     []address.Address
+		actorsRes []model.ActorRes
+	)
+
 	api := API.GetAppropriateAPI()
 
 	if req.Epoch == 0 {
@@ -54,185 +59,157 @@ func GetActorInfo(c *gin.Context) {
 		return
 	}
 
-	addr, err := address.NewFromString(req.ActorID)
-	if err != nil {
-		util.ReturnOnErr(c, alog, err)
-		return
+	if req.ActorID == "" {
+		addrs, err = api.StateListActors(ctx, ts.Key())
+		if err != nil {
+			util.ReturnOnErr(c, alog, err)
+			return
+		}
+	} else {
+		addr, err := address.NewFromString(req.ActorID)
+		if err != nil {
+			util.ReturnOnErr(c, alog, err)
+			return
+		}
+		addrs = append(addrs, addr)
 	}
 
-	var actorID address.Address
-	var actorAddr address.Address
+	for _, addr := range addrs {
+		var (
+			actorID   address.Address
+			actorAddr address.Address
+			actorType string
+			state     interface{}
+		)
 
-	if addr.Protocol() == address.ID {
-		actorID = addr
-	} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 {
-		actorID, err = api.StateLookupID(ctx, addr, ts.Key())
+		if addr.Protocol() == address.ID {
+			actorID = addr
+		} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 {
+			actorID, err = api.StateLookupID(ctx, addr, ts.Key())
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+
+			actorAddr = addr
+		}
+
+		stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(api))
+
+		act, err := api.StateGetActor(ctx, addr, ts.Key())
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)
 			return
 		}
 
-		actorAddr = addr
+		switch {
+		case builtin.IsAccountActor(act.Code):
+			actorType = "account"
+			st, err := account.Load(stor, act)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+
+			actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+		case builtin.IsMultisigActor(act.Code):
+			actorType = "multisig"
+			st, err := multisig.Load(stor, act)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+		case IsStoragePowerActor(act.Code):
+			actorType = "power"
+			st, err := power.Load(stor, act)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+		case IsRewardActor(act.Code):
+			actorType = "reward"
+			st, err := reward.Load(stor, act)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+		case IsInitActor(act.Code):
+			actorType = "init"
+			st, err := init_.Load(stor, act)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+		case IsStorageMarketActor(act.Code):
+			actorType = "market"
+			st, err := market.Load(stor, act)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+		case IsVerifiedRegistryActor(act.Code):
+			actorType = "verify"
+			st, err := verifreg.Load(stor, act)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+		case IsSystemActor(act.Code):
+			//system没有state？？
+			actorType = "system"
+			st, err := MakeSystemState(stor, act.Code)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+		case builtin.IsStorageMinerActor(act.Code):
+			actorType = "miner"
+			st, err := miner.Load(stor, act)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+		case builtin.IsPaymentChannelActor(act.Code):
+			actorType = "paych"
+			st, err := paych.Load(stor, act)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+		case IsBurntFundsActor(addr):
+			actorType = "burnt"
+		}
+
+		resData := model.ActorRes{
+			ActorID:   actorID,
+			ActorAddr: actorAddr.String(),
+			Epoch:     ts.Height(),
+			BlockTime: common.CalcTimeByEpoch(uint64(ts.Height())),
+			ActorType: actorType,
+			Balance:   act.Balance,
+			Code:      act.Code,
+			Head:      act.Head,
+			Nonce:     act.Nonce,
+			State:     state,
+		}
+
+		actorsRes = append(actorsRes, resData)
 	}
 
-	var actorType string
-
-	stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(api))
-
-	////too slow!!
-	//iact, err := api.StateGetActor(ctx, init_.Address, ts.Key())
-	//if err != nil {
-	//	log.Errorf("[GetActorInfo] api StateGetActor err: %w", err)
-	//	res.Code = model.Fail
-	//	res.Msg = err.Error()
-	//	c.JSON(http.StatusOK, res)
-	//	return
-	//}
-	//
-	//ist, err := init_.Load(stor, iact)
-	//if err != nil {
-	//	log.Errorf("[GetActorInfo] init_.Load err: %w", err)
-	//	res.Code = model.Fail
-	//	res.Msg = err.Error()
-	//	c.JSON(http.StatusOK, res)
-	//	return
-	//}
-	//
-	//err = ist.ForEachActor(func(id abi.ActorID, addr address.Address) error {
-	//	idAddr, err := address.NewIDAddress(uint64(id))
-	//	if err != nil {
-	//		return fmt.Errorf("[GetActorInfo] address.NewIDAddress: %w", err)
-	//	}
-	//
-	//	if idAddr == actorID {
-	//		log.Infof("idAddr: %v, actorID: %v", idAddr, actorID)
-	//		actorAddr = addr
-	//		return nil
-	//	}
-	//
-	//	return nil
-	//})
-	//if err != nil {
-	//	log.Errorf("[GetActorInfo] ist.ForEachActor err: %w", err)
-	//	res.Code = model.Fail
-	//	res.Msg = err.Error()
-	//	c.JSON(http.StatusOK, res)
-	//	return
-	//}
-
-	act, err := api.StateGetActor(ctx, addr, ts.Key())
-	if err != nil {
-		util.ReturnOnErr(c, alog, err)
-		return
-	}
-
-	var state interface{}
-
-	switch {
-	case builtin.IsAccountActor(act.Code):
-		actorType = "account"
-		st, err := account.Load(stor, act)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
-		state = st.GetState()
-
-		actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
-	case builtin.IsMultisigActor(act.Code):
-		actorType = "multisig"
-		st, err := multisig.Load(stor, act)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
-		state = st.GetState()
-	case IsStoragePowerActor(act.Code):
-		actorType = "power"
-		st, err := power.Load(stor, act)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
-		state = st.GetState()
-	case IsRewardActor(act.Code):
-		actorType = "reward"
-		st, err := reward.Load(stor, act)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
-		state = st.GetState()
-	case IsInitActor(act.Code):
-		actorType = "init"
-		st, err := init_.Load(stor, act)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
-		state = st.GetState()
-	case IsStorageMarketActor(act.Code):
-		actorType = "market"
-		st, err := market.Load(stor, act)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
-		state = st.GetState()
-	case IsVerifiedRegistryActor(act.Code):
-		actorType = "verify"
-		st, err := verifreg.Load(stor, act)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
-		state = st.GetState()
-	case IsSystemActor(act.Code):
-		//system没有state？？
-		actorType = "system"
-		st, err := MakeSystemState(stor, act.Code)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
-		state = st.GetState()
-	case builtin.IsStorageMinerActor(act.Code):
-		actorType = "miner"
-		st, err := miner.Load(stor, act)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
-		state = st.GetState()
-	case builtin.IsPaymentChannelActor(act.Code):
-		actorType = "paych"
-		st, err := paych.Load(stor, act)
-		if err != nil {
-			util.ReturnOnErr(c, alog, err)
-			return
-		}
-		state = st.GetState()
-	case IsBurntFundsActor(addr):
-		actorType = "burnt"
-	}
-
-	resData := model.ActorRes{
-		ActorID:   actorID,
-		ActorAddr: actorAddr.String(),
-		Epoch:     ts.Height(),
-		BlockTime: common.CalcTimeByEpoch(uint64(ts.Height())),
-		ActorType: actorType,
-		Balance:   act.Balance,
-		Code:      act.Code,
-		Head:      act.Head,
-		Nonce:     act.Nonce,
-		State:     state,
-	}
-
-	res.Data = resData
+	res.Data = actorsRes
 	c.JSON(http.StatusOK, res)
 }
