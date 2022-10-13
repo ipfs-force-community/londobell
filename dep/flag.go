@@ -75,7 +75,7 @@ func InjectRepoPath(cctx *cli.Context) dix.Option {
 }
 
 func InjectChainRepo(cctx *cli.Context) dix.Option {
-	return dix.Override(new(repo.LockedRepo), func() func(lc fx.Lifecycle) repo.LockedRepo {
+	return dix.Override(new(repo.LockedRepo), func(lc fx.Lifecycle) repo.LockedRepo {
 		r, err := repo.NewFS(cctx.String(OfflineChainStorageRepoFlag.Name))
 		if err != nil {
 			panic(fmt.Errorf("opening fs repo: %w", err))
@@ -93,7 +93,7 @@ func InjectChainRepo(cctx *cli.Context) dix.Option {
 			panic(fmt.Errorf("lock repo failed: %w", err))
 		}
 
-		return modules.LockedRepo(lr)
+		return modules.LockedRepo(lr)(lc)
 
 	})
 }
