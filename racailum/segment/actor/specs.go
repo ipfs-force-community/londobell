@@ -7,8 +7,11 @@ package actor
 import (
 	"fmt"
 
+	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/go-state-types/rt"
 	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
+
 	exported0 "github.com/filecoin-project/specs-actors/actors/builtin/exported"
 	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
 
@@ -30,8 +33,9 @@ import (
 	exported7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/exported"
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 
-	exported8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/exported"
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+
+	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
 )
 
 func init() {
@@ -58,7 +62,8 @@ var Specs = [][]rt.VMActor{
 	exported5.BuiltinActors(),
 	exported6.BuiltinActors(),
 	exported7.BuiltinActors(),
-	exported8.BuiltinActors(),
+	builtin.MakeRegistry(actorstypes.Version8),
+	builtin.MakeRegistry(actorstypes.Version9),
 }
 
 var WatchOuts = [][]interface{}{
@@ -93,5 +98,9 @@ var WatchOuts = [][]interface{}{
 	[]interface{}{
 		miner8.Deadline{},
 		miner8.Partition{},
+	},
+	[]interface{}{
+		miner9.Deadline{},
+		miner9.Partition{},
 	},
 }

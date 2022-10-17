@@ -11,10 +11,10 @@ import (
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	builtin8 "github.com/filecoin-project/go-state-types/builtin"
-	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
-	power8 "github.com/filecoin-project/go-state-types/builtin/v8/power"
-	reward8 "github.com/filecoin-project/go-state-types/builtin/v8/reward"
+	builtin9 "github.com/filecoin-project/go-state-types/builtin"
+	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
+	power9 "github.com/filecoin-project/go-state-types/builtin/v9/power"
+	reward9 "github.com/filecoin-project/go-state-types/builtin/v9/reward"
 
 	"github.com/filecoin-project/lotus/chain/vm"
 
@@ -25,14 +25,14 @@ import (
 )
 
 func init() {
-	reg.MustRegisterRegularExtractor("MiningProfitabilityV8", extractMiningProfitabilityV8)
+	reg.MustRegisterRegularExtractor("MiningProfitabilityV9", extractMiningProfitabilityV9)
 
 }
 
 // VERCHECK
-// see https://github.com/filecoin-project/builtin-actors/blob/v8.0.0/actors/miner/src/lib.rs#L4298-L4328
-// and https://github.com/filecoin-project/builtin-actors/blob/v8.0.0/actors/miner/src/monies.rs#L147-L161
-func extractMiningProfitabilityV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward8.State) error {
+// see https://github.com/filecoin-project/builtin-actors/blob/v9.0.0/actors/miner/src/lib.rs#L4866-L4896
+// and https://github.com/filecoin-project/builtin-actors/blob/v9.0.0/actors/miner/src/monies.rs#L143-L157
+func extractMiningProfitabilityV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward9.State) error {
 	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Global.Power.Head)
 	if err != nil {
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
@@ -43,26 +43,26 @@ func extractMiningProfitabilityV8(ctx *extract.Ctx, res *extract.Res, head *comm
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 	}
 
-	pwrState, ok := state.(*power8.State)
+	pwrState, ok := state.(*power9.State)
 	if !ok {
-		return fmt.Errorf("expecting *power8.State, got %T", pwrState)
+		return fmt.Errorf("expecting *power9.State, got %T", pwrState)
 	}
 
-	qaPower := miner8.QAPowerForWeight(sectorSize32GiB, 180, big.Zero(), big.Zero())
+	qaPower := miner9.QAPowerForWeight(sectorSize32GiB, 180, big.Zero(), big.Zero())
 
-	storagePledge := miner8.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner8.InitialPledgeProjectionPeriod)
-	initPledge := miner8.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating)
+	storagePledge := miner9.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner9.InitialPledgeProjectionPeriod)
+	initPledge := miner9.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating)
 
 	// we just ignore the influence of spaceRacePledgeCap here
 	consensusPledge := big.Sub(initPledge, storagePledge)
 
 	detail := model.MiningProfitabilityDetail{
-		ExpectedDayReward:         miner8.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, builtin8.EpochsInDay),
+		ExpectedDayReward:         miner9.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, builtin9.EpochsInDay),
 		InitialPledge:             initPledge,
 		InitialConsensusPledge:    consensusPledge,
 		InitialStoragePledge:      storagePledge,
 		ProjectionOfInitialPledge: storagePledge, // TODO: projection is just equal to the init storage power here, correct me if I'm wrong
-		ProjectionOfFaultFee:      miner8.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, abi.ChainEpoch(builtin8.EpochsInDay*351)/100),
+		ProjectionOfFaultFee:      miner9.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, abi.ChainEpoch(builtin9.EpochsInDay*351)/100),
 		Mined:                     st.TotalStoragePowerReward,
 	}
 

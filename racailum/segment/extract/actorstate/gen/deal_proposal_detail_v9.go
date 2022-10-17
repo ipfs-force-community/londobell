@@ -9,8 +9,9 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	market3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/market"
-	adt3 "github.com/filecoin-project/specs-actors/v3/actors/util/adt"
+	market9 "github.com/filecoin-project/go-state-types/builtin/v9/market"
+	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
+	lmarket "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -20,11 +21,11 @@ import (
 )
 
 func init() {
-	reg.MustRegisterRegularExtractor("DealProposalDetailedV3", extractDealProposalDetailedV3)
+	reg.MustRegisterRegularExtractor("DealProposalDetailedV9", extractDealProposalDetailedV9)
 
 }
 
-func extractDealProposalDetailedV3(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market3.State) error {
+func extractDealProposalDetailedV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market9.State) error {
 	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalDetailTicks, ctx, head.Epoch) {
 		return nil
 	}
@@ -36,20 +37,24 @@ func extractDealProposalDetailedV3(ctx *extract.Ctx, res *extract.Res, head *com
 
 	details := map[address.Address]*model.DealProposalDetail{}
 
-	deals, err := market3.AsDealProposalArray(adt3.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
+	state, err := lmarket.Load(adt9.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), head.Actor)
 	if err != nil {
-		return fmt.Errorf("load deal proposal array: %w", err)
+		return fmt.Errorf("failed to load market actor state: %w", err)
 	}
 
-	dealsStateArr, err := market3.AsDealStateArray(adt3.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.States)
+	dealsStateArr, err := state.States()
 	if err != nil {
 		return fmt.Errorf("load deal state array: %w", err)
 	}
 
-	var out market3.DealProposal
-	var dealProposals []model.DealProposal
+	deals, err := state.Proposals()
+	if err != nil {
+		return fmt.Errorf("load deal proposal array: %w", err)
+	}
 
-	err = deals.ForEach(&out, func(idx int64) error {
+	var dealProposals []model.DealProposalV8
+
+	err = deals.ForEach(func(idx abi.DealID, out lmarket.DealProposal) error {
 		if _, ok := details[out.Provider]; !ok {
 			details[out.Provider] = &model.DealProposalDetail{
 				ActorStateExBasic: model.ActorStateExBasic{
@@ -78,7 +83,7 @@ func extractDealProposalDetailedV3(ctx *extract.Ctx, res *extract.Res, head *com
 			details[out.Provider].Detail.UnVerifiedDealEndCount++
 		}
 
-		dealProposals = append(dealProposals, model.DealProposal{
+		dealProposals = append(dealProposals, model.DealProposalV8{
 			ID:           int64(idx),
 			Epoch:        head.Epoch,
 			DealProposal: out,

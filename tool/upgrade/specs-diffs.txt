@@ -44,6 +44,8 @@ Specs v6 => v7:
 		+ SectorsSnapshot: cid.Cid
 
 Specs v7 => v8:
-	> system.Actor
+	> system.State
 		+ BuiltinActors: cid.Cid
+
+Specs v8 => v9:
 

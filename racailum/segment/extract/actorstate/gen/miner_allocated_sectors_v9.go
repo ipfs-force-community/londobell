@@ -5,16 +5,16 @@
 package gen
 
 import (
-	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 )
 
 func init() {
-	// reg.MustRegisterRegularExtractor("AllocatedSectorsV8", extractAllocatedSectorsV8)
+	// reg.MustRegisterRegularExtractor("AllocatedSectorsV9", extractAllocatedSectorsV9)
 }
 
-func extractAllocatedSectorsV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *miner8.State) error { // nolint: deadcode
+func extractAllocatedSectorsV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, pst *miner9.State) error { // nolint: deadcode
 	return extractAllocatedSectors(ctx, res, head, pst.AllocatedSectors)
 }

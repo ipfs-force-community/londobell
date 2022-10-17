@@ -5,8 +5,14 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	{{- if ge .Ver 8 }}
+	lmarket "github.com/filecoin-project/lotus/chain/actors/builtin/market"
+	market{{ .Ver }} "{{ .ImportPath }}/market"
+    adt{{ .Ver }} "{{ .ImportPath }}/util/adt"
+    {{ else }}
 	market{{ .Ver }} "{{ .ImportPath }}/actors/builtin/market"
 	adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+	{{ end -}}
 	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -42,30 +48,48 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
         return nil
     }
 
-	deals, err := market{{ .Ver }}.AsDealProposalArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
-	if err != nil {
-		return fmt.Errorf("load deal proposal array: %w", err)
-	}
+    id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
+    if err != nil {
+        return fmt.Errorf("ge regular id: %w", err)
+    }
 
-	dealsStateArr, err := market{{ .Ver }}.AsDealStateArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.States)
-	if err != nil {
-		return fmt.Errorf("load deal state array: %w", err)
-	}
-	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
-	if err != nil {
-		return fmt.Errorf("ge regular id: %w", err)
-	}
+    details := map[address.Address]*model.DealProposalDetail{}
 
-	details := map[address.Address]*model.DealProposalDetail{}
+    {{ if ge .Ver 8 }}
+    state, err := lmarket.Load(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), head.Actor)
+    if err != nil {
+        return fmt.Errorf("failed to load market actor state: %w", err)
+    }
 
-	var out market{{ .Ver }}.DealProposal
-	{{ if lt .Ver 8 -}}
-	var dealProposals []model.DealProposal
-	{{- else }}
-	var dealProposals []model.DealProposalV8
-	{{- end }}
+    dealsStateArr, err := state.States()
+    if err != nil {
+        return fmt.Errorf("load deal state array: %w", err)
+    }
 
-	err = deals.ForEach(&out, func(idx int64) error {
+    deals, err := state.Proposals()
+    if err != nil {
+        return fmt.Errorf("load deal proposal array: %w", err)
+    }
+
+    var dealProposals []model.DealProposalV8
+
+    err = deals.ForEach(func(idx abi.DealID, out lmarket.DealProposal) error {
+    {{- else }}
+    deals, err := market{{ .Ver }}.AsDealProposalArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
+    if err != nil {
+        return fmt.Errorf("load deal proposal array: %w", err)
+    }
+
+    dealsStateArr, err := market{{ .Ver }}.AsDealStateArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.States)
+    if err != nil {
+        return fmt.Errorf("load deal state array: %w", err)
+    }
+
+    var out market{{ .Ver }}.DealProposal
+    var dealProposals []model.DealProposal
+
+    err = deals.ForEach(&out, func(idx int64) error {
+    {{- end -}}
 		if _, ok := details[out.Provider]; !ok {
 			details[out.Provider] = &model.DealProposalDetail{
 				ActorStateExBasic: model.ActorStateExBasic{
@@ -96,13 +120,13 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
 
         {{ if lt .Ver 8}}
 		dealProposals = append(dealProposals, model.DealProposal{
-			ID:           idx,
+			ID:           int64(idx),
 			Epoch:        head.Epoch,
 			DealProposal: out,
 		})
 		{{ else }}
 		dealProposals = append(dealProposals, model.DealProposalV8{
-            ID:           idx,
+            ID:           int64(idx),
             Epoch:        head.Epoch,
             DealProposal: out,
         })

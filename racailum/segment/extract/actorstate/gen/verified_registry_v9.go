@@ -11,9 +11,9 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 
-	builtin8 "github.com/filecoin-project/go-state-types/builtin"
-	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
-	verifreg8 "github.com/filecoin-project/go-state-types/builtin/v8/verifreg"
+	builtin9 "github.com/filecoin-project/go-state-types/builtin"
+	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
+	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -22,11 +22,11 @@ import (
 )
 
 func init() {
-	reg.MustRegisterRegularExtractor("VerifRegV8", extractVerifRegV8)
+	reg.MustRegisterRegularExtractor("VerifRegV9", extractVerifRegV9)
 
 }
 
-func extractVerifRegV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg8.State) error {
+func extractVerifRegV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg9.State) error {
 	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.VerifiedRegistryTicks, ctx, head.Epoch) {
 		return nil
 	}
@@ -49,7 +49,7 @@ func extractVerifRegV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		root := mapRoots[mi].root
 		name := mapRoots[mi].name
 
-		m, err := adt8.AsMap(ctx.D.ActorStore(ctx.C), root, builtin8.DefaultHamtBitwidth)
+		m, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), root, builtin9.DefaultHamtBitwidth)
 		if err != nil {
 			return fmt.Errorf("construct adt.Map: %w", err)
 		}

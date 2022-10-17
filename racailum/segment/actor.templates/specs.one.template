@@ -3,12 +3,17 @@ package actor
 import (
 	"fmt"
 
+    actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/go-state-types/rt"
 	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	{{ range $vi := .Vers -}}
+	{{ if ge .Ver 8 }}
+    miner{{ .Ver }} "{{ .ImportPath }}/miner"
+    {{ else }}
 	exported{{ .Ver }} "{{ .ImportPath }}/actors/builtin/exported"
 	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
-
+    {{ end }}
 	{{ end }}
 )
 
@@ -29,9 +34,13 @@ func init() {
 }
 
 var Specs = [][]rt.VMActor{
-	{{ range $vi := .Vers -}}
+	{{- range $vi := .Vers -}}
+	{{- if ge .Ver 8 }}
+	builtin.MakeRegistry(actorstypes.Version{{ .Ver }}),
+	{{- else }}
 	exported{{ .Ver }}.BuiltinActors(),
-	{{ end -}}
+	{{- end -}}
+	{{ end }}
 }
 
 var WatchOuts = [][]interface{}{

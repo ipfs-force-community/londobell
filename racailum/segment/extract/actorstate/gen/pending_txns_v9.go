@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	builtin8 "github.com/filecoin-project/go-state-types/builtin"
-	multisig8 "github.com/filecoin-project/go-state-types/builtin/v8/multisig"
-	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
+	builtin9 "github.com/filecoin-project/go-state-types/builtin"
+	multisig9 "github.com/filecoin-project/go-state-types/builtin/v9/multisig"
+	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
@@ -20,22 +20,22 @@ import (
 )
 
 func init() {
-	reg.MustRegisterRegularExtractor("PendingTxnsV8", extractPendingTxnsV8)
+	reg.MustRegisterRegularExtractor("PendingTxnsV9", extractPendingTxnsV9)
 
 }
 
-func extractPendingTxnsV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *multisig8.State) error {
+func extractPendingTxnsV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *multisig9.State) error {
 	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.PendingTxnsTicks, ctx, head.Epoch) {
 		return nil
 	}
 
-	pendingTxns, err := adt8.AsMap(ctx.D.ActorStore(ctx.C), st.PendingTxns, builtin8.DefaultHamtBitwidth)
+	pendingTxns, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), st.PendingTxns, builtin9.DefaultHamtBitwidth)
 
 	if err != nil {
-		return fmt.Errorf("construct adt.Map for PendingTxns in *multisig8.State: %w", err)
+		return fmt.Errorf("construct adt.Map for PendingTxns in *multisig9.State: %w", err)
 	}
 
-	out := &multisig8.Transaction{}
+	out := &multisig9.Transaction{}
 	if err := pendingTxns.ForEach(out, func(key string) error {
 		txnID, err := abi.ParseIntKey(key)
 		if err != nil {

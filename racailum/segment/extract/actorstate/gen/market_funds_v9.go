@@ -9,7 +9,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	market8 "github.com/filecoin-project/go-state-types/builtin/v8/market"
+	market9 "github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -20,11 +20,11 @@ import (
 )
 
 func init() {
-	reg.MustRegisterRegularExtractor("MarketFundsV8", extractMarketFundsV8)
+	reg.MustRegisterRegularExtractor("MarketFundsV9", extractMarketFundsV9)
 
 }
 
-func extractMarketFundsV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market8.State) error {
+func extractMarketFundsV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market9.State) error {
 	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MarketFundsTicks, ctx, head.Epoch) {
 		return nil
 	}
@@ -40,12 +40,12 @@ func extractMarketFundsV8(ctx *extract.Ctx, res *extract.Res, head *common.Actor
 	unlockClientCollateral := NewTokenAmountArr(len(ts))
 
 	actStore := ctx.D.ActorStore(ctx.C)
-	proposals, err := market8.AsDealProposalArray(actStore, st.Proposals)
+	proposals, err := market9.AsDealProposalArray(actStore, st.Proposals)
 	if err != nil {
 		return fmt.Errorf("constrcut DealProposalArray: %w", err)
 	}
 
-	deal := &market8.DealProposal{}
+	deal := &market9.DealProposal{}
 	err = proposals.ForEach(deal, func(_ int64) error {
 		if deal.StartEpoch >= head.Epoch {
 			return nil

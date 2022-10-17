@@ -5,7 +5,7 @@
 package gen
 
 import (
-	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -13,9 +13,9 @@ import (
 )
 
 func init() {
-	reg.MustRegisterRegularExtractor("MinerFundsV8", extractMinerFundsV8)
+	reg.MustRegisterRegularExtractor("MinerFundsV9", extractMinerFundsV9)
 }
 
-func extractMinerFundsV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner8.State) error {
+func extractMinerFundsV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner9.State) error {
 	return extractMinerFunds(ctx, res, head, st)
 }
