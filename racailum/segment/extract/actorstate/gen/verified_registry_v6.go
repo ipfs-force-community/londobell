@@ -39,10 +39,6 @@ func extractVerifRegV6(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			name: "Verifier",
 			root: st.Verifiers,
 		},
-		{
-			name: "VerifiedClient",
-			root: st.VerifiedClients,
-		},
 	}
 
 	for mi := range mapRoots {
