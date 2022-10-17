@@ -29,6 +29,13 @@ func extractDealProposalDetailedV6(ctx *extract.Ctx, res *extract.Res, head *com
 		return nil
 	}
 
+	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
+	if err != nil {
+		return fmt.Errorf("ge regular id: %w", err)
+	}
+
+	details := map[address.Address]*model.DealProposalDetail{}
+
 	deals, err := market6.AsDealProposalArray(adt6.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
 	if err != nil {
 		return fmt.Errorf("load deal proposal array: %w", err)
@@ -38,12 +45,6 @@ func extractDealProposalDetailedV6(ctx *extract.Ctx, res *extract.Res, head *com
 	if err != nil {
 		return fmt.Errorf("load deal state array: %w", err)
 	}
-	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
-	if err != nil {
-		return fmt.Errorf("ge regular id: %w", err)
-	}
-
-	details := map[address.Address]*model.DealProposalDetail{}
 
 	var out market6.DealProposal
 	var dealProposals []model.DealProposal

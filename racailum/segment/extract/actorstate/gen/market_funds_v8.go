@@ -9,7 +9,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	market8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/market"
+	market8 "github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"

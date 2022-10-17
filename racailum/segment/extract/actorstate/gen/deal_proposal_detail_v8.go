@@ -9,8 +9,9 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	market8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/market"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	market8 "github.com/filecoin-project/go-state-types/builtin/v8/market"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
+	lmarket "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -29,15 +30,6 @@ func extractDealProposalDetailedV8(ctx *extract.Ctx, res *extract.Res, head *com
 		return nil
 	}
 
-	deals, err := market8.AsDealProposalArray(adt8.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
-	if err != nil {
-		return fmt.Errorf("load deal proposal array: %w", err)
-	}
-
-	dealsStateArr, err := market8.AsDealStateArray(adt8.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.States)
-	if err != nil {
-		return fmt.Errorf("load deal state array: %w", err)
-	}
 	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
 		return fmt.Errorf("ge regular id: %w", err)
@@ -45,11 +37,24 @@ func extractDealProposalDetailedV8(ctx *extract.Ctx, res *extract.Res, head *com
 
 	details := map[address.Address]*model.DealProposalDetail{}
 
-	var out market8.DealProposal
+	state, err := lmarket.Load(adt8.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), head.Actor)
+	if err != nil {
+		return fmt.Errorf("failed to load market actor state: %w", err)
+	}
+
+	dealsStateArr, err := state.States()
+	if err != nil {
+		return fmt.Errorf("load deal state array: %w", err)
+	}
+
+	deals, err := state.Proposals()
+	if err != nil {
+		return fmt.Errorf("load deal proposal array: %w", err)
+	}
 
 	var dealProposals []model.DealProposalV8
 
-	err = deals.ForEach(&out, func(idx int64) error {
+	err = deals.ForEach(func(idx abi.DealID, out lmarket.DealProposal) error {
 		if _, ok := details[out.Provider]; !ok {
 			details[out.Provider] = &model.DealProposalDetail{
 				ActorStateExBasic: model.ActorStateExBasic{
@@ -79,7 +84,7 @@ func extractDealProposalDetailedV8(ctx *extract.Ctx, res *extract.Res, head *com
 		}
 
 		dealProposals = append(dealProposals, model.DealProposalV8{
-			ID:           idx,
+			ID:           int64(idx),
 			Epoch:        head.Epoch,
 			DealProposal: out,
 		})

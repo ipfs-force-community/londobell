@@ -4,13 +4,20 @@ import (
 	"context"
 	"fmt"
 
+    "github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-bitfield"
 
 	{{ range $vinfo := .Vers }}
+	{{ if ge $vinfo.Ver 8 }}
+	miner{{ $vinfo.Ver }} "{{ $vinfo.ImportPath }}/miner"
+	adt{{ $vinfo.Ver }} "{{ $vinfo.ImportPath }}/util/adt"
+    {{ else }}
 	miner{{ $vinfo.Ver }} "{{ $vinfo.ImportPath }}/actors/builtin/miner"
 	adt{{ $vinfo.Ver }} "{{ $vinfo.ImportPath }}/actors/util/adt"
+	{{ end }}
 
 	{{ end }}
 
@@ -71,13 +78,88 @@ func isEmptyMinerStateV{{ $vinfo.Ver }}(mst *miner{{ $vinfo.Ver }}.State) bool {
 {{- end -}}
 {{ with (eq $vinfo.Ver 6) -}}
 // see https://github.com/filecoin-project/specs-actors/blob/v6.0.0/actors/builtin/miner/miner_actor.go#L100-L136
+{{- end -}}
+{{ with (eq $vinfo.Ver 7) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v7.0.1/actors/builtin/miner/miner_actor.go#L105-L141
+{{- end -}}
+{{ with (eq $vinfo.Ver 8) -}}
+// see https://github.com/filecoin-project/builtin-actors/blob/v8.0.0/actors/miner/src/lib.rs#L126-L198
+{{- end -}}
+{{ with (eq $vinfo.Ver 9) -}}
+// see https://github.com/filecoin-project/builtin-actors/blob/v9.0.0/actors/miner/src/lib.rs#L135-L207
 {{- end }}
+
+{{- if ge $vinfo.Ver 8}}
+func newEmptyMinerStateV{{ $vinfo.Ver }}() (*miner{{ $vinfo.Ver }}.State, error) {
+    ctx := context.Background()
+    inMemStore := bstore.NewMemorySync()
+    store := adt{{ $vinfo.Ver }}.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
+    emptyPrecommitMapCid, err := adt{{ $vinfo.Ver }}.StoreEmptyMap(store, builtin.DefaultHamtBitwidth)
+    if err != nil {
+        return nil, fmt.Errorf("failed to construct empty map: %w", err)
+    }
+    emptyPrecommitsCleanUpArrayCid, err := adt{{ $vinfo.Ver }}.StoreEmptyArray(store, miner{{ $vinfo.Ver }}.PrecommitCleanUpAmtBitwidth)
+    if err != nil {
+        return nil, fmt.Errorf("failed to construct empty precommits array: %w", err)
+    }
+    emptySectorsArrayCid, err := adt{{ $vinfo.Ver }}.StoreEmptyArray(store, miner{{ $vinfo.Ver }}.SectorsAmtBitwidth)
+    if err != nil {
+        return nil, fmt.Errorf("failed to construct empty sectors array: %w", err)
+    }
+
+    emptyBitfield := bitfield.NewFromSet(nil)
+    emptyBitfieldCid, err := store.Put(store.Context(), emptyBitfield)
+    if err != nil {
+        return nil, fmt.Errorf("failed to construct empty bitfield: %w", err)
+    }
+    emptyDeadline, err := miner{{ $vinfo.Ver }}.ConstructDeadline(store)
+    if err != nil {
+        return nil, fmt.Errorf("failed to construct empty deadline: %w", err)
+    }
+    emptyDeadlineCid, err := store.Put(store.Context(), emptyDeadline)
+    if err != nil {
+        return nil, fmt.Errorf("failed to construct empty deadline: %w", err)
+    }
+    emptyDeadlines := miner{{ $vinfo.Ver }}.ConstructDeadlines(emptyDeadlineCid)
+    emptyDeadlinesCid, err := store.Put(store.Context(), emptyDeadlines)
+    if err != nil {
+        return nil, fmt.Errorf("failed to construct empty deadlines: %w", err)
+    }
+    emptyVestingFundsCid, err := store.Put(store.Context(), miner{{ $vinfo.Ver }}.ConstructVestingFunds())
+    if err != nil {
+        return nil, fmt.Errorf("failed to construct empty vesting funds: %w", err)
+    }
+
+    return &miner{{ $vinfo.Ver }}.State{
+        Info: cid.Undef,
+
+        PreCommitDeposits: abi.NewTokenAmount(0),
+        LockedFunds:       abi.NewTokenAmount(0),
+        FeeDebt:           abi.NewTokenAmount(0),
+
+        VestingFunds: emptyVestingFundsCid,
+
+        InitialPledge: abi.NewTokenAmount(0),
+
+        PreCommittedSectors:        emptyPrecommitMapCid,
+        PreCommittedSectorsCleanUp: emptyPrecommitsCleanUpArrayCid,
+        AllocatedSectors:           emptyBitfieldCid,
+        Sectors:                    emptySectorsArrayCid,
+        ProvingPeriodStart:         0,
+        CurrentDeadline:            0,
+        Deadlines:                  emptyDeadlinesCid,
+        EarlyTerminations:          bitfield.New(),
+        DeadlineCronActive:         false,
+    }, nil
+}
+{{ else }}
 func newEmptyMinerStateV{{ $vinfo.Ver }}() (*miner{{ $vinfo.Ver }}.State, error) {
 	ctx := context.Background()
 	inMemStore := bstore.NewMemorySync()
 	adtStore := adt{{ $vinfo.Ver }}.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
 	return miner{{ $vinfo.Ver }}.ConstructState(adtStore, cid.Undef, 0, 0)
 }
+{{ end }}
 {{ else }}
 func isEmptyMinerStateV{{ $vinfo.Ver }}(mst *miner{{ $vinfo.Ver }}.State) bool {
 	earlyCount, err := mst.EarlyTerminations.Count()

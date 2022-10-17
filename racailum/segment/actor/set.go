@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"sync"
 
+	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	"go.opencensus.io/trace"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	ainit "github.com/filecoin-project/specs-actors/v3/actors/builtin/init"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -52,7 +52,7 @@ func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSe
 		m[addr] = act.Code
 		count++
 
-		if addr == builtin.InitActorAddr {
+		if addr == builtin3.InitActorAddr {
 			initActor = act
 		}
 
@@ -111,16 +111,16 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 	// for MethodConstructor subcalls, we should look into it's parent call
 	// as aborted execution of its' parent message would rollback the actor id assignment, the final actor code may be mismatched
 	if call.Method == lbuiltin.MethodConstructor && call.To.Protocol() == address.ID && parent != nil {
-		if aid, err := address.IDFromAddress(call.To); err == nil && aid > builtin.FirstNonSingletonActorId {
+		if aid, err := address.IDFromAddress(call.To); err == nil && aid > builtin3.FirstNonSingletonActorId {
 			switch {
-			case parent.To == builtin.InitActorAddr && parent.Method == builtin.MethodsInit.Exec:
+			case parent.To == builtin3.InitActorAddr && parent.Method == builtin3.MethodsInit.Exec:
 				parentParam := &ainit.ExecParams{}
 				if err := parentParam.UnmarshalCBOR(bytes.NewReader(parent.Params)); err == nil {
 					code = parentParam.CodeCID
 				}
 
 			case call.From == lbuiltin.SystemActorAddr && parent.Method == lbuiltin.MethodSend:
-				code = builtin.AccountActorCodeID
+				code = builtin3.AccountActorCodeID
 
 			}
 		}

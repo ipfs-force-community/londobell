@@ -43,6 +43,24 @@
 }
 ```
 
+### Allocations
+
+```
+{
+	"ActorID": "abi.ActorID",
+	"AllocationID": "verifreg.AllocationId",
+	"Client": "abi.ActorID",
+	"Data": "cid.Cid",
+	"Epoch": "abi.ChainEpoch",
+	"Expiration": "abi.ChainEpoch",
+	"Provider": "abi.ActorID",
+	"Size": "abi.PaddedPieceSize",
+	"TermMax": "abi.ChainEpoch",
+	"TermMin": "abi.ChainEpoch",
+	"_id": "cid.Cid"
+}
+```
+
 ### BlockHeader
 
 ```
@@ -66,6 +84,51 @@
 	"Detail": "model.ClaimedPowerDetail",
 	"Epoch": "abi.ChainEpoch",
 	"Path": "[]cid.Cid",
+	"_id": "cid.Cid"
+}
+```
+
+### Claims
+
+```
+{
+	"Addr": "address.Address",
+	"Detail": {
+		"ClaimID": "uint64",
+		"Client": "abi.ActorID",
+		"Data": "cid.Cid",
+		"Provider": "abi.ActorID",
+		"Sector": "abi.SectorNumber",
+		"Size": "abi.PaddedPieceSize",
+		"TermMax": "abi.ChainEpoch",
+		"TermMin": "abi.ChainEpoch",
+		"TermStart": "abi.ChainEpoch"
+	},
+	"Epoch": "abi.ChainEpoch",
+	"Path": "[]cid.Cid",
+	"_id": "cid.Cid"
+}
+```
+
+### DatacapAllowances
+
+```
+{
+	"Amount": "big.Int",
+	"Epoch": "abi.ChainEpoch",
+	"Operator": "abi.ActorID",
+	"Owner": "abi.ActorID",
+	"_id": "cid.Cid"
+}
+```
+
+### DatacapBalances
+
+```
+{
+	"Amount": "big.Int",
+	"Epoch": "abi.ChainEpoch",
+	"Owner": "abi.ActorID",
 	"_id": "cid.Cid"
 }
 ```
