@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"reflect"
 
+	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/go-state-types/cbor"
+	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
+	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/gen"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs/go-cid"
-
-	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/builtin"
-	"github.com/filecoin-project/lotus/chain/vm"
 )
 
 var GenRegularHeadID = gen.GenRegularHeadID
@@ -43,13 +44,13 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 	}
 
 	actor := head.Actor
-	actorVersion, err := actors.VersionForNetwork(ctx.D.GetNetworkVersion(ctx.C, head.Epoch))
+	actorVersion, err := actorstypes.VersionForNetwork(ctx.D.GetNetworkVersion(ctx.C, head.Epoch))
 	if err != nil {
 		return fmt.Errorf("get network.Version for height(%v): %w", head.Epoch, err)
 	}
 
 	var realCode cid.Cid
-	if actorVersion >= actors.Version8 {
+	if actorVersion >= actorstypes.Version8 {
 		name := actors.CanonicalName(builtin.ActorNameByCode(head.Code))
 
 		var ok bool
@@ -59,7 +60,7 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 		}
 	}
 
-	state, err := vm.DumpActorState(reg.ActorReg, actor, blkraw.RawData())
+	state, err := vm.DumpActorState(filcns.NewTipSetExecutor().NewActorRegistry(), actor, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 

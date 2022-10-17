@@ -55,6 +55,10 @@ func defaultActorStateRegularOptions() ActorStateRegularOptions {
 		DealProposalDetailTicks:  12,                   // 12h
 		ActorBalanceTicks:        24,                   // 24h
 		PendingTxnsTicks:         1,                    // 1h
+		AllocationsTicks:         4,                    //4h
+		ClaimsTicks:              4,                    //4h
+		DatacapBalancesTicks:     4,                    //4h
+		DatacapAllowancesTicks:   4,                    //4h
 	}
 }
 
@@ -70,6 +74,10 @@ func dryActorStateRegularOptions() ActorStateRegularOptions {
 		DealProposalDetailTicks:  1,
 		ActorBalanceTicks:        1,
 		PendingTxnsTicks:         1,
+		AllocationsTicks:         1,
+		ClaimsTicks:              1,
+		DatacapBalancesTicks:     1,
+		DatacapAllowancesTicks:   1,
 	}
 }
 
@@ -85,6 +93,10 @@ type ActorStateRegularOptions struct {
 	MinerSectorHeathTicks    int
 	ActorBalanceTicks        int
 	PendingTxnsTicks         int
+	AllocationsTicks         int
+	ClaimsTicks              int
+	DatacapBalancesTicks     int
+	DatacapAllowancesTicks   int
 }
 
 func IsExtract(tickOption int, ctx *Ctx, curEpoch abi.ChainEpoch) bool {

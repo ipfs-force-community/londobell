@@ -3,18 +3,25 @@ package gen
 import (
 	"fmt"
 
+    "github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
 	{{ range $vi := .Vers }}
+	{{ if ge .Ver 8 }}
+	miner{{ .Ver }} "{{ .ImportPath }}/miner"
+    adt{{ .Ver }} "{{ .ImportPath }}/util/adt"
+    {{ else }}
 	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
 	adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+	{{ end }}
 
 	{{ end }}
 
+    "github.com/filecoin-project/go-state-types/builtin"
     {{ range $vi := .Vers }}
-	{{ if gt .Ver 2 -}}
+	{{ if and (gt .Ver 2) (lt .Ver 8) -}}
     builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
     {{- end }}
     {{ end }}
@@ -168,7 +175,11 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 				return fmt.Errorf("get dl partition failed: %w", err)
 			}
 			var part miner{{ .Ver }}.Partition
+			{{- if ge .Ver 8 }}
+			dlInfo := miner{{ .Ver }}.NewDeadlineInfo(st.ProvingPeriodStart, dlIdx, head.Epoch).NextNotElapsed()
+			{{ else }}
 			dlInfo := miner{{ .Ver }}.NewDeadlineInfo(st.CurrentProvingPeriodStart(head.Epoch), dlIdx, head.Epoch).NextNotElapsed()
+			{{ end -}}
 			quant := miner{{ .Ver }}.QuantSpecForDeadline(dlInfo)
 
 			return ps.ForEach(&part, func(partIdx int64) error {
@@ -178,7 +189,11 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 				}
 
 				for i := range tsRange {
+					{{- if ge .Ver 8 }}
+					popped, err := PopUntilV{{ .Ver }}(expirations, tsRange[i])
+					{{ else }}
 					popped, err := expirations.PopUntil(tsRange[i])
+					{{ end -}}
 					if err != nil {
 						return fmt.Errorf("failed to pop expiration queue until %d: %w", tsRange[i], err)
 					}
@@ -218,7 +233,11 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
         mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
         mInfo.FeeDebt = st.FeeDebt
 
+        {{ if ge .Ver 8 }}
+        precommitted, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin.DefaultHamtBitwidth)
+        {{ else }}
         precommitted, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin{{ .Ver }}.DefaultHamtBitwidth)
+        {{ end -}}
         if err != nil {
             return fmt.Errorf("load state PreCommittedSectors: %w", err)
         }
@@ -262,3 +281,49 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 
 	return nil
 }
+
+{{ range $vi := .Vers -}}
+{{ if ge .Ver 8 }}
+func PopUntilV{{ .Ver }}(q miner{{ .Ver }}.ExpirationQueue, until abi.ChainEpoch) (*miner{{ .Ver }}.ExpirationSet, error) {
+	var onTimeSectors []bitfield.BitField
+	var earlySectors []bitfield.BitField
+	activePower := miner{{ .Ver }}.NewPowerPairZero()
+	faultyPower := miner{{ .Ver }}.NewPowerPairZero()
+	onTimePledge := big.Zero()
+
+	var poppedKeys []uint64
+	var thisValue miner{{ .Ver }}.ExpirationSet
+	stopErr := fmt.Errorf("stop")
+	if err := q.Array.ForEach(&thisValue, func(i int64) error {
+		if abi.ChainEpoch(i) > until {
+			return stopErr
+		}
+		poppedKeys = append(poppedKeys, uint64(i))
+		onTimeSectors = append(onTimeSectors, thisValue.OnTimeSectors)
+		earlySectors = append(earlySectors, thisValue.EarlySectors)
+		activePower = activePower.Add(thisValue.ActivePower)
+		faultyPower = faultyPower.Add(thisValue.FaultyPower)
+		onTimePledge = big.Add(onTimePledge, thisValue.OnTimePledge)
+		return nil
+	}); err != nil && err != stopErr {
+		return nil, err
+	}
+
+	if err := q.Array.BatchDelete(poppedKeys, true); err != nil {
+		return nil, err
+	}
+
+	allOnTime, err := bitfield.MultiMerge(onTimeSectors...)
+	if err != nil {
+		return nil, err
+	}
+	allEarly, err := bitfield.MultiMerge(earlySectors...)
+	if err != nil {
+		return nil, err
+	}
+	return &miner{{ .Ver }}.ExpirationSet{
+		OnTimeSectors: allOnTime,
+		EarlySectors:  allEarly, OnTimePledge: onTimePledge, ActivePower: activePower, FaultyPower: faultyPower}, nil
+}
+{{ end }}
+{{ end }}

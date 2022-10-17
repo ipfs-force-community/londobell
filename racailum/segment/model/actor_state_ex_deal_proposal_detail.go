@@ -2,8 +2,8 @@ package model
 
 import (
 	"github.com/filecoin-project/go-state-types/abi"
+	lmarket "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/filecoin-project/specs-actors/v5/actors/builtin/market"
-	market8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/market"
 
 	"github.com/ipfs-force-community/londobell/common"
 )
@@ -26,7 +26,7 @@ type DealProposal struct {
 type DealProposalV8 struct {
 	ID                   int64 `bson:"_id"`
 	Epoch                abi.ChainEpoch
-	market8.DealProposal `bson:",inline"`
+	lmarket.DealProposal `bson:",inline"`
 }
 
 // CollectionName impl CollectionName

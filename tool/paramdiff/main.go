@@ -11,7 +11,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
 )
 
-const pkgPrefix = "github.com/filecoin-project/specs-actors/"
+const pkgPrefix = "github.com/filecoin-project/go-state-types/builtin/"
 
 func main() {
 	latest := actor.Specs[len(actor.Specs)-1]
@@ -57,7 +57,7 @@ func main() {
 	for _, typ := range typeSlice {
 		pkgPath := typ.PkgPath()
 		if strings.HasPrefix(pkgPath, latestPrefix) {
-			pkgPath = strings.ReplaceAll(pkgPath, latestPrefix, "github.com/filecoin-project/specs-actors/latest/")
+			pkgPath = strings.ReplaceAll(pkgPath, latestPrefix, "github.com/filecoin-project/go-state-types/builtin/latest/")
 		}
 
 		fmt.Fprintf(os.Stdout, "%s\t%s\t%s\n", typ.Kind(), typ.String(), pkgPath)

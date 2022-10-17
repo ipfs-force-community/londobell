@@ -29,7 +29,8 @@ func init() {
 }
 
 // VERCHECK
-
+// see https://github.com/filecoin-project/specs-actors/blob/v7.0.1/actors/builtin/miner/miner_actor.go#L1138-L1146
+// and https://github.com/filecoin-project/specs-actors/blob/v7.0.1/actors/builtin/miner/monies.go#L99-L104
 func extractMiningProfitabilityV7(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward7.State) error {
 	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Global.Power.Head)
 	if err != nil {

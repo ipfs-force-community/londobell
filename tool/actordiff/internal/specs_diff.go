@@ -7,26 +7,26 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/filecoin-project/go-state-types/rt"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
 )
 
-func ResolveSpecs(expectedVer int, exported []rt.VMActor) (*Specs, error) {
+func ResolveSpecs(expectedVer int, exported []builtin.RegistryEntry) (*Specs, error) {
 	actors := map[string]resolvedActor{}
 
 	for _, actor := range exported {
-		actTyp := reflect.TypeOf(actor)
-		ver, err := getVer(actTyp.PkgPath())
+		stateTyp := reflect.TypeOf(actor.State()).Elem()
+		ver, name, err := getStateVer(stateTyp.PkgPath())
 		if err != nil {
-			return nil, fmt.Errorf("get specs version for %s in %s: %w", actTyp, actTyp.PkgPath(), err)
+			return nil, fmt.Errorf("get specs version for %s in %s: %w", stateTyp, stateTyp.PkgPath(), err)
 		}
 
 		if ver != expectedVer {
-			return nil, fmt.Errorf("version not match, got %d for %s in %s", ver, actTyp, actTyp.PkgPath())
+			return nil, fmt.Errorf("version not match, got %d for %s in %s", ver, stateTyp, stateTyp.PkgPath())
 		}
 
-		actors[actTyp.String()] = resolvedActor{
-			VMActor: actor,
-			rtype:   actTyp,
+		actors[name] = resolvedActor{
+			RegistryEntry: actor,
+			rtype:         stateTyp,
 		}
 	}
 
@@ -50,20 +50,22 @@ type StateDiff struct {
 }
 
 type resolvedActor struct {
-	rt.VMActor
+	builtin.RegistryEntry
 	rtype reflect.Type
 }
 
 type Specs struct {
 	Ver      int
-	Exported []rt.VMActor
+	Exported []builtin.RegistryEntry
 	actors   map[string]resolvedActor
 }
 
 func CompareSpecs(prev, next *Specs) SpecsDiff {
 	var sdiff SpecsDiff
 	for name, pactor := range prev.actors {
-		nactor, has := next.actors[name]
+		var nactor resolvedActor
+		var has bool
+		nactor, has = next.actors[name]
 		if !has {
 			sdiff.Minuses = append(sdiff.Minuses, pactor.rtype)
 			continue
@@ -106,12 +108,21 @@ func CompareSpecs(prev, next *Specs) SpecsDiff {
 	return sdiff
 }
 
-func getVer(pkg string) (int, error) {
-	if strings.HasPrefix(pkg, "github.com/filecoin-project/specs-actors/actors") {
-		return 0, nil
+func getStateVer(pkg string) (int, string, error) {
+	splits := strings.Split(pkg, "/")
+	name := splits[len(splits)-1]
+
+	if strings.HasPrefix(pkg, "github.com/filecoin-project/specs-actors/") {
+		if strings.HasPrefix(pkg, "github.com/filecoin-project/specs-actors/actors") {
+			return 0, name, nil
+		}
+
+		var ver int
+		_, err := fmt.Fscanf(bytes.NewReader([]byte(pkg)), "github.com/filecoin-project/specs-actors/v%d/actors", &ver)
+		return ver, name, err
 	}
 
 	var ver int
-	_, err := fmt.Fscanf(bytes.NewReader([]byte(pkg)), "github.com/filecoin-project/specs-actors/v%d/actors", &ver)
-	return ver, err
+	_, err := fmt.Fscanf(bytes.NewReader([]byte(pkg)), "github.com/filecoin-project/go-state-types/builtin/v%d/"+name, &ver)
+	return ver, name, err
 }

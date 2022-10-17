@@ -11,7 +11,7 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
-	multisig8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/multisig"
+	multisig8 "github.com/filecoin-project/go-state-types/builtin/v8/multisig"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
