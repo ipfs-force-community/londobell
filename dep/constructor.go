@@ -60,7 +60,7 @@ func (a *WrapAPIBlockstore) DeleteBlock(context.Context, cid.Cid) error {
 	return nil
 }
 
-func ChainIOBlockstore(full v0api.FullNode) (dtypes.HotBlockstore, error) {
+func ChainIOBlockstore(full v0api.FullNode) (dtypes.BasicChainBlockstore, error) {
 	bs := blockstore.NewAPIBlockstore(full)
 	wrapBlockStore := &WrapAPIBlockstore{
 		bs,

@@ -1,0 +1,106 @@
+ver:9
+package gen
+
+import (
+	"fmt"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin"
+	adt{{ .Ver }} "{{ .ImportPath }}/util/adt"
+	verifreg{{ .Ver }} "{{ .ImportPath }}/verifreg"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+	"golang.org/x/xerrors"
+
+	"github.com/ipfs/go-cid"
+	cbg "github.com/whyrusleeping/cbor-gen"
+)
+
+func init() {
+	reg.MustRegisterRegularExtractor("ClaimsV{{ .Ver }}", extractClaimsV{{ .Ver }})
+
+	schema.Register(
+		schema.Model{
+			Name: "claims",
+			D:    &model.Claims{},
+		},
+	)
+}
+
+func extractClaimsV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg{{ .Ver }}.State) error {
+	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.ClaimsTicks, ctx, head.Epoch) {
+		return nil
+	}
+
+	actorToHamtMap, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), st.Claims, builtin.DefaultHamtBitwidth)
+	if err != nil {
+		return fmt.Errorf("couldn't get outer map: %x", err)
+	}
+
+	var innerHamtCid cbg.CborCid
+	err = actorToHamtMap.ForEach(&innerHamtCid, func(key string) error {
+		innerMap, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), cid.Cid(innerHamtCid), builtin.DefaultHamtBitwidth)
+		if err != nil {
+			return xerrors.Errorf("couldn't get outer map: %x", err)
+		}
+
+		addr, err := address.NewFromBytes([]byte(key))
+		if err != nil {
+			return fmt.Errorf("parse addr from adt.Map key %s: %w", key, err)
+		}
+
+		id, err := GenRegularHeadID(head.Head, addr, head.Epoch)
+		if err != nil {
+			return fmt.Errorf("gen regular id: %w", err)
+		}
+
+		var claim verifreg{{ .Ver }}.Claim
+		err = innerMap.ForEach(&claim, func(key string) error {
+			if head.Epoch >= claim.TermStart+claim.TermMax {
+				return nil
+			}
+
+			claimID, err := abi.ParseUIntKey(key)
+			if err != nil {
+				return fmt.Errorf("parse claimID from key: %w", err)
+			}
+
+			res.Docs = append(res.Docs, &model.Claims{
+				ActorStateExBasic: model.ActorStateExBasic{
+					ID:    id,
+					Path:  []cid.Cid{head.Head, cid.Cid(innerHamtCid), st.Claims},
+					Addr:  addr,
+					Epoch: head.Epoch,
+				},
+				Detail: model.ClaimsDetail{
+					ClaimID:   claimID,
+					Provider:  claim.Provider,
+					Client:    claim.Client,
+					Data:      claim.Data,
+					Size:      claim.Size,
+					TermMin:   claim.TermMin,
+					TermMax:   claim.TermMax,
+					TermStart: claim.TermStart,
+					Sector:    claim.Sector,
+				},
+			})
+
+			return nil
+		})
+		if err != nil {
+			return xerrors.Errorf("couldn't iterate over inner map: %x", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return xerrors.Errorf("couldn't iterate over actorToHamtMap: %x", err)
+	}
+
+	return nil
+}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
 	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -61,12 +61,12 @@ func extractMinerSectorHealthV8(ctx *extract.Ctx, res *extract.Res, head *common
 		detail.Live += dl.LiveSectors
 		var part miner8.Partition
 		return ps.ForEach(&part, func(partIdx int64) error {
-			detail.ActiveSectorsQAPower = big.Add(detail.ActiveSectorsQAPower, part.ActivePower().QA)
+			detail.ActiveSectorsQAPower = big.Add(detail.ActiveSectorsQAPower, part.LivePower.Sub(part.FaultyPower).Sub(part.UnprovenPower).QA)
 			detail.FaultsQAPower = big.Add(detail.FaultsQAPower, part.FaultyPower.QA)
 			detail.RecoveriesQAPower = big.Add(detail.RecoveriesQAPower, part.RecoveringPower.QA)
 			detail.UnprovenQAPower = big.Add(detail.UnprovenQAPower, part.UnprovenPower.QA)
 
-			detail.ActiveSectorsRawPower = big.Add(detail.ActiveSectorsRawPower, part.ActivePower().Raw)
+			detail.ActiveSectorsRawPower = big.Add(detail.ActiveSectorsRawPower, part.LivePower.Sub(part.FaultyPower).Sub(part.UnprovenPower).Raw)
 			detail.FaultsRawPower = big.Add(detail.FaultsRawPower, part.FaultyPower.Raw)
 			detail.RecoveriesRawPower = big.Add(detail.RecoveriesRawPower, part.RecoveringPower.Raw)
 			detail.UnprovenRawPower = big.Add(detail.UnprovenRawPower, part.UnprovenPower.Raw)

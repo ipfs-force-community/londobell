@@ -7,9 +7,15 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
+    {{ if ge .Ver 8 }}
+    builtin{{ .Ver }} "github.com/filecoin-project/go-state-types/builtin"
+    miner{{ .Ver }} "{{ .ImportPath }}/miner"
+    adt{{ .Ver }} "{{ .ImportPath }}/util/adt"
+    {{ else }}
 	builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
 	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
 	adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+	{{ end }}
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -144,7 +150,11 @@ func extractMinerSectorSummaryV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, he
 				DealWeight:         out.DealWeight,
 				VerifiedDealWeight: out.VerifiedDealWeight,
 				InitialPledge:      out.InitialPledge,
+				{{- if ge .Ver 8 }}
+				QAPower:            miner{{ .Ver }}.QAPowerForWeight(sectorSize, out.Expiration-out.Activation, out.DealWeight, out.VerifiedDealWeight),
+				{{ else }}
 				QAPower:            miner{{ .Ver }}.QAPowerForSector(sectorSize, &out),
+				{{ end -}}
 				Miner:              head.Addr,
 			})
 		}
