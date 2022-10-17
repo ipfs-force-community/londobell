@@ -11,10 +11,9 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 
-	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
-
-	power8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/power"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	builtin8 "github.com/filecoin-project/go-state-types/builtin"
+	power8 "github.com/filecoin-project/go-state-types/builtin/v8/power"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"

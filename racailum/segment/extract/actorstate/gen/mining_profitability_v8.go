@@ -10,10 +10,11 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
-	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
-	power8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/power"
-	reward8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/reward"
+	"github.com/filecoin-project/go-state-types/abi"
+	builtin8 "github.com/filecoin-project/go-state-types/builtin"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	power8 "github.com/filecoin-project/go-state-types/builtin/v8/power"
+	reward8 "github.com/filecoin-project/go-state-types/builtin/v8/reward"
 
 	"github.com/filecoin-project/lotus/chain/vm"
 
@@ -29,7 +30,8 @@ func init() {
 }
 
 // VERCHECK
-
+// see https://github.com/filecoin-project/builtin-actors/blob/v8.0.0/actors/miner/src/lib.rs#L4298-L4328
+// and https://github.com/filecoin-project/builtin-actors/blob/v8.0.0/actors/miner/src/monies.rs#L147-L161
 func extractMiningProfitabilityV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward8.State) error {
 	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Global.Power.Head)
 	if err != nil {
@@ -60,7 +62,7 @@ func extractMiningProfitabilityV8(ctx *extract.Ctx, res *extract.Res, head *comm
 		InitialConsensusPledge:    consensusPledge,
 		InitialStoragePledge:      storagePledge,
 		ProjectionOfInitialPledge: storagePledge, // TODO: projection is just equal to the init storage power here, correct me if I'm wrong
-		ProjectionOfFaultFee:      miner8.PledgePenaltyForContinuedFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower),
+		ProjectionOfFaultFee:      miner8.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, abi.ChainEpoch(builtin8.EpochsInDay*351)/100),
 		Mined:                     st.TotalStoragePowerReward,
 	}
 

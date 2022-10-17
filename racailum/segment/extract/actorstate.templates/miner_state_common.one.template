@@ -9,8 +9,12 @@ import (
 	"github.com/filecoin-project/go-bitfield"
 
 	{{ range $vinfo := .Vers }}
+	{{ if ge $vinfo.Ver 8 }}
+	miner{{ $vinfo.Ver }} "{{ $vinfo.ImportPath }}/miner"
+    {{ else }}
 	miner{{ $vinfo.Ver }} "{{ $vinfo.ImportPath }}/actors/builtin/miner"
 	adt{{ $vinfo.Ver }} "{{ $vinfo.ImportPath }}/actors/util/adt"
+	{{ end }}
 
 	{{ end }}
 
@@ -71,13 +75,29 @@ func isEmptyMinerStateV{{ $vinfo.Ver }}(mst *miner{{ $vinfo.Ver }}.State) bool {
 {{- end -}}
 {{ with (eq $vinfo.Ver 6) -}}
 // see https://github.com/filecoin-project/specs-actors/blob/v6.0.0/actors/builtin/miner/miner_actor.go#L100-L136
+{{- end -}}
+{{ with (eq $vinfo.Ver 7) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v7.0.1/actors/builtin/miner/miner_actor.go#L105-L141
+{{- end -}}
+{{ with (eq $vinfo.Ver 8) -}}
+// see https://github.com/filecoin-project/builtin-actors/blob/v8.0.0/actors/miner/src/lib.rs#L126-L198
+{{- end -}}
+{{ with (eq $vinfo.Ver 9) -}}
+// see https://github.com/filecoin-project/builtin-actors/blob/v9.0.0/actors/miner/src/lib.rs#L135-L207
 {{- end }}
+
+{{- if ge $vinfo.Ver 8}}
+func newEmptyMinerStateV{{ $vinfo.Ver }}() (*miner{{ $vinfo.Ver }}.State, error) {
+	return new(miner{{ $vinfo.Ver }}.State), nil
+}
+{{ else }}
 func newEmptyMinerStateV{{ $vinfo.Ver }}() (*miner{{ $vinfo.Ver }}.State, error) {
 	ctx := context.Background()
 	inMemStore := bstore.NewMemorySync()
 	adtStore := adt{{ $vinfo.Ver }}.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
 	return miner{{ $vinfo.Ver }}.ConstructState(adtStore, cid.Undef, 0, 0)
 }
+{{ end }}
 {{ else }}
 func isEmptyMinerStateV{{ $vinfo.Ver }}(mst *miner{{ $vinfo.Ver }}.State) bool {
 	earlyCount, err := mst.EarlyTerminations.Count()

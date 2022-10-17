@@ -33,8 +33,9 @@ import (
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 	adt7 "github.com/filecoin-project/specs-actors/v7/actors/util/adt"
 
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+
+	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
 
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	cstore "github.com/filecoin-project/lotus/chain/store"
@@ -98,6 +99,13 @@ func init() {
 
 	emptyMinerStateV8 = empty8
 
+	empty9, err := newEmptyMinerStateV9()
+	if err != nil {
+		panic(fmt.Errorf("construct empty miner state v9: %w", err))
+	}
+
+	emptyMinerStateV9 = empty9
+
 }
 
 var (
@@ -109,6 +117,7 @@ var (
 	emptyMinerStateV6 *miner6.State
 	emptyMinerStateV7 *miner7.State
 	emptyMinerStateV8 *miner8.State
+	emptyMinerStateV9 *miner9.State
 )
 
 func isEmptyMinerStateV0(mst *miner0.State) bool {
@@ -365,7 +374,7 @@ func isEmptyMinerStateV7(mst *miner7.State) bool {
 }
 
 // VERCHECK
-
+// see https://github.com/filecoin-project/specs-actors/blob/v7.0.1/actors/builtin/miner/miner_actor.go#L105-L141
 func newEmptyMinerStateV7() (*miner7.State, error) {
 	ctx := context.Background()
 	inMemStore := bstore.NewMemorySync()
@@ -392,10 +401,31 @@ func isEmptyMinerStateV8(mst *miner8.State) bool {
 }
 
 // VERCHECK
-
+// see https://github.com/filecoin-project/builtin-actors/blob/v8.0.0/actors/miner/src/lib.rs#L126-L198
 func newEmptyMinerStateV8() (*miner8.State, error) {
-	ctx := context.Background()
-	inMemStore := bstore.NewMemorySync()
-	adtStore := adt8.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
-	return miner8.ConstructState(adtStore, cid.Undef, 0, 0)
+	return new(miner8.State), nil
+}
+
+func isEmptyMinerStateV9(mst *miner9.State) bool {
+	earlyCount, err := mst.EarlyTerminations.Count()
+	if err != nil || earlyCount != 0 {
+		return false
+	}
+
+	return isEmptyOrZero(mst.PreCommitDeposits) &&
+		isEmptyOrZero(mst.LockedFunds) &&
+		isEmptyOrZero(mst.FeeDebt) &&
+		mst.VestingFunds.Equals(emptyMinerStateV9.VestingFunds) &&
+		isEmptyOrZero(mst.InitialPledge) &&
+		mst.PreCommittedSectors.Equals(emptyMinerStateV9.PreCommittedSectors) &&
+		mst.PreCommittedSectorsCleanUp.Equals(emptyMinerStateV9.PreCommittedSectorsCleanUp) &&
+		mst.AllocatedSectors.Equals(emptyMinerStateV9.AllocatedSectors) &&
+		mst.Sectors.Equals(emptyMinerStateV9.Sectors) &&
+		mst.Deadlines.Equals(emptyMinerStateV9.Deadlines)
+}
+
+// VERCHECK
+// see https://github.com/filecoin-project/builtin-actors/blob/v9.0.0/actors/miner/src/lib.rs#L135-L207
+func newEmptyMinerStateV9() (*miner9.State, error) {
+	return new(miner9.State), nil
 }

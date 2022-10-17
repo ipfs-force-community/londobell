@@ -7,8 +7,10 @@ package actor
 import (
 	"fmt"
 
-	"github.com/filecoin-project/go-state-types/rt"
+	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
+
 	exported0 "github.com/filecoin-project/specs-actors/actors/builtin/exported"
 	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
 
@@ -30,8 +32,9 @@ import (
 	exported7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/exported"
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 
-	exported8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/exported"
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+
+	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
 )
 
 func init() {
@@ -50,15 +53,16 @@ func init() {
 	}
 }
 
-var Specs = [][]rt.VMActor{
-	exported0.BuiltinActors(),
-	exported2.BuiltinActors(),
-	exported3.BuiltinActors(),
-	exported4.BuiltinActors(),
-	exported5.BuiltinActors(),
-	exported6.BuiltinActors(),
-	exported7.BuiltinActors(),
-	exported8.BuiltinActors(),
+var Specs = [][]builtin.RegistryEntry{
+	builtin.MakeRegistryLegacy(exported0.BuiltinActors()),
+	builtin.MakeRegistryLegacy(exported2.BuiltinActors()),
+	builtin.MakeRegistryLegacy(exported3.BuiltinActors()),
+	builtin.MakeRegistryLegacy(exported4.BuiltinActors()),
+	builtin.MakeRegistryLegacy(exported5.BuiltinActors()),
+	builtin.MakeRegistryLegacy(exported6.BuiltinActors()),
+	builtin.MakeRegistryLegacy(exported7.BuiltinActors()),
+	builtin.MakeRegistry(actorstypes.Version8),
+	builtin.MakeRegistry(actorstypes.Version9),
 }
 
 var WatchOuts = [][]interface{}{
@@ -93,5 +97,9 @@ var WatchOuts = [][]interface{}{
 	[]interface{}{
 		miner8.Deadline{},
 		miner8.Partition{},
+	},
+	[]interface{}{
+		miner9.Deadline{},
+		miner9.Partition{},
 	},
 }

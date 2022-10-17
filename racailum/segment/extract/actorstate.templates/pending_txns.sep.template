@@ -4,11 +4,17 @@ import (
     "fmt"
 
     "github.com/filecoin-project/go-state-types/abi"
-    {{ if gt .Ver 2 -}}
+    {{ if ge .Ver 8 -}}
+    builtin{{ .Ver }} "github.com/filecoin-project/go-state-types/builtin"
+    multisig{{ .Ver }} "{{ .ImportPath }}/multisig"
+    adt{{ .Ver }} "{{ .ImportPath }}/util/adt"
+    {{- else }}
+    {{- if gt .Ver 2 -}}
     builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
     {{- end }}
     multisig{{ .Ver }} "{{ .ImportPath }}/actors/builtin/multisig"
     adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+    {{- end }}
     "github.com/ipfs-force-community/londobell/common"
     "github.com/ipfs-force-community/londobell/racailum/segment/extract"
     "github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"

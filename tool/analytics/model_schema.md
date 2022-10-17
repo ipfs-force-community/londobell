@@ -43,6 +43,27 @@
 }
 ```
 
+### Allocations
+
+```
+{
+	"Addr": "address.Address",
+	"Detail": {
+		"AllocationID": "uint64",
+		"Client": "abi.ActorID",
+		"Data": "cid.Cid",
+		"Expiration": "abi.ChainEpoch",
+		"Provider": "abi.ActorID",
+		"Size": "abi.PaddedPieceSize",
+		"TermMax": "abi.ChainEpoch",
+		"TermMin": "abi.ChainEpoch"
+	},
+	"Epoch": "abi.ChainEpoch",
+	"Path": "[]cid.Cid",
+	"_id": "cid.Cid"
+}
+```
+
 ### BlockHeader
 
 ```
@@ -64,6 +85,28 @@
 {
 	"Addr": "address.Address",
 	"Detail": "model.ClaimedPowerDetail",
+	"Epoch": "abi.ChainEpoch",
+	"Path": "[]cid.Cid",
+	"_id": "cid.Cid"
+}
+```
+
+### Claims
+
+```
+{
+	"Addr": "address.Address",
+	"Detail": {
+		"ClaimID": "uint64",
+		"Client": "abi.ActorID",
+		"Data": "cid.Cid",
+		"Provider": "abi.ActorID",
+		"Sector": "abi.SectorNumber",
+		"Size": "abi.PaddedPieceSize",
+		"TermMax": "abi.ChainEpoch",
+		"TermMin": "abi.ChainEpoch",
+		"TermStart": "abi.ChainEpoch"
+	},
 	"Epoch": "abi.ChainEpoch",
 	"Path": "[]cid.Cid",
 	"_id": "cid.Cid"
