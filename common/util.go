@@ -4,8 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
+	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/filecoin-project/lotus/chain/types"
+
+	"github.com/ipfs-force-community/londobell/buildnet"
+)
+
+var (
+	Loc, _      = time.LoadLocation("Asia/Shanghai")
+	BaseTime, _ = time.Parse(time.RFC3339, buildnet.BeginTime)
 )
 
 // IsCtxCanceled checks if an error is caused by context.Canceled
@@ -58,4 +68,25 @@ func LoadLinkedTipSet(cs ChainStore, child types.TipSetKey) (*LinkedTipSet, erro
 		Parent: parentts,
 		Child:  childts,
 	}, nil
+}
+
+func IsZeroHour(curEpoch abi.ChainEpoch) bool {
+	curTime := time.Unix(BaseTime.Unix()+int64(curEpoch)*30, 0).In(Loc)
+	if curTime.Hour() == 0 && curTime.Minute() == 0 && curTime.Second() == 0 {
+		return true
+	}
+
+	return false
+}
+
+func CalcTimeByEpoch(height uint64) time.Time {
+	return time.Unix(BaseTime.Unix()+int64(height)*30, 0).In(Loc)
+}
+
+func GetCurEpoch() abi.ChainEpoch {
+	return abi.ChainEpoch((time.Now().Unix() - BaseTime.Unix()) / 30)
+}
+
+func AddAddressPrefix(addr string) string {
+	return buildnet.NetPrefix + addr
 }

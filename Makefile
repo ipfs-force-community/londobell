@@ -83,3 +83,19 @@ gen-diff:
 
 gen-extractor:
 	go run tool/genvercodes/main.go
+
+build-adapter: $(BUILD_DEPS)
+	rm -rf ./lotus-api-adapter
+	go build $(GOFLAGS) -o lotus-api-adapter ./cmd/londobell-api/adapter
+
+build-adapter-calib: GOFLAGS+=-tags=calibnet
+build-adapter-calib: $(BUILD_DEPS)
+	rm -rf ./lotus-api-adapter
+	go build $(GOFLAGS) -o lotus-api-adapter ./cmd/londobell-api/adapter
+
+build-aggregators: $(BUILD_DEPS)
+	rm -rf ./londobell-api-aggregators
+	go build $(GOFLAGS) -o londobell-api-aggregators ./cmd/londobell-api/aggregators
+
+gen-types:
+	go run tool/gentypes/main.go

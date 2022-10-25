@@ -9,3 +9,6 @@
 .idea
 
 testdb/LOCK
+
+/lotus-api-adapter
+/londobell-api-aggregators

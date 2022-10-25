@@ -1,0 +1,4 @@
+{
+  "url": "mongodb://guest:read-only@dds-uf6d6d33e7700d641580-pub.mongodb.rds.aliyuncs.com:3717,dds-uf6d6d33e7700d642762-pub.mongodb.rds.aliyuncs.com:3717/?replicaSet=mgset-61594643&authSource=bell",
+  "name": "bell"
+}
