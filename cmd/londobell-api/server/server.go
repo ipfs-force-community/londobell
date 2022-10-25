@@ -48,7 +48,8 @@ func Run(cctx *cli.Context, useAPI bool) error {
 				case <-tick.C:
 					err = adapter.API.Choose(ctx)
 					if err != nil {
-						log.Fatal(err)
+						log.Warn(err)
+						continue
 					}
 
 					_, err = dix.New(ctx, dep.Bell(ctx, adapter.Fxlog, &adapter.Components), dep.InjectRepoPath(cctx), adapter.InjectAppropriateFullNode())
