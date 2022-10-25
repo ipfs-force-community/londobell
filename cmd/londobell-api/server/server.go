@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/dtynn/dix"
 	"github.com/gin-gonic/gin"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
@@ -18,6 +19,7 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	"github.com/ipfs-force-community/londobell/dep"
 )
 
 var (
@@ -47,6 +49,11 @@ func Run(cctx *cli.Context, useAPI bool) error {
 					err = adapter.API.Choose(ctx)
 					if err != nil {
 						log.Fatal(err)
+					}
+
+					_, err = dix.New(ctx, dep.Bell(ctx, adapter.Fxlog, &adapter.Components), dep.InjectRepoPath(cctx), adapter.InjectAppropriateFullNode())
+					if err != nil {
+						log.Errorf("inject dependencies failed: %v", err)
 					}
 				}
 			}
@@ -101,6 +108,7 @@ func RegisterAdapterApi(router *gin.Engine) {
 		group.POST("/sector", adapter.GetSectorInfo)
 		group.POST("/batchminers", adapter.GetBatchMinersInfo)
 		group.POST("/sectorpower", adapter.GetSectorPowerInfo)
+		group.POST("/precommit_deposit_toburn", adapter.GetPreCommitDepositToBurnInfo)
 	}
 }
 
