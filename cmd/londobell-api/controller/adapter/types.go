@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-address"
+	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/go-state-types/builtin"
 	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
 	builtin2 "github.com/filecoin-project/specs-actors/v2/actors/builtin"
@@ -237,32 +238,33 @@ func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
 
 		switch av {
 
-		case actors.Version8:
-			return system.MakeState(store, actors.Version8, cid.Undef)
-
+		case actorstypes.Version8:
+			return system.MakeState(store, actorstypes.Version8, cid.Undef)
+		case actorstypes.Version9:
+			return system.MakeState(store, actorstypes.Version9, cid.Undef)
 		}
 	}
 
 	if c == builtin0.SystemActorCodeID {
-		return system.MakeState(store, actors.Version0, cid.Undef)
+		return system.MakeState(store, actorstypes.Version0, cid.Undef)
 	}
 	if c == builtin2.SystemActorCodeID {
-		return system.MakeState(store, actors.Version2, cid.Undef)
+		return system.MakeState(store, actorstypes.Version2, cid.Undef)
 	}
 	if c == builtin3.SystemActorCodeID {
-		return system.MakeState(store, actors.Version3, cid.Undef)
+		return system.MakeState(store, actorstypes.Version3, cid.Undef)
 	}
 	if c == builtin4.SystemActorCodeID {
-		return system.MakeState(store, actors.Version4, cid.Undef)
+		return system.MakeState(store, actorstypes.Version4, cid.Undef)
 	}
 	if c == builtin5.SystemActorCodeID {
-		return system.MakeState(store, actors.Version5, cid.Undef)
+		return system.MakeState(store, actorstypes.Version5, cid.Undef)
 	}
 	if c == builtin6.SystemActorCodeID {
-		return system.MakeState(store, actors.Version6, cid.Undef)
+		return system.MakeState(store, actorstypes.Version6, cid.Undef)
 	}
 	if c == builtin7.SystemActorCodeID {
-		return system.MakeState(store, actors.Version7, cid.Undef)
+		return system.MakeState(store, actorstypes.Version7, cid.Undef)
 	}
 
 	return nil, fmt.Errorf("not system actor code: %v", c)

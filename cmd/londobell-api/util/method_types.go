@@ -8,6 +8,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/lotus/chain/actors"
 	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
@@ -56,15 +57,15 @@ func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to strin
 		if err != nil {
 			return actor.MethodInfo{}, err
 		}
-		Code, err := GetBuiltinActorCodeID(actors.Version(av), actType)
+		actorCode, err := GetBuiltinActorCodeID(actorstypes.Version(av), actType)
 		if err != nil {
 			return actor.MethodInfo{}, fmt.Errorf("fallback to load from StateManager, still failed: %w", err)
 		}
 		actorSet.loadmu.Lock()
-		actorSet.m[To] = Code
+		actorSet.m[To] = actorCode
 		actorSet.loadmu.Unlock()
 
-		code = Code
+		code = actorCode
 	}
 
 	if ccode, cname, ok := actor.DefaultActorConvertor(epoch, Actor); ok {
@@ -84,76 +85,16 @@ func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to strin
 	}, nil
 }
 
-func GetBuiltinActorCodeID(av actors.Version, actorName string) (cid.Cid, error) {
-	//GetBuiltinActorsKeys
-	switch actorName {
-	case actors.AccountKey:
-		code, err := lbuiltin.GetAccountActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.CronKey:
-		code, err := lbuiltin.GetCronActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.InitKey:
-		code, err := lbuiltin.GetInitActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.MarketKey:
-		code, err := lbuiltin.GetMarketActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.MinerKey:
-		code, err := lbuiltin.GetMinerActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.MultisigKey:
-		code, err := lbuiltin.GetMultisigActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.PaychKey:
-		code, err := lbuiltin.GetPaymentChannelActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.PowerKey:
-		code, err := lbuiltin.GetPowerActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.RewardKey:
-		code, err := lbuiltin.GetRewardActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.SystemKey:
-		code, err := lbuiltin.GetSystemActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.VerifregKey:
-		code, err := lbuiltin.GetVerifregActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	default:
-		return cid.Undef, fmt.Errorf("unknow actor name: %v", actorName)
+func GetBuiltinActorCodeID(av actorstypes.Version, actorName string) (cid.Cid, error) {
+	// GetBuiltinActorsKeys
+	codeIDs, err := actors.GetActorCodeIDs(av)
+	if err != nil {
+		return cid.Undef, err
 	}
+
+	if _, ok := codeIDs[actorName]; !ok {
+		return cid.Undef, fmt.Errorf("unknow actor type: %v", actorName)
+	}
+
+	return codeIDs[actorName], nil
 }

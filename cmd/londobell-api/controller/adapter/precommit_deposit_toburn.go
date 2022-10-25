@@ -6,7 +6,17 @@ import (
 	"net/http"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
+	actorstypes "github.com/filecoin-project/go-state-types/actors"
+	"github.com/filecoin-project/go-state-types/big"
+	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	util8 "github.com/filecoin-project/go-state-types/builtin/v8/util"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
+	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
+	util9 "github.com/filecoin-project/go-state-types/builtin/v9/util"
+	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
 	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/filecoin-project/specs-actors/actors/util/adt"
 	builtin2 "github.com/filecoin-project/specs-actors/v2/actors/builtin"
@@ -17,9 +27,10 @@ import (
 	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
 	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
+	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 	"github.com/gin-gonic/gin"
 	"github.com/ipfs/go-cid"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
@@ -56,6 +67,11 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 		baseFee          abi.TokenAmount
 		parentTs         *types.TipSet
 	)
+
+	if req.Epoch == 0 {
+		util.ReturnOnErr(c, alog, fmt.Errorf("epoch must be specified"))
+		return
+	}
 
 	curEpoch := abi.ChainEpoch(req.Epoch)
 	curTs, err := Components.Full.ChainGetTipSetByHeight(ctx, curEpoch, types.EmptyTSK)
@@ -223,9 +239,9 @@ func getDepositToBurnByCode(ctx context.Context, mact *types.Actor, stor adt.Sto
 
 		switch av {
 
-		case actors.Version8:
-			state := miner8.State{}
-			err := stor.Get(ctx, mact.Head, &state)
+		case actorstypes.Version8:
+			state := &miner8.State{}
+			err := stor.Get(ctx, mact.Head, state)
 			if err != nil {
 				return abi.NewTokenAmount(0), err
 			}
@@ -233,7 +249,22 @@ func getDepositToBurnByCode(ctx context.Context, mact *types.Actor, stor adt.Sto
 			if !state.PreCommittedSectorsCleanUp.Defined() {
 				return abi.NewTokenAmount(0), nil
 			}
-			depositToBurn, err := state.CleanUpExpiredPreCommits(stor, curEpoch)
+			depositToBurn, err := CleanUpExpiredPreCommits(state, stor, curEpoch)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+			return depositToBurn, nil
+		case actorstypes.Version9:
+			state := &miner9.State{}
+			err := stor.Get(ctx, mact.Head, state)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+
+			if !state.PreCommittedSectorsCleanUp.Defined() {
+				return abi.NewTokenAmount(0), nil
+			}
+			depositToBurn, err := CleanUpExpiredPreCommits(state, stor, curEpoch)
 			if err != nil {
 				return abi.NewTokenAmount(0), err
 			}
@@ -269,8 +300,8 @@ func getDepositToBurnByCode(ctx context.Context, mact *types.Actor, stor adt.Sto
 		}
 		return depositToBurn, nil
 	case builtin6.StorageMinerActorCodeID:
-		state := miner6.State{}
-		err := stor.Get(ctx, mact.Head, &state)
+		state := &miner6.State{}
+		err := stor.Get(ctx, mact.Head, state)
 		if err != nil {
 			return abi.NewTokenAmount(0), err
 		}
@@ -284,8 +315,8 @@ func getDepositToBurnByCode(ctx context.Context, mact *types.Actor, stor adt.Sto
 		}
 		return depositToBurn, nil
 	case builtin7.StorageMinerActorCodeID:
-		state := miner6.State{}
-		err := stor.Get(ctx, mact.Head, &state)
+		state := &miner7.State{}
+		err := stor.Get(ctx, mact.Head, state)
 		if err != nil {
 			return abi.NewTokenAmount(0), err
 		}
@@ -301,4 +332,229 @@ func getDepositToBurnByCode(ctx context.Context, mact *types.Actor, stor adt.Sto
 	}
 
 	return abi.NewTokenAmount(0), fmt.Errorf("unknown actor code %s", mact.Code)
+}
+
+func CleanUpExpiredPreCommits(state interface{}, store adt.Store, currEpoch abi.ChainEpoch) (depositToBurn abi.TokenAmount, err error) {
+	switch state.(type) {
+	case *miner8.State:
+		st := state.(*miner8.State)
+		depositToBurn = abi.NewTokenAmount(0)
+
+		// cleanup expired pre-committed sectors
+		cleanUpQ, err := util8.LoadBitfieldQueue(store, st.PreCommittedSectorsCleanUp, st.QuantSpecEveryDeadline(), miner8.PrecommitCleanUpAmtBitwidth)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to load sector expiry queue: %w", err)
+		}
+
+		sectors, modified, err := PopUntil(cleanUpQ, currEpoch)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to pop expired sectors: %w", err)
+		}
+
+		if modified {
+			st.PreCommittedSectorsCleanUp, err = cleanUpQ.Root()
+			if err != nil {
+				return depositToBurn, xerrors.Errorf("failed to save pre commit clean up queue: %w", err)
+			}
+		}
+
+		var precommitsToDelete []abi.SectorNumber
+		if err = sectors.ForEach(func(i uint64) error {
+			sectorNo := abi.SectorNumber(i)
+			sector, found, err := st.GetPrecommittedSector(store, sectorNo)
+			if err != nil {
+				return err
+			}
+			if !found {
+				// already committed/deleted
+				return nil
+			}
+
+			// mark it for deletion
+			precommitsToDelete = append(precommitsToDelete, sectorNo)
+
+			// increment deposit to burn
+			depositToBurn = big.Add(depositToBurn, sector.PreCommitDeposit)
+			return nil
+		}); err != nil {
+			return big.Zero(), xerrors.Errorf("failed to check pre-commit expiries: %w", err)
+		}
+
+		// Actually delete it.
+		if len(precommitsToDelete) > 0 {
+			if err := DeletePrecommittedSectors(st, store, precommitsToDelete...); err != nil {
+				return big.Zero(), fmt.Errorf("failed to delete pre-commits: %w", err)
+			}
+		}
+
+		st.PreCommitDeposits = big.Sub(st.PreCommitDeposits, depositToBurn)
+		if st.PreCommitDeposits.LessThan(big.Zero()) {
+			return big.Zero(), xerrors.Errorf("pre-commit clean up caused negative deposits: %v", st.PreCommitDeposits)
+		}
+
+		// This deposit was locked separately to pledge collateral so there's no pledge change here.
+		return depositToBurn, nil
+	case *miner9.State:
+		st := state.(*miner9.State)
+		depositToBurn = abi.NewTokenAmount(0)
+
+		// cleanup expired pre-committed sectors
+		cleanUpQ, err := util9.LoadBitfieldQueue(store, st.PreCommittedSectorsCleanUp, st.QuantSpecEveryDeadline(), miner9.PrecommitCleanUpAmtBitwidth)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to load sector expiry queue: %w", err)
+		}
+
+		sectors, modified, err := PopUntil(cleanUpQ, currEpoch)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to pop expired sectors: %w", err)
+		}
+
+		if modified {
+			st.PreCommittedSectorsCleanUp, err = cleanUpQ.Root()
+			if err != nil {
+				return depositToBurn, xerrors.Errorf("failed to save pre commit clean up queue: %w", err)
+			}
+		}
+
+		var precommitsToDelete []abi.SectorNumber
+		if err = sectors.ForEach(func(i uint64) error {
+			sectorNo := abi.SectorNumber(i)
+			sector, found, err := st.GetPrecommittedSector(store, sectorNo)
+			if err != nil {
+				return err
+			}
+			if !found {
+				// already committed/deleted
+				return nil
+			}
+
+			// mark it for deletion
+			precommitsToDelete = append(precommitsToDelete, sectorNo)
+
+			// increment deposit to burn
+			depositToBurn = big.Add(depositToBurn, sector.PreCommitDeposit)
+			return nil
+		}); err != nil {
+			return big.Zero(), xerrors.Errorf("failed to check pre-commit expiries: %w", err)
+		}
+
+		// Actually delete it.
+		if len(precommitsToDelete) > 0 {
+			if err := DeletePrecommittedSectors(st, store, precommitsToDelete...); err != nil {
+				return big.Zero(), fmt.Errorf("failed to delete pre-commits: %w", err)
+			}
+		}
+
+		st.PreCommitDeposits = big.Sub(st.PreCommitDeposits, depositToBurn)
+		if st.PreCommitDeposits.LessThan(big.Zero()) {
+			return big.Zero(), xerrors.Errorf("pre-commit clean up caused negative deposits: %v", st.PreCommitDeposits)
+		}
+
+		// This deposit was locked separately to pledge collateral so there's no pledge change here.
+		return depositToBurn, nil
+	default:
+		return big.Zero(), fmt.Errorf("CleanUpExpiredPreCommits gets invalid type: %v", state)
+	}
+}
+
+func PopUntil(queue interface{}, until abi.ChainEpoch) (values bitfield.BitField, modified bool, err error) {
+	var poppedValues []bitfield.BitField
+	var poppedKeys []uint64
+
+	stopErr := fmt.Errorf("stop")
+	switch queue.(type) {
+	case util8.BitfieldQueue:
+		q := queue.(util8.BitfieldQueue)
+		if err = q.ForEach(func(epoch abi.ChainEpoch, bf bitfield.BitField) error {
+			if epoch > until {
+				return stopErr
+			}
+			poppedKeys = append(poppedKeys, uint64(epoch))
+			poppedValues = append(poppedValues, bf)
+			return err
+		}); err != nil && err != stopErr {
+			return bitfield.BitField{}, false, err
+		}
+
+		// Nothing expired.
+		if len(poppedKeys) == 0 {
+			return bitfield.New(), false, nil
+		}
+
+		if err = q.BatchDelete(poppedKeys, true); err != nil {
+			return bitfield.BitField{}, false, err
+		}
+		merged, err := bitfield.MultiMerge(poppedValues...)
+		if err != nil {
+			return bitfield.BitField{}, false, err
+		}
+
+		return merged, true, nil
+	case util9.BitfieldQueue:
+		q := queue.(util9.BitfieldQueue)
+		if err = q.ForEach(func(epoch abi.ChainEpoch, bf bitfield.BitField) error {
+			if epoch > until {
+				return stopErr
+			}
+			poppedKeys = append(poppedKeys, uint64(epoch))
+			poppedValues = append(poppedValues, bf)
+			return err
+		}); err != nil && err != stopErr {
+			return bitfield.BitField{}, false, err
+		}
+
+		// Nothing expired.
+		if len(poppedKeys) == 0 {
+			return bitfield.New(), false, nil
+		}
+
+		if err = q.BatchDelete(poppedKeys, true); err != nil {
+			return bitfield.BitField{}, false, err
+		}
+		merged, err := bitfield.MultiMerge(poppedValues...)
+		if err != nil {
+			return bitfield.BitField{}, false, err
+		}
+
+		return merged, true, nil
+	default:
+		return bitfield.BitField{}, false, fmt.Errorf("PopUntil gets invalid type: %v", queue)
+	}
+}
+
+func DeletePrecommittedSectors(state interface{}, store adt.Store, sectorNos ...abi.SectorNumber) error {
+	switch state.(type) {
+	case *miner8.State:
+		st := state.(*miner8.State)
+		precommitted, err := adt8.AsMap(store, st.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+		if err != nil {
+			return err
+		}
+
+		for _, sectorNo := range sectorNos {
+			err = precommitted.Delete(miner8.SectorKey(sectorNo))
+			if err != nil {
+				return xerrors.Errorf("failed to delete precommitment for %v: %w", sectorNo, err)
+			}
+		}
+		st.PreCommittedSectors, err = precommitted.Root()
+		return err
+	case *miner9.State:
+		st := state.(*miner9.State)
+		precommitted, err := adt9.AsMap(store, st.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+		if err != nil {
+			return err
+		}
+
+		for _, sectorNo := range sectorNos {
+			err = precommitted.Delete(miner9.SectorKey(sectorNo))
+			if err != nil {
+				return xerrors.Errorf("failed to delete precommitment for %v: %w", sectorNo, err)
+			}
+		}
+		st.PreCommittedSectors, err = precommitted.Root()
+		return err
+	default:
+		return fmt.Errorf("DeletePrecommittedSectors gets invalid type: %v", state)
+	}
 }
