@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,28 +21,9 @@ type ActorSet struct {
 	loadmu sync.RWMutex
 }
 
-var (
-	UpgradeActorSet = make(map[abi.ChainEpoch]*ActorSet)
-	lock            sync.RWMutex
-	HeightSlice     []abi.ChainEpoch
-)
-
 func NewActorSet() *ActorSet {
 	m := make(map[address.Address]cid.Cid)
 	return &ActorSet{m: m}
-}
-func init() {
-	var UpgradeInfinityHeight = abi.ChainEpoch(99999999999999)
-	HeightSlice = append(HeightSlice, UpgradeInfinityHeight)
-	UpgradeActorSet[UpgradeInfinityHeight] = NewActorSet()
-	for _, u := range filcns.DefaultUpgradeSchedule() {
-		UpgradeActorSet[u.Height] = NewActorSet()
-		HeightSlice = append(HeightSlice, u.Height)
-	}
-
-	sort.Slice(HeightSlice, func(i, j int) bool {
-		return HeightSlice[i] > HeightSlice[j]
-	})
 }
 
 func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to string, Actor string) (actor.MethodInfo, error) {
@@ -55,15 +35,7 @@ func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to strin
 		return actor.MethodSend, nil
 	}
 
-	lock.Lock()
-	defer lock.Unlock()
-	var actorSet *ActorSet
-	for _, h := range HeightSlice {
-		if epoch >= h {
-			actorSet = UpgradeActorSet[h]
-			break
-		}
-	}
+	actorSet := NewActorSet()
 
 	code := cid.Undef
 	if code == cid.Undef {
@@ -95,6 +67,11 @@ func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to strin
 		code = Code
 	}
 
+	if ccode, cname, ok := actor.DefaultActorConvertor(epoch, Actor); ok {
+		code = ccode
+		Actor = cname
+	}
+
 	vma := filcns.NewActorRegistry()
 	mi, ok := vma.Methods[code][Method]
 	if !ok {
@@ -102,7 +79,7 @@ func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to strin
 	}
 
 	return actor.MethodInfo{
-		Actor:  actType,
+		Actor:  Actor,
 		Method: mi,
 	}, nil
 }
