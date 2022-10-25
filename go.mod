@@ -8,8 +8,8 @@ require (
 	github.com/filecoin-project/go-address v1.0.0
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-jsonrpc v0.1.8
-	github.com/filecoin-project/go-state-types v0.9.1
-	github.com/filecoin-project/lotus v1.18.0-rc3
+	github.com/filecoin-project/go-state-types v0.9.4
+	github.com/filecoin-project/lotus v1.18.0-rc4
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v3 v3.1.2

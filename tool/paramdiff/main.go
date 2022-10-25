@@ -23,7 +23,7 @@ func main() {
 	for _, act := range latest {
 		methods := act.Exports()
 		for _, meth := range methods {
-			methType := reflect.TypeOf(meth)
+			methType := reflect.TypeOf(meth.Method)
 			if methType == nil || methType.Kind() != reflect.Func {
 				continue
 			}

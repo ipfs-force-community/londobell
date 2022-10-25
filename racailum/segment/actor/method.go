@@ -12,16 +12,14 @@ import (
 var MethodSend = MethodInfo{
 	Actor: "",
 	Method: vm.MethodMeta{
-		Num: "0",
+		Name: "Send",
 	},
-	MethodName: "Send",
 }
 
 // MethodInfo includes actor name & method meta
 type MethodInfo struct {
-	Actor      string
-	Method     vm.MethodMeta
-	MethodName string
+	Actor  string
+	Method vm.MethodMeta
 }
 
 // ParamObj returns a new instance of param object
