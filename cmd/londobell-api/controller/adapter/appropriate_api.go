@@ -81,7 +81,7 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 
 	// more appropriate candidate is unsynchronized
 	if candidate.gap > 10 {
-		return fmt.Errorf("no available APIs: %v", urls)
+		return fmt.Errorf("no available APIs: %v, for gap: %v", urls, candidate.gap)
 	}
 
 	previousAPI := a.GetAppropriateAPI()

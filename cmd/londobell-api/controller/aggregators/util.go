@@ -2,16 +2,11 @@ package aggregators
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 
-	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/robertkrimen/otto"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-
-	"github.com/filecoin-project/lotus/chain/actors"
 )
 
 var log = logging.Logger("aggregators")
@@ -173,37 +168,4 @@ func array2agg(a *otto.Object) (interface{}, error) {
 	}
 
 	return out, nil
-}
-
-// name:fil/8/storageminer actorVersion:8 actorName:storageminer
-func ActorCodeByName(name string) (cid.Cid, error) {
-	strs := strings.Split(strings.TrimSpace(name), "/")
-	actorVersion, err := strconv.Atoi(strs[1])
-	if err != nil {
-		return cid.Undef, err
-	}
-
-	actorName := strs[2]
-
-	code, ok := actors.GetActorCodeID(actors.Version(actorVersion), actorName)
-	if ok {
-		return code, nil
-	}
-
-	code, err = GetActorCodeIDOlder(actors.Version(actorVersion), actorName)
-	if err != nil {
-		return cid.Undef, err
-	}
-
-	return code, nil
-}
-
-func GetActorCodeIDOlder(version actors.Version, actorName string) (cid.Cid, error) {
-	for code, actorInfo := range builtinActors {
-		if actorName == strings.Split(actorInfo.name, "/")[2] {
-			return code, nil
-		}
-	}
-
-	return cid.Undef, fmt.Errorf("can't found code for actorName %v of version %v", actorName, version)
 }
