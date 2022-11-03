@@ -40,7 +40,7 @@ func init() {
 
 
 func extractPendingTxnsV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *multisig{{ .Ver }}.State) error {
-    if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.PendingTxnsTicks, ctx, head.Epoch) {
+    if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.PendingTxnsTicks, ctx, head.Epoch) {
         return nil
     }
 

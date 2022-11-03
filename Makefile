@@ -97,5 +97,10 @@ build-aggregators: $(BUILD_DEPS)
 	rm -rf ./londobell-api-aggregators
 	go build $(GOFLAGS) -o londobell-api-aggregators ./cmd/londobell-api/aggregators
 
+build-aggregators-calib: GOFLAGS+=-tags=calibnet
+build-aggregators-calib: $(BUILD_DEPS)
+	rm -rf ./londobell-api-aggregators
+	go build $(GOFLAGS) -o londobell-api-aggregators ./cmd/londobell-api/aggregators
+
 gen-types:
 	go run tool/gentypes/main.go

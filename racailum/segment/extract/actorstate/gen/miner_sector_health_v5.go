@@ -23,7 +23,7 @@ func init() {
 }
 
 func extractMinerSectorHealthV5(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner5.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerSectorHeathTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerSectorHeathTicks, ctx, head.Epoch) {
 		return nil
 	}
 

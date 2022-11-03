@@ -55,32 +55,37 @@ func GetTraces(c *gin.Context) {
 
 		if trace.Params != nil {
 			params := methodInfo.ParamObj()
-			err = params.UnmarshalCBOR(bytes.NewBuffer(trace.Params.(primitive.Binary).Data))
-			if err != nil {
-				util.ReturnOnErr(c, alog, err)
-				return
+			if params != nil {
+				err = params.UnmarshalCBOR(bytes.NewBuffer(trace.Params.(primitive.Binary).Data))
+				if err != nil {
+					util.ReturnOnErr(c, alog, err)
+					return
+				}
+
+				paramsByte, err := json.Marshal(params)
+				if err != nil {
+					util.ReturnOnErr(c, alog, err)
+					return
+				}
+				trace.Params = string(paramsByte)
 			}
-			paramsByte, err := json.Marshal(params)
-			if err != nil {
-				util.ReturnOnErr(c, alog, err)
-				return
-			}
-			trace.Params = string(paramsByte)
 		}
 
-		returns := methodInfo.ReturnObj()
 		if trace.Return != nil {
-			err = returns.UnmarshalCBOR(bytes.NewBuffer(trace.Return.(primitive.Binary).Data))
-			if err != nil {
-				util.ReturnOnErr(c, alog, err)
-				return
+			returns := methodInfo.ReturnObj()
+			if returns != nil {
+				err = returns.UnmarshalCBOR(bytes.NewBuffer(trace.Return.(primitive.Binary).Data))
+				if err != nil {
+					util.ReturnOnErr(c, alog, err)
+					return
+				}
+				returnsByte, err := json.Marshal(returns)
+				if err != nil {
+					util.ReturnOnErr(c, alog, err)
+					return
+				}
+				trace.Return = string(returnsByte)
 			}
-			returnsByte, err := json.Marshal(returns)
-			if err != nil {
-				util.ReturnOnErr(c, alog, err)
-				return
-			}
-			trace.Return = string(returnsByte)
 		}
 	}
 

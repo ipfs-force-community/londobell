@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/ipfs-force-community/londobell/common"
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/ipfs-force-community/londobell/dep"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil"
-	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 )
 
 var checkCmd = &cli.Command{
@@ -244,7 +244,7 @@ func getStartEpoch(tableName string, interval abi.ChainEpoch, loEpoch abi.ChainE
 	restHeight1 = int(intervalT - startEpoch%intervalT)
 
 	if isZeroHour {
-		curTime := time.Unix(extract.BaseTime.Unix()+int64(startEpoch)*30, 0).In(extract.Loc)
+		curTime := time.Unix(common.BaseTime.Unix()+int64(startEpoch)*30, 0).In(common.Loc)
 		diffSec := curTime.Hour()*60*60 + curTime.Minute()*60 + curTime.Second()
 		if diffSec == 0 {
 			log.Infow("getStartEpoch [zero hour]", "tableName", tableName, "loEpoch", loEpoch, "intervalT", intervalT, "isZeroHour", isZeroHour, "startEpoch", startEpoch)
@@ -425,7 +425,7 @@ func getLastEndEpoch(startEpoch abi.ChainEpoch, tableName string, interval abi.C
 	endEpoch1 = endEpoch - endEpoch%intervalT
 
 	if isZeroHour {
-		curTime := time.Unix(extract.BaseTime.Unix()+int64(endEpoch)*30, 0).In(extract.Loc)
+		curTime := time.Unix(common.BaseTime.Unix()+int64(endEpoch)*30, 0).In(common.Loc)
 		diffSec := curTime.Hour()*60*60 + curTime.Minute()*60 + curTime.Second()
 		if diffSec == 0 {
 			log.Infow("getLastEndEpoch [zero hour]", "tableName", tableName, "intervalT", intervalT, "isZeroHour", isZeroHour, "endEpoch", endEpoch)

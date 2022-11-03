@@ -17,7 +17,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
-	"golang.org/x/xerrors"
+	"github.com/multiformats/go-varint"
 
 	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
@@ -35,25 +35,28 @@ func init() {
 }
 
 func extractAllocationsV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg9.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.AllocationsTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.AllocationsTicks, ctx, head.Epoch) {
 		return nil
 	}
 
 	actorToHamtMap, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), st.Allocations, builtin.DefaultHamtBitwidth)
 	if err != nil {
-		return fmt.Errorf("couldn't get outer map: %x", err)
+		return fmt.Errorf("couldn't get outer map: %w, st.Allocations: %v", err, st.Allocations)
 	}
 
 	var innerHamtCid cbg.CborCid
 	err = actorToHamtMap.ForEach(&innerHamtCid, func(key string) error {
-		actorID, err := abi.ParseUIntKey(key)
+		actorID, n, err := varint.FromUvarint([]byte(key))
+		if n != len([]byte(key)) {
+			return fmt.Errorf("could not get varint from address string")
+		}
 		if err != nil {
-			return fmt.Errorf("parse actorID from adt.Map key %s: %w", key, err)
+			return err
 		}
 
-		addr, err := address.NewFromBytes([]byte(key)) // just to generate unique ID
+		addr, err := address.NewIDAddress(actorID) // just to generate unique ID
 		if err != nil {
-			return fmt.Errorf("parse addr from adt.Map key %s: %w", key, err)
+			return fmt.Errorf("parse addr from adt.Map key %s: %w, actorID: %v", key, err, actorID)
 		}
 
 		id, err := GenRegularHeadID(head.Head, addr, head.Epoch)
@@ -63,7 +66,7 @@ func extractAllocationsV9(ctx *extract.Ctx, res *extract.Res, head *common.Actor
 
 		innerMap, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), cid.Cid(innerHamtCid), builtin.DefaultHamtBitwidth)
 		if err != nil {
-			return xerrors.Errorf("couldn't get outer map: %x", err)
+			return fmt.Errorf("couldn't get outer map: %w, innerHamtCid: %v", err, innerHamtCid)
 		}
 
 		var allocation verifreg9.Allocation
@@ -74,7 +77,7 @@ func extractAllocationsV9(ctx *extract.Ctx, res *extract.Res, head *common.Actor
 
 			allocationID, err := abi.ParseUIntKey(key)
 			if err != nil {
-				return fmt.Errorf("parse allocationID from key: %w", err)
+				return fmt.Errorf("parse allocationID from key: %w, key: %v", err, key)
 			}
 
 			res.Docs = append(res.Docs, &model.Allocations{
@@ -95,14 +98,14 @@ func extractAllocationsV9(ctx *extract.Ctx, res *extract.Res, head *common.Actor
 			return nil
 		})
 		if err != nil {
-			return xerrors.Errorf("couldn't iterate over inner map: %x", err)
+			return fmt.Errorf("couldn't iterate over inner map: %w, innerHamtCid: %v", err, innerHamtCid)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		return xerrors.Errorf("couldn't iterate over actorToHamtMap: %x", err)
+		return fmt.Errorf("couldn't iterate over actorToHamtMap: %w, st.Allocations: %v", err, st.Allocations)
 	}
 
 	return nil

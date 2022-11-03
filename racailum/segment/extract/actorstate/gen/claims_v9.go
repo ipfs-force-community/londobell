@@ -17,7 +17,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
-	"golang.org/x/xerrors"
+	"github.com/multiformats/go-varint"
 
 	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
@@ -35,25 +35,33 @@ func init() {
 }
 
 func extractClaimsV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg9.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.ClaimsTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.ClaimsTicks, ctx, head.Epoch) {
 		return nil
 	}
 
 	actorToHamtMap, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), st.Claims, builtin.DefaultHamtBitwidth)
 	if err != nil {
-		return fmt.Errorf("couldn't get outer map: %x", err)
+		return fmt.Errorf("couldn't get outer map: %w, st.Claims: %v", err, st.Claims)
 	}
 
 	var innerHamtCid cbg.CborCid
 	err = actorToHamtMap.ForEach(&innerHamtCid, func(key string) error {
 		innerMap, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), cid.Cid(innerHamtCid), builtin.DefaultHamtBitwidth)
 		if err != nil {
-			return xerrors.Errorf("couldn't get outer map: %x", err)
+			return fmt.Errorf("couldn't get outer map: %w, innerHamtCid: %v", err, innerHamtCid)
 		}
 
-		addr, err := address.NewFromBytes([]byte(key))
+		actorID, n, err := varint.FromUvarint([]byte(key))
+		if n != len([]byte(key)) {
+			return fmt.Errorf("could not get varint from address string")
+		}
 		if err != nil {
-			return fmt.Errorf("parse addr from adt.Map key %s: %w", key, err)
+			return err
+		}
+
+		addr, err := address.NewIDAddress(actorID) // just to generate unique ID
+		if err != nil {
+			return fmt.Errorf("parse ownerAddr from adt.Map key %s: %w, actorID: %v", key, err, actorID)
 		}
 
 		id, err := GenRegularHeadID(head.Head, addr, head.Epoch)
@@ -69,7 +77,7 @@ func extractClaimsV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead,
 
 			claimID, err := abi.ParseUIntKey(key)
 			if err != nil {
-				return fmt.Errorf("parse claimID from key: %w", err)
+				return fmt.Errorf("parse claimID from key: %w, key: %v", err, key)
 			}
 
 			res.Docs = append(res.Docs, &model.Claims{
@@ -95,14 +103,14 @@ func extractClaimsV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead,
 			return nil
 		})
 		if err != nil {
-			return xerrors.Errorf("couldn't iterate over inner map: %x", err)
+			return fmt.Errorf("couldn't iterate over inner map: %w, innerHamtCid: %v", err, innerHamtCid)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		return xerrors.Errorf("couldn't iterate over actorToHamtMap: %x", err)
+		return fmt.Errorf("couldn't iterate over actorToHamtMap: %w, st.Claims: %v", err, st.Claims)
 	}
 
 	return nil

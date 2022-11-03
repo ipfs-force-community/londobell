@@ -27,7 +27,7 @@ func init() {
 }
 
 func extractVerifRegV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg9.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.VerifiedRegistryTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.VerifiedRegistryTicks, ctx, head.Epoch) {
 		return nil
 	}
 

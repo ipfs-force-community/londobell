@@ -1005,6 +1005,12 @@
 	"Info": {
 		"AvailableBalance": "1024",
 		"Balance": "340282591298641078465964189926313473653",
+		"Beneficiary": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+		"BeneficiaryTerm": {
+			"Expiration": 0,
+			"Quota": "340282591298641078465964189926313473653",
+			"UsedQuota": "1024"
+		},
 		"ConsensusFaultElapsed": 0,
 		"ControlAddresses": [
 			"1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq"
@@ -1024,6 +1030,13 @@
 				"base64": "SGVsbG8=",
 				"subType": "00"
 			}
+		},
+		"PendingBeneficiaryTerm": {
+			"ApprovedByBeneficiary": false,
+			"ApprovedByNominee": false,
+			"NewBeneficiary": "073366",
+			"NewExpiration": 0,
+			"NewQuota": "1073741824"
 		},
 		"PendingOwnerAddress": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 		"PendingWorkerKey": {
@@ -1051,7 +1064,7 @@
 
 ```
 {
-	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
 		"CommittedCapacity": 0,
 		"Summaries": [
@@ -1083,7 +1096,7 @@
 
 ```
 {
-	"Addr": "073366",
+	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
 		"ExpectedDayReward": "1024",
 		"InitialConsensusPledge": "340282591298641078465964189926313473653",
@@ -1108,7 +1121,7 @@
 
 ```
 {
-	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 	"Detail": {
 		"Locked": "1073741824",
 		"VestInFuture": [
@@ -1131,10 +1144,10 @@
 
 ```
 {
-	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"Addr": "073366",
 	"Detail": {
 		"Approved": [
-			"073366"
+			"2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q"
 		],
 		"Params": {
 			"$binary": {
@@ -1142,7 +1155,7 @@
 				"subType": "00"
 			}
 		},
-		"To": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+		"To": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 		"TxnID": 0,
 		"Value": "1073741824"
 	},
@@ -1181,7 +1194,7 @@
 
 ```
 {
-	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 	"Detail": {
 		"Cap": "1073741824",
 		"Type": ""

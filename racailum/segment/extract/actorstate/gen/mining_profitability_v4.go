@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/ipfs/go-cid"
 
 	builtin4 "github.com/filecoin-project/specs-actors/v4/actors/builtin"
@@ -37,7 +38,7 @@ func extractMiningProfitabilityV4(ctx *extract.Ctx, res *extract.Res, head *comm
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
 	}
 
-	state, err := vm.DumpActorState(reg.ActorReg, head.Global.Power, blkraw.RawData())
+	state, err := vm.DumpActorState(filcns.NewTipSetExecutor().NewActorRegistry(), head.Global.Power, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 	}

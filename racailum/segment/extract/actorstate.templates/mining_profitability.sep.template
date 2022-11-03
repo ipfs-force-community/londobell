@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/ipfs/go-cid"
 
     {{ if ge .Ver 8 }}
@@ -86,7 +87,7 @@ func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, h
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
 	}
 
-	state, err := vm.DumpActorState(reg.ActorReg, head.Global.Power, blkraw.RawData())
+	state, err := vm.DumpActorState(filcns.NewTipSetExecutor().NewActorRegistry(), head.Global.Power, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 	}
@@ -98,7 +99,11 @@ func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, h
 
 	qaPower := miner{{ .Ver }}.QAPowerForWeight(sectorSize32GiB, 180, big.Zero(), big.Zero())
 
-	storagePledge := miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner{{ .Ver }}.InitialPledgeProjectionPeriod)
+    {{ if ge .Ver 9 -}}
+    storagePledge := miner9.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, miner9.QAPowerMax(sectorSize32GiB), miner9.PreCommitDepositProjectionPeriod)
+	{{- else -}}
+    storagePledge := miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner{{ .Ver }}.InitialPledgeProjectionPeriod)
+    {{- end }}
 	{{ if eq .Ver 0 -}}
 	initPledge := miner{{ .Ver }}.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, pwrState.ThisEpochPledgeCollateral,
 		st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating)

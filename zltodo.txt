@@ -1,7 +1,0 @@
-- IsEmptyState(miner.state)   miner state的构造
-- verified_registry state和方法的改变是否生效？？ 记录新state??
-- 除state外的其他地方替换spec-actors
-- -                       dlInfo := miner8.NewDeadlineInfo(st.CurrentProvingPeriodStart(head.Epoch), dlIdx, head.Epoch).NextNotElapsed()
-  +                       dlInfo := miner8.NewDeadlineInfo(st.ProvingPeriodStart, dlIdx, head.Epoch).NextNotElapsed()    直接用ProvingPeriodStart有问题吗？？
-- 通过num-1获取函数名 不安全或不优美
-- pendingTxns产生id重复

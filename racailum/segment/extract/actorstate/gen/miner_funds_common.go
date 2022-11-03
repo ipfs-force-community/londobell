@@ -76,7 +76,7 @@ func NewTokenAmountArr(length int) []abi.TokenAmount {
 }
 
 func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st interface{}) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerFundsTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerFundsTicks, ctx, head.Epoch) {
 		return nil
 	}
 
@@ -865,7 +865,11 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
-		mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
+		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
+		if err != nil {
+			return fmt.Errorf("get available balance failed: %w", err)
+		}
+
 		mInfo.FeeDebt = st.FeeDebt
 
 		precommitted, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin.DefaultHamtBitwidth)
@@ -879,6 +883,9 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			return nil
 		})
 
+		mInfo.Beneficiary = info.Beneficiary
+		mInfo.BeneficiaryTerm = info.BeneficiaryTerm
+		mInfo.PendingBeneficiaryTerm = info.PendingBeneficiaryTerm
 		mInfo.State = st
 
 	}

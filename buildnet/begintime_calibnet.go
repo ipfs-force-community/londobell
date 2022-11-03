@@ -4,6 +4,6 @@
 package buildnet
 
 const (
-	BeginTime = "2021-06-19T08:00:00+08:00" // calibnet高度0时的时间
+	BeginTime = "2022-11-02T02:13:00+08:00" // calibnet高度0时的时间
 	NetPrefix = "t"
 )

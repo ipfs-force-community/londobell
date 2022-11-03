@@ -6,6 +6,8 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 
+	"github.com/filecoin-project/lotus/build"
+
 	"github.com/filecoin-project/lotus/lib/lotuslog"
 )
 
@@ -19,6 +21,7 @@ func main() {
 		Commands: []*cli.Command{
 			daemonCmd,
 		},
+		Version: build.UserVersion(),
 	}
 
 	app.Setup()

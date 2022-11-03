@@ -53,7 +53,7 @@ func init() {
 var summaryDaysV{{ .Ver }} []abi.ChainEpoch
 
 func extractMinerSectorSummaryV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner{{ .Ver }}.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerSectorSummaryTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerSectorSummaryTicks, ctx, head.Epoch) {
         return nil
     }
 

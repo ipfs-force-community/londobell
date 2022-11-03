@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -38,7 +39,7 @@ func extractMiningProfitabilityV9(ctx *extract.Ctx, res *extract.Res, head *comm
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
 	}
 
-	state, err := vm.DumpActorState(reg.ActorReg, head.Global.Power, blkraw.RawData())
+	state, err := vm.DumpActorState(filcns.NewTipSetExecutor().NewActorRegistry(), head.Global.Power, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 	}
@@ -50,7 +51,7 @@ func extractMiningProfitabilityV9(ctx *extract.Ctx, res *extract.Res, head *comm
 
 	qaPower := miner9.QAPowerForWeight(sectorSize32GiB, 180, big.Zero(), big.Zero())
 
-	storagePledge := miner9.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner9.InitialPledgeProjectionPeriod)
+	storagePledge := miner9.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, miner9.QAPowerMax(sectorSize32GiB), miner9.PreCommitDepositProjectionPeriod)
 	initPledge := miner9.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating)
 
 	// we just ignore the influence of spaceRacePledgeCap here
