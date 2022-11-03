@@ -18,6 +18,7 @@ struct	datacap.BurnFromParams	github.com/filecoin-project/go-state-types/builtin
 struct	datacap.BurnParams	github.com/filecoin-project/go-state-types/builtin/latest/datacap
 struct	datacap.DecreaseAllowanceParams	github.com/filecoin-project/go-state-types/builtin/latest/datacap
 struct	datacap.DestroyParams	github.com/filecoin-project/go-state-types/builtin/latest/datacap
+struct	datacap.GetAllowanceParams	github.com/filecoin-project/go-state-types/builtin/latest/datacap
 struct	datacap.IncreaseAllowanceParams	github.com/filecoin-project/go-state-types/builtin/latest/datacap
 struct	datacap.MintParams	github.com/filecoin-project/go-state-types/builtin/latest/datacap
 struct	datacap.RevokeAllowanceParams	github.com/filecoin-project/go-state-types/builtin/latest/datacap
