@@ -16,7 +16,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
-	"golang.org/x/xerrors"
+	"github.com/multiformats/go-varint"
 )
 
 func init() {
@@ -37,19 +37,22 @@ func extractDatacapBalancesV9(ctx *extract.Ctx, res *extract.Res, head *common.A
 
 	actorToHamtMap, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), st.Token.Balances, int(st.Token.HamtBitWidth))
 	if err != nil {
-		return fmt.Errorf("couldn't get outer map: %x", err)
+		return fmt.Errorf("couldn't get outer map: %w, st.Token.Balances: %v", err, st.Token.Balances)
 	}
 
 	var amount abi.TokenAmount
 	err = actorToHamtMap.ForEach(&amount, func(key string) error {
-		owner, err := abi.ParseUIntKey(key)
+		owner, n, err := varint.FromUvarint([]byte(key))
+		if n != len([]byte(key)) {
+			return fmt.Errorf("could not get varint from address string")
+		}
 		if err != nil {
-			return fmt.Errorf("parse owner from adt.Map key %s: %w", key, err)
+			return err
 		}
 
-		ownerAddr, err := address.NewFromBytes([]byte(key)) // just to generate unique ID
+		ownerAddr, err := address.NewIDAddress(owner) // just to generate unique ID
 		if err != nil {
-			return fmt.Errorf("parse ownerAddr from adt.Map key %s: %w", key, err)
+			return fmt.Errorf("parse ownerAddr from adt.Map key %s: %w, owner: %v", key, err, owner)
 		}
 
 		id, err := GenRegularHeadID(head.Head, ownerAddr, head.Epoch)
@@ -68,7 +71,7 @@ func extractDatacapBalancesV9(ctx *extract.Ctx, res *extract.Res, head *common.A
 	})
 
 	if err != nil {
-		return xerrors.Errorf("couldn't iterate over actorToHamtMap: %x", err)
+		return fmt.Errorf("couldn't iterate over actorToHamtMap: %w, st.Token.Balances: %v", err, st.Token.Balances)
 	}
 
 	return nil
