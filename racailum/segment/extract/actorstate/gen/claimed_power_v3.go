@@ -24,6 +24,9 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("ClaimedPowerV3", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.ClaimedPower
+	}, nil)
 	reg.MustRegisterRegularExtractor("ClaimedPowerV3", extractClaimedPowerV3)
 
 	schema.Register(

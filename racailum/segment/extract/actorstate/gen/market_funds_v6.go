@@ -20,15 +20,16 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("MarketFundsV6", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.MarketFunds
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.MarketFundsTicks
+	})
 	reg.MustRegisterRegularExtractor("MarketFundsV6", extractMarketFundsV6)
 
 }
 
 func extractMarketFundsV6(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market6.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MarketFundsTicks, ctx, head.Epoch) {
-		return nil
-	}
-
 	var detail model.MarketFundsDetail
 	if err := mir.Mirror(&detail, st); err != nil {
 		return fmt.Errorf("mirroring *market.State: %w", err)

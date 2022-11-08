@@ -20,14 +20,16 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("PendingTxnsV5", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.PendingTxns
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.PendingTxnsTicks
+	})
 	reg.MustRegisterRegularExtractor("PendingTxnsV5", extractPendingTxnsV5)
 
 }
 
 func extractPendingTxnsV5(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *multisig5.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.PendingTxnsTicks, ctx, head.Epoch) {
-		return nil
-	}
 
 	pendingTxns, err := adt5.AsMap(ctx.D.ActorStore(ctx.C), st.PendingTxns, builtin5.DefaultHamtBitwidth)
 

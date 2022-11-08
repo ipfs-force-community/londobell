@@ -32,6 +32,9 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("MiningProfitabilityV{{ .Ver }}", func(ctx *extract.Ctx) bool {
+        return ctx.Opts.ZeroHourExtract.MiningProfitability
+    }, nil)
 	reg.MustRegisterRegularExtractor("MiningProfitabilityV{{ .Ver }}", extractMiningProfitabilityV{{ .Ver }})
 
 	{{ if eq .Ver 0 -}}

@@ -20,14 +20,16 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("PendingTxnsV7", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.PendingTxns
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.PendingTxnsTicks
+	})
 	reg.MustRegisterRegularExtractor("PendingTxnsV7", extractPendingTxnsV7)
 
 }
 
 func extractPendingTxnsV7(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *multisig7.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.PendingTxnsTicks, ctx, head.Epoch) {
-		return nil
-	}
 
 	pendingTxns, err := adt7.AsMap(ctx.D.ActorStore(ctx.C), st.PendingTxns, builtin7.DefaultHamtBitwidth)
 

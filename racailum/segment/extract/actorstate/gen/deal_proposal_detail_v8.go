@@ -21,15 +21,16 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("DealProposalDetailedV8", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.DealProposalDetail
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.DealProposalDetailTicks
+	})
 	reg.MustRegisterRegularExtractor("DealProposalDetailedV8", extractDealProposalDetailedV8)
 
 }
 
 func extractDealProposalDetailedV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market8.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalDetailTicks, ctx, head.Epoch) {
-		return nil
-	}
-
 	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
 		return fmt.Errorf("ge regular id: %w", err)

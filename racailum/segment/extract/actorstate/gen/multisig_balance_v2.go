@@ -20,6 +20,9 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("MultisigBalanceV2", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.MultisigBalance
+	}, nil)
 	reg.MustRegisterRegularExtractor("MultisigBalanceV2", extractMultisigBalanceV2)
 
 }

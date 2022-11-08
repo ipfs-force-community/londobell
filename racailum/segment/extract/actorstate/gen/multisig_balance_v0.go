@@ -21,6 +21,9 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("MultisigBalanceV0", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.MultisigBalance
+	}, nil)
 	reg.MustRegisterRegularExtractor("MultisigBalanceV0", extractMultisigBalanceV0)
 
 	schema.Register(

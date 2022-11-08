@@ -25,6 +25,9 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("MiningProfitabilityV5", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.MiningProfitability
+	}, nil)
 	reg.MustRegisterRegularExtractor("MiningProfitabilityV5", extractMiningProfitabilityV5)
 
 }

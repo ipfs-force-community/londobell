@@ -129,30 +129,42 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 
 type ZeroHourExtractOptions struct {
 	ActorBalance        bool
-	DealProposal        bool
-	DealProposalDetail  bool
+	ClaimedPower        bool
+	DealProposalDetail  bool // contain DealProposal
 	DealProposalSummary bool
+	FilSupply           bool
 	MarketFunds         bool
-	MinerDealSector     bool
 	MinerFunds          bool
 	MinerSectorHealth   bool
-	MinerSectorSummary  bool
+	MinerSectorSummary  bool // contain MinerDealSector
+	MiningProfitability bool
+	MultisigBalance     bool
 	PendingTxns         bool
 	VerifiedRegistry    bool
+	Allocation          bool
+	Claims              bool
+	DatacapAllowances   bool
+	DatacapBalances     bool
 }
 
 func defaultZeroHourExtractOptions() ZeroHourExtractOptions {
 	return ZeroHourExtractOptions{
 		ActorBalance:        true,
-		DealProposal:        true,
+		ClaimedPower:        true,
 		DealProposalDetail:  true,
 		DealProposalSummary: true,
+		FilSupply:           true,
 		MarketFunds:         true,
-		MinerDealSector:     true,
 		MinerFunds:          true,
 		MinerSectorHealth:   true,
 		MinerSectorSummary:  true,
+		MiningProfitability: true,
+		MultisigBalance:     true,
 		PendingTxns:         true,
 		VerifiedRegistry:    true,
+		Allocation:          true,
+		Claims:              true,
+		DatacapAllowances:   true,
+		DatacapBalances:     true,
 	}
 }

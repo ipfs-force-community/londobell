@@ -21,15 +21,16 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("DealProposalSummaryV4", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.DealProposalSummary
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.DealProposalSummaryTicks
+	})
 	reg.MustRegisterRegularExtractor("DealProposalSummaryV4", extractDealProposalSummaryV4)
 
 }
 
 func extractDealProposalSummaryV4(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market4.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalSummaryTicks, ctx, head.Epoch) {
-		return nil
-	}
-
 	deals, err := market4.AsDealProposalArray(adt4.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
 	if err != nil {
 		return fmt.Errorf("load deal proposal array: %w", err)

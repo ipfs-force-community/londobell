@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/ipfs/go-cid"
+
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/filecoin-project/lotus/chain/actors"
@@ -15,7 +17,6 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/gen"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-	"github.com/ipfs/go-cid"
 )
 
 var GenRegularHeadID = gen.GenRegularHeadID
@@ -90,6 +91,10 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 
 	if ok && len(exes) > 0 {
 		for ei := range exes {
+			if !exes[ei].PreCheck(ctx, exes[ei].Name, head.Epoch) {
+				continue
+			}
+
 			if err := exes[ei].Method(ctx, res, head, raw); err != nil {
 				return fmt.Errorf("extracting %s: %w", exes[ei].Name, err)
 			}

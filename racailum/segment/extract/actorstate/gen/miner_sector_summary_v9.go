@@ -27,16 +27,17 @@ func init() {
 		summaryDaysV9 = append(summaryDaysV9, abi.ChainEpoch(d))
 	}
 
+	reg.MustRegisterPreCheck("MinerSectorSummaryV9", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.MinerSectorSummary
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.MinerSectorSummaryTicks
+	})
 	reg.MustRegisterRegularExtractor("MinerSectorSummaryV9", extractMinerSectorSummaryV9)
 }
 
 var summaryDaysV9 []abi.ChainEpoch
 
 func extractMinerSectorSummaryV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner9.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerSectorSummaryTicks, ctx, head.Epoch) {
-		return nil
-	}
-
 	if st.Sectors.Equals(emptyMinerStateV9.Sectors) {
 		return nil
 	}

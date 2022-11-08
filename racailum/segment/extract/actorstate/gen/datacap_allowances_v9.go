@@ -23,6 +23,11 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("DatacapAllowancesV9", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.DatacapAllowances
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.DatacapAllowancesTicks
+	})
 	reg.MustRegisterRegularExtractor("DatacapAllowancesV9", extractDatacapAllowancesV9)
 
 	schema.Register(
@@ -34,10 +39,6 @@ func init() {
 }
 
 func extractDatacapAllowancesV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *datacap9.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DatacapAllowancesTicks, ctx, head.Epoch) {
-		return nil
-	}
-
 	actorToHamtMap, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), st.Token.Allowances, int(st.Token.HamtBitWidth))
 	if err != nil {
 		return fmt.Errorf("couldn't get outer map: %w, st.Token.Allowances: %v", err, st.Token.Allowances)

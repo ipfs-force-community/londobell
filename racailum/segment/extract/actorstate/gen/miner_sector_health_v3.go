@@ -19,13 +19,15 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("MinerSectorHealthV3", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.MinerSectorHealth
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.MinerSectorHeathTicks
+	})
 	reg.MustRegisterRegularExtractor("MinerSectorHealthV3", extractMinerSectorHealthV3)
 }
 
 func extractMinerSectorHealthV3(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner3.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerSectorHeathTicks, ctx, head.Epoch) {
-		return nil
-	}
 
 	actStore := ctx.D.ActorStore(ctx.C)
 	deadlines, err := st.LoadDeadlines(actStore)
