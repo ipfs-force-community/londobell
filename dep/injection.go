@@ -14,12 +14,14 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
+	"github.com/filecoin-project/lotus/storage/sealer/storiface"
+
 	"github.com/filecoin-project/lotus/chain/beacon"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/vm"
-	"github.com/filecoin-project/lotus/extern/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -56,28 +58,30 @@ func SegmentManager() dix.Option {
 }
 
 func StateManager() dix.Option {
-	return dix.Options(dix.Override(new(vm.SyscallBuilder), vm.Syscalls(ffiwrapper.ProofVerifier)),
-		dix.Override(new(journal.Journal), journal.NilJournal),
+	return dix.Options(dix.Override(new(vm.SyscallBuilder), vm.Syscalls),
+		dix.Override(new(storiface.Verifier), ffiwrapper.ProofVerifier),
+		dix.Override(new(journal.Journal), modules.OpenFilesystemJournal),
+		dix.Override(new(journal.DisabledEvents), journal.EnvDisabledEvents),
 		dix.Override(new(store.WeightFunc), filcns.Weight),
 		dix.Override(new(*store.ChainStore), modules.ChainStore),
 		dix.Override(new(stmgr.Executor), filcns.NewTipSetExecutor),
 		dix.Override(new(dtypes.DrandSchedule), modules.BuiltinDrandConfig),
-		dix.Override(new(dtypes.AfterGenesisSet), NewAfterGenesisSet),
+		dix.Override(new(dtypes.AfterGenesisSet), modules.SetGenesis),
 		dix.Override(new(beacon.Schedule), modules.RandomSchedule),
-		dix.Override(new(stmgr.UpgradeSchedule), filcns.DefaultUpgradeSchedule),
+		dix.Override(new(stmgr.UpgradeSchedule), modules.UpgradeSchedule),
 		dix.Override(new(*stmgr.StateManager), stmgr.NewStateManager),
 		dix.Override(new(modules.Genesis), modules.LoadGenesis(build.MaybeGenesis())),
-		dix.Override(new(dtypes.ChainBlockstore), dix.From(new(dtypes.HotBlockstore))),
-		dix.Override(new(dtypes.StateBlockstore), dix.From(new(dtypes.HotBlockstore))),
-		dix.Override(new(dtypes.BaseBlockstore), dix.From(new(dtypes.HotBlockstore))),
-		dix.Override(new(dtypes.ExposedBlockstore), dix.From(new(dtypes.HotBlockstore))),
+		dix.Override(new(dtypes.ChainBlockstore), dix.From(new(dtypes.BasicChainBlockstore))),
+		dix.Override(new(dtypes.StateBlockstore), dix.From(new(dtypes.BasicChainBlockstore))),
+		dix.Override(new(dtypes.BaseBlockstore), dix.From(new(dtypes.BasicChainBlockstore))),
+		dix.Override(new(dtypes.ExposedBlockstore), dix.From(new(dtypes.BasicChainBlockstore))),
 		dix.Override(new(common.ChainStore), dix.From(new(*store.ChainStore))),
 		dix.Override(new(common.StateManager), dix.From(new(*stmgr.StateManager))))
 }
 
 func OnlineDataSource() dix.Option {
 	return dix.Options(
-		dix.Override(new(dtypes.HotBlockstore), ChainIOBlockstore),
+		dix.Override(new(dtypes.BasicChainBlockstore), ChainIOBlockstore),
 		dix.Override(new(repo.Repo), repo.NewMemory(nil)),
 		dix.Override(new(repo.LockedRepo), LockedRepo),
 		dix.Override(new(dtypes.MetadataDS), InMemMetadataDS))
@@ -88,7 +92,7 @@ func OfflineDataSource() dix.Option {
 		// Notice: we may need to use other datastore someday. It depends on
 		// the origin data structs.
 		dix.Override(new(dtypes.AfterGenesisSet), modules.SetGenesis),
-		dix.Override(new(dtypes.HotBlockstore), modules.UniversalBlockstore),
+		dix.Override(new(dtypes.BasicChainBlockstore), modules.UniversalBlockstore),
 		dix.Override(new(dtypes.MetadataDS), modules.Datastore(true)),
 	)
 }
