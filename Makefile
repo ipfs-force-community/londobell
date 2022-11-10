@@ -63,6 +63,11 @@ build-bell-butterfly: $(BUILD_DEPS)
 	rm -rf ./bell
 	go build $(GOFLAGS) -o bell ./cmd/bell
 
+build-bell-wallaby: GOFLAGS+=-tags=wallabynet
+build-bell-wallaby: $(BUILD_DEPS)
+	rm -rf ./bell
+	go build $(GOFLAGS) -o bell ./cmd/bell
+
 dist-clean:
 	git clean -xdff
 	git submodule deinit --all -f

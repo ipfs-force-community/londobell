@@ -8,12 +8,13 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/chain/actors"
-	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
-	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
 	"github.com/ipfs/go-cid"
+
+	"github.com/filecoin-project/lotus/chain/actors"
+	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 )
 
 type ActorSet struct {
@@ -86,74 +87,10 @@ func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to strin
 
 func GetBuiltinActorCodeID(av actors.Version, actorName string) (cid.Cid, error) {
 	//GetBuiltinActorsKeys
-	switch actorName {
-	case actors.AccountKey:
-		code, err := lbuiltin.GetAccountActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.CronKey:
-		code, err := lbuiltin.GetCronActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.InitKey:
-		code, err := lbuiltin.GetInitActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.MarketKey:
-		code, err := lbuiltin.GetMarketActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.MinerKey:
-		code, err := lbuiltin.GetMinerActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.MultisigKey:
-		code, err := lbuiltin.GetMultisigActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.PaychKey:
-		code, err := lbuiltin.GetPaymentChannelActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.PowerKey:
-		code, err := lbuiltin.GetPowerActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.RewardKey:
-		code, err := lbuiltin.GetRewardActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.SystemKey:
-		code, err := lbuiltin.GetSystemActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	case actors.VerifregKey:
-		code, err := lbuiltin.GetVerifregActorCodeID(av)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return code, nil
-	default:
-		return cid.Undef, fmt.Errorf("unknow actor name: %v", actorName)
+	actcid, ok := actors.GetActorCodeID(av, actors.AccountKey)
+	if !ok {
+		return cid.Undef, fmt.Errorf("invalid actor")
 	}
+
+	return actcid, nil
 }
