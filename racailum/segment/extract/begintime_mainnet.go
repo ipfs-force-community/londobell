@@ -1,5 +1,5 @@
-//go:build !calibnet && !wallaby
-// +build !calibnet,!wallaby
+//go:build !calibnet && !wallabynet
+// +build !calibnet,!wallabynet
 
 package extract
 

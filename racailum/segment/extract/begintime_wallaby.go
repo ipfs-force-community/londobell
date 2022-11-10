@@ -1,5 +1,5 @@
-//go:build wallaby
-// +build wallaby
+//go:build wallabynet
+// +build wallabynet
 
 package extract
 
