@@ -2,9 +2,19 @@ package actorstate
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 
 	"github.com/filecoin-project/go-state-types/cbor"
+	exported0 "github.com/filecoin-project/specs-actors/actors/builtin/exported"
+	"github.com/filecoin-project/specs-actors/actors/runtime"
+	exported2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/exported"
+	exported3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/exported"
+	exported4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/exported"
+	exported5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/exported"
+	exported6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/exported"
+	exported7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/exported"
+	exported8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/exported"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/gen"
@@ -12,10 +22,29 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs/go-cid"
 
+	"github.com/filecoin-project/lotus/chain/vm"
+
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
-	"github.com/filecoin-project/lotus/chain/vm"
+	"github.com/filecoin-project/lotus/chain/types"
 )
+
+var builtinActorsCode = make([]cid.Cid, 0)
+
+func init() {
+	builtinActors := make([]runtime.VMActor, 0)
+	builtinActors = append(builtinActors, exported0.BuiltinActors()...)
+	builtinActors = append(builtinActors, exported2.BuiltinActors()...)
+	builtinActors = append(builtinActors, exported3.BuiltinActors()...)
+	builtinActors = append(builtinActors, exported4.BuiltinActors()...)
+	builtinActors = append(builtinActors, exported5.BuiltinActors()...)
+	builtinActors = append(builtinActors, exported6.BuiltinActors()...)
+	builtinActors = append(builtinActors, exported7.BuiltinActors()...)
+	builtinActors = append(builtinActors, exported8.BuiltinActors()...)
+	for _, actor := range builtinActors {
+		builtinActorsCode = append(builtinActorsCode, actor.Code())
+	}
+}
 
 var GenRegularHeadID = gen.GenRegularHeadID
 
@@ -50,6 +79,13 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 
 	var realCode cid.Cid
 	if actorVersion >= actors.Version8 {
+		if actor.Code.String() == "bafk2bzacedwuvyzfaaf6vpxx4lhervvs4qs4ukfqitjxikeemzpec3lbqu5ba" ||
+			actor.Code.String() == "bafk2bzacecau3tohdilfx66pohfqdrngpuqd5oew2j5iv3c7sjlrkcm5npqos" ||
+			actor.Code.String() == "bafk2bzacedzg2dsdry6cy5nzfldtqatuopljgdxt5hxdwn2gmuj3fk566bndg" {
+			fmt.Println("actor.Code.String():", actor.Code.String())
+		}
+
+		// todo: 自定义actor
 		name := actors.CanonicalName(builtin.ActorNameByCode(head.Code))
 
 		var ok bool
@@ -59,10 +95,24 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 		}
 	}
 
-	state, err := vm.DumpActorState(reg.ActorReg, actor, blkraw.RawData())
-	if err != nil {
-		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
-
+	var state interface{}
+	// 非内置actor  actor->state
+	if !IsBuiltinActors(actor) {
+		// todo: 自定义？？
+		if IsCustomActors(actor) {
+			// need users to registry
+			log.Printf("custom actor skip... actor.Code: %v\n", actor.Code)
+		} else {
+			state, err = reg.DumpExternalActorState(reg.NewExternalActorRegistry(), actor, blkraw.RawData())
+			if err != nil {
+				return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
+			}
+		}
+	} else {
+		state, err = vm.DumpActorState(reg.ActorReg, actor, blkraw.RawData())
+		if err != nil {
+			return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
+		}
 	}
 
 	if gen.IsEmptyState(state) {
@@ -96,4 +146,31 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 	}
 
 	return nil
+}
+
+func getrealcode(code cid.Cid) cid.Cid {
+	fmt.Println(code)
+	name := actors.CanonicalName(builtin.ActorNameByCode(code))
+
+	var ok bool
+	realCode, ok := actors.GetActorCodeID(actors.Version8, name)
+	if ok {
+		return realCode
+	}
+	return code
+}
+
+func IsBuiltinActors(actor *types.Actor) bool {
+	for _, code := range builtinActorsCode {
+		if actor.Code == code {
+			return true
+		}
+	}
+
+	return false
+}
+
+func IsCustomActors(actor *types.Actor) bool {
+	_, _, ok := actors.GetActorMetaByCode(actor.Code)
+	return !ok
 }
