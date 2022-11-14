@@ -30,29 +30,32 @@ type ActorStateDetail cbor.Er
 // NewActorState converts raw to ActorStateFromRaw
 func NewActorState(head *common.ActorHead, raw cbor.Er) (*ActorState, error) {
 	return &ActorState{
-		Head:    head.Head,
-		Addr:    head.Addr,
-		Code:    builtin.ActorNameByCode(head.Code),
-		Balance: head.Balance,
-		Epoch:   head.Epoch,
-		Detail:  raw,
+		Head:     head.Head,
+		Addr:     head.Addr,
+		CodeName: builtin.ActorNameByCode(head.Code),
+		Code:     head.Code,
+		Balance:  head.Balance,
+		Epoch:    head.Epoch,
+		Detail:   raw,
 	}, nil
 }
 
 // ActorState is the schema of actor states
 type ActorState struct {
-	Head    cid.Cid `mir:"-" bson:"_id"`
-	Addr    address.Address
-	Code    string
-	Balance types.BigInt
-	Epoch   abi.ChainEpoch
-	Detail  ActorStateDetail
+	Head     cid.Cid `mir:"-" bson:"_id"`
+	Addr     address.Address
+	CodeName string
+	Code     cid.Cid
+	Balance  types.BigInt
+	Epoch    abi.ChainEpoch
+	Detail   ActorStateDetail
 }
 
 // Indexes impl common.Indexed
 func (a *ActorState) Indexes() [][]string {
 	return [][]string{
 		[]string{actorStateEpochField, "Code", "Addr"},
+		[]string{actorStateEpochField, "CodeName", "Addr"},
 	}
 }
 

@@ -102,7 +102,7 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 	var state interface{}
 	// 非内置actor  actor->state
 	if !IsBuiltinActors(actors.CanonicalName(builtin.ActorNameByCode(head.Code))) {
-		// todo: 自定义？？
+		// todo: 自定义？？  actor code, methods, state
 		if IsCustomActors(actor) {
 			// need users to registry
 			log.Printf("custom actor skip... actor.Code: %v\n", actor.Code)
