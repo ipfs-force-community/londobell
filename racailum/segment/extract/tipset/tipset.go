@@ -338,7 +338,22 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 		if ctx.Opts.EnabelExtract.EnableExtractMessage {
 			if _, has := dupmsgs[mcid]; !has {
-				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
+				var (
+					mmsg *model.Message
+					err  error
+				)
+
+				// todo: 自定义
+				if mi.IsEmpty() {
+					mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
+				} else {
+					if mi.IsParamsImplemetsCbor() {
+						mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
+					} else {
+						mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, nil, ts.Height())
+					}
+				}
+
 				if err != nil {
 					elog.Errorw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 				} else {
@@ -350,7 +365,21 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractExecTrace {
-			met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas)
+			var (
+				met *model.ExecTrace
+				err error
+			)
+
+			if mi.IsEmpty() {
+				met, _, err = model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, nil, p.gas)
+			} else {
+				if mi.IsParamsImplemetsCbor() {
+					met, _, err = model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas)
+				} else {
+					met, _, err = model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, nil, p.gas)
+				}
+			}
+
 			if err != nil {
 				elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {

@@ -39,3 +39,23 @@ func (mi *MethodInfo) ReturnObj() cbor.Er {
 
 	return reflect.New(mi.Method.Ret.Elem()).Interface().(cbor.Er)
 }
+
+func (mi *MethodInfo) IsParamsImplemetsCbor() bool {
+	if mi.Method.Params == nil {
+		return true
+	}
+
+	return mi.Method.Params.Implements(reflect.TypeOf((*cbor.Er)(nil)).Elem())
+}
+
+func (mi *MethodInfo) IsRetImplemetsCbor() bool {
+	if mi.Method.Ret == nil {
+		return true
+	}
+
+	return mi.Method.Ret.Implements(reflect.TypeOf((*cbor.Er)(nil)).Elem())
+}
+
+func (mi MethodInfo) IsEmpty() bool {
+	return mi == MethodInfo{}
+}

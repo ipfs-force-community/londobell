@@ -3,8 +3,10 @@ package actorstate
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
+	scbor "github.com/filecoin-project/go-state-types/cbor"
 	"github.com/filecoin-project/specs-actors/v8/actors/builtin"
 	evm8 "github.com/ipfs-force-community/custom-actors-parsing/external/v8/evm"
 	"github.com/ipfs-force-community/londobell/testutils"
@@ -67,4 +69,16 @@ func PutState(t *testing.T) {
 		fmt.Println(err)
 	}
 	fmt.Println(h1, h2)
+}
+
+func TestImplementCbor(t *testing.T) {
+	state := &evm8.State{
+		ByteCode:      cid.Undef,
+		ContractState: cid.Undef,
+		Nonce:         1,
+	}
+
+	st := reflect.TypeOf(state)
+	fmt.Println(st)
+	fmt.Println(st.Implements(reflect.TypeOf((*scbor.Er)(nil)).Elem()))
 }
