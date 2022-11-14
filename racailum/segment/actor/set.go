@@ -197,13 +197,14 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 			// need users to registry
 			log.Warnf("LookupMethodInfo custom actor skip... actor.Code: %v\n", code)
 			return MethodInfo{}, nil // todo: 暂时跳过
-		} else {
-			vma := NewExternalActorRegistry()
-			mi, ok = vma.Methods[code][call.Method]
-			if !ok {
-				return MethodInfo{}, fmt.Errorf("%w: lookup method for from=%s, to=%s, code=%s, meth=%d", ErrActorMethodNotFound, call.From, call.To, code, call.Method)
-			}
 		}
+
+		vma := NewExternalActorRegistry()
+		mi, ok = vma.Methods[code][call.Method]
+		if !ok {
+			return MethodInfo{}, fmt.Errorf("%w: lookup method for from=%s, to=%s, code=%s, meth=%d", ErrActorMethodNotFound, call.From, call.To, code, call.Method)
+		}
+
 	} else {
 		if actorVersion >= actors.Version8 {
 			vma := NewActorV8Registry()
