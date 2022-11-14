@@ -79,11 +79,6 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 
 	var realCode cid.Cid
 	if actorVersion >= actors.Version8 {
-		if actor.Code.String() == "bafk2bzacedwuvyzfaaf6vpxx4lhervvs4qs4ukfqitjxikeemzpec3lbqu5ba" ||
-			actor.Code.String() == "bafk2bzacecau3tohdilfx66pohfqdrngpuqd5oew2j5iv3c7sjlrkcm5npqos" ||
-			actor.Code.String() == "bafk2bzacedzg2dsdry6cy5nzfldtqatuopljgdxt5hxdwn2gmuj3fk566bndg" {
-			fmt.Println("actor.Code.String():", actor.Code.String())
-		}
 
 		// todo: 自定义actor
 		name := actors.CanonicalName(builtin.ActorNameByCode(head.Code))

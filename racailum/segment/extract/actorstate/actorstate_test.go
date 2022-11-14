@@ -47,15 +47,15 @@ func TestPutState(t *testing.T) {
 	cs := cbor.NewCborStore(localBS)
 	require.NoError(t, err)
 	s1 := &evm8.State{
-		ByteCode,
-		ContractState,
-		Nonce,
+		ByteCode:      ByteCode,
+		ContractState: ContractState,
+		Nonce:         Nonce,
 	}
 
 	s2 := &evm8.State{
-		ByteCode,
-		ContractState,
-		Nonce,
+		ByteCode:      ByteCode,
+		ContractState: ContractState,
+		Nonce:         Nonce,
 	}
 
 	h1, err := cs.Put(ctx, s1)
