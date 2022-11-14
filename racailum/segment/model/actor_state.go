@@ -32,7 +32,7 @@ type ActorStateDetail cbor.Er
 // NewActorState converts raw to ActorStateFromRaw
 func NewActorState(head *common.ActorHead, raw cbor.Er) (*ActorState, error) {
 	return &ActorState{
-		ID:       fmt.Sprintf("%v-%v", head, head.Addr),
+		ID:       fmt.Sprintf("%v-%v", head.Head, head.Addr),
 		Head:     head.Head,
 		Addr:     head.Addr,
 		CodeName: builtin.ActorNameByCode(head.Code),
