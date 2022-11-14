@@ -19,7 +19,8 @@
 {
 	"Addr": "address.Address",
 	"Balance": "big.Int",
-	"Code": "string",
+	"Code": "cid.Cid",
+	"CodeName": "string",
 	"Detail": "model.ActorStateDetail",
 	"Epoch": "abi.ChainEpoch",
 	"_id": "cid.Cid"
