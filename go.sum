@@ -763,6 +763,10 @@ github.com/ipfs-force-community/custom-actors-parsing v0.0.0-20221111071353-63d4
 github.com/ipfs-force-community/custom-actors-parsing v0.0.0-20221111071353-63d47f7610ef/go.mod h1:I1sn8O5v3LP3fTvMuqgjgqKmxHrVe+IOg1cX5kE0QC0=
 github.com/ipfs-force-community/custom-actors-parsing v0.0.0-20221114020128-9d59dc0f0913 h1:9vsVSagzgzEne0c6suaEBA4vIzBUxBSoG1L0Y3c6jiw=
 github.com/ipfs-force-community/custom-actors-parsing v0.0.0-20221114020128-9d59dc0f0913/go.mod h1:MNAtmYTmolMtFz0xvt4pBnL8txWC2r08a3UU8tQm1UA=
+github.com/ipfs-force-community/custom-actors-parsing v0.0.0-20221114030340-9773a5c4dc83 h1:JVzbMLHhO0zmkybXSnr24xzbDw+LDBHHEToaqeuFUlk=
+github.com/ipfs-force-community/custom-actors-parsing v0.0.0-20221114030340-9773a5c4dc83/go.mod h1:MNAtmYTmolMtFz0xvt4pBnL8txWC2r08a3UU8tQm1UA=
+github.com/ipfs-force-community/custom-actors-parsing v0.0.0-20221114030632-38260bcb5bcc h1:8lNC7iWeDWDkcl2fSCHR4GO/BdwtGShu/VweZNH/L04=
+github.com/ipfs-force-community/custom-actors-parsing v0.0.0-20221114030632-38260bcb5bcc/go.mod h1:MNAtmYTmolMtFz0xvt4pBnL8txWC2r08a3UU8tQm1UA=
 github.com/ipfs-force-community/londobell-aggregators v0.0.0-20221012060821-d8b791518143 h1:qboVJDG322ckEK8gCGvIoq6V4fOJD2fAdFld9O63VyA=
 github.com/ipfs-force-community/londobell-aggregators v0.0.0-20221012060821-d8b791518143/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
 github.com/ipfs/bbloom v0.0.1/go.mod h1:oqo8CVWsJFMOZqTglBG4wydCE4IQA/G2/SEofB0rjUI=

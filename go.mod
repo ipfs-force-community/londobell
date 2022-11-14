@@ -158,7 +158,7 @@ require (
 	github.com/holiman/uint256 v1.2.1 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
 	github.com/icza/backscanner v0.0.0-20210726202459-ac2ffc679f94 // indirect
-	github.com/ipfs-force-community/custom-actors-parsing v0.0.0-20221114020128-9d59dc0f0913 // indirect
+	github.com/ipfs-force-community/custom-actors-parsing v0.0.0-20221114030632-38260bcb5bcc // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.0.0 // indirect
 	github.com/ipfs/go-bitswap v0.6.0 // indirect

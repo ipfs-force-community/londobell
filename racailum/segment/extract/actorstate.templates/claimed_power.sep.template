@@ -7,11 +7,17 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 
+    {{ if ge .Ver 8 }}
+    builtin{{ .Ver }} "github.com/ipfs-force-community/custom-actors-parsing/external"
+    power{{ .Ver }} "github.com/ipfs-force-community/custom-actors-parsing/external/v8/power"
+    adt{{ .Ver }} "github.com/ipfs-force-community/custom-actors-parsing/external/v8/util/adt"
+    {{ else }}
 	{{ if gt .Ver 2 }}
 	builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
 	{{ end }}
 	power{{ .Ver }} "{{ .ImportPath }}/actors/builtin/power"
 	adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+	{{ end }}
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
