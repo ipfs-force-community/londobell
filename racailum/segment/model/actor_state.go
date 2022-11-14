@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/cbor"
@@ -30,6 +32,7 @@ type ActorStateDetail cbor.Er
 // NewActorState converts raw to ActorStateFromRaw
 func NewActorState(head *common.ActorHead, raw cbor.Er) (*ActorState, error) {
 	return &ActorState{
+		ID:       fmt.Sprintf("%v-%v", head, head.Addr),
 		Head:     head.Head,
 		Addr:     head.Addr,
 		CodeName: builtin.ActorNameByCode(head.Code),
@@ -42,7 +45,8 @@ func NewActorState(head *common.ActorHead, raw cbor.Er) (*ActorState, error) {
 
 // ActorState is the schema of actor states
 type ActorState struct {
-	Head     cid.Cid `mir:"-" bson:"_id"`
+	ID       string  `mir:"-" bson:"_id"`
+	Head     cid.Cid `mir:"-"`
 	Addr     address.Address
 	CodeName string
 	Code     cid.Cid
