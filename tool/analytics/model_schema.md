@@ -23,7 +23,8 @@
 	"CodeName": "string",
 	"Detail": "model.ActorStateDetail",
 	"Epoch": "abi.ChainEpoch",
-	"_id": "cid.Cid"
+	"Head": "cid.Cid",
+	"_id": "string"
 }
 ```
 

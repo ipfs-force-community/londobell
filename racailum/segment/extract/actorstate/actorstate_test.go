@@ -37,7 +37,7 @@ func TestMarketCodeEqual(t *testing.T) {
 	fmt.Println(mcode8)
 }
 
-func TestPutState(t *testing.T) {
+func PutState(t *testing.T) {
 	ByteCode, _ := cid.Decode("bafk2bzacebdfozypqvzidx6owdew5iotx5qlx6kbuuopruburupx3jjxjrymc")
 	ContractState, _ := cid.Decode("bafy2bzaceco5nbg5npqgmqcxmuj3sdv7kqxci5mscjhys6rtcg2qhlzzbto2e")
 	var Nonce uint64 = 1
