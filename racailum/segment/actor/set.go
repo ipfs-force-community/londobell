@@ -284,14 +284,14 @@ func GetBuiltinActorsKeys() []string {
 	}
 }
 
-func NewExternalActorRegistry() *ActorRegistry {
+func NewExternalActorRegistry() *Registry {
 	inv := NewActorRegistry()
 	Register(inv, actors.Version8, ActorsVersionPredicate(actors.Version8), MakeRegistry(actors.Version8))
 
 	return inv
 }
 
-func NewActorV8Registry() *ActorRegistry {
+func NewActorV8Registry() *Registry {
 	inv := NewActorRegistry()
 
 	Register(inv, actors.Version8, ActorsVersionPredicate(actors.Version8), MakeBuiltinRegistry(actors.Version8))
@@ -308,7 +308,7 @@ func IsEam(c cid.Cid) bool {
 	return false
 }
 
-func DumpExternalActorState(i *ActorRegistry, act *types.Actor, b []byte) (interface{}, error) {
+func DumpExternalActorState(i *Registry, act *types.Actor, b []byte) (interface{}, error) {
 	if IsEam(act.Code) || lbuiltin.IsEmbryo(act.Code) {
 		return nil, nil
 	}
@@ -328,22 +328,22 @@ func DumpExternalActorState(i *ActorRegistry, act *types.Actor, b []byte) (inter
 
 type invokeFunc func(rt runtime.Runtime, params []byte) ([]byte, aerrors.ActorError)
 type nativeCode map[uint64]invokeFunc
-type ActorPredicate func(runtime.Runtime, cid.Cid) error
+type Predicate func(runtime.Runtime, cid.Cid) error
 
 type actorInfo struct {
 	methods nativeCode
 	vmActor RegistryEntry
 	// TODO: consider making this a network version range?
-	predicate ActorPredicate
+	predicate Predicate
 }
 
-type ActorRegistry struct {
+type Registry struct {
 	actors map[cid.Cid]*actorInfo
 
 	Methods map[cid.Cid]map[abi.MethodNum]vm.MethodMeta
 }
 
-func ActorsVersionPredicate(ver actors.Version) ActorPredicate {
+func ActorsVersionPredicate(ver actors.Version) Predicate {
 	return func(rt runtime.Runtime, codeCid cid.Cid) error {
 		aver, err := actors.VersionForNetwork(rt.NetworkVersion())
 		if err != nil {
@@ -356,14 +356,14 @@ func ActorsVersionPredicate(ver actors.Version) ActorPredicate {
 	}
 }
 
-func NewActorRegistry() *ActorRegistry {
-	return &ActorRegistry{
+func NewActorRegistry() *Registry {
+	return &Registry{
 		actors:  make(map[cid.Cid]*actorInfo),
 		Methods: map[cid.Cid]map[abi.MethodNum]vm.MethodMeta{},
 	}
 }
 
-func Register(ar *ActorRegistry, av actors.Version, pred ActorPredicate, vmactors []RegistryEntry) {
+func Register(ar *Registry, av actors.Version, pred Predicate, vmactors []RegistryEntry) {
 	if pred == nil {
 		pred = func(runtime.Runtime, cid.Cid) error { return nil }
 	}
