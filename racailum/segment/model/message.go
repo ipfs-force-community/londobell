@@ -2,11 +2,15 @@ package model
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/ipfs/go-cid"
+	cbg "github.com/whyrusleeping/cbor-gen"
 
 	"github.com/filecoin-project/lotus/chain/types"
 
@@ -90,7 +94,52 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, p
 		msg.Detail.Params = params
 	}
 
+	if len(raw.Params) > 0 {
+		if meth == "InvokeContract" && strings.Contains(act, "evm") {
+			// parse contract method
+			hexParams, err := hexEncodeParams(raw.Params)
+			if err != nil {
+				return nil, fmt.Errorf("hex encode params failed: %w", err)
+			}
+
+			// the first 4 bytes is method ID
+			if len(hexParams) < 8 {
+				return nil, fmt.Errorf("invalid length of params %v for InvokeContract", len(hexParams))
+			}
+			if (len(hexParams)-8)%64 != 0 {
+				return nil, fmt.Errorf("invalid length of params %v for InvokeContract", len(hexParams))
+			}
+
+			//methodID := hexParams[:8]
+			//params := hexParams[8:]
+			// methodID has been recorded
+			msg.Detail.Params = hexString(hexParams)
+		}
+
+	}
+
 	msg.Detail.PackedHeight = epoch
 
 	return msg, nil
+}
+
+type hexString string
+
+func (h hexString) MarshalCBOR(w io.Writer) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (h hexString) UnmarshalCBOR(r io.Reader) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func hexEncodeParams(params []byte) (string, error) {
+	buffer := bytes.NewBuffer(params)
+	hexParams, err := cbg.ReadByteArray(buffer, 1024)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hexParams), nil
 }
