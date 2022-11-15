@@ -373,7 +373,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			if mi.IsEmpty() {
 				met, _, err = model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, nil, p.gas)
 			} else {
-				if mi.IsParamsImplemetsCbor() {
+				if mi.IsRetImplemetsCbor() {
 					met, _, err = model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas)
 				} else {
 					met, _, err = model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, nil, p.gas)

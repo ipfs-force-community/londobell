@@ -192,7 +192,7 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 		mi vm.MethodMeta
 		ok bool
 	)
-	if !IsBuiltinActors(actorName) {
+	if !IsBuiltinActors(actors.CanonicalName(actorName)) {
 		if IsCustomActors(code) {
 			// need users to registry
 			log.Warnf("LookupMethodInfo custom actor skip... actor.Code: %v\n", code)
