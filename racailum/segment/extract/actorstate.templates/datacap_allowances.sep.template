@@ -22,12 +22,14 @@ import (
 func init() {
 	reg.MustRegisterRegularExtractor("DatacapAllowancesV{{ .Ver }}", extractDatacapAllowancesV{{ .Ver }})
 
+    {{ if eq .Ver 9 -}}
 	schema.Register(
 		schema.Model{
 			Name: "datacap-allowances",
 			D:    &model.DatacapAllowances{},
 		},
 	)
+	{{ end -}}
 }
 
 func extractDatacapAllowancesV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *datacap{{ .Ver }}.State) error {

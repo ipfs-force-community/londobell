@@ -23,12 +23,14 @@ import (
 func init() {
 	reg.MustRegisterRegularExtractor("ClaimsV{{ .Ver }}", extractClaimsV{{ .Ver }})
 
+    {{ if eq .Ver 9 -}}
 	schema.Register(
 		schema.Model{
 			Name: "claims",
 			D:    &model.Claims{},
 		},
 	)
+	{{ end -}}
 }
 
 func extractClaimsV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg{{ .Ver }}.State) error {
