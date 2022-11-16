@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	cbg "github.com/whyrusleeping/cbor-gen"
+	"golang.org/x/crypto/sha3"
 )
 
 func TestHexEncodeParams(t *testing.T) {
@@ -35,4 +39,54 @@ func TestHexEncodeParams(t *testing.T) {
 		return
 	}
 	fmt.Println(hex.EncodeToString(enParams))
+}
+
+func TestGetStringsIndex(t *testing.T) {
+	s := "withdraw(address token, uint256 amount, address destination)"
+	a := strings.Index(s, "(")
+	b := strings.Index(s, ")")
+	fmt.Println(a, b)
+
+	type params struct {
+		Type string
+		Name string
+	}
+
+	s1 := s[9:59]
+	fmt.Println("s1:", s1)
+	s2 := strings.Split(s1, ",")
+	fmt.Println("s2:", s2)
+	m := make([]params, 0)
+	for i := range s2 {
+		s := s2[i]
+		s = strings.TrimSpace(s)
+		s3 := strings.Split(s, " ")
+		fmt.Println("s3:", s3)
+		m = append(m, params{s3[0], s3[1]})
+	}
+
+	fmt.Println(m)
+}
+
+func TestKeccak256Hash(t *testing.T) {
+	hasher := sha3.NewLegacyKeccak256()
+	hasher.Write([]byte("balanceOf(address)"))
+	hash := hexutil.Encode(hasher.Sum(nil)[:])
+	fmt.Println(hash)
+}
+
+const (
+	balanceOf   = "balanceOf(address account)"
+	totalSupply = "totalSupply()"
+	withdraw    = "withdraw(address token, uint256 amount, address destination)"
+)
+
+func TestSearchConstractMethod(t *testing.T) {
+	functionList := []string{balanceOf, totalSupply, withdraw}
+
+	if err := model.RegistryConstractMethods(functionList); err != nil {
+		panic(err)
+	}
+
+	fmt.Println(model.SearchConstractMethod("0x70a08231"))
 }

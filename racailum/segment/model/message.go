@@ -2,7 +2,7 @@ package model
 
 import (
 	"bytes"
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -10,7 +10,6 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/ipfs/go-cid"
-	cbg "github.com/whyrusleeping/cbor-gen"
 
 	"github.com/filecoin-project/lotus/chain/types"
 
@@ -97,7 +96,7 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, p
 	if len(raw.Params) > 0 {
 		if meth == "InvokeContract" && strings.Contains(act, "evm") {
 			// parse contract method
-			hexParams, err := hexEncodeParams(raw.Params)
+			hexParams, err := hexEncodeByteArray(raw.Params)
 			if err != nil {
 				return nil, fmt.Errorf("hex encode params failed: %w", err)
 			}
@@ -110,12 +109,28 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, p
 				return nil, fmt.Errorf("invalid length of params %v for InvokeContract", len(hexParams))
 			}
 
-			//methodID := hexParams[:8]
-			//params := hexParams[8:]
+			methodID := hexParams[:8]
+			datas := hexParams[8:]
 			// methodID has been recorded
-			msg.Detail.Params = hexString(hexParams)
-		}
+			inputData, ok := SearchConstractMethod(methodID)
+			if ok {
+				index := 0
+				if len(datas)%len(inputData.Params) != 64 {
+					return nil, fmt.Errorf("datas dont correspond to params, datas %v, params: %v", datas, inputData.Params)
+				}
 
+				for _, param := range inputData.Params {
+					if param.Type == "address" {
+						param.Data = fmt.Sprintf("%s%s", "0x", datas[index:index+64])
+					}
+					param.Data = datas[index : index+64]
+					index += index + 64
+				}
+			}
+
+			input, err := json.Marshal(inputData)
+			msg.Detail.Params = hexString(input)
+		}
 	}
 
 	msg.Detail.PackedHeight = epoch
@@ -133,13 +148,4 @@ func (h hexString) MarshalCBOR(w io.Writer) error {
 func (h hexString) UnmarshalCBOR(r io.Reader) error {
 	//TODO implement me
 	panic("implement me")
-}
-
-func hexEncodeParams(params []byte) (string, error) {
-	buffer := bytes.NewBuffer(params)
-	hexParams, err := cbg.ReadByteArray(buffer, 1024)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(hexParams), nil
 }
