@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/dtynn/dix"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
@@ -97,4 +98,23 @@ func GetBuiltinActorCodeID(av actorstypes.Version, actorName string) (cid.Cid, e
 	}
 
 	return codeIDs[actorName], nil
+}
+
+type StopFuncMap struct {
+	sync.RWMutex
+	stop map[string]dix.StopFunc
+}
+
+var stopFuncMap = &StopFuncMap{stop: make(map[string]dix.StopFunc)}
+
+func RegistryStopFuncMap(url string, stopFunc dix.StopFunc) {
+	stopFuncMap.Lock()
+	stopFuncMap.stop[url] = stopFunc
+	stopFuncMap.Unlock()
+}
+
+func GetStopFuncByUrl(url string) dix.StopFunc {
+	stopFuncMap.RLock()
+	defer stopFuncMap.RUnlock()
+	return stopFuncMap.stop[url]
 }
