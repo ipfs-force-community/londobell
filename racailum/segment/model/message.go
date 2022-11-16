@@ -112,7 +112,7 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, p
 			methodID := hexParams[:8]
 			datas := hexParams[8:]
 			// methodID has been recorded
-			inputData, ok := SearchConstractMethod(methodID)
+			inputData, ok := SearchConstractMethod(fmt.Sprintf("%s%s", "0x", methodID))
 			if ok {
 				index := 0
 				if len(datas)%len(inputData.Params) != 64 {
@@ -126,14 +126,17 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, p
 					param.Data = datas[index : index+64]
 					index += index + 64
 				}
-			}
 
-			input, err := json.Marshal(inputData)
-			if err != nil {
-				return nil, err
-			}
+				// replace Detail.Params
+				input, err := json.Marshal(inputData)
+				if err != nil {
+					return nil, err
+				}
 
-			msg.Detail.Params = hexString(input)
+				msg.Detail.Params = hexString(input)
+			} else {
+				msg.Detail.Params = hexString(hexParams)
+			}
 		}
 	}
 
