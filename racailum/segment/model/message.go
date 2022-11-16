@@ -129,6 +129,10 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, p
 			}
 
 			input, err := json.Marshal(inputData)
+			if err != nil {
+				return nil, err
+			}
+
 			msg.Detail.Params = hexString(input)
 		}
 	}

@@ -165,7 +165,6 @@ func getMethodID(function string) (string, error) {
 	}
 
 	return hash[:10], nil
-	return "", nil
 }
 
 func getConstractParams(function string) ([]ConstractParams, error) {
