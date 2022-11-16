@@ -76,6 +76,7 @@ var MethodsRegistry = struct {
 //totalSupply(): 18160ddd
 //transfer(address, uint256): 9d61d234
 //load(): 86d5c4be
+//withdraw(address,uint256,address): 69328dec
 
 // get from db
 const (
@@ -154,7 +155,7 @@ func getMethodID(function string) (string, error) {
 	}
 
 	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write([]byte("balanceOf(address)"))
+	hasher.Write(buffer.Bytes())
 	hash := hexutil.Encode(hasher.Sum(nil)[:])
 
 	if !strings.HasPrefix(hash, "0x") {
@@ -196,6 +197,13 @@ func getConstractParams(function string) ([]ConstractParams, error) {
 func getFunctionName(function string) string {
 	start := strings.Index(function, "(")
 	return function[:start]
+}
+
+func ConstractMethods() map[string]InputData {
+	MethodsRegistry.methods.RLock()
+	defer MethodsRegistry.methods.RUnlock()
+
+	return MethodsRegistry.methods.c
 }
 
 func SearchConstractMethod(methodID string) (InputData, bool) {

@@ -88,5 +88,7 @@ func TestSearchConstractMethod(t *testing.T) {
 		panic(err)
 	}
 
-	fmt.Println(model.SearchConstractMethod("0x70a08231"))
+	fmt.Println(model.ConstractMethods())
+
+	fmt.Println(model.SearchConstractMethod(fmt.Sprintf("%s%s", "0x", "70a08231")))
 }

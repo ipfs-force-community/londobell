@@ -321,7 +321,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				return fmt.Errorf("lookup method info for %s/%d: %w", msg.To, msg.Method, err)
 			}
 
-			elog.Errorf("%s", err)
+			elog.Errorf("%s, msg: %v", err, msg)
 		}
 
 		mcid := msg.Cid()
