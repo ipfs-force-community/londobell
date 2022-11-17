@@ -347,12 +347,25 @@
 	"Info": {
 		"AvailableBalance": "big.Int",
 		"Balance": "big.Int",
+		"Beneficiary": "address.Address",
+		"BeneficiaryTerm": {
+			"Expiration": "abi.ChainEpoch",
+			"Quota": "big.Int",
+			"UsedQuota": "big.Int"
+		},
 		"ConsensusFaultElapsed": "abi.ChainEpoch",
 		"ControlAddresses": "[]address.Address",
 		"FeeDebt": "big.Int",
 		"Multiaddrs": "[][]uint8",
 		"Owner": "address.Address",
 		"PeerID": "[]uint8",
+		"PendingBeneficiaryTerm": {
+			"ApprovedByBeneficiary": "bool",
+			"ApprovedByNominee": "bool",
+			"NewBeneficiary": "address.Address",
+			"NewExpiration": "abi.ChainEpoch",
+			"NewQuota": "big.Int"
+		},
 		"PendingOwnerAddress": "*address.Address",
 		"PendingWorkerKey": {
 			"EffectiveAt": "abi.ChainEpoch",

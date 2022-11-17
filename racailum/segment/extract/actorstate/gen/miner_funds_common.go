@@ -879,6 +879,9 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			return nil
 		})
 
+		mInfo.Beneficiary = info.Beneficiary
+		mInfo.BeneficiaryTerm = info.BeneficiaryTerm
+		mInfo.PendingBeneficiaryTerm = info.PendingBeneficiaryTerm
 		mInfo.State = st
 
 	}
