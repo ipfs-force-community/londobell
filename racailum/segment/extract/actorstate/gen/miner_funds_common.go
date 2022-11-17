@@ -119,7 +119,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.WindowPoStPartitionSectors = info.WindowPoStPartitionSectors
 
 		mInfo.Balance = head.Balance
-		mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
+		mInfo.AvailableBalance = st.GetAvailableBalance(head.Balance)
 
 		precommitted, err := adt0.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors)
 
@@ -173,7 +173,10 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.FeeDebt = st.FeeDebt
 
 		mInfo.Balance = head.Balance
-		mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
+		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
+		if err != nil {
+			return fmt.Errorf("get available balance failed: %w", err)
+		}
 
 		precommitted, err := adt2.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors)
 
@@ -227,7 +230,10 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.FeeDebt = st.FeeDebt
 
 		mInfo.Balance = head.Balance
-		mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
+		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
+		if err != nil {
+			return fmt.Errorf("get available balance failed: %w", err)
+		}
 
 		precommitted, err := adt3.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin3.DefaultHamtBitwidth)
 
@@ -281,7 +287,10 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.FeeDebt = st.FeeDebt
 
 		mInfo.Balance = head.Balance
-		mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
+		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
+		if err != nil {
+			return fmt.Errorf("get available balance failed: %w", err)
+		}
 
 		precommitted, err := adt4.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin4.DefaultHamtBitwidth)
 
@@ -392,7 +401,11 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
-		mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
+		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
+		if err != nil {
+			return fmt.Errorf("get available balance failed: %w", err)
+		}
+
 		mInfo.FeeDebt = st.FeeDebt
 
 		precommitted, err := adt5.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin5.DefaultHamtBitwidth)
@@ -503,7 +516,11 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
-		mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
+		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
+		if err != nil {
+			return fmt.Errorf("get available balance failed: %w", err)
+		}
+
 		mInfo.FeeDebt = st.FeeDebt
 
 		precommitted, err := adt6.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin6.DefaultHamtBitwidth)
@@ -614,7 +631,11 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
-		mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
+		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
+		if err != nil {
+			return fmt.Errorf("get available balance failed: %w", err)
+		}
+
 		mInfo.FeeDebt = st.FeeDebt
 
 		precommitted, err := adt7.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin7.DefaultHamtBitwidth)
@@ -725,7 +746,11 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
-		mInfo.AvailableBalance = big.Sub(big.Subtract(head.Balance, detail.LockedFunds, detail.PreCommitDeposits), detail.InitialPledge)
+		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
+		if err != nil {
+			return fmt.Errorf("get available balance failed: %w", err)
+		}
+
 		mInfo.FeeDebt = st.FeeDebt
 
 		precommitted, err := adt8.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin8.DefaultHamtBitwidth)
