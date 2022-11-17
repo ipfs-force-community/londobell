@@ -9,36 +9,38 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/stretchr/testify/require"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"golang.org/x/crypto/sha3"
 )
 
 func TestHexEncodeParams(t *testing.T) {
-	entryPoint, err := hex.DecodeString("a9059cbb")
-	if err != nil {
-		return
-	}
+	var (
+		point = "a9059cbb"
+		input = "000000000000000000000000ff00000000000000000000000000000000000064"
+	)
+
+	entryPoint, err := hex.DecodeString(point)
+	require.Equal(t, nil, err)
+
 	var inputData []byte
-	inputData, err = hex.DecodeString("000000000000000000000000ff00000000000000000000000000000000000064")
-	if err != nil {
-		return
-	}
+	inputData, err = hex.DecodeString(input)
+	require.Equal(t, nil, err)
+
 	// TODO need to encode as CBOR bytes now
 	params := append(entryPoint, inputData...)
 
 	var buffer bytes.Buffer
-	if err := cbg.WriteByteArray(&buffer, params); err != nil {
-		return
-	}
-	params = buffer.Bytes()
+	err = cbg.WriteByteArray(&buffer, params)
+	require.Equal(t, nil, err)
 
 	// encode
-	enbuffer := bytes.NewBuffer(params)
-	enParams, err := cbg.ReadByteArray(enbuffer, 1024)
-	if err != nil {
-		return
-	}
-	fmt.Println(hex.EncodeToString(enParams))
+	params = buffer.Bytes()
+	hexParams, err := model.HexEncodeByteArray(params)
+	require.Equal(t, nil, err)
+	require.Equal(t, fmt.Sprintf("%s%s", point, input), hexParams)
+
+	fmt.Println(hexParams)
 }
 
 func TestGetStringsIndex(t *testing.T) {
@@ -70,25 +72,156 @@ func TestGetStringsIndex(t *testing.T) {
 
 func TestKeccak256Hash(t *testing.T) {
 	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write([]byte("balanceOf(address)"))
+	_, err := hasher.Write([]byte("balanceOf(address)"))
+	require.Equal(t, nil, err)
 	hash := hexutil.Encode(hasher.Sum(nil)[:])
-	fmt.Println(hash)
+
+	require.Equal(t, true, strings.HasPrefix(hash, "0x"))
+	require.Equal(t, 64, len(hash[2:]))
+	require.Equal(t, balanceOfID, hash[:10])
 }
 
 const (
-	balanceOf   = "balanceOf(address account)"
-	totalSupply = "totalSupply()"
-	withdraw    = "withdraw(address token, uint256 amount, address destination)"
+	balanceOf     = "balanceOf(address account)"
+	totalSupply   = "totalSupply()"
+	withdraw      = "withdraw(address token, uint256 amount, address destination)"
+	balanceOfID   = "0x70a08231"
+	totalSupplyID = "0x18160ddd"
+	withdrawID    = "0x69328dec"
+
+	invalid1   = "invalid1(,)"
+	invalid2   = "invalid2(, ,)"
+	test       = "test( )"
+	balanceOf2 = "balanceOf(address)"
 )
 
-func TestSearchConstractMethod(t *testing.T) {
-	functionList := []string{balanceOf, totalSupply, withdraw}
+var (
+	functionList        = []string{balanceOf, totalSupply, withdraw}
+	methodIDList        = []string{balanceOfID, totalSupplyID, withdrawID}
+	invalidFunctionList = []string{invalid1, invalid2, test}
+)
 
+func TestGetMethodID(t *testing.T) {
+	methodID, err := model.GetMethodID(balanceOf)
+	require.Equal(t, nil, err)
+	require.Equal(t, balanceOfID, methodID)
+
+	methodID2, err := model.GetMethodID(balanceOf2)
+	require.Equal(t, nil, err)
+	require.Equal(t, balanceOfID, methodID2)
+}
+
+func TestGetConstractParams(t *testing.T) {
+	for _, function := range functionList {
+		constractParams, err := model.GetConstractParams(function)
+		require.Equal(t, nil, err)
+
+		if function == balanceOf {
+			require.Equal(t, 1, len(constractParams))
+		}
+		if function == totalSupply {
+			require.Equal(t, 0, len(constractParams))
+		}
+		if function == withdraw {
+			require.Equal(t, 3, len(constractParams))
+		}
+
+		for i, param := range constractParams {
+			if function == balanceOf {
+				require.Equal(t, "account", param.Name)
+				require.Equal(t, "address", param.Type)
+				require.Equal(t, "", param.Data)
+			}
+
+			if function == withdraw {
+				if i == 0 {
+					require.Equal(t, "token", param.Name)
+					require.Equal(t, "address", param.Type)
+					require.Equal(t, "", param.Data)
+				}
+				if i == 1 {
+					require.Equal(t, "amount", param.Name)
+					require.Equal(t, "uint256", param.Type)
+					require.Equal(t, "", param.Data)
+				}
+				if i == 2 {
+					require.Equal(t, "destination", param.Name)
+					require.Equal(t, "address", param.Type)
+					require.Equal(t, "", param.Data)
+				}
+			}
+		}
+
+	}
+
+	for _, invalidFunction := range invalidFunctionList {
+		constractParams, err := model.GetConstractParams(invalidFunction)
+		require.Equal(t, nil, err)
+		require.Equal(t, 0, len(constractParams))
+	}
+
+}
+
+func TestRegistryConstractMethods(t *testing.T) {
 	if err := model.RegistryConstractMethods(functionList); err != nil {
 		panic(err)
 	}
 
-	fmt.Println(model.ConstractMethods())
+	methods := model.ConstractMethods()
+	require.Equal(t, 3, len(methods))
 
+	// registry successfully
+	for _, methodID := range methodIDList {
+		_, ok := methods[methodID]
+		require.Equal(t, true, ok)
+	}
+
+	// methodID -> functionName
+	for methodID, inputData := range methods {
+		if methodID == balanceOfID {
+			require.Equal(t, balanceOf, inputData.Function)
+		}
+		if methodID == totalSupplyID {
+			require.Equal(t, totalSupply, inputData.Function)
+		}
+		if methodID == withdrawID {
+			require.Equal(t, withdraw, inputData.Function)
+		}
+	}
+
+	// methodID -> ConstractParams
+	for methodID, inputData := range methods {
+		params := inputData.Params
+
+		if methodID == balanceOfID {
+			require.Equal(t, 1, len(params))
+			require.Equal(t, "account", params[0].Name)
+			require.Equal(t, "address", params[0].Type)
+		}
+		if methodID == totalSupplyID {
+			require.Equal(t, 0, len(params))
+		}
+		if methodID == withdrawID {
+			require.Equal(t, 3, len(params))
+			for i := range params {
+				if i == 0 {
+					require.Equal(t, "token", params[i].Name)
+					require.Equal(t, "address", params[i].Type)
+				}
+				if i == 1 {
+					require.Equal(t, "amount", params[i].Name)
+					require.Equal(t, "uint256", params[i].Type)
+				}
+				if i == 2 {
+					require.Equal(t, "destination", params[i].Name)
+					require.Equal(t, "address", params[i].Type)
+				}
+			}
+		}
+	}
+
+}
+
+func TestSearchConstractMethod(t *testing.T) {
 	fmt.Println(model.SearchConstractMethod(fmt.Sprintf("%s%s", "0x", "70a08231")))
 }

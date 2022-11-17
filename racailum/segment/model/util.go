@@ -106,12 +106,12 @@ func RegistryConstractMethods(functions []string) error {
 
 	// lock内计算，会导致lock锁占有过长时间？？
 	for _, function := range functions {
-		methodID, err = getMethodID(function)
+		methodID, err = GetMethodID(function)
 		if err != nil {
 			return err
 		}
 
-		params, err := getConstractParams(function)
+		params, err := GetConstractParams(function)
 		if err != nil {
 			return err
 		}
@@ -128,8 +128,8 @@ func RegistryConstractMethods(functions []string) error {
 	return nil
 }
 
-func getMethodID(function string) (string, error) {
-	constractParams, err := getConstractParams(function)
+func GetMethodID(function string) (string, error) {
+	constractParams, err := GetConstractParams(function)
 	if err != nil {
 		return "", err
 	}
@@ -168,7 +168,7 @@ func getMethodID(function string) (string, error) {
 	return hash[:10], nil
 }
 
-func getConstractParams(function string) ([]ConstractParams, error) {
+func GetConstractParams(function string) ([]ConstractParams, error) {
 	start := strings.Index(function, "(")
 	end := strings.Index(function, ")")
 
@@ -181,6 +181,11 @@ func getConstractParams(function string) ([]ConstractParams, error) {
 	for i := range params {
 		param := params[i]
 		param = strings.TrimSpace(param)
+		// todo: strings.Split splits "" to [""]
+		if param == "" {
+			continue
+		}
+
 		tuples := strings.Split(param, " ")
 		if len(tuples) == 2 {
 			constractParams = append(constractParams, ConstractParams{Type: tuples[0], Name: tuples[1]})
@@ -214,7 +219,7 @@ func SearchConstractMethod(methodID string) (InputData, bool) {
 	return inputData, ok
 }
 
-func hexEncodeByteArray(params []byte) (string, error) {
+func HexEncodeByteArray(params []byte) (string, error) {
 	buffer := bytes.NewBuffer(params)
 	hexParams, err := cbg.ReadByteArray(buffer, 1024)
 	if err != nil {

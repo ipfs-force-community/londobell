@@ -96,7 +96,7 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, p
 	if len(raw.Params) > 0 {
 		if meth == "InvokeContract" && strings.Contains(act, "evm") {
 			// parse contract method
-			hexParams, err := hexEncodeByteArray(raw.Params)
+			hexParams, err := HexEncodeByteArray(raw.Params)
 			if err != nil {
 				return nil, fmt.Errorf("hex encode params failed: %w", err)
 			}
