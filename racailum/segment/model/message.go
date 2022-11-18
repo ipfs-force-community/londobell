@@ -7,6 +7,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/cbor"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/registry"
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/chain/types"
@@ -82,7 +83,7 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, p
 	msg.Detail.Actor = act
 	msg.Detail.Method = meth
 
-	if params != nil && reflect.TypeOf(params) == reflect.ValueOf(HexString("")).Type() {
+	if params != nil && reflect.TypeOf(params) == reflect.ValueOf(registry.HexString("")).Type() {
 		msg.Detail.Params = params
 	} else {
 		if params != nil && len(raw.Params) > 0 {

@@ -22,6 +22,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/registry"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 	"github.com/ipfs/go-cid"
@@ -361,7 +362,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 						if params == nil {
 							mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, nil, ts.Height())
 						} else {
-							mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, *(*model.HexString)(unsafe.Pointer(&params)), ts.Height())
+							mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, *(*registry.HexString)(unsafe.Pointer(&params)), ts.Height())
 						}
 					}
 				}
@@ -416,7 +417,7 @@ func parseInvokeContractParams(raw *types.Message, act, meth string) ([]byte, er
 	if len(raw.Params) > 0 {
 		if meth == "InvokeContract" && strings.Contains(act, "evm") {
 			// parse contract method
-			hexParams, err := model.HexEncodeByteArray(raw.Params)
+			hexParams, err := registry.HexEncodeByteArray(raw.Params)
 			if err != nil {
 				return nil, fmt.Errorf("hex encode params failed: %w", err)
 			}
@@ -433,7 +434,7 @@ func parseInvokeContractParams(raw *types.Message, act, meth string) ([]byte, er
 			methodID := hexParamsString[:8]
 			datas := hexParamsString[8:]
 
-			inputData, ok, err := model.AssignDataForConstractParams(fmt.Sprintf("%s%s", "0x", methodID), datas)
+			inputData, ok, err := registry.AssignDataForConstractParams(fmt.Sprintf("%s%s", "0x", methodID), datas)
 			if err != nil {
 				// todo: err just log instead of returning
 				return nil, err

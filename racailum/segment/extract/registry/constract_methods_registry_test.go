@@ -1,4 +1,4 @@
-package tipset
+package registry
 
 import (
 	"bytes"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/filecoin-project/go-state-types/cbor"
-	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/stretchr/testify/require"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"golang.org/x/crypto/sha3"
@@ -39,7 +38,7 @@ func TestHexEncodeParams(t *testing.T) {
 
 	// encode
 	params = buffer.Bytes()
-	hexParams, err := model.HexEncodeByteArray(params)
+	hexParams, err := HexEncodeByteArray(params)
 	require.Equal(t, nil, err)
 	require.Equal(t, fmt.Sprintf("%s%s", point, input), *(*string)(unsafe.Pointer(&hexParams)))
 }
@@ -83,9 +82,6 @@ func TestKeccak256Hash(t *testing.T) {
 }
 
 const (
-	balanceOf     = "balanceOf(address account)"
-	totalSupply   = "totalSupply()"
-	withdraw      = "withdraw(address token, uint256 amount, address destination)"
 	balanceOfID   = "0x70a08231"
 	totalSupplyID = "0x18160ddd"
 	withdrawID    = "0x69328dec"
@@ -103,18 +99,18 @@ var (
 )
 
 func TestGetMethodID(t *testing.T) {
-	methodID, err := model.GetMethodID(balanceOf)
+	methodID, err := GetMethodID(balanceOf)
 	require.Equal(t, nil, err)
 	require.Equal(t, balanceOfID, methodID)
 
-	methodID2, err := model.GetMethodID(balanceOf2)
+	methodID2, err := GetMethodID(balanceOf2)
 	require.Equal(t, nil, err)
 	require.Equal(t, balanceOfID, methodID2)
 }
 
 func TestGetConstractParams(t *testing.T) {
 	for _, function := range functionList {
-		constractParams, err := model.GetConstractParams(function)
+		constractParams, err := GetConstractParams(function)
 		require.Equal(t, nil, err)
 
 		if function == balanceOf {
@@ -156,7 +152,7 @@ func TestGetConstractParams(t *testing.T) {
 	}
 
 	for _, invalidFunction := range invalidFunctionList {
-		constractParams, err := model.GetConstractParams(invalidFunction)
+		constractParams, err := GetConstractParams(invalidFunction)
 		require.Equal(t, nil, err)
 		require.Equal(t, 0, len(constractParams))
 	}
@@ -164,11 +160,11 @@ func TestGetConstractParams(t *testing.T) {
 }
 
 func TestRegistryConstractMethods(t *testing.T) {
-	if err := model.RegistryConstractMethods(functionList); err != nil {
+	if err := RegistryConstractMethods(functionList); err != nil {
 		panic(err)
 	}
 
-	methods := model.ConstractMethods()
+	methods := ConstractMethods()
 	require.Equal(t, 3, len(methods))
 
 	// registry successfully
@@ -224,13 +220,13 @@ func TestRegistryConstractMethods(t *testing.T) {
 }
 
 func TestGetType(t *testing.T) {
-	p := model.HexString("hello")
-	require.Equal(t, true, reflect.TypeOf(cbor.Er(p)) == reflect.ValueOf(model.HexString("")).Type())
+	p := HexString("hello")
+	require.Equal(t, true, reflect.TypeOf(cbor.Er(p)) == reflect.ValueOf(HexString("")).Type())
 }
 
 func TestAssignData(t *testing.T) {
 	datas := "000000000000000000000000ff00000000000000000000000000000000000064"
-	p, ok, err := model.AssignDataForConstractParams(balanceOfID, datas)
+	p, ok, err := AssignDataForConstractParams(balanceOfID, datas)
 	require.Equal(t, true, ok)
 	require.NoError(t, err, fmt.Errorf("falied"))
 	require.Equal(t, p.Function, balanceOf)
