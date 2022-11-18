@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
@@ -38,9 +39,7 @@ func TestHexEncodeParams(t *testing.T) {
 	params = buffer.Bytes()
 	hexParams, err := model.HexEncodeByteArray(params)
 	require.Equal(t, nil, err)
-	require.Equal(t, fmt.Sprintf("%s%s", point, input), hexParams)
-
-	fmt.Println(hexParams)
+	require.Equal(t, fmt.Sprintf("%s%s", point, input), *(*string)(unsafe.Pointer(&hexParams)))
 }
 
 func TestGetStringsIndex(t *testing.T) {
