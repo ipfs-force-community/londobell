@@ -411,6 +411,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 }
 
 // when params is nil
+// todo: operate multiple types of errors separately
 func parseInvokeContractParams(raw *types.Message, act, meth string) ([]byte, error) {
 	if len(raw.Params) > 0 {
 		if meth == "InvokeContract" && strings.Contains(act, "evm") {

@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/stretchr/testify/require"
 	cbg "github.com/whyrusleeping/cbor-gen"
@@ -219,4 +221,9 @@ func TestRegistryConstractMethods(t *testing.T) {
 		}
 	}
 
+}
+
+func TestGetType(t *testing.T) {
+	p := model.HexString("hello")
+	require.Equal(t, true, reflect.TypeOf(cbor.Er(p)) == reflect.ValueOf(model.HexString("")).Type())
 }

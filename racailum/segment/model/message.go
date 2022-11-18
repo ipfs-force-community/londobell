@@ -3,6 +3,7 @@ package model
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/cbor"
@@ -81,13 +82,17 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, p
 	msg.Detail.Actor = act
 	msg.Detail.Method = meth
 
-	if params != nil && len(raw.Params) > 0 {
-		err := params.UnmarshalCBOR(bytes.NewReader(raw.Params))
-		if err != nil {
-			return nil, fmt.Errorf("unmarshal cbor for message params: %w", err)
-		}
-
+	if params != nil && reflect.TypeOf(params) == reflect.ValueOf(HexString("")).Type() {
 		msg.Detail.Params = params
+	} else {
+		if params != nil && len(raw.Params) > 0 {
+			err := params.UnmarshalCBOR(bytes.NewReader(raw.Params))
+			if err != nil {
+				return nil, fmt.Errorf("unmarshal cbor for message params: %w", err)
+			}
+
+			msg.Detail.Params = params
+		}
 	}
 
 	msg.Detail.PackedHeight = epoch
