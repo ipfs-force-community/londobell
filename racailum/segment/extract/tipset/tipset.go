@@ -420,8 +420,8 @@ func parseInvokeContractParams(raw *types.Message, act, meth string) ([]byte, er
 			if err != nil {
 				return nil, fmt.Errorf("hex encode params failed: %w", err)
 			}
-
 			hexParamsString := *(*string)(unsafe.Pointer(&hexParams))
+
 			// the first 4 bytes is method ID
 			if len(hexParamsString) < 8 {
 				return nil, fmt.Errorf("invalid length of params %v for InvokeContract", len(hexParams))
@@ -432,23 +432,15 @@ func parseInvokeContractParams(raw *types.Message, act, meth string) ([]byte, er
 
 			methodID := hexParamsString[:8]
 			datas := hexParamsString[8:]
-			// methodID has been recorded
-			inputData, ok := model.SearchConstractMethod(fmt.Sprintf("%s%s", "0x", methodID))
+
+			inputData, ok, err := model.AssignDataForConstractParams(fmt.Sprintf("%s%s", "0x", methodID), datas)
+			if err != nil {
+				// todo: err just log instead of returning
+				return nil, err
+			}
+
 			if ok {
-				index := 0
-				if len(inputData.Params)*64 != len(datas) {
-					return nil, fmt.Errorf("datas dont correspond to params, datas %v, params: %v", datas, inputData.Params)
-				}
-
-				for _, param := range inputData.Params {
-					if param.Type == "address" {
-						param.Data = fmt.Sprintf("%s%s", "0x", datas[index:index+64])
-					}
-					param.Data = datas[index : index+64]
-					index += index + 64
-				}
-
-				// replace Detail.Params
+				// methodID has been recorded, replace Detail.Params
 				input, err := json.Marshal(inputData)
 				if err != nil {
 					return nil, err

@@ -55,7 +55,7 @@ type ConstractMethodsRegistry struct {
 
 type InputData struct {
 	Function string
-	Params   []ConstractParams
+	Params   []*ConstractParams
 }
 
 type ConstractParams struct {
@@ -181,7 +181,7 @@ func GetMethodID(function string) (string, error) {
 	return hash[:10], nil
 }
 
-func GetConstractParams(function string) ([]ConstractParams, error) {
+func GetConstractParams(function string) ([]*ConstractParams, error) {
 	start := strings.Index(function, "(")
 	end := strings.Index(function, ")")
 
@@ -190,7 +190,7 @@ func GetConstractParams(function string) ([]ConstractParams, error) {
 	}
 
 	params := strings.Split(function[start+1:end], ",")
-	constractParams := make([]ConstractParams, 0)
+	constractParams := make([]*ConstractParams, 0)
 	for i := range params {
 		param := params[i]
 		param = strings.TrimSpace(param)
@@ -201,9 +201,9 @@ func GetConstractParams(function string) ([]ConstractParams, error) {
 
 		tuples := strings.Split(param, " ")
 		if len(tuples) == 2 {
-			constractParams = append(constractParams, ConstractParams{Type: tuples[0], Name: tuples[1]})
+			constractParams = append(constractParams, &ConstractParams{Type: tuples[0], Name: tuples[1]})
 		} else if len(tuples) == 1 {
-			constractParams = append(constractParams, ConstractParams{Type: tuples[0]})
+			constractParams = append(constractParams, &ConstractParams{Type: tuples[0]})
 		} else {
 			return nil, fmt.Errorf("invalid params: %v", tuples)
 		}
@@ -230,6 +230,34 @@ func SearchConstractMethod(methodID string) (InputData, bool) {
 	MethodsRegistry.methods.RUnlock()
 
 	return inputData, ok
+}
+
+func AssignDataForConstractParams(methodID string, datas string) (InputData, bool, error) {
+	inputData, ok := SearchConstractMethod(methodID)
+	if ok {
+		index := 0
+		if len(inputData.Params)*64 != len(datas) {
+			return InputData{}, ok, fmt.Errorf("datas dont correspond to params, datas %v, params: %v", datas, inputData.Params)
+		}
+
+		for _, param := range inputData.Params {
+			if param.Type == "address" {
+				fmt.Println(fmt.Sprintf("%s%s", "0x", datas[index:index+64]))
+				param.Data = fmt.Sprintf("%s%s", "0x", datas[index:index+64])
+			} else {
+				param.Data = datas[index : index+64]
+			}
+
+			index += index + 64
+			if index == len(datas) {
+				break
+			}
+		}
+
+		return inputData, ok, nil
+	}
+
+	return InputData{}, ok, nil
 }
 
 func HexEncodeByteArray(params []byte) ([]byte, error) {

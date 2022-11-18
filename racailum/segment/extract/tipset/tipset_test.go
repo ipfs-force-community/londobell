@@ -227,3 +227,15 @@ func TestGetType(t *testing.T) {
 	p := model.HexString("hello")
 	require.Equal(t, true, reflect.TypeOf(cbor.Er(p)) == reflect.ValueOf(model.HexString("")).Type())
 }
+
+func TestAssignData(t *testing.T) {
+	datas := "000000000000000000000000ff00000000000000000000000000000000000064"
+	p, ok, err := model.AssignDataForConstractParams(balanceOfID, datas)
+	require.Equal(t, true, ok)
+	require.NoError(t, err, fmt.Errorf("falied"))
+	require.Equal(t, p.Function, balanceOf)
+	require.Equal(t, 1, len(p.Params))
+	require.Equal(t, "account", p.Params[0].Name)
+	require.Equal(t, "address", p.Params[0].Type)
+	require.Equal(t, fmt.Sprintf("%s%s", "0x", datas), p.Params[0].Data)
+}
