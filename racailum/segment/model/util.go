@@ -239,7 +239,7 @@ func HexEncodeByteArray(params []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	var hexParams []byte
+	hexParams := make([]byte, hex.EncodedLen(len(paramsByte)))
 	hex.Encode(hexParams, paramsByte)
 	return hexParams, nil
 }
