@@ -1,12 +1,14 @@
 package tipset
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -350,7 +352,17 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					if mi.IsParamsImplemetsCbor() {
 						mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 					} else {
-						mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, nil, ts.Height())
+						var params []byte
+						params, err = parseInvokeContractParams(msg, mi.Actor, mi.Method.Name)
+						if err != nil {
+							return fmt.Errorf("parse params of InvokeContract failed: %w", err)
+						}
+
+						if params == nil {
+							mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, nil, ts.Height())
+						} else {
+							mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, *(*model.HexString)(unsafe.Pointer(&params)), ts.Height())
+						}
 					}
 				}
 
@@ -381,6 +393,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 
 			if err != nil {
+				// todo: continue??
 				elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
 				tracecnt++
@@ -395,6 +408,59 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt)
 
 	return nil
+}
+
+// when params is nil
+func parseInvokeContractParams(raw *types.Message, act, meth string) ([]byte, error) {
+	if len(raw.Params) > 0 {
+		if meth == "InvokeContract" && strings.Contains(act, "evm") {
+			// parse contract method
+			hexParams, err := model.HexEncodeByteArray(raw.Params)
+			if err != nil {
+				return nil, fmt.Errorf("hex encode params failed: %w", err)
+			}
+
+			hexParamsString := *(*string)(unsafe.Pointer(&hexParams))
+			// the first 4 bytes is method ID
+			if len(hexParamsString) < 8 {
+				return nil, fmt.Errorf("invalid length of params %v for InvokeContract", len(hexParams))
+			}
+			if (len(hexParamsString)-8)%64 != 0 {
+				return nil, fmt.Errorf("invalid length of params %v for InvokeContract", len(hexParams))
+			}
+
+			methodID := hexParamsString[:8]
+			datas := hexParamsString[8:]
+			// methodID has been recorded
+			inputData, ok := model.SearchConstractMethod(fmt.Sprintf("%s%s", "0x", methodID))
+			if ok {
+				index := 0
+				if len(inputData.Params)*64 != len(datas) {
+					return nil, fmt.Errorf("datas dont correspond to params, datas %v, params: %v", datas, inputData.Params)
+				}
+
+				for _, param := range inputData.Params {
+					if param.Type == "address" {
+						param.Data = fmt.Sprintf("%s%s", "0x", datas[index:index+64])
+					}
+					param.Data = datas[index : index+64]
+					index += index + 64
+				}
+
+				// replace Detail.Params
+				input, err := json.Marshal(inputData)
+				if err != nil {
+					return nil, err
+				}
+
+				return input, nil
+			}
+
+			return hexParams, nil
+		}
+	}
+
+	return nil, nil
 }
 
 func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error {

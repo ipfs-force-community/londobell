@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"sync"
@@ -69,6 +70,18 @@ var MethodsRegistry = struct {
 	methods: &ConstractMethodsRegistry{
 		c: make(map[string]InputData),
 	},
+}
+
+type HexString string
+
+func (h HexString) MarshalCBOR(w io.Writer) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (h HexString) UnmarshalCBOR(r io.Reader) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 //// RegistryMethodID: method(params...)
@@ -219,11 +232,14 @@ func SearchConstractMethod(methodID string) (InputData, bool) {
 	return inputData, ok
 }
 
-func HexEncodeByteArray(params []byte) (string, error) {
+func HexEncodeByteArray(params []byte) ([]byte, error) {
 	buffer := bytes.NewBuffer(params)
-	hexParams, err := cbg.ReadByteArray(buffer, 1024)
+	paramsByte, err := cbg.ReadByteArray(buffer, 1024)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return hex.EncodeToString(hexParams), nil
+
+	var hexParams []byte
+	hex.Encode(hexParams, paramsByte)
+	return hexParams, nil
 }

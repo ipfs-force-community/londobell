@@ -221,7 +221,3 @@ func TestRegistryConstractMethods(t *testing.T) {
 	}
 
 }
-
-func TestSearchConstractMethod(t *testing.T) {
-	fmt.Println(model.SearchConstractMethod(fmt.Sprintf("%s%s", "0x", "70a08231")))
-}
