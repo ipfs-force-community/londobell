@@ -69,12 +69,12 @@ func init() {
 	// get from db
 	functionList := []string{balanceOf, totalSupply, withdraw}
 
-	if err := RegistryConstractMethods(functionList); err != nil {
+	if err := RegisterConstractMethods(functionList); err != nil {
 		panic(err)
 	}
 }
 
-func RegistryConstractMethods(functions []string) error {
+func RegisterConstractMethods(functions []string) error {
 	var (
 		methodID  string
 		inputData InputData

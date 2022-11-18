@@ -160,7 +160,7 @@ func TestGetConstractParams(t *testing.T) {
 }
 
 func TestRegistryConstractMethods(t *testing.T) {
-	if err := RegistryConstractMethods(functionList); err != nil {
+	if err := RegisterConstractMethods(functionList); err != nil {
 		panic(err)
 	}
 
