@@ -16,9 +16,9 @@ import (
 
 var (
 	API   *AppropriateAPI
-	log   = logging.Logger("adapter")
+	Log   = logging.Logger("adapter")
 	Fxlog = &fxlogger{
-		ZapEventLogger: log,
+		ZapEventLogger: Log,
 	}
 	Components StateComponents
 )

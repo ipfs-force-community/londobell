@@ -44,19 +44,19 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 	for _, url := range urls {
 		api, err := GetFullNodeAPI(ctx, url)
 		if err != nil {
-			log.Warnf("api:%v is not accessiable", url)
+			Log.Warnf("api:%v is not accessiable", url)
 			continue
 		}
 
 		headTs, err := api.ChainHead(ctx)
 		if err != nil {
-			log.Warnf("api:%v is not accessiable", url)
+			Log.Warnf("api:%v is not accessiable", url)
 			continue
 		}
 
 		headWeight, err := api.ChainTipSetWeight(ctx, headTs.Key())
 		if err != nil {
-			log.Warnf("api:%v is not accessiable", url)
+			Log.Warnf("api:%v is not accessiable", url)
 			continue
 		}
 
@@ -68,7 +68,7 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 	}
 
 	for i := range candidates {
-		log.Infof("candidates[%v]: url: %v, ts: %v, ts.Height: %v, curEpoch: %v, weight: %v", i, candidates[i].url, candidates[i].ts, candidates[i].ts.Height(), curEpoch, candidates[i].weight)
+		Log.Infof("candidates[%v]: url: %v, ts: %v, ts.Height: %v, curEpoch: %v, weight: %v", i, candidates[i].url, candidates[i].ts, candidates[i].ts.Height(), curEpoch, candidates[i].weight)
 	}
 
 	candidate := candidates[0]
@@ -87,9 +87,9 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 	previousAPI := a.GetAppropriateAPI()
 	if previousAPI != candidate.api {
 		a.SetAppropriateAPI(candidate.api)
-		log.Infof("choose more appropriate api: %v, gap: %v", candidate.url, candidate.gap)
+		Log.Infof("choose more appropriate api: %v, gap: %v", candidate.url, candidate.gap)
 	} else {
-		log.Infof("current api is more appropriate api: %v, gap: %v", candidate.url, candidate.gap)
+		Log.Infof("current api is more appropriate api: %v, gap: %v", candidate.url, candidate.gap)
 	}
 
 	return nil

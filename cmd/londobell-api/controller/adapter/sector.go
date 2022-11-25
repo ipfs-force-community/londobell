@@ -17,7 +17,7 @@ import (
 )
 
 func GetSectorInfo(c *gin.Context) {
-	alog := log.With("method", "GetSectorInfo")
+	alog := Log.With("method", "GetSectorInfo")
 	req := model.SectorReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)

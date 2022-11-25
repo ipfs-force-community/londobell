@@ -9,17 +9,17 @@ import (
 
 	"github.com/dtynn/dix"
 	"github.com/gin-gonic/gin"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter/lotus-cmd/state"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	"github.com/ipfs-force-community/londobell/dep"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
-	"github.com/ipfs-force-community/londobell/dep"
 )
 
 var (
@@ -112,6 +112,8 @@ func RegisterAdapterApi(router *gin.Engine) {
 		group.POST("/batchminers", adapter.GetBatchMinersInfo)
 		group.POST("/sectorpower", adapter.GetSectorPowerInfo)
 		group.POST("/precommit_deposit_toburn", adapter.GetPreCommitDepositToBurnInfo)
+		// lotus-api
+		group.POST("/state_power", state.GetStatePower)
 	}
 }
 

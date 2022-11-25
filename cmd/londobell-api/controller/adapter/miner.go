@@ -49,7 +49,7 @@ import (
 )
 
 func GetMinerInfo(c *gin.Context) {
-	alog := log.With("method", "GetMinerInfo")
+	alog := Log.With("method", "GetMinerInfo")
 	req := model.MinerReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)

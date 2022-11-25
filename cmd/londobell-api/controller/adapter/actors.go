@@ -28,7 +28,7 @@ import (
 )
 
 func GetActorsInfo(c *gin.Context) {
-	alog := log.With("method", "GetActorsInfo")
+	alog := Log.With("method", "GetActorsInfo")
 	req := model.ActorReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)

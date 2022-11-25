@@ -21,7 +21,7 @@ import (
 )
 
 func GetEpochInfo(c *gin.Context) {
-	alog := log.With("method", "GetEpochInfo")
+	alog := Log.With("method", "GetEpochInfo")
 	req := model.EpochReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)

@@ -47,7 +47,7 @@ import (
 )
 
 func GetPreCommitDepositToBurnInfo(c *gin.Context) {
-	alog := log.With("method", "GetPreCommitDepositToBurnInfo")
+	alog := Log.With("method", "GetPreCommitDepositToBurnInfo")
 	req := model.PreCommitDepositToBurnReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
@@ -116,11 +116,11 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 			Method:     cron.Methods.EpochTick,
 			Params:     nil,
 		}
-		log.Infof("(sm *StateManager) ApplyBlocks runCron begin, height: %v", epoch)
+		Log.Infof("(sm *StateManager) ApplyBlocks runCron begin, height: %v", epoch)
 
 		ret, err := vmCron.ApplyImplicitMessage(ctx, cronMsg)
 
-		log.Infof("(sm *StateManager) ApplyBlocks runCron end, height: %v", epoch)
+		Log.Infof("(sm *StateManager) ApplyBlocks runCron end, height: %v", epoch)
 
 		if err != nil {
 			return fmt.Errorf("running cron: %w", err)
@@ -149,7 +149,7 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 			return
 		}
 
-		log.Infof("state at height %v is %v", curTs.Height(), pstate)
+		Log.Infof("state at height %v is %v", curTs.Height(), pstate)
 	} else {
 		pstate = curTs.Blocks()[0].ParentStateRoot
 		parentTs, err = Components.CS.LoadTipSet(ctx, curTs.Parents())
@@ -159,7 +159,7 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 		}
 		baseFee = curTs.Blocks()[0].ParentBaseFee
 
-		log.Infof("state at height %v is %v", parentTs.Height(), pstate)
+		Log.Infof("state at height %v is %v", parentTs.Height(), pstate)
 	}
 
 	// run cron for null rounds
@@ -187,7 +187,7 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 			util.ReturnOnErr(c, alog, err)
 			return
 		}
-		log.Infof("state at height %v is %v", i, pstate)
+		Log.Infof("state at height %v is %v", i, pstate)
 	}
 
 	parentSt, err := sm.StateTree(pstate)

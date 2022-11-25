@@ -20,7 +20,7 @@ import (
 )
 
 func GetBatchMinersInfo(c *gin.Context) {
-	alog := log.With("method", "GetBatchMinersInfo")
+	alog := Log.With("method", "GetBatchMinersInfo")
 	req := model.BatchMinersReq{}
 	res := model.CommonRes{Code: model.Success}
 	batchRes := model.BatchMinersRes{}
