@@ -3,19 +3,20 @@ package aggregators
 import monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
 var (
-	addressAggregator          []byte
-	aggPreNetfeeAggregator     []byte
-	aggProNetfeeAggregator     []byte
-	blockAggregator            []byte
-	finalHeightAggregator      []byte
-	minerBlockrewardAggregator []byte
-	minersInfoAggregator       []byte
-	minersMinedAggregator      []byte
-	multisigMessageAggregator  []byte
-	punishmentAggregator       []byte
-	wincountZlAggregator       []byte
-	tracesAggregator           []byte
-	childEpochAggregator       []byte
+	addressAggregator           []byte
+	aggPreNetfeeAggregator      []byte
+	aggProNetfeeAggregator      []byte
+	blockAggregator             []byte
+	finalHeightAggregator       []byte
+	minerBlockrewardAggregator  []byte
+	minersInfoAggregator        []byte
+	minersMinedAggregator       []byte
+	multisigMessageAggregator   []byte
+	punishmentAggregator        []byte
+	wincountZlAggregator        []byte
+	tracesAggregator            []byte
+	childEpochAggregator        []byte
+	minersBlockrewardAggregator []byte
 )
 
 func InitAggregators() {
@@ -33,4 +34,5 @@ func InitAggregators() {
 	wincountZlAggregator = monitor.GetWincountZlAggregator()
 	tracesAggregator = monitor.GetTracesAggregator()
 	childEpochAggregator = monitor.GetChildEpochAggregator()
+	minersBlockrewardAggregator = monitor.GetMinersBlockRewardAggregator()
 }

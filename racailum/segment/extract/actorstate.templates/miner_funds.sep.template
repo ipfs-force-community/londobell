@@ -1,7 +1,11 @@
 package gen
 
 import (
+    {{ if ge .Ver 8 }}
+    miner{{ .Ver }} "{{ .ImportPath }}/miner"
+    {{ else }}
 	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
+	{{ end }}
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"

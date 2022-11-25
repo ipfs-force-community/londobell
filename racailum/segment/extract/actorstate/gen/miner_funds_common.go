@@ -7,6 +7,7 @@ package gen
 import (
 	"fmt"
 
+	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
@@ -32,8 +33,13 @@ import (
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 	adt7 "github.com/filecoin-project/specs-actors/v7/actors/util/adt"
 
-	miner8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/miner"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
+
+	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
+	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
+
+	"github.com/filecoin-project/go-state-types/builtin"
 
 	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
 
@@ -44,8 +50,6 @@ import (
 	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
 
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
-
-	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mir"
@@ -72,7 +76,7 @@ func NewTokenAmountArr(length int) []abi.TokenAmount {
 }
 
 func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st interface{}) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerFundsTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MinerFundsTicks, ctx, head.Epoch) {
 		return nil
 	}
 
@@ -699,7 +703,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 				return fmt.Errorf("get dl partition failed: %w", err)
 			}
 			var part miner8.Partition
-			dlInfo := miner8.NewDeadlineInfo(st.CurrentProvingPeriodStart(head.Epoch), dlIdx, head.Epoch).NextNotElapsed()
+			dlInfo := miner8.NewDeadlineInfo(st.ProvingPeriodStart, dlIdx, head.Epoch).NextNotElapsed()
 			quant := miner8.QuantSpecForDeadline(dlInfo)
 
 			return ps.ForEach(&part, func(partIdx int64) error {
@@ -709,7 +713,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 				}
 
 				for i := range tsRange {
-					popped, err := expirations.PopUntil(tsRange[i])
+					popped, err := PopUntilV8(expirations, tsRange[i])
 					if err != nil {
 						return fmt.Errorf("failed to pop expiration queue until %d: %w", tsRange[i], err)
 					}
@@ -753,7 +757,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 
 		mInfo.FeeDebt = st.FeeDebt
 
-		precommitted, err := adt8.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin8.DefaultHamtBitwidth)
+		precommitted, err := adt8.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin.DefaultHamtBitwidth)
 		if err != nil {
 			return fmt.Errorf("load state PreCommittedSectors: %w", err)
 		}
@@ -764,6 +768,124 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			return nil
 		})
 
+		mInfo.State = st
+
+	case *miner9.State:
+		if err := mir.Mirror(&detail, st); err != nil {
+			return fmt.Errorf("mirroring *miner9.State: %w", err)
+		}
+
+		if isEmptyOrZero(detail.PreCommitDeposits) &&
+			isEmptyOrZero(detail.LockedFunds) &&
+			isEmptyOrZero(detail.FeeDebt) &&
+			isEmptyOrZero(detail.InitialPledge) {
+			return nil
+		}
+
+		if !st.VestingFunds.Equals(emptyMinerStateV9.VestingFunds) {
+			funds, err := st.LoadVestingFunds(adt9.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+			if err != nil {
+				return fmt.Errorf("load vesting funds: %w", err)
+			}
+
+			// assign vest in future
+			for _, v := range funds.Funds {
+				if v.Epoch < head.Epoch {
+					continue
+				}
+
+				for j := range tsRange {
+					if v.Epoch < tsRange[j] {
+						vestInFuture[j] = big.Add(vestInFuture[j], v.Amount)
+						break
+					}
+				}
+			}
+		}
+		actStore := ctx.D.ActorStore(ctx.C)
+		deadlines, err := st.LoadDeadlines(actStore)
+		if err != nil {
+			return fmt.Errorf("load deadlines failed: %w", err)
+		}
+
+		err = deadlines.ForEach(actStore, func(dlIdx uint64, dl *miner9.Deadline) error {
+			if dl == nil {
+				return nil
+			}
+
+			ps, err := dl.PartitionsArray(actStore)
+			if err != nil {
+				return fmt.Errorf("get dl partition failed: %w", err)
+			}
+			var part miner9.Partition
+			dlInfo := miner9.NewDeadlineInfo(st.ProvingPeriodStart, dlIdx, head.Epoch).NextNotElapsed()
+			quant := miner9.QuantSpecForDeadline(dlInfo)
+
+			return ps.ForEach(&part, func(partIdx int64) error {
+				expirations, err := miner9.LoadExpirationQueue(actStore, part.ExpirationsEpochs, quant, miner9.PartitionExpirationAmtBitwidth)
+				if err != nil {
+					return fmt.Errorf("failed to load expiration queue: %w", err)
+				}
+
+				for i := range tsRange {
+					popped, err := PopUntilV9(expirations, tsRange[i])
+					if err != nil {
+						return fmt.Errorf("failed to pop expiration queue until %d: %w", tsRange[i], err)
+					}
+
+					pledgeRelease[i] = popped.OnTimePledge
+				}
+
+				return nil
+			})
+		})
+
+		if err != nil {
+			return fmt.Errorf("process sector pledge failed")
+		}
+
+		info, err := st.GetInfo(adt9.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+		if err != nil {
+			return fmt.Errorf("load miner info: %w", err)
+		}
+
+		mInfo.Owner = info.Owner
+		mInfo.Worker = info.Worker
+		mInfo.ControlAddresses = info.ControlAddresses
+		if info.PendingWorkerKey != nil {
+			mInfo.PendingWorkerKey.NewWorker = info.PendingWorkerKey.NewWorker
+			mInfo.PendingWorkerKey.EffectiveAt = info.PendingWorkerKey.EffectiveAt
+		}
+		mInfo.PeerID = info.PeerId
+		mInfo.Multiaddrs = info.Multiaddrs
+		mInfo.WindowPoStProofType = info.WindowPoStProofType
+		mInfo.SectorSize = info.SectorSize
+		mInfo.WindowPoStPartitionSectors = info.WindowPoStPartitionSectors
+		mInfo.ConsensusFaultElapsed = info.ConsensusFaultElapsed
+		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
+
+		mInfo.Balance = head.Balance
+		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
+		if err != nil {
+			return fmt.Errorf("get available balance failed: %w", err)
+		}
+
+		mInfo.FeeDebt = st.FeeDebt
+
+		precommitted, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin.DefaultHamtBitwidth)
+		if err != nil {
+			return fmt.Errorf("load state PreCommittedSectors: %w", err)
+		}
+
+		var precommit miner9.SectorPreCommitOnChainInfo
+		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			mInfo.PrecommitSectorCount++
+			return nil
+		})
+
+		mInfo.Beneficiary = info.Beneficiary
+		mInfo.BeneficiaryTerm = info.BeneficiaryTerm
+		mInfo.PendingBeneficiaryTerm = info.PendingBeneficiaryTerm
 		mInfo.State = st
 
 	}
@@ -795,4 +917,88 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 	})
 
 	return nil
+}
+
+func PopUntilV8(q miner8.ExpirationQueue, until abi.ChainEpoch) (*miner8.ExpirationSet, error) {
+	var onTimeSectors []bitfield.BitField
+	var earlySectors []bitfield.BitField
+	activePower := miner8.NewPowerPairZero()
+	faultyPower := miner8.NewPowerPairZero()
+	onTimePledge := big.Zero()
+
+	var poppedKeys []uint64
+	var thisValue miner8.ExpirationSet
+	stopErr := fmt.Errorf("stop")
+	if err := q.Array.ForEach(&thisValue, func(i int64) error {
+		if abi.ChainEpoch(i) > until {
+			return stopErr
+		}
+		poppedKeys = append(poppedKeys, uint64(i))
+		onTimeSectors = append(onTimeSectors, thisValue.OnTimeSectors)
+		earlySectors = append(earlySectors, thisValue.EarlySectors)
+		activePower = activePower.Add(thisValue.ActivePower)
+		faultyPower = faultyPower.Add(thisValue.FaultyPower)
+		onTimePledge = big.Add(onTimePledge, thisValue.OnTimePledge)
+		return nil
+	}); err != nil && err != stopErr {
+		return nil, err
+	}
+
+	if err := q.Array.BatchDelete(poppedKeys, true); err != nil {
+		return nil, err
+	}
+
+	allOnTime, err := bitfield.MultiMerge(onTimeSectors...)
+	if err != nil {
+		return nil, err
+	}
+	allEarly, err := bitfield.MultiMerge(earlySectors...)
+	if err != nil {
+		return nil, err
+	}
+	return &miner8.ExpirationSet{
+		OnTimeSectors: allOnTime,
+		EarlySectors:  allEarly, OnTimePledge: onTimePledge, ActivePower: activePower, FaultyPower: faultyPower}, nil
+}
+
+func PopUntilV9(q miner9.ExpirationQueue, until abi.ChainEpoch) (*miner9.ExpirationSet, error) {
+	var onTimeSectors []bitfield.BitField
+	var earlySectors []bitfield.BitField
+	activePower := miner9.NewPowerPairZero()
+	faultyPower := miner9.NewPowerPairZero()
+	onTimePledge := big.Zero()
+
+	var poppedKeys []uint64
+	var thisValue miner9.ExpirationSet
+	stopErr := fmt.Errorf("stop")
+	if err := q.Array.ForEach(&thisValue, func(i int64) error {
+		if abi.ChainEpoch(i) > until {
+			return stopErr
+		}
+		poppedKeys = append(poppedKeys, uint64(i))
+		onTimeSectors = append(onTimeSectors, thisValue.OnTimeSectors)
+		earlySectors = append(earlySectors, thisValue.EarlySectors)
+		activePower = activePower.Add(thisValue.ActivePower)
+		faultyPower = faultyPower.Add(thisValue.FaultyPower)
+		onTimePledge = big.Add(onTimePledge, thisValue.OnTimePledge)
+		return nil
+	}); err != nil && err != stopErr {
+		return nil, err
+	}
+
+	if err := q.Array.BatchDelete(poppedKeys, true); err != nil {
+		return nil, err
+	}
+
+	allOnTime, err := bitfield.MultiMerge(onTimeSectors...)
+	if err != nil {
+		return nil, err
+	}
+	allEarly, err := bitfield.MultiMerge(earlySectors...)
+	if err != nil {
+		return nil, err
+	}
+	return &miner9.ExpirationSet{
+		OnTimeSectors: allOnTime,
+		EarlySectors:  allEarly, OnTimePledge: onTimePledge, ActivePower: activePower, FaultyPower: faultyPower}, nil
 }

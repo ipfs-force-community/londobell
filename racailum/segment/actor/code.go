@@ -8,17 +8,17 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 
-	"github.com/filecoin-project/lotus/chain/actors"
+	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 )
 
 func init() {
 	{
-		curActorVersion := actors.Version0
+		curActorVersion := actorstypes.Version0
 		upgrades := filcns.DefaultUpgradeSchedule()
 		for _, up := range upgrades {
-			actver, err := actors.VersionForNetwork(up.Network)
+			actver, err := actorstypes.VersionForNetwork(up.Network)
 			if err != nil {
 				panic(err)
 			}

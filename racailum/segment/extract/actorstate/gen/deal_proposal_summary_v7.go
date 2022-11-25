@@ -26,7 +26,7 @@ func init() {
 }
 
 func extractDealProposalSummaryV7(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market7.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalSummaryTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalSummaryTicks, ctx, head.Epoch) {
 		return nil
 	}
 

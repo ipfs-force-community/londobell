@@ -25,7 +25,7 @@ func init() {
 }
 
 func extractPendingTxnsV4(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *multisig4.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.PendingTxnsTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.PendingTxnsTicks, ctx, head.Epoch) {
 		return nil
 	}
 

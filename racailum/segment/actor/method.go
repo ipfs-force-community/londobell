@@ -28,6 +28,11 @@ func (mi *MethodInfo) ParamObj() cbor.Er {
 		return nil
 	}
 
+	// prevent error caused by UniversalReceiverHook
+	if !mi.Method.Params.Implements(reflect.TypeOf((*cbor.Er)(nil)).Elem()) {
+		return nil
+	}
+
 	return reflect.New(mi.Method.Params.Elem()).Interface().(cbor.Er)
 }
 

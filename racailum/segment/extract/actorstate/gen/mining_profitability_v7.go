@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/ipfs/go-cid"
 
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
@@ -29,14 +30,15 @@ func init() {
 }
 
 // VERCHECK
-
+// see https://github.com/filecoin-project/specs-actors/blob/v7.0.1/actors/builtin/miner/miner_actor.go#L1138-L1146
+// and https://github.com/filecoin-project/specs-actors/blob/v7.0.1/actors/builtin/miner/monies.go#L99-L104
 func extractMiningProfitabilityV7(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward7.State) error {
 	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Global.Power.Head)
 	if err != nil {
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
 	}
 
-	state, err := vm.DumpActorState(reg.ActorReg, head.Global.Power, blkraw.RawData())
+	state, err := vm.DumpActorState(filcns.NewTipSetExecutor().NewActorRegistry(), head.Global.Power, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 	}

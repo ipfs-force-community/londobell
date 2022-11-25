@@ -1,0 +1,111 @@
+ver:9
+package gen
+
+import (
+	"fmt"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin"
+	adt{{ .Ver }} "{{ .ImportPath }}/util/adt"
+	verifreg{{ .Ver }} "{{ .ImportPath }}/verifreg"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+    "github.com/multiformats/go-varint"
+
+	"github.com/ipfs/go-cid"
+	cbg "github.com/whyrusleeping/cbor-gen"
+)
+
+func init() {
+	reg.MustRegisterRegularExtractor("AllocationsV{{ .Ver }}", extractAllocationsV{{ .Ver }})
+
+    {{ if eq .Ver 9 -}}
+	schema.Register(
+		schema.Model{
+			Name: "allocations",
+			D:    &model.Allocations{},
+		},
+	)
+	{{ end -}}
+}
+
+func extractAllocationsV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg{{ .Ver }}.State) error {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.AllocationsTicks, ctx, head.Epoch) {
+		return nil
+	}
+
+	actorToHamtMap, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), st.Allocations, builtin.DefaultHamtBitwidth)
+	if err != nil {
+		return fmt.Errorf("couldn't get outer map: %w, st.Allocations: %v", err, st.Allocations)
+	}
+
+	var innerHamtCid cbg.CborCid
+	err = actorToHamtMap.ForEach(&innerHamtCid, func(key string) error {
+		actorID, n, err := varint.FromUvarint([]byte(key))
+        if n != len([]byte(key)) {
+            return fmt.Errorf("could not get varint from address string")
+        }
+        if err != nil {
+            return err
+        }
+
+        addr, err := address.NewIDAddress(actorID) // just to generate unique ID
+        if err != nil {
+            return fmt.Errorf("parse addr from adt.Map key %s: %w, actorID: %v", key, err, actorID)
+        }
+
+		id, err := GenRegularHeadID(head.Head, addr, head.Epoch)
+		if err != nil {
+			return fmt.Errorf("gen regular id: %w", err)
+		}
+
+		innerMap, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), cid.Cid(innerHamtCid), builtin.DefaultHamtBitwidth)
+		if err != nil {
+			return fmt.Errorf("couldn't get outer map: %w, innerHamtCid: %v", err, innerHamtCid)
+		}
+
+		var allocation verifreg{{ .Ver }}.Allocation
+		err = innerMap.ForEach(&allocation, func(key string) error {
+			if head.Epoch >= allocation.Expiration {
+				return nil
+			}
+
+			allocationID, err := abi.ParseUIntKey(key)
+			if err != nil {
+				return fmt.Errorf("parse allocationID from key: %w, key: %v", err, key)
+			}
+
+			res.Docs = append(res.Docs, &model.Allocations{
+				ID:           id,
+				Epoch:        head.Epoch,
+				ActorID:      abi.ActorID(actorID),
+				AllocationID: model.AllocationID(allocationID),
+				Client:       allocation.Client,
+				Provider:     allocation.Provider,
+				Data:         allocation.Data,
+				Size:         allocation.Size,
+				TermMin:      allocation.TermMin,
+				TermMax:      allocation.TermMax,
+				Expiration:   allocation.Expiration,
+			},
+			)
+
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("couldn't iterate over inner map: %w, innerHamtCid: %v", err, innerHamtCid)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("couldn't iterate over actorToHamtMap: %w, st.Allocations: %v", err, st.Allocations)
+	}
+
+	return nil
+}

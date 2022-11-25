@@ -11,9 +11,9 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 
-	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
-	verifreg8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/verifreg"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	builtin8 "github.com/filecoin-project/go-state-types/builtin"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
+	verifreg8 "github.com/filecoin-project/go-state-types/builtin/v8/verifreg"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -27,7 +27,7 @@ func init() {
 }
 
 func extractVerifRegV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg8.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.VerifiedRegistryTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.VerifiedRegistryTicks, ctx, head.Epoch) {
 		return nil
 	}
 
@@ -38,10 +38,6 @@ func extractVerifRegV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		{
 			name: "Verifier",
 			root: st.Verifiers,
-		},
-		{
-			name: "VerifiedClient",
-			root: st.VerifiedClients,
 		},
 	}
 

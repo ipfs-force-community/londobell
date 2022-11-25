@@ -25,9 +25,16 @@ func init() {
 }
 
 func extractDealProposalDetailedV6(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market6.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalDetailTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalDetailTicks, ctx, head.Epoch) {
 		return nil
 	}
+
+	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
+	if err != nil {
+		return fmt.Errorf("ge regular id: %w", err)
+	}
+
+	details := map[address.Address]*model.DealProposalDetail{}
 
 	deals, err := market6.AsDealProposalArray(adt6.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
 	if err != nil {
@@ -38,12 +45,6 @@ func extractDealProposalDetailedV6(ctx *extract.Ctx, res *extract.Res, head *com
 	if err != nil {
 		return fmt.Errorf("load deal state array: %w", err)
 	}
-	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
-	if err != nil {
-		return fmt.Errorf("ge regular id: %w", err)
-	}
-
-	details := map[address.Address]*model.DealProposalDetail{}
 
 	var out market6.DealProposal
 	var dealProposals []model.DealProposal

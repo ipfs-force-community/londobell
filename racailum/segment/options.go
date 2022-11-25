@@ -60,7 +60,11 @@ func DefaultOptions() Options {
 		AllToCheckTableList: []string{
 			"ActorBalance",
 			"ActorState",
+			"Allocations",
 			"ClaimedPower",
+			"Claims",
+			"DatacapAllowances",
+			"DatacapBalances",
 			"DealProposal",
 			"DealProposalDetail",
 			"DealProposalSummary",

@@ -32,7 +32,7 @@ func init() {
 }
 
 func extractMarketFundsV0(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market0.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MarketFundsTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MarketFundsTicks, ctx, head.Epoch) {
 		return nil
 	}
 

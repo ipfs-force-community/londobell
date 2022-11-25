@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	builtin8 "github.com/filecoin-project/specs-actors/v8/actors/builtin"
-	multisig8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/multisig"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	builtin8 "github.com/filecoin-project/go-state-types/builtin"
+	multisig8 "github.com/filecoin-project/go-state-types/builtin/v8/multisig"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
@@ -25,7 +25,7 @@ func init() {
 }
 
 func extractPendingTxnsV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *multisig8.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.PendingTxnsTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.PendingTxnsTicks, ctx, head.Epoch) {
 		return nil
 	}
 

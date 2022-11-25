@@ -3,7 +3,7 @@ package model
 import (
 	addr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-
+	"github.com/filecoin-project/go-state-types/builtin/v9/miner"
 	"github.com/ipfs-force-community/londobell/common"
 )
 
@@ -47,6 +47,9 @@ type MinerInfo struct {
 	AvailableBalance           abi.TokenAmount
 	FeeDebt                    abi.TokenAmount
 	PrecommitSectorCount       uint64
+	Beneficiary                addr.Address                    `mir:"-"`
+	BeneficiaryTerm            miner.BeneficiaryTerm           `mir:"-"`
+	PendingBeneficiaryTerm     *miner.PendingBeneficiaryChange `mir:"-"`
 	State                      interface{}
 }
 

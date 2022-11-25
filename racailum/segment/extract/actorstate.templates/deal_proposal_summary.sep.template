@@ -7,8 +7,13 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
+    {{ if ge .Ver 8 }}
+    market{{ .Ver }} "{{ .ImportPath }}/market"
+    adt{{ .Ver }} "{{ .ImportPath }}/util/adt"
+    {{ else }}
 	market{{ .Ver }} "{{ .ImportPath }}/actors/builtin/market"
 	adt{{ .Ver }} "{{ .ImportPath }}/actors/util/adt"
+	{{ end }}
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -32,7 +37,7 @@ func init() {
 }
 
 func extractDealProposalSummaryV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market{{ .Ver }}.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalSummaryTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalSummaryTicks, ctx, head.Epoch) {
         return nil
     }
 

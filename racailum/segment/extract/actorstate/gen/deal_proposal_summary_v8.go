@@ -11,8 +11,8 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
-	market8 "github.com/filecoin-project/specs-actors/v8/actors/builtin/market"
-	adt8 "github.com/filecoin-project/specs-actors/v8/actors/util/adt"
+	market8 "github.com/filecoin-project/go-state-types/builtin/v8/market"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -26,7 +26,7 @@ func init() {
 }
 
 func extractDealProposalSummaryV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market8.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalSummaryTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalSummaryTicks, ctx, head.Epoch) {
 		return nil
 	}
 

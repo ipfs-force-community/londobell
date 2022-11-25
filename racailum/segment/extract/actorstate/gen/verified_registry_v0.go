@@ -33,7 +33,7 @@ func init() {
 }
 
 func extractVerifRegV0(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg0.State) error {
-	if !extract.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.VerifiedRegistryTicks, ctx, head.Epoch) {
+	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.VerifiedRegistryTicks, ctx, head.Epoch) {
 		return nil
 	}
 
@@ -44,10 +44,6 @@ func extractVerifRegV0(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		{
 			name: "Verifier",
 			root: st.Verifiers,
-		},
-		{
-			name: "VerifiedClient",
-			root: st.VerifiedClients,
 		},
 	}
 

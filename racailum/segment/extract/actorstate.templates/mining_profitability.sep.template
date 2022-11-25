@@ -4,12 +4,21 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/ipfs/go-cid"
 
+    {{ if ge .Ver 8 }}
+    "github.com/filecoin-project/go-state-types/abi"
+    builtin{{ .Ver }} "github.com/filecoin-project/go-state-types/builtin"
+    miner{{ .Ver }} "{{ .ImportPath }}/miner"
+    power{{ .Ver }} "{{ .ImportPath }}/power"
+    reward{{ .Ver }} "{{ .ImportPath }}/reward"
+    {{ else }}
 	builtin{{ .Ver }} "{{ .ImportPath }}/actors/builtin"
 	miner{{ .Ver }} "{{ .ImportPath }}/actors/builtin/miner"
 	power{{ .Ver }} "{{ .ImportPath }}/actors/builtin/power"
 	reward{{ .Ver }} "{{ .ImportPath }}/actors/builtin/reward"
+	{{ end }}
 
 	"github.com/filecoin-project/lotus/chain/vm"
 
@@ -59,6 +68,18 @@ func init() {
 {{ with (eq .Ver 6) -}}
 // see https://github.com/filecoin-project/specs-actors/blob/v6.0.0/actors/builtin/miner/miner_actor.go#L1165-L1178
 // and https://github.com/filecoin-project/specs-actors/blob/v6.0.0/actors/builtin/miner/monies.go#L99-L104
+{{- end -}}
+{{ with (eq .Ver 7) -}}
+// see https://github.com/filecoin-project/specs-actors/blob/v7.0.1/actors/builtin/miner/miner_actor.go#L1138-L1146
+// and https://github.com/filecoin-project/specs-actors/blob/v7.0.1/actors/builtin/miner/monies.go#L99-L104
+{{- end -}}
+{{ with (eq .Ver 8) -}}
+// see https://github.com/filecoin-project/builtin-actors/blob/v8.0.0/actors/miner/src/lib.rs#L4298-L4328
+// and https://github.com/filecoin-project/builtin-actors/blob/v8.0.0/actors/miner/src/monies.rs#L147-L161
+{{- end -}}
+{{ with (eq .Ver 9) -}}
+// see https://github.com/filecoin-project/builtin-actors/blob/v9.0.0/actors/miner/src/lib.rs#L4866-L4896
+// and https://github.com/filecoin-project/builtin-actors/blob/v9.0.0/actors/miner/src/monies.rs#L143-L157
 {{- end }}
 func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward{{ .Ver }}.State) error {
 	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Global.Power.Head)
@@ -66,7 +87,7 @@ func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, h
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
 	}
 
-	state, err := vm.DumpActorState(reg.ActorReg, head.Global.Power, blkraw.RawData())
+	state, err := vm.DumpActorState(filcns.NewTipSetExecutor().NewActorRegistry(), head.Global.Power, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 	}
@@ -78,7 +99,11 @@ func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, h
 
 	qaPower := miner{{ .Ver }}.QAPowerForWeight(sectorSize32GiB, 180, big.Zero(), big.Zero())
 
-	storagePledge := miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner{{ .Ver }}.InitialPledgeProjectionPeriod)
+    {{ if ge .Ver 9 -}}
+    storagePledge := miner9.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, miner9.QAPowerMax(sectorSize32GiB), miner9.PreCommitDepositProjectionPeriod)
+	{{- else -}}
+    storagePledge := miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner{{ .Ver }}.InitialPledgeProjectionPeriod)
+    {{- end }}
 	{{ if eq .Ver 0 -}}
 	initPledge := miner{{ .Ver }}.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, pwrState.ThisEpochPledgeCollateral,
 		st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating)
@@ -99,7 +124,11 @@ func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, h
 		ProjectionOfFaultFee:      miner{{ .Ver }}.PledgePenaltyForDeclaredFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, ctx.D.GetNetworkVersion(ctx.C, head.Epoch)),
 		Mined:                     st.TotalMined,
 		{{- else -}}
+		{{- if ge .Ver 8 -}}
+        ProjectionOfFaultFee:      miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, abi.ChainEpoch(builtin{{ .Ver }}.EpochsInDay*351)/100),
+		{{- else -}}
 		ProjectionOfFaultFee:      miner{{ .Ver }}.PledgePenaltyForContinuedFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower),
+		{{- end }}
 		Mined:                     st.TotalStoragePowerReward,
 		{{- end}}
 	}
