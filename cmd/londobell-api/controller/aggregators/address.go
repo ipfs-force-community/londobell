@@ -47,7 +47,11 @@ func GetAddress(c *gin.Context) {
 	}
 
 	if len(addressRes) != 1 {
-		util.ReturnOnErr(c, alog, fmt.Errorf("get wrong result, length of result shoule be one but is %v", len(addressRes)))
+		err := fmt.Errorf("get wrong result, length of result shoule be one but is %v", len(addressRes))
+		res.Code = model.NotFound
+		res.Msg = err.Error()
+		c.JSON(http.StatusOK, res)
+		log.Error(err)
 		return
 	}
 

@@ -5,6 +5,7 @@ type State = uint64
 const (
 	Success State = iota
 	Fail
+	NotFound
 )
 
 type CommonRes struct {
