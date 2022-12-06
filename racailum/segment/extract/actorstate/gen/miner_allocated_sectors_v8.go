@@ -12,6 +12,7 @@ import (
 )
 
 func init() {
+	// reg.MustRegisterPreCheck("AllocatedSectorsV8", nil, nil)
 	// reg.MustRegisterRegularExtractor("AllocatedSectorsV8", extractAllocatedSectorsV8)
 }
 

@@ -20,6 +20,11 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("PendingTxnsV0", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.PendingTxns
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.PendingTxnsTicks
+	})
 	reg.MustRegisterRegularExtractor("PendingTxnsV0", extractPendingTxnsV0)
 
 	schema.Register(
@@ -31,9 +36,6 @@ func init() {
 }
 
 func extractPendingTxnsV0(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *multisig0.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.PendingTxnsTicks, ctx, head.Epoch) {
-		return nil
-	}
 
 	pendingTxns, err := adt0.AsMap(ctx.D.ActorStore(ctx.C), st.PendingTxns)
 

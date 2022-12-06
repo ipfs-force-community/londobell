@@ -17,6 +17,11 @@ import (
 )
 
 func init() {
+     reg.MustRegisterPreCheck("DatacapBalancesV{{ .Ver }}", func(ctx *extract.Ctx) bool {
+        return ctx.Opts.ZeroHourExtract.DatacapBalances
+    }, func(ctx *extract.Ctx) int {
+        return ctx.Opts.StateRegular.DatacapBalancesTicks
+    })
 	reg.MustRegisterRegularExtractor("DatacapBalancesV{{ .Ver }}", extractDatacapBalancesV{{ .Ver }})
 
     {{ if eq .Ver 9 -}}
@@ -30,10 +35,6 @@ func init() {
 }
 
 func extractDatacapBalancesV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *datacap{{ .Ver }}.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DatacapBalancesTicks, ctx, head.Epoch) {
-		return nil
-	}
-
 	actorToHamtMap, err := adt{{ .Ver }}.AsMap(ctx.D.ActorStore(ctx.C), st.Token.Balances, int(st.Token.HamtBitWidth))
 	if err != nil {
 		return fmt.Errorf("couldn't get outer map: %w, st.Token.Balances: %v", err, st.Token.Balances)

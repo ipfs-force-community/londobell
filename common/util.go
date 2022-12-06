@@ -70,7 +70,11 @@ func LoadLinkedTipSet(cs ChainStore, child types.TipSetKey) (*LinkedTipSet, erro
 	}, nil
 }
 
-func IsZeroHour(curEpoch abi.ChainEpoch) bool {
+func IsZeroHour(tickOption bool, curEpoch abi.ChainEpoch) bool {
+	if !tickOption {
+		return false
+	}
+
 	curTime := time.Unix(BaseTime.Unix()+int64(curEpoch)*30, 0).In(Loc)
 	if curTime.Hour() == 0 && curTime.Minute() == 0 && curTime.Second() == 0 {
 		return true

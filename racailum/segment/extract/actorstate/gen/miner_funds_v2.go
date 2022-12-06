@@ -13,6 +13,11 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("MinerFundsV2", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.MinerFunds
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.MinerFundsTicks
+	})
 	reg.MustRegisterRegularExtractor("MinerFundsV2", extractMinerFundsV2)
 }
 

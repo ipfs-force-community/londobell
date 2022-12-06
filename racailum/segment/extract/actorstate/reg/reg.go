@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/cbor"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -32,8 +33,9 @@ var (
 )
 
 type Extractor struct {
-	Name   string
-	Method func(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, state cbor.Er) error
+	Name     string
+	Method   func(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, state cbor.Er) error
+	PreCheck func(ctx *extract.Ctx, name string, epoch abi.ChainEpoch) bool
 }
 
 type registry struct {
@@ -62,19 +64,23 @@ func Extractors(typ reflect.Type) ([]Extractor, bool) {
 
 var extractorRegistry = struct {
 	regular *registry
+	pre     *preCheck
 }{
 	regular: &registry{
 		e: make(map[reflect.Type][]Extractor),
 	},
+	pre: &preCheck{
+		c: make(map[string]Check),
+	},
 }
 
 func MustRegisterRegularExtractor(name string, fn interface{}) {
-	if err := registerExtractor(extractorRegistry.regular, name, fn); err != nil {
+	if err := registerExtractor(extractorRegistry.regular, extractorRegistry.pre, name, fn); err != nil {
 		panic(fmt.Errorf("register actor state regulaer extractor: %s", err))
 	}
 }
 
-func registerExtractor(reg *registry, name string, fn interface{}) error {
+func registerExtractor(reg *registry, pre *preCheck, name string, fn interface{}) error {
 	fnVal := reflect.ValueOf(fn)
 	if kind := fnVal.Kind(); kind != reflect.Func {
 		return fmt.Errorf("actor state-ex extractor should be a func, got %s", kind)
@@ -128,8 +134,48 @@ func registerExtractor(reg *registry, name string, fn interface{}) error {
 	reg.e[stateInType] = append(reg.e[stateInType], Extractor{
 		Name:   name,
 		Method: exfn,
+		PreCheck: func(ctx *extract.Ctx, name string, epoch abi.ChainEpoch) bool {
+			pre.Lock()
+			defer pre.Unlock()
+			return validate(ctx, pre.c[name], epoch)
+		},
 	})
 	reg.Unlock()
 
 	return nil
+}
+
+type Check struct {
+	ZeroHourOption func(*extract.Ctx) bool
+	TickOption     func(*extract.Ctx) int
+}
+
+type preCheck struct {
+	sync.RWMutex
+	c map[string]Check
+}
+
+func MustRegisterPreCheck(name string, getZeroHourOption func(*extract.Ctx) bool, getTickOption func(*extract.Ctx) int) {
+	if err := registerPreCheck(extractorRegistry.pre, name, getZeroHourOption, getTickOption); err != nil {
+		panic(fmt.Errorf("register actor pre check failed: %s", err))
+	}
+}
+
+func registerPreCheck(pre *preCheck, name string, getZeroHourOption func(*extract.Ctx) bool, getTickOption func(*extract.Ctx) int) error {
+	pre.Lock()
+	pre.c[name] = Check{ZeroHourOption: getZeroHourOption, TickOption: getTickOption}
+	pre.Unlock()
+
+	return nil
+}
+
+func validate(ctx *extract.Ctx, check Check, epoch abi.ChainEpoch) bool {
+	isZeroHour := check.ZeroHourOption != nil && common.IsZeroHour(check.ZeroHourOption(ctx), epoch)
+	isExtract := check.TickOption == nil || check.TickOption != nil && extract.IsExtract(check.TickOption(ctx), ctx, epoch)
+
+	if !isZeroHour && !isExtract {
+		return false
+	}
+
+	return true
 }

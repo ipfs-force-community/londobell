@@ -23,7 +23,13 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("MarketFundsV{{ .Ver }}", func(ctx *extract.Ctx) bool {
+        return ctx.Opts.ZeroHourExtract.MarketFunds
+    }, func(ctx *extract.Ctx) int {
+        return ctx.Opts.StateRegular.MarketFundsTicks
+    })
 	reg.MustRegisterRegularExtractor("MarketFundsV{{ .Ver }}", extractMarketFundsV{{ .Ver }})
+
 	{{ if eq .Ver 0 -}}
 	schema.Register(
 		schema.Model{
@@ -35,10 +41,6 @@ func init() {
 }
 
 func extractMarketFundsV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market{{ .Ver }}.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.MarketFundsTicks, ctx, head.Epoch) {
-        return nil
-    }
-
 	var detail model.MarketFundsDetail
 	if err := mir.Mirror(&detail, st); err != nil {
 		return fmt.Errorf("mirroring *market.State: %w", err)

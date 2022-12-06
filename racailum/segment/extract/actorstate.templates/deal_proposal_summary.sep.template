@@ -25,7 +25,13 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("DealProposalSummaryV{{ .Ver }}", func(ctx *extract.Ctx) bool {
+        return ctx.Opts.ZeroHourExtract.DealProposalSummary
+    }, func(ctx *extract.Ctx) int {
+        return ctx.Opts.StateRegular.DealProposalSummaryTicks
+    })
 	reg.MustRegisterRegularExtractor("DealProposalSummaryV{{ .Ver }}", extractDealProposalSummaryV{{ .Ver }})
+
 	{{ if eq .Ver 0 -}}
 	schema.Register(
 		schema.Model{
@@ -37,10 +43,6 @@ func init() {
 }
 
 func extractDealProposalSummaryV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market{{ .Ver }}.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalSummaryTicks, ctx, head.Epoch) {
-        return nil
-    }
-
 	deals, err := market{{ .Ver }}.AsDealProposalArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
 	if err != nil {
 		return fmt.Errorf("load deal proposal array: %w", err)

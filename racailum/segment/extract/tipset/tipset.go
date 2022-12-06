@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/ipfs/go-cid"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
@@ -22,7 +24,6 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
-	"github.com/ipfs/go-cid"
 	"go.opencensus.io/trace"
 
 	"github.com/filecoin-project/lotus/api"
@@ -373,7 +374,7 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 	height := ts.Height()
-	if !common.IsZeroHour(height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorBalanceTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractActorBalance {
+	if !common.IsZeroHour(ctx.Opts.ZeroHourExtract.ActorBalance, height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorBalanceTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractActorBalance {
 		return nil
 	}
 
@@ -462,7 +463,7 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	forRegular := ctx.Opts.StateRegular.Interval > 0 && height%ctx.Opts.StateRegular.Interval == 0
 
-	if !forRegular || !ctx.Opts.EnabelExtract.EnableExtractState && !ctx.Opts.EnabelExtract.EnableExtractFilSupply {
+	if !forRegular && !common.IsZeroHour(true, height) || !ctx.Opts.EnabelExtract.EnableExtractState && !ctx.Opts.EnabelExtract.EnableExtractFilSupply {
 		return nil
 	}
 
@@ -515,7 +516,7 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		res.RegularStates = actors
 	}
 
-	if ctx.Opts.EnabelExtract.EnableExtractFilSupply {
+	if ctx.Opts.EnabelExtract.EnableExtractFilSupply && (forRegular || common.IsZeroHour(ctx.Opts.ZeroHourExtract.FilSupply, height)) {
 		res.Docs = append(res.Docs, &model.FilSupply{
 			Epoch:             height,
 			CirculatingSupply: supply,

@@ -24,6 +24,11 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("ClaimsV9", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.Claims
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.ClaimsTicks
+	})
 	reg.MustRegisterRegularExtractor("ClaimsV9", extractClaimsV9)
 
 	schema.Register(
@@ -35,10 +40,6 @@ func init() {
 }
 
 func extractClaimsV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg9.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.ClaimsTicks, ctx, head.Epoch) {
-		return nil
-	}
-
 	actorToHamtMap, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), st.Claims, builtin.DefaultHamtBitwidth)
 	if err != nil {
 		return fmt.Errorf("couldn't get outer map: %w, st.Claims: %v", err, st.Claims)

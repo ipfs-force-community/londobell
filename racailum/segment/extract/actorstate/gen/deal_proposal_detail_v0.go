@@ -21,7 +21,13 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("DealProposalDetailedV0", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.DealProposalDetail
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.DealProposalDetailTicks
+	})
 	reg.MustRegisterRegularExtractor("DealProposalDetailedV0", extractDealProposalDetailedV0)
+
 	schema.Register(
 		schema.Model{
 			Name: "deal-proposal-detail",
@@ -38,10 +44,6 @@ func init() {
 }
 
 func extractDealProposalDetailedV0(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market0.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.DealProposalDetailTicks, ctx, head.Epoch) {
-		return nil
-	}
-
 	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
 		return fmt.Errorf("ge regular id: %w", err)

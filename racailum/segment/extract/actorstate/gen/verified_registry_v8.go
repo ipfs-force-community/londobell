@@ -22,15 +22,16 @@ import (
 )
 
 func init() {
+	reg.MustRegisterPreCheck("VerifRegV8", func(ctx *extract.Ctx) bool {
+		return ctx.Opts.ZeroHourExtract.VerifiedRegistry
+	}, func(ctx *extract.Ctx) int {
+		return ctx.Opts.StateRegular.VerifiedRegistryTicks
+	})
 	reg.MustRegisterRegularExtractor("VerifRegV8", extractVerifRegV8)
 
 }
 
 func extractVerifRegV8(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *verifreg8.State) error {
-	if !common.IsZeroHour(head.Epoch) && !extract.IsExtract(ctx.Opts.StateRegular.VerifiedRegistryTicks, ctx, head.Epoch) {
-		return nil
-	}
-
 	mapRoots := []struct {
 		name string
 		root cid.Cid
