@@ -51,6 +51,9 @@ func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to strin
 
 	var actType string
 	if code == cid.Undef {
+		if Actor == "" {
+			return actor.MethodInfo{}, nil
+		}
 		actTypes := strings.Split(Actor, "/")
 		actType = actTypes[2]
 		av, err := strconv.Atoi(actTypes[1])
