@@ -133,6 +133,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/traces", aggregators.GetTraces)
 		group.POST("/child_epoch", aggregators.GetChildEpoch)
 		group.POST("/miners_blockreward", aggregators.GetMinersBlockReward)
+		group.POST("/burn_monitor", aggregators.GetBurnMonitor)
 	}
 }
 

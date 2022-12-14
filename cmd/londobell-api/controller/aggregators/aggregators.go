@@ -17,6 +17,7 @@ var (
 	tracesAggregator            []byte
 	childEpochAggregator        []byte
 	minersBlockrewardAggregator []byte
+	burnMonitorAggregator       []byte
 )
 
 func InitAggregators() {
@@ -35,4 +36,5 @@ func InitAggregators() {
 	tracesAggregator = monitor.GetTracesAggregator()
 	childEpochAggregator = monitor.GetChildEpochAggregator()
 	minersBlockrewardAggregator = monitor.GetMinersBlockRewardAggregator()
+	burnMonitorAggregator = monitor.GetBurnMonitorAggregator()
 }
