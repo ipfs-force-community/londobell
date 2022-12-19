@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dtynn/dix"
+	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs-force-community/londobell/common"
 	logging "github.com/ipfs/go-log/v2"
@@ -29,6 +30,7 @@ type Candidate struct {
 	weight types.BigInt
 	api    v0api.FullNode
 	url    string
+	closer jsonrpc.ClientCloser
 }
 
 type StateComponents struct {
@@ -46,16 +48,16 @@ func (l *fxlogger) Printf(msg string, args ...interface{}) {
 	l.ZapEventLogger.Debugf(msg, args...)
 }
 
-func GetFullNodeAPI(ctx context.Context, url string) (v0api.FullNode, error) {
-	api, _, err := client.NewFullNodeRPCV0(ctx, url, nil)
+func GetFullNodeAPI(ctx context.Context, url string) (v0api.FullNode, jsonrpc.ClientCloser, error) {
+	api, closer, err := client.NewFullNodeRPCV0(ctx, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return api, nil
+	return api, closer, nil
 }
 
-func InjectAppropriateFullNode() dix.Option {
+func InjectAppropriateFullNode(full v0api.FullNode) dix.Option {
 	return dix.Override(new(v0api.FullNode), func(lc fx.Lifecycle) v0api.FullNode {
-		return API.GetAppropriateAPI()
+		return full
 	})
 }

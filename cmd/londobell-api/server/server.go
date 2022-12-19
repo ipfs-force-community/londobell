@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/dtynn/dix"
 	"github.com/gin-gonic/gin"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
@@ -19,7 +18,6 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
-	"github.com/ipfs-force-community/londobell/dep"
 )
 
 var (
@@ -40,6 +38,16 @@ func Run(cctx *cli.Context, useAPI bool) error {
 
 	if useAPI {
 		adapter.API = adapter.NewAppropriateAPI(cctx.StringSlice("apis"))
+		err = adapter.API.Choose(ctx)
+		if err != nil {
+			return err
+		}
+
+		_, err = adapter.API.InjectNewFullNode(cctx)
+		if err != nil {
+			return err
+		}
+
 		tick := time.NewTicker(15 * time.Second)
 		defer tick.Stop()
 		go func() {
@@ -52,9 +60,15 @@ func Run(cctx *cli.Context, useAPI bool) error {
 						continue
 					}
 
-					_, err = dix.New(ctx, dep.Bell(ctx, adapter.Fxlog, &adapter.Components), dep.InjectRepoPath(cctx), adapter.InjectAppropriateFullNode())
-					if err != nil {
-						log.Errorf("inject dependencies failed: %v", err)
+					injectNew, err := adapter.API.InjectNewFullNode(cctx)
+					if injectNew {
+						if err != nil {
+							log.Errorf("inject new fullnode failed: %v", err)
+						} else {
+							log.Info("inject new fullnode successfully")
+						}
+					} else {
+						log.Info("no new fullnode injected")
 					}
 				}
 			}
