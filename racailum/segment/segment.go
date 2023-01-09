@@ -6,23 +6,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ipfs-force-community/londobell/metrics"
-	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
-	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-
-	"go.opencensus.io/stats"
-	"go.opencensus.io/trace"
-
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/ipfs/go-cid"
-	logging "github.com/ipfs/go-log/v2"
-
 	"github.com/filecoin-project/lotus/chain/types"
-
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil/mdict"
+	"github.com/ipfs-force-community/londobell/metrics"
 	"github.com/ipfs-force-community/londobell/racailum/segment/aggregate"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
+	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/trace"
 )
 
 var log = logging.Logger("segment")
@@ -342,4 +340,31 @@ func (s *Segment) SaveFinalHeight(ctx context.Context, hi *common.LinkedTipSet) 
 	}
 
 	return nil
+}
+
+func (s *Segment) GetFinalHeight(ctx context.Context) (abi.ChainEpoch, error) {
+	log.Info("get final height")
+
+	findOpts := make([]*options.FindOptions, 0)
+	findOpts = append(findOpts, options.Find().SetSort(bson.D{{Key: "_id", Value: -1}}), options.Find().SetLimit(-1))
+	cursor, err := s.rdb.Find(ctx, "FinalHeight", bson.D{}, findOpts...)
+	if err != nil {
+		return 0, err
+	}
+
+	type FinalHeightRes struct {
+		Epoch abi.ChainEpoch `bson:"_id"`
+		Cids  []string
+	}
+
+	var results []FinalHeightRes
+	if err = cursor.All(context.TODO(), &results); err != nil {
+		return 0, err
+	}
+
+	if len(results) != 1 {
+		return 0, fmt.Errorf("unexpected length of results: %v", len(results))
+	}
+
+	return results[0].Epoch, nil
 }

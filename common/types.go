@@ -7,15 +7,16 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/network"
-	"github.com/ipfs/go-cid"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.uber.org/zap"
-
 	"github.com/filecoin-project/lotus/api"
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/ipfs/go-cid"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.uber.org/zap"
 )
 
 // HeadNotifier receives head change events from chain syncer
@@ -89,6 +90,7 @@ type IndexedDocument interface {
 // DocumentDB is a simple abstraction of a document databse with only insert & delete methods exported
 type DocumentDB interface {
 	Insert(ctx context.Context, col string, docs []interface{}) (int, error)
+	Find(ctx context.Context, col string, filter interface{}, opts ...*options.FindOptions) (*mongo.Cursor, error)
 	Delete(ctx context.Context, col string, filter interface{}) (int, error)
 	Aggregate(ctx context.Context, col string, pipeline interface{}, res interface{}) error
 }
