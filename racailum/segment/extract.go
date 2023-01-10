@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ipfs-force-community/londobell/metrics"
+	"go.opencensus.io/stats"
+
 	"go.opencensus.io/trace"
 
 	"github.com/hashicorp/go-multierror"
@@ -160,6 +163,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 		ctx.asyncPersistWaitGroup.Go(func() error {
 			if err := s.insertMany(ctx.ctx, elog, docs); err != nil {
 				if nerr := common.NonCtxCanceledErr(err); nerr != nil {
+					stats.Record(ctx.ctx, metrics.ExtractError.M(1))
 					elog.Errorf("insert extracted documents from tipsets: %s", err)
 					return nerr
 				}
@@ -261,6 +265,7 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, pctx *persistCtx, heads
 	if s.opts.Persist.Async {
 		pctx.asyncPersistWaitGroup.Go(func() error {
 			if err := s.insertMany(originCtx, ctx.L, docs); err != nil {
+				stats.Record(originCtx, metrics.ExtractError.M(1))
 				return fmt.Errorf("insert extracted documents from regular states: %w", err)
 			}
 			return nil
