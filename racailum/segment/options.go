@@ -22,6 +22,7 @@ type extractOptions struct {
 
 type persistOptions struct {
 	Async            bool
+	AsyncState       bool
 	BatchInsertLimit int
 }
 
@@ -54,6 +55,7 @@ func DefaultOptions() Options {
 
 		Persist: persistOptions{
 			Async:            true,
+			AsyncState:       false,
 			BatchInsertLimit: 4 << 10,
 		},
 

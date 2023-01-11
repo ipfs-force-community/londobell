@@ -262,7 +262,7 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, pctx *persistCtx, heads
 		return fmt.Errorf("extract part regular states: %w", err)
 	}
 
-	if s.opts.Persist.Async {
+	if s.opts.Persist.AsyncState {
 		pctx.asyncPersistWaitGroup.Go(func() error {
 			if err := s.insertMany(originCtx, ctx.L, docs); err != nil {
 				stats.Record(originCtx, metrics.ExtractError.M(1))
