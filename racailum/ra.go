@@ -46,6 +46,7 @@ func DefaultConfig() Config {
 		EnableTracing: true,
 		EnableGrafana: true,
 		EnableDebug:   true,
+		OutdatedGap:   5760,
 	}
 }
 
@@ -74,6 +75,7 @@ type Config struct {
 	EnableTracing bool
 	EnableGrafana bool
 	EnableDebug   bool
+	OutdatedGap   int64
 }
 
 // New returns an instance of *RaCailum
@@ -219,6 +221,34 @@ HEAD_LOOP:
 				stats.Record(ctx, metrics.ExtractDuration.M(metrics.SinceInMilliseconds(estart)))
 			}
 			log.Infow("done tipset extracting", "tsk", tsk, "height", ts.Height(), "elapsed", time.Now().Sub(estart).String())
+		}
+	}
+}
+
+func (r *RaCailum) AlertOutdatedFinalHeight(ctx context.Context, outdatedGap int64) {
+	tick := time.NewTicker(30 * time.Minute)
+	defer tick.Stop()
+	for {
+		select {
+		case <-tick.C:
+			finalHeight, err := r.activeSeg.GetFinalHeight(ctx)
+			if err != nil {
+				log.Errorf("get final height failed: %v", err)
+				stats.Record(ctx, metrics.OutdatedFinalHeight.M(1))
+				continue
+			}
+
+			curEpoch := common.GetCurEpoch()
+			if curEpoch-finalHeight >= abi.ChainEpoch(outdatedGap) {
+				log.Warnf("finalHeight %v lag behind curEpoch %v more than outdatedGap %v", finalHeight, curEpoch, outdatedGap)
+				stats.Record(ctx, metrics.OutdatedFinalHeight.M(1))
+				continue
+			}
+
+			log.Infof("finalHeight %v not lag behind curEpoch %v more than outdatedGap %v", finalHeight, curEpoch, outdatedGap)
+			stats.Record(ctx, metrics.OutdatedFinalHeight.M(0))
+		case <-ctx.Done():
+			return
 		}
 	}
 }

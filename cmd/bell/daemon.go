@@ -70,6 +70,7 @@ var daemonStartCmd = &cli.Command{
 			return fmt.Errorf("sub head change: %w", err)
 		}
 		go components.Ra.Run(ctx, doneCh, ch)
+		go components.Ra.AlertOutdatedFinalHeight(ctx, components.Cfg.OutdatedGap)
 		addr := components.Cfg.HTTP.RPCListen
 		if addr == "" {
 			addr = racailum.DefaultRPCListenAddr

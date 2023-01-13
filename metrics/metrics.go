@@ -15,12 +15,13 @@ var (
 )
 
 var (
-	LoadTipSetDuration = stats.Float64("load_tipset_duration_ms", "Duration of lotus load tipset request", stats.UnitMilliseconds)
-	TipSetHeight       = stats.Int64("tipset_height", "The lastest received tipset's height ", stats.UnitDimensionless)
-	ExtractDuration    = stats.Float64("persist_duration_ms", "Duration of a models persist operation", stats.UnitMilliseconds)
-	ExtractError       = stats.Int64("extract_error_status", "Status of extract tipset", stats.UnitDimensionless)
-	LowerBoundary      = stats.Int64("lower_boundary", "lower boundary of segment", stats.UnitDimensionless)
-	UpperBoundary      = stats.Int64("upper_boundary", "upper boundary of segment", stats.UnitDimensionless)
+	LoadTipSetDuration  = stats.Float64("load_tipset_duration_ms", "Duration of lotus load tipset request", stats.UnitMilliseconds)
+	TipSetHeight        = stats.Int64("tipset_height", "The lastest received tipset's height ", stats.UnitDimensionless)
+	ExtractDuration     = stats.Float64("persist_duration_ms", "Duration of a models persist operation", stats.UnitMilliseconds)
+	ExtractError        = stats.Int64("extract_error_status", "Status of extract tipset", stats.UnitDimensionless)
+	LowerBoundary       = stats.Int64("lower_boundary", "lower boundary of segment", stats.UnitDimensionless)
+	UpperBoundary       = stats.Int64("upper_boundary", "upper boundary of segment", stats.UnitDimensionless)
+	OutdatedFinalHeight = stats.Int64("outdated_final_height", "outdated finalHeight of extract", stats.UnitDimensionless)
 
 	CacheGetCnt      = stats.Int64("cache_get_ops_total", "Cache get count", stats.UnitDimensionless)
 	CacheGetMissCnt  = stats.Int64("cache_get_miss_ops_total", "Cache get miss count", stats.UnitDimensionless)
@@ -62,6 +63,11 @@ var DefaultViews = []*view.View{
 	{
 		Name:        UpperBoundary.Name(),
 		Measure:     UpperBoundary,
+		Aggregation: view.LastValue(),
+	},
+	{
+		Name:        OutdatedFinalHeight.Name(),
+		Measure:     OutdatedFinalHeight,
 		Aggregation: view.LastValue(),
 	},
 }
