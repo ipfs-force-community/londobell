@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -22,7 +24,8 @@ func GetSectorInfo(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -30,7 +33,7 @@ func GetSectorInfo(c *gin.Context) {
 	defer cancel()
 
 	var ts *types.TipSet
-	api := API.GetAppropriateAPI()
+	api := fullnode.API.GetAppropriateAPI()
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)
 	} else {
@@ -38,13 +41,15 @@ func GetSectorInfo(c *gin.Context) {
 	}
 
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	maddr, err := address.NewFromString(req.Miner)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -52,7 +57,8 @@ func GetSectorInfo(c *gin.Context) {
 
 	sectors, err := api.StateMinerSectors(ctx, maddr, nil, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -70,7 +76,8 @@ func GetSectorInfo(c *gin.Context) {
 
 		resData.Size, err = info.SealProof.SectorSize()
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
