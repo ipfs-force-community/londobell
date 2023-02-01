@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+
 	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/filecoin-project/go-address"
@@ -20,8 +22,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/ipfs-force-community/londobell/buildnet"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
 	"github.com/ipfs-force-community/londobell/lib/limiter"
 )
 
@@ -56,13 +56,13 @@ var fixActorMessageCmd = &cli.Command{
 			return err
 		}
 
-		adapter.API = adapter.NewAppropriateAPI(util.Nodes)
-		err := adapter.API.Choose(ctx)
+		fullnode.API = fullnode.NewAppropriateAPI(util.Nodes)
+		err := fullnode.API.Choose(ctx)
 		if err != nil {
 			return err
 		}
 
-		api := adapter.API.GetAppropriateAPI()
+		api := fullnode.API.GetAppropriateAPI()
 
 		client, err := mongo.Connect(ctx, options.Client().ApplyURI(cctx.String("dsn")))
 		if err != nil {
@@ -164,7 +164,7 @@ var fixActorMessageCmd = &cli.Command{
 							lim.Release(context.TODO())
 						}()
 
-						pipe, err := aggregators.Parse(model.Ctx{StartEpoch: r.Start, EndEpoch: r.End}, getToFixActorMessageJS)
+						pipe, err := util.Parse(model.Ctx{StartEpoch: r.Start, EndEpoch: r.End}, getToFixActorMessageJS)
 						if err != nil {
 							return err
 						}
@@ -208,7 +208,7 @@ var fixActorMessageCmd = &cli.Command{
 						}
 
 						for id, actorID := range toCompleteMap {
-							pipe, err := aggregators.Parse(model.Ctx{PrimaryID: id, Addr: actorID.String()[1:]}, mergeFixActorMessageJS)
+							pipe, err := util.Parse(model.Ctx{PrimaryID: id, Addr: actorID.String()[1:]}, mergeFixActorMessageJS)
 							if err != nil {
 								return err
 							}

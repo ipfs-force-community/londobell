@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/filecoin-project/lotus/chain/vm"
+
 	"github.com/dtynn/dix"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -16,9 +18,10 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors"
 	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
+	"github.com/ipfs/go-cid"
+
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
-	"github.com/ipfs/go-cid"
 )
 
 var Nodes []Node
@@ -57,6 +60,8 @@ func NewActorSet() *ActorSet {
 	return &ActorSet{m: m}
 }
 
+var actorSet = NewActorSet()
+
 func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to string, Actor string) (actor.MethodInfo, error) {
 	To, err := address.NewFromString(common.AddAddressPrefix(to))
 	if err != nil {
@@ -66,7 +71,7 @@ func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to strin
 		return actor.MethodSend, nil
 	}
 
-	actorSet := NewActorSet()
+	//actorSet := NewActorSet()
 
 	code := cid.Undef
 	if code == cid.Undef {
@@ -108,6 +113,15 @@ func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to strin
 	if ccode, cname, ok := actor.DefaultActorConvertor(epoch, Actor); ok {
 		code = ccode
 		Actor = cname
+	}
+
+	if lbuiltin.IsPlaceholderActor(code) {
+		return actor.MethodInfo{
+			Actor: Actor,
+			Method: vm.MethodMeta{
+				Name: "Send(placeholder)",
+			},
+		}, nil
 	}
 
 	vma := filcns.NewActorRegistry()

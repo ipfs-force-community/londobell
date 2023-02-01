@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
@@ -24,13 +25,15 @@ func GetMinerInfo(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	maddr, err := address.NewFromString(req.Miner)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -38,7 +41,7 @@ func GetMinerInfo(c *gin.Context) {
 	defer cancel()
 
 	var ts *types.TipSet
-	api := API.GetAppropriateAPI()
+	api := fullnode.API.GetAppropriateAPI()
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)
 	} else {
@@ -46,49 +49,58 @@ func GetMinerInfo(c *gin.Context) {
 	}
 
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	mi, err := api.StateMinerInfo(ctx, maddr, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	power, err := api.StateMinerPower(ctx, maddr, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	mact, err := api.StateGetActor(ctx, maddr, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	if !builtin.IsStorageMinerActor(mact.Code) {
-		util.ReturnOnErr(c, alog, fmt.Errorf("provided address does not correspond to a miner actor"))
+		err = fmt.Errorf("provided address does not correspond to a miner actor")
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	availableBalance, err := api.StateMinerAvailableBalance(ctx, maddr, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(api))
 	mas, err := miner.Load(stor, mact)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	lockedFunds, err := mas.LockedFunds()
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -107,10 +119,16 @@ func GetMinerInfo(c *gin.Context) {
 	resData.VestingFunds = lockedFunds.VestingFunds
 	resData.LockedFunds = lockedFunds.PreCommitDeposits
 	resData.InitialPledgeRequirement = lockedFunds.InitialPledgeRequirement
+	resData.Beneficiary = mi.Beneficiary
+	resData.BeneficiaryTerm = mi.BeneficiaryTerm
+	resData.PendingBeneficiaryTerm = mi.PendingBeneficiaryTerm
+	resData.PeerID = mi.PeerId
+	resData.Multiaddrs = mi.Multiaddrs
 
 	err = getMinerResByCode(ctx, mact, stor, resData)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
