@@ -33,7 +33,8 @@ func GetActorsInfo(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -55,20 +56,23 @@ func GetActorsInfo(c *gin.Context) {
 	}
 
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	if req.ActorID == "" {
 		addrs, err = api.StateListActors(ctx, ts.Key())
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 	} else {
 		addr, err := address.NewFromString(req.ActorID)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		addrs = append(addrs, addr)
@@ -87,7 +91,8 @@ func GetActorsInfo(c *gin.Context) {
 		} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 {
 			actorID, err = api.StateLookupID(ctx, addr, ts.Key())
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 
@@ -98,7 +103,8 @@ func GetActorsInfo(c *gin.Context) {
 
 		act, err := api.StateGetActor(ctx, addr, ts.Key())
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
@@ -107,21 +113,24 @@ func GetActorsInfo(c *gin.Context) {
 			actorType = "account"
 			st, err := account.Load(stor, act)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 			state = st.GetState()
 
 			actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 		case builtin.IsMultisigActor(act.Code):
 			actorType = "multisig"
 			st, err := multisig.Load(stor, act)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 			state = st.GetState()
@@ -129,7 +138,8 @@ func GetActorsInfo(c *gin.Context) {
 			actorType = "power"
 			st, err := power.Load(stor, act)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 			state = st.GetState()
@@ -137,7 +147,8 @@ func GetActorsInfo(c *gin.Context) {
 			actorType = "reward"
 			st, err := reward.Load(stor, act)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 			state = st.GetState()
@@ -145,7 +156,8 @@ func GetActorsInfo(c *gin.Context) {
 			actorType = "init"
 			st, err := init_.Load(stor, act)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 			state = st.GetState()
@@ -153,7 +165,8 @@ func GetActorsInfo(c *gin.Context) {
 			actorType = "market"
 			st, err := market.Load(stor, act)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 			state = st.GetState()
@@ -161,7 +174,8 @@ func GetActorsInfo(c *gin.Context) {
 			actorType = "verify"
 			st, err := verifreg.Load(stor, act)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 			state = st.GetState()
@@ -170,7 +184,8 @@ func GetActorsInfo(c *gin.Context) {
 			actorType = "system"
 			st, err := MakeSystemState(stor, act.Code)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 			state = st.GetState()
@@ -178,7 +193,8 @@ func GetActorsInfo(c *gin.Context) {
 			actorType = "miner"
 			st, err := miner.Load(stor, act)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 			state = st.GetState()
@@ -186,7 +202,8 @@ func GetActorsInfo(c *gin.Context) {
 			actorType = "paych"
 			st, err := paych.Load(stor, act)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 			state = st.GetState()

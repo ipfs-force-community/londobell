@@ -20,28 +20,37 @@ func GetFinalHeight(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
-	var finalHeightRes []model.FinalHeightRes
-	pipe, err := Parse(model.Ctx{}, string(finalHeightAggregator))
+	finalHeightRes, err := GetFinalHeightForFormalDB(ctx)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
-		return
-	}
-	cur, err := mongoutil.FinalHeightCol.Aggregate(ctx, pipe)
-	if err != nil {
-		util.ReturnOnErr(c, alog, err)
-		return
-	}
-
-	err = cur.All(ctx, &finalHeightRes)
-	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	res.Data = finalHeightRes
 	c.JSON(http.StatusOK, res)
+}
+
+func GetFinalHeightForFormalDB(ctx context.Context) ([]model.FinalHeightRes, error) {
+	var finalHeightRes []model.FinalHeightRes
+	pipe, err := Parse(model.Ctx{}, string(finalHeightAggregator))
+	if err != nil {
+		return nil, err
+	}
+	cur, err := mongoutil.FinalHeightCol.Aggregate(ctx, pipe)
+	if err != nil {
+		return nil, err
+	}
+
+	err = cur.All(ctx, &finalHeightRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return finalHeightRes, nil
 }

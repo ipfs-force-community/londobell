@@ -28,4 +28,5 @@ type MinersInfoRes struct {
 	InitialPledge        string         `bson:"initial_pledge" json:"InitialPledge"`
 	PreCommitDeposits    string         `bson:"pre_commit_deposits" json:"PreCommitDeposits"`
 	States               interface{}    `bson:"states" json:"State"`
+	Multiaddrs           interface{}    `bson:"multiaddrs" json:"Multiaddrs"`
 }

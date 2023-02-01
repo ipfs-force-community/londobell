@@ -56,13 +56,15 @@ func GetMinerInfo(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	maddr, err := address.NewFromString(req.Miner)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -78,49 +80,58 @@ func GetMinerInfo(c *gin.Context) {
 	}
 
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	mi, err := api.StateMinerInfo(ctx, maddr, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	power, err := api.StateMinerPower(ctx, maddr, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	mact, err := api.StateGetActor(ctx, maddr, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	if !builtin.IsStorageMinerActor(mact.Code) {
-		util.ReturnOnErr(c, alog, fmt.Errorf("provided address does not correspond to a miner actor"))
+		err = fmt.Errorf("provided address does not correspond to a miner actor")
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	availableBalance, err := api.StateMinerAvailableBalance(ctx, maddr, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(api))
 	mas, err := miner.Load(stor, mact)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	lockedFunds, err := mas.LockedFunds()
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -142,7 +153,8 @@ func GetMinerInfo(c *gin.Context) {
 
 	err = getMinerResByCode(ctx, mact, stor, resData)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 

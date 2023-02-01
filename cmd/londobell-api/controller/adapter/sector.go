@@ -22,7 +22,8 @@ func GetSectorInfo(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -38,13 +39,15 @@ func GetSectorInfo(c *gin.Context) {
 	}
 
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	maddr, err := address.NewFromString(req.Miner)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -52,7 +55,8 @@ func GetSectorInfo(c *gin.Context) {
 
 	sectors, err := api.StateMinerSectors(ctx, maddr, nil, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -70,7 +74,8 @@ func GetSectorInfo(c *gin.Context) {
 
 		resData.Size, err = info.SealProof.SectorSize()
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 

@@ -13,6 +13,12 @@ var daemonCmd = &cli.Command{
 			Name:  "port",
 			Usage: "2345",
 		},
+		&cli.StringSliceFlag{
+			Name:  "apis",
+			Usage: "ws://127.0.0.1:1234/rpc/v0",
+		},
+
+		// todo: dbs of config.json
 	},
 	Action: func(cctx *cli.Context) error {
 		err := server.Run(cctx, false)

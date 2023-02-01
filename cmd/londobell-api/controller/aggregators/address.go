@@ -22,7 +22,8 @@ func GetAddress(c *gin.Context) {
 	err := c.BindJSON(&req)
 	//todo: 🍬？
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -30,19 +31,22 @@ func GetAddress(c *gin.Context) {
 
 	pipe, err := Parse(model.Ctx{Addr: req.Addr}, string(addressAggregator))
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	cur, err := mongoutil.ActorBalanceCol.Aggregate(ctx, pipe)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	err = cur.All(ctx, &addressRes)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 

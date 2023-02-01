@@ -7,17 +7,18 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/urfave/cli/v2"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+
+	"github.com/gin-gonic/gin"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/urfave/cli/v2"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 var (
@@ -36,7 +37,7 @@ func Run(cctx *cli.Context, useAPI bool) error {
 		ctx = context.Background()
 	)
 
-	if useAPI {
+	if useAPI { // todo
 		adapter.API = adapter.NewAppropriateAPI(cctx.StringSlice("apis"))
 		err = adapter.API.Choose(ctx)
 		if err != nil {
@@ -83,13 +84,32 @@ func Run(cctx *cli.Context, useAPI bool) error {
 			return err
 		}
 		defer mongoutil.Client.Disconnect(ctx) //nolint:errcheck
-
 		db := mongoutil.Client.Database(mongoutil.DbConfig.Name)
 		mongoutil.TraceCol = db.Collection("ExecTrace")
 		mongoutil.ActorBalanceCol = db.Collection("ActorBalance")
 		mongoutil.FinalHeightCol = db.Collection("FinalHeight")
 		mongoutil.MinerSectorHealthCol = db.Collection("MinerSectorHealth")
 		mongoutil.TipSetCol = db.Collection("Tipset")
+		mongoutil.ActorStateCol = db.Collection("ActorState")
+		mongoutil.MinerFundsCol = db.Collection("MinerFunds")
+		mongoutil.BlockHeaderCol = db.Collection("BlockHeader")
+		mongoutil.ClaimedPowerCol = db.Collection("ClaimedPower")
+		mongoutil.DealProposalCol = db.Collection("DealProposal")
+		mongoutil.MessageCol = db.Collection("Message")
+		mongoutil.MessageBlockCol = db.Collection("MessageBlock")
+
+		// tmp
+		mongoutil.TmpClient, err = mongo.Connect(ctx, options.Client().ApplyURI(mongoutil.DbConfig.TmpURL).SetRegistry(bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{})).Build()))
+		if err != nil {
+			return err
+		}
+		defer mongoutil.TmpClient.Disconnect(ctx) //nolint:errcheck
+		tmpDB := mongoutil.TmpClient.Database(mongoutil.DbConfig.TmpName)
+		mongoutil.TmpTraceCol = tmpDB.Collection("ExecTrace")
+		mongoutil.TmpTipSetCol = tmpDB.Collection("Tipset")
+		mongoutil.TmpBlockHeaderCol = tmpDB.Collection("BlockHeader")
+		mongoutil.TmpMessageCol = tmpDB.Collection("Message")
+		mongoutil.TmpMessageBlockCol = tmpDB.Collection("MessageBlock")
 
 		RegisterAggregatorsApi(router)
 	}
@@ -114,7 +134,6 @@ func Run(cctx *cli.Context, useAPI bool) error {
 }
 
 func RegisterAdapterApi(router *gin.Engine) {
-	// todo: 更新文档
 	group := router.Group("/adapter").Use()
 	{
 		group.POST("/actor", adapter.GetActorInfo)
@@ -127,6 +146,10 @@ func RegisterAdapterApi(router *gin.Engine) {
 		group.POST("/sectorpower", adapter.GetSectorPowerInfo)
 		group.POST("/precommit_deposit_toburn", adapter.GetPreCommitDepositToBurnInfo)
 		group.POST("/sector_for_miner", adapter.GetSectorForMinerInfo)
+		group.POST("/mpool", adapter.GetPendingMessages)
+		group.POST("/list_miners", adapter.GetListMiners)
+		group.POST("/current_sector_initial_pledge", adapter.CurrentSectorInitialPledge)
+		group.POST("/sectornumber_by_dealID", adapter.GetSectorNumberByDealID)
 	}
 }
 
@@ -148,6 +171,39 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/child_epoch", aggregators.GetChildEpoch)
 		group.POST("/miners_blockreward", aggregators.GetMinersBlockReward)
 		group.POST("/burn_monitor", aggregators.GetBurnMonitor)
+		group.POST("/latest_tipset", aggregators.GetLatestTipSet)
+		group.POST("/total_block_count", aggregators.GetTotalBlockCount)
+		group.POST("/actor_state_epoch", aggregators.GetActorStateForEpoch)
+		group.POST("/tipset", aggregators.GetTipSet)
+		group.POST("/miner_info", aggregators.GetMinerInfo)
+		group.POST("/balance", aggregators.GetBalance)
+		group.POST("/miners_for_owner", aggregators.GetMinersForOwner)
+		group.POST("/messages_for_actor", aggregators.GetMessagesForActor)
+		group.POST("/transfer_messages", aggregators.GetTransferMessages)
+		group.POST("/time_of_trace", aggregators.GetTimeOfTrace)
+		group.POST("/create_time", aggregators.GetCreateTime)
+		group.POST("/gascost_for_sector", aggregators.GetGasCostForSector)
+		group.POST("/transfer_message_for_largeAmount", aggregators.GetTransferMessageForLargeAmount)
+		group.POST("/deals", aggregators.GetDeals)
+		group.POST("/detail_for_deal", aggregators.GetDetailForDeal)
+		group.POST("/blockheader", aggregators.GetBlockHeader)
+		group.POST("/trace_for_message", aggregators.GetTraceForMessage)
+		group.POST("/batch_trace_for_message", aggregators.GetBatchTraceForMessage)
+		group.POST("/child_transfers_for_message", aggregators.GetChildTransfersForMessage)
+		group.POST("/all_owners", aggregators.GetAllOwners)
+		group.POST("/parent_tipset", aggregators.GetParentTipSet)
+		group.POST("/blockheader_by_cid", aggregators.GetBlockHeaderByCid)
+		group.POST("/blockmessages_by_methodname", aggregators.GetBlockMessagesByMethodName)
+		group.POST("/actormessages_by_methodname", aggregators.GetActorMessagesByMethodName)
+		group.POST("/blockheaders_by_miner", aggregators.GetBlockHeadersByMiner)
+		group.POST("/deals_by_addr", aggregators.GetDealsByAddr)
+		group.POST("/all_methods", aggregators.GetAllMethods)
+		group.POST("/all_methods_for_actor", aggregators.GetAllMethodsForActor)
+		group.POST("/blocks_for_message", aggregators.GetBlocksForMessage)
+		group.POST("/messages_for_block", aggregators.GetMessagesForBlock)
+		group.POST("/count_and_methods_of_messages_for_blockheader", aggregators.GetCountAndMethodsOfMessagesForBlockHeader)
+		group.POST("/blockheader_messages_by_methodname", aggregators.GetBlockHeaderMessagesByMethodName)
+		group.POST("/richlist", aggregators.GetRichList)
 	}
 }
 

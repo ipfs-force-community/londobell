@@ -54,7 +54,8 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -71,20 +72,25 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 	)
 
 	if req.Epoch == 0 {
-		util.ReturnOnErr(c, alog, fmt.Errorf("epoch must be specified"))
+		err = fmt.Errorf("epoch must be specified")
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	curEpoch := abi.ChainEpoch(req.Epoch)
 	curTs, err := Components.Full.ChainGetTipSetByHeight(ctx, curEpoch, types.EmptyTSK)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	sm, ok := Components.SM.(*stmgr.StateManager)
 	if !ok {
-		util.ReturnOnErr(c, alog, fmt.Errorf("Components.SM is not *stmgr.StateManager type"))
+		err = fmt.Errorf("Components.SM is not *stmgr.StateManager type")
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -140,14 +146,16 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 		var msgs []*types.Message
 		pstate, _, err = stmgr.ComputeState(ctx, sm, curTs.Height(), msgs, curTs)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
 		parentTs = curTs
 		baseFee, err = Components.CS.ComputeBaseFee(ctx, curTs)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
@@ -156,7 +164,8 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 		pstate = curTs.Blocks()[0].ParentStateRoot
 		parentTs, err = Components.CS.LoadTipSet(ctx, curTs.Parents())
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		baseFee = curTs.Blocks()[0].ParentBaseFee
@@ -169,24 +178,28 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 		if i > parentTs.Height() {
 			vmCron, err = makeVMWithBaseStateAndEpoch(pstate, i)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 
 			if err = runCron(vmCron, i); err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 			pstate, err = vmCron.Flush(ctx)
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 		}
 
 		pstate, err = sm.HandleStateForks(ctx, pstate, i, nil, curTs)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		log.Infof("state at height %v is %v", i, pstate)
@@ -194,7 +207,8 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 
 	parentSt, err := sm.StateTree(pstate)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -203,7 +217,8 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 	for _, addr := range req.Miners {
 		miner, err := address.NewFromString(addr)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		allMiners = append(allMiners, miner)
@@ -213,13 +228,15 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 	for _, miner := range allMiners {
 		mact, err := parentSt.GetActor(miner)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
 		depositToBurn, err := getDepositToBurnByCode(ctx, mact, stor, curEpoch)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		if depositToBurn.IsZero() {

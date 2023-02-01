@@ -23,26 +23,30 @@ func GetTraces(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	var tracesRes []*model.TraceRes
 	pipe, err := Parse(model.Ctx{StartEpoch: req.StartEpoch, EndEpoch: req.EndEpoch}, string(tracesAggregator))
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	cur, err := mongoutil.TraceCol.Aggregate(ctx, pipe)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	err = cur.All(ctx, &tracesRes)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -57,13 +61,15 @@ func GetTraces(c *gin.Context) {
 			if params != nil {
 				err = params.UnmarshalCBOR(bytes.NewBuffer(trace.Params.(primitive.Binary).Data))
 				if err != nil {
-					util.ReturnOnErr(c, alog, err)
+					alog.Error(err)
+					util.ReturnOnErr(c, err)
 					return
 				}
 
 				paramsByte, err := json.Marshal(params)
 				if err != nil {
-					util.ReturnOnErr(c, alog, err)
+					alog.Error(err)
+					util.ReturnOnErr(c, err)
 					return
 				}
 				trace.Params = string(paramsByte)
@@ -75,12 +81,14 @@ func GetTraces(c *gin.Context) {
 			if returns != nil {
 				err = returns.UnmarshalCBOR(bytes.NewBuffer(trace.Return.(primitive.Binary).Data))
 				if err != nil {
-					util.ReturnOnErr(c, alog, err)
+					alog.Error(err)
+					util.ReturnOnErr(c, err)
 					return
 				}
 				returnsByte, err := json.Marshal(returns)
 				if err != nil {
-					util.ReturnOnErr(c, alog, err)
+					alog.Error(err)
+					util.ReturnOnErr(c, err)
 					return
 				}
 				trace.Return = string(returnsByte)

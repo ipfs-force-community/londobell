@@ -1,4 +1,6 @@
 {
-  "url": "mongodb://guest:read-only@dds-uf655172d52c38641.mongodb.rds.aliyuncs.com:3717/bell?replicaSet=mgset-65444697",
-  "name": "bell"
+  "url": "mongodb://guest:read-only@dds-uf655172d52c38641732-pub.mongodb.rds.aliyuncs.com:3717/bell?replicaSet=mgset-65444697",
+  "name": "bell",
+  "tmp-url": "mongodb://192.168.1.221:27017/tmpbell",
+  "tmp-name": "tmpbell"
 }

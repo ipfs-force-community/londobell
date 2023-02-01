@@ -6,7 +6,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type BlockRes struct {
+type BlockMessage struct {
 	From       string             `bson:"from" json:"From"`
 	To         string             `bson:"to" json:"To"`
 	Method     string             `bson:"method" json:"Method"`
@@ -24,4 +24,9 @@ type BlockRes struct {
 	GasFeeCap  string             `bson:"gas_fee_cap" json:"GasFeeCap"`
 	Version    uint64             `bson:"version" json:"Version"`
 	GasCost    interface{}        `bson:"gascost" json:"GasCost"`
+}
+
+type BlockMessagesRes struct {
+	TotalCount    int64          `json:"totalCount"`
+	BlockMessages []BlockMessage `json:"blockMessages"`
 }

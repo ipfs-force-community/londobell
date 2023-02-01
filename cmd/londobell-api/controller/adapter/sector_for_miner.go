@@ -23,7 +23,8 @@ func GetSectorForMinerInfo(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -39,24 +40,29 @@ func GetSectorForMinerInfo(c *gin.Context) {
 	}
 
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	maddr, err := address.NewFromString(req.Miner)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	si, err := api.StateSectorGetInfo(ctx, maddr, abi.SectorNumber(req.SectorNumber), ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	if si == nil {
-		util.ReturnOnErr(c, alog, fmt.Errorf("sector %d for miner %s not found", req.SectorNumber, maddr))
+		err = fmt.Errorf("sector %d for miner %s not found", req.SectorNumber, maddr)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -73,7 +79,8 @@ func GetSectorForMinerInfo(c *gin.Context) {
 
 	resData.Size, err = si.SealProof.SectorSize()
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 

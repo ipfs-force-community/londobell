@@ -26,7 +26,8 @@ func GetBatchMinersInfo(c *gin.Context) {
 	batchRes := model.BatchMinersRes{}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -44,56 +45,66 @@ func GetBatchMinersInfo(c *gin.Context) {
 	}
 
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	for _, Miner := range req.Miners {
 		maddr, err := address.NewFromString(Miner.Miner)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
 		mi, err := api.StateMinerInfo(ctx, maddr, ts.Key())
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
 		power, err := api.StateMinerPower(ctx, maddr, ts.Key())
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
 		mact, err := api.StateGetActor(ctx, maddr, ts.Key())
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
 		if !builtin.IsStorageMinerActor(mact.Code) {
-			util.ReturnOnErr(c, alog, fmt.Errorf("provided address does not correspond to a miner actor"))
+			err = fmt.Errorf("provided address does not correspond to a miner actor")
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
 		availableBalance, err := api.StateMinerAvailableBalance(ctx, maddr, ts.Key())
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
 		stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(api))
 		mas, err := miner.Load(stor, mact)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
 		lockedFunds, err := mas.LockedFunds()
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
@@ -115,7 +126,8 @@ func GetBatchMinersInfo(c *gin.Context) {
 
 		err = getMinerResByCode(ctx, mact, stor, resData)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 

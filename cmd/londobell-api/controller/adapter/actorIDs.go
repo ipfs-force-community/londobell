@@ -19,7 +19,8 @@ func GetActorIDs(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -42,13 +43,15 @@ func GetActorIDs(c *gin.Context) {
 	}
 
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	addrs, err = api.StateListActors(ctx, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -60,7 +63,8 @@ func GetActorIDs(c *gin.Context) {
 		} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 {
 			actorID, err = api.StateLookupID(ctx, addr, ts.Key())
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 		}
