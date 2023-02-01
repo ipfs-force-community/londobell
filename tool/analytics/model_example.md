@@ -559,7 +559,7 @@
 }
 ```
 
-#### claimed-power-v2
+#### claimed-power-v10
 
 ```
 {
@@ -577,7 +577,7 @@
 }
 ```
 
-#### claimed-power-v3
+#### claimed-power-v11
 
 ```
 {
@@ -595,7 +595,7 @@
 }
 ```
 
-#### claimed-power-v4
+#### claimed-power-v2
 
 ```
 {
@@ -613,7 +613,7 @@
 }
 ```
 
-#### claimed-power-v5
+#### claimed-power-v3
 
 ```
 {
@@ -631,7 +631,7 @@
 }
 ```
 
-#### claimed-power-v6
+#### claimed-power-v4
 
 ```
 {
@@ -649,7 +649,7 @@
 }
 ```
 
-#### claimed-power-v7
+#### claimed-power-v5
 
 ```
 {
@@ -667,7 +667,7 @@
 }
 ```
 
-#### claimed-power-v8
+#### claimed-power-v6
 
 ```
 {
@@ -685,7 +685,7 @@
 }
 ```
 
-#### claimed-power-v9
+#### claimed-power-v7
 
 ```
 {
@@ -703,6 +703,42 @@
 }
 ```
 
+#### claimed-power-v8
+
+```
+{
+	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Detail": {
+		"QualityAdjPower": "1024",
+		"RawBytePower": "340282591298641078465964189926313473653",
+		"WindowPoStProofType": 0
+	},
+	"Epoch": 0,
+	"Path": [
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	],
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+}
+```
+
+#### claimed-power-v9
+
+```
+{
+	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"Detail": {
+		"QualityAdjPower": "340282591298641078465964189926313473653",
+		"RawBytePower": "1073741824",
+		"WindowPoStProofType": 0
+	},
+	"Epoch": 0,
+	"Path": [
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	],
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+}
+```
+
 
 ### Claims
 
@@ -712,7 +748,7 @@
 {
 	"ClaimID": 0,
 	"Client": 0,
-	"Data": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"Data": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 	"Epoch": 0,
 	"Provider": 0,
 	"Sector": 0,
@@ -730,7 +766,7 @@
 {
 	"ClaimID": 0,
 	"Client": 0,
-	"Data": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+	"Data": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 	"Epoch": 0,
 	"Provider": 0,
 	"Sector": 0,
@@ -753,7 +789,7 @@
 	"Epoch": 0,
 	"Operator": 0,
 	"Owner": 0,
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -765,7 +801,7 @@
 	"Epoch": 0,
 	"Operator": 0,
 	"Owner": 0,
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -779,7 +815,7 @@
 	"Amount": "340282591298641078465964189926313473653",
 	"Epoch": 0,
 	"Owner": 0,
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -790,7 +826,7 @@
 	"Amount": "1024",
 	"Epoch": 0,
 	"Owner": 0,
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -806,7 +842,7 @@
 	"EndEpoch": 0,
 	"Epoch": 0,
 	"Label": "",
-	"PieceCID": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"PieceCID": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 	"PieceSize": 0,
 	"Provider": "073366",
 	"ProviderCollateral": "340282591298641078465964189926313473653",
@@ -828,9 +864,9 @@
 		"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 		"Epoch": 0,
 		"Path": [
-			"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+			"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 		],
-		"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	},
 	"Detail": {
 		"UnVerifiedDealCount": 0,
@@ -852,9 +888,9 @@
 		"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 		"Epoch": 0,
 		"Path": [
-			"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+			"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 		],
-		"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+		"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	},
 	"Detail": {
 		"Regular": {
@@ -908,7 +944,7 @@
 
 ```
 {
-	"Cid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"Cid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 	"Depth": 0,
 	"Detail": {
 		"Return": {
@@ -959,7 +995,7 @@
 			0
 		]
 	],
-	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"SignedCid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 	"SubCallCount": 0,
 	"Ver": "",
 	"_id": ""
@@ -993,7 +1029,7 @@
 ```
 {
 	"Cids": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
 	"_id": 0
 }
@@ -1024,9 +1060,9 @@
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	],
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -1052,12 +1088,12 @@
 			"ReplaceSectorPartition": 0,
 			"SealProof": 0,
 			"SealRandEpoch": 0,
-			"SealedCID": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+			"SealedCID": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 			"SectorNumber": 0
 		}
 	},
-	"SignedCid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -1080,12 +1116,12 @@
 			"ReplaceSectorPartition": 0,
 			"SealProof": 0,
 			"SealRandEpoch": 0,
-			"SealedCID": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+			"SealedCID": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 			"SectorNumber": 0
 		}
 	},
-	"SignedCid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -1109,8 +1145,8 @@
 			"Value": "1024"
 		}
 	},
-	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"SignedCid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -1134,8 +1170,8 @@
 			"Value": "1073741824"
 		}
 	},
-	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 

@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"golang.org/x/xerrors"
 )
 
@@ -23,6 +24,15 @@ type BellAPIStruct struct {
 }
 
 type BellAPIStub struct {
+}
+
+type MultiAPIStruct struct {
+	Internal struct {
+		LoadDBState func(p0 string) (multiquery.DataBaseState, error) ``
+	}
+}
+
+type MultiAPIStub struct {
 }
 
 func (s *BellAPIStruct) GetSampleRate(p0 context.Context) (float64, error) {
@@ -69,4 +79,16 @@ func (s *BellAPIStub) ShutDown(p0 context.Context) error {
 	return ErrNotSupported
 }
 
+func (s *MultiAPIStruct) LoadDBState(p0 string) (multiquery.DataBaseState, error) {
+	if s.Internal.LoadDBState == nil {
+		return *new(multiquery.DataBaseState), ErrNotSupported
+	}
+	return s.Internal.LoadDBState(p0)
+}
+
+func (s *MultiAPIStub) LoadDBState(p0 string) (multiquery.DataBaseState, error) {
+	return *new(multiquery.DataBaseState), ErrNotSupported
+}
+
 var _ BellAPI = new(BellAPIStruct)
+var _ MultiAPI = new(MultiAPIStruct)

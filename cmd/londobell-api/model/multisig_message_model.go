@@ -17,7 +17,7 @@ type MultisigMessageRes struct {
 	SubCallCount int
 	Detail       interface{}
 	GasCost      interface{}
-	Message      interface{} `bson:"message" json:"Message"`
-	ChildTrace   interface{} `bson:"childTrace" json:"ChildTrace"`
-	ChildMessage interface{} `bson:"childMessage" json:"ChildMessage"`
+	Message      interface{}
+	ChildTrace   interface{}
+	ChildMessage interface{}
 }

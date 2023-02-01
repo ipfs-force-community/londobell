@@ -2,13 +2,14 @@ package aggregators
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 func GetBlock(c *gin.Context) {
@@ -16,33 +17,62 @@ func GetBlock(c *gin.Context) {
 	defer cancel()
 
 	alog := log.With("method", "GetBlock")
+
 	req := model.CommonReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
-	var blockRes []model.BlockRes
-	pipe, err := Parse(model.Ctx{StartEpoch: req.StartEpoch, EndEpoch: req.EndEpoch}, string(blockAggregator))
+	curEpoch := common.GetCurEpoch()
+
+	countUtils, err := multiquery.GetTotalCountForBlockMsgs(ctx, &multiquery.DBStateManager, curEpoch)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
-	cur, err := mongoutil.TraceCol.Aggregate(ctx, pipe)
-	if err != nil {
-		util.ReturnOnErr(c, alog, err)
-		return
+	totalCount := int64(0)
+	for _, countUtil := range countUtils {
+		totalCount += countUtil.Count
 	}
 
-	err = cur.All(ctx, &blockRes)
-	if err != nil {
-		util.ReturnOnErr(c, alog, err)
-		return
+	var blockMessages []model.BlockMessage
+
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, blockAggregator, req, "ExecTrace")
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		raw := multiResult
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		err = json.Unmarshal(rawByte, &blockMessages)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 	}
 
-	res.Data = blockRes
+	res.Data = model.BlockMessagesRes{TotalCount: totalCount, BlockMessages: blockMessages}
 	c.JSON(http.StatusOK, res)
 }

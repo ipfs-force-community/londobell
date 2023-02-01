@@ -5,16 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/filecoin-project/lotus/chain/actors/builtin/datacap"
-	"github.com/filecoin-project/lotus/chain/actors/builtin/evm"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/gin-gonic/gin"
-
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/account"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/datacap"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/evm"
 	init_ "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
@@ -25,19 +22,22 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/gin-gonic/gin"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
 )
 
 func GetActorInfo(c *gin.Context) {
-	alog := log.With("method", "GetActorsInfo")
+	alog := log.With("method", "GetActorInfo")
 	req := model.ActorReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -46,7 +46,7 @@ func GetActorInfo(c *gin.Context) {
 
 	var ts *types.TipSet
 
-	api := API.GetAppropriateAPI()
+	api := fullnode.API.GetAppropriateAPI()
 
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)
@@ -55,13 +55,15 @@ func GetActorInfo(c *gin.Context) {
 	}
 
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	addr, err := address.NewFromString(req.ActorID)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -78,7 +80,8 @@ func GetActorInfo(c *gin.Context) {
 	} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 || addr.Protocol() == address.Actor || addr.Protocol() == address.Delegated {
 		actorID, err = api.StateLookupID(ctx, addr, ts.Key())
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 
@@ -89,7 +92,8 @@ func GetActorInfo(c *gin.Context) {
 
 	act, err := api.StateGetActor(ctx, addr, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -98,21 +102,24 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "account"
 		st, err := account.Load(stor, act)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
 
 		actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 	case builtin.IsMultisigActor(act.Code):
 		actorType = "multisig"
 		st, err := multisig.Load(stor, act)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
@@ -120,7 +127,8 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "power"
 		st, err := power.Load(stor, act)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
@@ -128,7 +136,8 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "reward"
 		st, err := reward.Load(stor, act)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
@@ -136,7 +145,8 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "init"
 		st, err := init_.Load(stor, act)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
@@ -144,7 +154,8 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "market"
 		st, err := market.Load(stor, act)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
@@ -152,7 +163,8 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "verify"
 		st, err := verifreg.Load(stor, act)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
@@ -161,7 +173,8 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "system"
 		st, err := MakeSystemState(stor, act.Code)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
@@ -169,7 +182,8 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "miner"
 		st, err := miner.Load(stor, act)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
@@ -177,7 +191,8 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "paych"
 		st, err := paych.Load(stor, act)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
