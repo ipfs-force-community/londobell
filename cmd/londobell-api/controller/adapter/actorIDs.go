@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -19,7 +21,8 @@ func GetActorIDs(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -33,7 +36,7 @@ func GetActorIDs(c *gin.Context) {
 		actorIDsRes model.ActorIDRes
 	)
 
-	api := API.GetAppropriateAPI()
+	api := fullnode.API.GetAppropriateAPI()
 
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)
@@ -42,13 +45,15 @@ func GetActorIDs(c *gin.Context) {
 	}
 
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	addrs, err = api.StateListActors(ctx, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -60,7 +65,8 @@ func GetActorIDs(c *gin.Context) {
 		} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 || addr.Protocol() == address.Actor || addr.Protocol() == address.Delegated {
 			actorID, err = api.StateLookupID(ctx, addr, ts.Key())
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 		}
