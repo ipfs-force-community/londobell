@@ -1,13 +1,15 @@
 package aggregators
 
 import (
-	"math"
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/common"
 	"golang.org/x/net/context"
 )
 
@@ -25,34 +27,62 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 		return
 	}
 
-	var blockHeadersByMinerRes []model.BlockHeader
-	// todo: 默认返回所有数据，防止恶意攻击
-	limit := req.Limit
-	if req.Index == 0 && req.Limit == 0 {
-		limit = math.MaxInt64
-	}
+	curEpoch := common.GetCurEpoch()
 
-	pipe, err := Parse(model.Ctx{StartEpoch: req.StartEpoch, EndEpoch: req.EndEpoch, Addr: req.Addr, Skip: req.Index * req.Limit, Limit: limit}, string(blockHeadersByMinerAggregator))
+	countUtils, err := multiquery.GetTotalCountForMinedMsgsMap(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	cur, err := mongoutil.BlockHeaderCol.Aggregate(ctx, pipe)
+	totalCount := int64(0)
+	for _, countUtil := range countUtils {
+		totalCount += countUtil.Count
+	}
+
+	api := fullnode.API.GetAppropriateAPI()
+	addrs, err := GetAllAddrs(ctx, req.Addr, api)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	err = cur.All(ctx, &blockHeadersByMinerRes)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
+	req.Addrs = addrs
+
+	var blockHeadersByMiner []model.BlockHeader
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, blockHeadersByMinerAggregator, req, "BlockHeader")
+		if err != nil {
+			alog.Error(err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		raw := multiResult
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		err = json.Unmarshal(rawByte, &blockHeadersByMiner)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 	}
 
-	res.Data = model.BlockHeaderRes{TotalCount: int64(len(blockHeadersByMinerRes)), BlockHeaders: blockHeadersByMinerRes}
+	res.Data = model.BlockHeaderRes{TotalCount: totalCount, BlockHeaders: blockHeadersByMiner}
 	c.JSON(http.StatusOK, res)
 }

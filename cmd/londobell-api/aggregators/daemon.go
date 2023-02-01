@@ -15,10 +15,12 @@ var daemonCmd = &cli.Command{
 		},
 		&cli.StringSliceFlag{
 			Name:  "apis",
-			Usage: "ws://127.0.0.1:1234/rpc/v0",
+			Usage: "ws://112.124.1.253:1234/rpc/v0",
 		},
-
-		// todo: dbs of config.json
+		&cli.StringFlag{
+			Name:  "RPCListen",
+			Usage: "multiaddr of rpc",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		err := server.Run(cctx, false)

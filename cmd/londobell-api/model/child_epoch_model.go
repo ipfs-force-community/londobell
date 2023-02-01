@@ -5,7 +5,7 @@ import (
 )
 
 type ChildEpochRes struct {
-	CurrentEpoch  abi.ChainEpoch `bson:"_id"`
+	CurrentEpoch  abi.ChainEpoch `bson:"_id" json:"_id"`
 	CurrentTipset []string
 	ChildEpoch    abi.ChainEpoch
 	ChildTipset   []string

@@ -1,13 +1,14 @@
 package aggregators
 
 import (
-	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"golang.org/x/net/context"
 )
 
 func GetTraceForMessage(c *gin.Context) {
@@ -24,45 +25,45 @@ func GetTraceForMessage(c *gin.Context) {
 		return
 	}
 
+	countUtils, err := multiquery.GetColsOnly(&multiquery.DBStateManager)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(traceForMessageAggregator))
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
 	var traceForMessageRes []model.TraceForMessageRes
-	pipe, err := Parse(model.Ctx{Cid: req.Cid}, string(traceForMessageAggregator))
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
 
-	cur, err := mongoutil.TraceCol.Aggregate(ctx, pipe)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	err = cur.All(ctx, &traceForMessageRes)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	// search from the temporary repository if not found
-	if len(traceForMessageRes) == 0 {
-		tmpPipe, err := Parse(model.Ctx{Cid: req.Cid}, string(traceForMessageAggregator))
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "ExecTrace")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
 		}
 
-		tmpCur, err := mongoutil.TmpTraceCol.Aggregate(ctx, tmpPipe)
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		raw := multiResult
+		rawByte, err := json.Marshal(raw)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
 		}
 
-		err = tmpCur.All(ctx, &traceForMessageRes)
+		err = json.Unmarshal(rawByte, &traceForMessageRes)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

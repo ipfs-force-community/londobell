@@ -1,20 +1,23 @@
 package aggregators
 
 import (
-	"context"
+	"encoding/json"
 	"net/http"
-	"sort"
-	"sync"
 
+	"github.com/filecoin-project/go-address"
+	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
-	"github.com/hashicorp/go-multierror"
+	"github.com/ipfs-force-community/londobell/buildnet"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
+	"golang.org/x/net/context"
 )
 
-// ctx.Addr 使用robust & ID
 func GetMessagesForActor(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -29,118 +32,153 @@ func GetMessagesForActor(c *gin.Context) {
 		return
 	}
 
-	// avoid large query scope
-	latestEpoch := common.GetCurEpoch()
-	if req.EndEpoch > int64(latestEpoch) {
-		req.EndEpoch = int64(latestEpoch)
-	}
+	curEpoch := common.GetCurEpoch()
 
-	var (
-		messagesForActorRess []model.MessageForActor
-		ewg                  multierror.Group
-		mutex                sync.Mutex
-	)
-
-	for epoch := req.StartEpoch; epoch < req.EndEpoch; epoch++ {
-		curEpoch := epoch
-		ewg.Go(func() error {
-			var messagesForActorRes []model.MessageForActor
-			pipe, err := Parse(model.Ctx{StartEpoch: curEpoch, Addr: req.Addr}, string(messagesForActorAggregator))
-			if err != nil {
-				return err
-			}
-
-			cur, err := mongoutil.TraceCol.Aggregate(ctx, pipe)
-			if err != nil {
-				return err
-			}
-
-			err = cur.All(ctx, &messagesForActorRes)
-			if err != nil {
-				return err
-			}
-
-			mutex.Lock()
-			messagesForActorRess = append(messagesForActorRess, messagesForActorRes...)
-			mutex.Unlock()
-			return nil
-		})
-	}
-
-	if err := ewg.Wait(); err != nil {
+	countUtils, err := multiquery.GetTotalCountForActorMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
+	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	// get near-height data from the temporary repository
-	sort.Slice(messagesForActorRess, func(i, j int) bool {
-		return messagesForActorRess[i].Epoch > messagesForActorRess[j].Epoch
-	})
-
-	tmpStartEpoch := req.StartEpoch
-	if len(messagesForActorRess) > 0 {
-		tmpStartEpoch = int64(messagesForActorRess[0].Epoch) + 1
+	totalCount := int64(0)
+	for _, countUtil := range countUtils {
+		totalCount += countUtil.Count
 	}
 
-	var tmpMessagesForActorRess []model.MessageForActor
-	for epoch := tmpStartEpoch; epoch < req.EndEpoch; epoch++ {
-		curEpoch := epoch
-		ewg.Go(func() error {
-			var tmpMessagesForActorRes []model.MessageForActor
-			tmpPipe, err := Parse(model.Ctx{StartEpoch: curEpoch, Addr: req.Addr}, string(messagesForActorAggregator))
-			if err != nil {
-				return err
-			}
-
-			tmpCur, err := mongoutil.TmpTraceCol.Aggregate(ctx, tmpPipe)
-			if err != nil {
-				return err
-			}
-
-			err = tmpCur.All(ctx, &tmpMessagesForActorRes)
-			if err != nil {
-				return err
-			}
-
-			mutex.Lock()
-			tmpMessagesForActorRess = append(tmpMessagesForActorRess, tmpMessagesForActorRes...)
-			mutex.Unlock()
-			return nil
-		})
-	}
-
-	if err := ewg.Wait(); err != nil {
+	api := fullnode.API.GetAppropriateAPI()
+	addrs, err := GetAllAddrs(ctx, req.Addr, api)
+	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	messagesForActorRess = append(messagesForActorRess, tmpMessagesForActorRess...)
+	req.Addrs = addrs
 
-	// sort
-	sort.Slice(messagesForActorRess, func(i, j int) bool {
-		return messagesForActorRess[i].Epoch > messagesForActorRess[j].Epoch
-	})
+	var messagesForActor []model.MessageForActor
 
-	if req.Index == 0 && req.Limit == 0 {
-		res.Data = model.MessagesForActorRes{TotalCount: int64(len(messagesForActorRess)), MessagesForActor: messagesForActorRess}
-		c.JSON(http.StatusOK, res)
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, messagesForActorAggregator, req, "ExecTrace")
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		if len(multiResult) != 0 {
+			raw := multiResult
+			rawByte, err := json.Marshal(raw)
+			if err != nil {
+				log.Error(err)
+				util.ReturnOnErr(c, err)
+				return
+			}
+
+			err = json.Unmarshal(rawByte, &messagesForActor)
+			if err != nil {
+				log.Error(err)
+				util.ReturnOnErr(c, err)
+				return
+			}
+		}
+	}
+
+	// create message
+	addr, err := address.NewFromString(buildnet.NetPrefix + req.Addr)
+	if err != nil {
+		log.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
-	// paging
-	if req.Index*req.Limit >= int64(len(messagesForActorRess)) {
-		c.JSON(http.StatusOK, res)
+	actor, err := api.StateGetActor(ctx, addr, types.EmptyTSK)
+	if err != nil {
+		log.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
-	if (req.Index+1)*req.Limit >= int64(len(messagesForActorRess)) {
-		res.Data = model.MessagesForActorRes{TotalCount: int64(len(messagesForActorRess[req.Index*req.Limit:])), MessagesForActor: messagesForActorRess[req.Index*req.Limit:]}
+	switch {
+	case addr == sbuiltin.SystemActorAddr, addr == sbuiltin.InitActorAddr, addr == sbuiltin.RewardActorAddr, addr == sbuiltin.CronActorAddr, addr == sbuiltin.StoragePowerActorAddr,
+		addr == sbuiltin.VerifiedRegistryActorAddr, addr == sbuiltin.BurntFundsActorAddr, addr == sbuiltin.DatacapActorAddr, addr == sbuiltin.EthereumAddressManagerActorAddr,
+		builtin.IsAccountActor(actor.Code), builtin.IsEthAccountActor(actor.Code), builtin.IsPlaceholderActor(actor.Code):
+		res.Data = model.MessagesForActorRes{TotalCount: totalCount, MessagesForActor: messagesForActor}
 		c.JSON(http.StatusOK, res)
+		return
+	case builtin.IsStorageMinerActor(actor.Code):
+		// CreateMiner
+		req.To = sbuiltin.StoragePowerActorAddr.String()[1:]
+		req.Method = 2
+	case builtin.IsEvmActor(actor.Code):
+		// CreateExternal
+		req.To = sbuiltin.EthereumAddressManagerActorAddr.String()[1:]
+		req.Method = 4
+	default:
+		// Exec
+		req.To = sbuiltin.InitActorAddr.String()[1:]
+		req.Method = 2
+	}
+
+	ID, err := api.StateLookupID(ctx, addr, types.EmptyTSK)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
-	res.Data = model.MessagesForActorRes{TotalCount: int64(len(messagesForActorRess[req.Index*req.Limit : (req.Index+1)*req.Limit])), MessagesForActor: messagesForActorRess[req.Index*req.Limit : (req.Index+1)*req.Limit]}
+	robust, err := GetRobustByID(ctx, api, ID, actor)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
+	req.Addr = robust
+
+	pipe, err := util.Parse(model.Ctx{Addr: req.Addr, To: req.To, Method: req.Method}, string(createMessageAggregator))
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
+	var createMessage model.MessageForActor
+
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "ExecTrace")
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		raw := multiResult[0]
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		err = json.Unmarshal(rawByte, &createMessage)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+	}
+
+	messagesForActor = append(messagesForActor, createMessage)
+	totalCount++
+
+	res.Data = model.MessagesForActorRes{TotalCount: totalCount, MessagesForActor: messagesForActor}
 	c.JSON(http.StatusOK, res)
 }

@@ -3,7 +3,7 @@ package model
 import "github.com/filecoin-project/go-state-types/abi"
 
 type ChildTransfersForMessageRes struct {
-	Epoch        abi.ChainEpoch `bson:"_id" json:"Epoch"`
+	Epoch        abi.ChainEpoch `json:"_id"`
 	TransferList []Message
 	GasCost      GasCost
 	Cid          string

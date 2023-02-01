@@ -1,11 +1,12 @@
 package aggregators
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"golang.org/x/net/context"
 )
@@ -24,45 +25,44 @@ func GetChildTransfersForMessage(c *gin.Context) {
 		return
 	}
 
+	countUtils, err := multiquery.GetColsOnly(&multiquery.DBStateManager)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(childTransfersForMessageAggregator))
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
 	var childTransfersForMessageRes []model.ChildTransfersForMessageRes
-	pipe, err := Parse(model.Ctx{Cid: req.Cid}, string(childTransfersForMessageAggregator))
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	cur, err := mongoutil.TraceCol.Aggregate(ctx, pipe)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	err = cur.All(ctx, &childTransfersForMessageRes)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	// search from the temporary repository if not found
-	if len(childTransfersForMessageRes) == 0 {
-		tmpPipe, err := Parse(model.Ctx{Cid: req.Cid}, string(childTransfersForMessageAggregator))
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "ExecTrace")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
 		}
 
-		tmpCur, err := mongoutil.TmpTraceCol.Aggregate(ctx, tmpPipe)
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		raw := multiResult
+		rawByte, err := json.Marshal(raw)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
 		}
 
-		err = tmpCur.All(ctx, &childTransfersForMessageRes)
+		err = json.Unmarshal(rawByte, &childTransfersForMessageRes)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

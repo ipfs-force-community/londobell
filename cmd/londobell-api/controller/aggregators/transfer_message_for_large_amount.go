@@ -1,18 +1,14 @@
 package aggregators
 
 import (
+	"encoding/json"
 	"net/http"
-	"sort"
-	"sync"
-
-	"github.com/ipfs-force-community/londobell/common"
-
-	"github.com/hashicorp/go-multierror"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/common"
 	"golang.org/x/net/context"
 )
 
@@ -30,118 +26,55 @@ func GetTransferMessageForLargeAmount(c *gin.Context) {
 		return
 	}
 
-	// avoid large query scope
-	latestEpoch := common.GetCurEpoch()
-	if req.EndEpoch > int64(latestEpoch) {
-		req.EndEpoch = int64(latestEpoch)
-	}
+	curEpoch := common.GetCurEpoch()
 
-	var (
-		transferMessageForLargeAmountRess []model.TransferMessageForLargeAmount
-		ewg                               multierror.Group
-		mutex                             sync.Mutex
-	)
-
-	for epoch := req.StartEpoch; epoch < req.EndEpoch; epoch++ {
-		curEpoch := epoch
-		ewg.Go(func() error {
-			var transferMessageForLargeAmountRes []model.TransferMessageForLargeAmount
-			pipe, err := Parse(model.Ctx{StartEpoch: curEpoch}, string(transferMessageForLargeAmountAggregator))
-			if err != nil {
-				return err
-			}
-
-			cur, err := mongoutil.TraceCol.Aggregate(ctx, pipe)
-			if err != nil {
-				return err
-			}
-
-			err = cur.All(ctx, &transferMessageForLargeAmountRes)
-			if err != nil {
-				return err
-			}
-
-			mutex.Lock()
-			transferMessageForLargeAmountRess = append(transferMessageForLargeAmountRess, transferMessageForLargeAmountRes...)
-			mutex.Unlock()
-			return nil
-		})
-	}
-
-	if err := ewg.Wait(); err != nil {
+	countUtils, err := multiquery.GetTotalCountForTransfersForLargeAmount(ctx, &multiquery.DBStateManager, curEpoch)
+	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	// get near-height data from the temporary repository
-	sort.Slice(transferMessageForLargeAmountRess, func(i, j int) bool {
-		return transferMessageForLargeAmountRess[i].Epoch > transferMessageForLargeAmountRess[j].Epoch
-	})
-
-	tmpStartEpoch := req.StartEpoch
-	if len(transferMessageForLargeAmountRess) > 0 {
-		tmpStartEpoch = int64(transferMessageForLargeAmountRess[0].Epoch) + 1
+	totalCount := int64(0)
+	for _, countUtil := range countUtils {
+		totalCount += countUtil.Count
 	}
 
-	var tmpTransferMessageForLargeAmountRess []model.TransferMessageForLargeAmount
-	for epoch := tmpStartEpoch; epoch < req.EndEpoch; epoch++ {
-		curEpoch := epoch
-		ewg.Go(func() error {
-			var tmpTransferMessageForLargeAmountRes []model.TransferMessageForLargeAmount
-			tmpPipe, err := Parse(model.Ctx{StartEpoch: curEpoch}, string(transferMessageForLargeAmountAggregator))
-			if err != nil {
-				return err
-			}
+	var transferMessageForLargeAmount []model.TransferMessageForLargeAmount
 
-			tmpCur, err := mongoutil.TmpTraceCol.Aggregate(ctx, tmpPipe)
-			if err != nil {
-				return err
-			}
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, transferMessageForLargeAmountAggregator, req, "ExecTrace")
+		if err != nil {
+			alog.Error(err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 
-			err = tmpCur.All(ctx, &tmpTransferMessageForLargeAmountRes)
-			if err != nil {
-				return err
-			}
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
 
-			mutex.Lock()
-			tmpTransferMessageForLargeAmountRess = append(tmpTransferMessageForLargeAmountRess, tmpTransferMessageForLargeAmountRes...)
-			mutex.Unlock()
-			return nil
-		})
+		raw := multiResult
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			alog.Error(err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		err = json.Unmarshal(rawByte, &transferMessageForLargeAmount)
+		if err != nil {
+			alog.Error(err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 	}
 
-	if err := ewg.Wait(); err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	transferMessageForLargeAmountRess = append(transferMessageForLargeAmountRess, tmpTransferMessageForLargeAmountRess...)
-
-	// sort
-	sort.Slice(transferMessageForLargeAmountRess, func(i, j int) bool {
-		return transferMessageForLargeAmountRess[i].Epoch > transferMessageForLargeAmountRess[j].Epoch
-	})
-
-	if req.Index == 0 && req.Limit == 0 {
-		res.Data = model.TransferMessagesForLargeAmountRes{TotalCount: int64(len(transferMessageForLargeAmountRess)), TransferMessagesForLargeAmount: transferMessageForLargeAmountRess}
-		c.JSON(http.StatusOK, res)
-		return
-	}
-
-	// paging
-	if req.Index*req.Limit >= int64(len(transferMessageForLargeAmountRess)) {
-		c.JSON(http.StatusOK, res)
-		return
-	}
-
-	if (req.Index+1)*req.Limit >= int64(len(transferMessageForLargeAmountRess)) {
-		res.Data = model.TransferMessagesForLargeAmountRes{TotalCount: int64(len(transferMessageForLargeAmountRess[req.Index*req.Limit:])), TransferMessagesForLargeAmount: transferMessageForLargeAmountRess[req.Index*req.Limit:]}
-		c.JSON(http.StatusOK, res)
-		return
-	}
-
-	res.Data = model.TransferMessagesForLargeAmountRes{TotalCount: int64(len(transferMessageForLargeAmountRess[req.Index*req.Limit : (req.Index+1)*req.Limit])), TransferMessagesForLargeAmount: transferMessageForLargeAmountRess[req.Index*req.Limit : (req.Index+1)*req.Limit]}
+	res.Data = model.TransferMessagesForLargeAmountRes{TotalCount: totalCount, TransferMessagesForLargeAmount: transferMessageForLargeAmount}
 	c.JSON(http.StatusOK, res)
 }

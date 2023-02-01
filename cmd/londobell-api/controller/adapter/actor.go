@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/gin-gonic/gin"
@@ -43,7 +45,7 @@ func GetActorInfo(c *gin.Context) {
 
 	var ts *types.TipSet
 
-	api := API.GetAppropriateAPI()
+	api := fullnode.API.GetAppropriateAPI()
 
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)
@@ -73,7 +75,7 @@ func GetActorInfo(c *gin.Context) {
 
 	if addr.Protocol() == address.ID {
 		actorID = addr
-	} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 {
+	} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 || addr.Protocol() == address.Actor || addr.Protocol() == address.Delegated {
 		actorID, err = api.StateLookupID(ctx, addr, ts.Key())
 		if err != nil {
 			alog.Error(err)

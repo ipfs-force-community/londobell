@@ -1,15 +1,19 @@
 package aggregators
 
 import (
-	"context"
+	"encoding/json"
 	"net/http"
+
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/common"
+	"golang.org/x/net/context"
 )
 
+// todo: 出账单要用，req.EndEpoch一定要在finalHeight之前，才能保证账单准确性
 func GetMinersBlockReward(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -24,26 +28,45 @@ func GetMinersBlockReward(c *gin.Context) {
 		return
 	}
 
+	curEpoch := common.GetCurEpoch()
+
+	countUtils, err := multiquery.GetEpochRange(ctx, &multiquery.DBStateManager, curEpoch)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
 	var minersBlockRewardRes []model.MinersBlockRewardRes
-	pipe, err := Parse(model.Ctx{StartEpoch: req.StartEpoch, EndEpoch: req.EndEpoch}, string(minersBlockrewardAggregator))
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
 
-	cur, err := mongoutil.TraceCol.Aggregate(ctx, pipe)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, minersBlockrewardAggregator, req, "ExecTrace")
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 
-	err = cur.All(ctx, &minersBlockRewardRes)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		raw := multiResult
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		err = json.Unmarshal(rawByte, &minersBlockRewardRes)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 	}
 
 	res.Data = minersBlockRewardRes

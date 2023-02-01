@@ -8,23 +8,18 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/go-state-types/abi"
-
-	"go.uber.org/zap"
-
 	"github.com/filecoin-project/lotus/api/v0api"
-	"github.com/filecoin-project/lotus/chain/types"
-
-	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
-
-	"github.com/ipfs/go-cid"
-
-	"github.com/hashicorp/go-multierror"
-
 	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
+	"github.com/hashicorp/go-multierror"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
+	"github.com/ipfs/go-cid"
+	"go.uber.org/zap"
 )
 
 var ActorReg = filcns.NewActorRegistry()
@@ -43,7 +38,7 @@ func GetPendingMessages(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	api := API.GetAppropriateAPI()
+	api := fullnode.API.GetAppropriateAPI()
 
 	ts, err := api.ChainHead(ctx)
 	if err != nil {
@@ -90,6 +85,7 @@ func GetPendingMessages(c *gin.Context) {
 
 	var (
 		pendingMessages []model.PendingMessage
+		totalCount      int64
 		g               multierror.Group
 		mutex           sync.Mutex
 	)
@@ -108,6 +104,7 @@ func GetPendingMessages(c *gin.Context) {
 				pendingMessages = append(pendingMessages, model.PendingMessage{
 					Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: ts.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName,
 				})
+				totalCount++
 				mutex.Unlock()
 			}
 
@@ -117,6 +114,7 @@ func GetPendingMessages(c *gin.Context) {
 				pendingMessages = append(pendingMessages, model.PendingMessage{
 					Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: ts.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName,
 				})
+				totalCount++
 				mutex.Unlock()
 			}
 
@@ -136,7 +134,7 @@ func GetPendingMessages(c *gin.Context) {
 	})
 
 	if req.Index == 0 && req.Limit == 0 {
-		res.Data = model.PendingMessagesRes{TotalCount: int64(len(pendingMessages)), PendingMessages: pendingMessages}
+		res.Data = model.PendingMessagesRes{TotalCount: totalCount, PendingMessages: pendingMessages}
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -148,12 +146,12 @@ func GetPendingMessages(c *gin.Context) {
 	}
 
 	if (req.Index+1)*req.Limit >= int64(len(pendingMessages)) {
-		res.Data = model.PendingMessagesRes{TotalCount: int64(len(pendingMessages[req.Index*req.Limit:])), PendingMessages: pendingMessages[req.Index*req.Limit:]}
+		res.Data = model.PendingMessagesRes{TotalCount: totalCount, PendingMessages: pendingMessages[req.Index*req.Limit:]}
 		c.JSON(http.StatusOK, res)
 		return
 	}
 
-	res.Data = model.PendingMessagesRes{TotalCount: int64(len(pendingMessages[req.Index*req.Limit : (req.Index+1)*req.Limit])), PendingMessages: pendingMessages[req.Index*req.Limit : (req.Index+1)*req.Limit]}
+	res.Data = model.PendingMessagesRes{TotalCount: totalCount, PendingMessages: pendingMessages[req.Index*req.Limit : (req.Index+1)*req.Limit]}
 	c.JSON(http.StatusOK, res)
 }
 

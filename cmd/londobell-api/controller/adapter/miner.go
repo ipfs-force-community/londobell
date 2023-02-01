@@ -5,45 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
-	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
-	adt10 "github.com/filecoin-project/go-state-types/builtin/v10/util/adt"
-
-	"github.com/filecoin-project/go-state-types/manifest"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
-	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
+	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
 	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
-	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
 	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
-	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
-	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
-	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
-	adt0 "github.com/filecoin-project/specs-actors/actors/util/adt"
-	builtin2 "github.com/filecoin-project/specs-actors/v2/actors/builtin"
-	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
-	adt2 "github.com/filecoin-project/specs-actors/v2/actors/util/adt"
-	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
-	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
-	adt3 "github.com/filecoin-project/specs-actors/v3/actors/util/adt"
-	builtin4 "github.com/filecoin-project/specs-actors/v4/actors/builtin"
-	miner4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/miner"
-	adt4 "github.com/filecoin-project/specs-actors/v4/actors/util/adt"
-	builtin5 "github.com/filecoin-project/specs-actors/v5/actors/builtin"
-	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
-	adt5 "github.com/filecoin-project/specs-actors/v5/actors/util/adt"
-	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
-	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
-	adt6 "github.com/filecoin-project/specs-actors/v6/actors/util/adt"
-	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
-	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
-	adt7 "github.com/filecoin-project/specs-actors/v7/actors/util/adt"
-	"github.com/gin-gonic/gin"
-
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
-
+	"github.com/filecoin-project/go-state-types/manifest"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
@@ -51,6 +19,24 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
+	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
+	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
+	builtin2 "github.com/filecoin-project/specs-actors/v2/actors/builtin"
+	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
+	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
+	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
+	builtin4 "github.com/filecoin-project/specs-actors/v4/actors/builtin"
+	miner4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/miner"
+	builtin5 "github.com/filecoin-project/specs-actors/v5/actors/builtin"
+	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
+	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
+	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
+	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
+	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
+	"github.com/gin-gonic/gin"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
 
 func GetMinerInfo(c *gin.Context) {
@@ -75,7 +61,7 @@ func GetMinerInfo(c *gin.Context) {
 	defer cancel()
 
 	var ts *types.TipSet
-	api := API.GetAppropriateAPI()
+	api := fullnode.API.GetAppropriateAPI()
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)
 	} else {
@@ -153,6 +139,11 @@ func GetMinerInfo(c *gin.Context) {
 	resData.VestingFunds = lockedFunds.VestingFunds
 	resData.LockedFunds = lockedFunds.PreCommitDeposits
 	resData.InitialPledgeRequirement = lockedFunds.InitialPledgeRequirement
+	resData.Beneficiary = mi.Beneficiary
+	resData.BeneficiaryTerm = mi.BeneficiaryTerm
+	resData.PendingBeneficiaryTerm = mi.PendingBeneficiaryTerm
+	resData.PeerID = mi.PeerId
+	resData.Multiaddrs = mi.Multiaddrs
 
 	err = getMinerResByCode(ctx, mact, stor, resData)
 	if err != nil {
@@ -253,16 +244,16 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 				return err
 			}
 
-			precommitted, err := adt8.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
-			if err != nil {
-				return err
-			}
-
-			var precommit miner8.SectorPreCommitOnChainInfo
-			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
-				precommitSectorCount++
-				return nil
-			})
+			//precommitted, err := adt8.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+			//if err != nil {
+			//	return err
+			//}
+			//
+			//var precommit miner8.SectorPreCommitOnChainInfo
+			//precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			//	precommitSectorCount++
+			//	return nil
+			//})
 
 			resData.State = state
 			resData.SectorCount = sectorCount
@@ -344,16 +335,16 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 				return err
 			}
 
-			precommitted, err := adt9.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
-			if err != nil {
-				return err
-			}
-
-			var precommit miner9.SectorPreCommitOnChainInfo
-			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
-				precommitSectorCount++
-				return nil
-			})
+			//precommitted, err := adt9.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+			//if err != nil {
+			//	return err
+			//}
+			//
+			//var precommit miner9.SectorPreCommitOnChainInfo
+			//precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			//	precommitSectorCount++
+			//	return nil
+			//})
 
 			resData.State = state
 			resData.SectorCount = sectorCount
@@ -435,16 +426,16 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 				return err
 			}
 
-			precommitted, err := adt10.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
-			if err != nil {
-				return err
-			}
-
-			var precommit miner10.SectorPreCommitOnChainInfo
-			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
-				precommitSectorCount++
-				return nil
-			})
+			//precommitted, err := adt10.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+			//if err != nil {
+			//	return err
+			//}
+			//
+			//var precommit miner10.SectorPreCommitOnChainInfo
+			//precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			//	precommitSectorCount++
+			//	return nil
+			//})
 
 			resData.State = state
 			resData.SectorCount = sectorCount
@@ -530,16 +521,16 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 			return err
 		}
 
-		precommitted, err := adt0.AsMap(stor, state.PreCommittedSectors)
-		if err != nil {
-			return err
-		}
-
-		var precommit miner0.SectorPreCommitOnChainInfo
-		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
-			precommitSectorCount++
-			return nil
-		})
+		//precommitted, err := adt0.AsMap(stor, state.PreCommittedSectors)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//var precommit miner0.SectorPreCommitOnChainInfo
+		//precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+		//	precommitSectorCount++
+		//	return nil
+		//})
 
 		resData.State = state
 		resData.SectorCount = sectorCount
@@ -622,16 +613,16 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 			return err
 		}
 
-		precommitted, err := adt2.AsMap(stor, state.PreCommittedSectors)
-		if err != nil {
-			return err
-		}
-
-		var precommit miner2.SectorPreCommitOnChainInfo
-		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
-			precommitSectorCount++
-			return nil
-		})
+		//precommitted, err := adt2.AsMap(stor, state.PreCommittedSectors)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//var precommit miner2.SectorPreCommitOnChainInfo
+		//precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+		//	precommitSectorCount++
+		//	return nil
+		//})
 
 		resData.State = state
 		resData.SectorCount = sectorCount
@@ -713,16 +704,16 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 			return err
 		}
 
-		precommitted, err := adt3.AsMap(stor, state.PreCommittedSectors, builtin3.DefaultHamtBitwidth)
-		if err != nil {
-			return err
-		}
-
-		var precommit miner3.SectorPreCommitOnChainInfo
-		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
-			precommitSectorCount++
-			return nil
-		})
+		//precommitted, err := adt3.AsMap(stor, state.PreCommittedSectors, builtin3.DefaultHamtBitwidth)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//var precommit miner3.SectorPreCommitOnChainInfo
+		//precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+		//	precommitSectorCount++
+		//	return nil
+		//})
 
 		resData.State = state
 		resData.SectorCount = sectorCount
@@ -804,16 +795,16 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 			return err
 		}
 
-		precommitted, err := adt4.AsMap(stor, state.PreCommittedSectors, builtin4.DefaultHamtBitwidth)
-		if err != nil {
-			return err
-		}
-
-		var precommit miner4.SectorPreCommitOnChainInfo
-		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
-			precommitSectorCount++
-			return nil
-		})
+		//precommitted, err := adt4.AsMap(stor, state.PreCommittedSectors, builtin4.DefaultHamtBitwidth)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//var precommit miner4.SectorPreCommitOnChainInfo
+		//precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+		//	precommitSectorCount++
+		//	return nil
+		//})
 
 		resData.State = state
 		resData.SectorCount = sectorCount
@@ -895,15 +886,15 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 			return err
 		}
 
-		precommitted, err := adt5.AsMap(stor, state.PreCommittedSectors, builtin5.DefaultHamtBitwidth)
-		if err != nil {
-			return err
-		}
-		var precommit miner5.SectorPreCommitOnChainInfo
-		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
-			precommitSectorCount++
-			return nil
-		})
+		//precommitted, err := adt5.AsMap(stor, state.PreCommittedSectors, builtin5.DefaultHamtBitwidth)
+		//if err != nil {
+		//	return err
+		//}
+		//var precommit miner5.SectorPreCommitOnChainInfo
+		//precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+		//	precommitSectorCount++
+		//	return nil
+		//})
 
 		resData.State = state
 		resData.SectorCount = sectorCount
@@ -985,16 +976,16 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 			return err
 		}
 
-		precommitted, err := adt6.AsMap(stor, state.PreCommittedSectors, builtin6.DefaultHamtBitwidth)
-		if err != nil {
-			return err
-		}
-
-		var precommit miner6.SectorPreCommitOnChainInfo
-		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
-			precommitSectorCount++
-			return nil
-		})
+		//precommitted, err := adt6.AsMap(stor, state.PreCommittedSectors, builtin6.DefaultHamtBitwidth)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//var precommit miner6.SectorPreCommitOnChainInfo
+		//precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+		//	precommitSectorCount++
+		//	return nil
+		//})
 
 		resData.State = state
 		resData.SectorCount = sectorCount
@@ -1076,16 +1067,16 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 			return err
 		}
 
-		precommitted, err := adt7.AsMap(stor, state.PreCommittedSectors, builtin7.DefaultHamtBitwidth)
-		if err != nil {
-			return err
-		}
-
-		var precommit miner7.SectorPreCommitOnChainInfo
-		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
-			precommitSectorCount++
-			return nil
-		})
+		//precommitted, err := adt7.AsMap(stor, state.PreCommittedSectors, builtin7.DefaultHamtBitwidth)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//var precommit miner7.SectorPreCommitOnChainInfo
+		//precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+		//	precommitSectorCount++
+		//	return nil
+		//})
 
 		resData.State = state
 		resData.SectorCount = sectorCount

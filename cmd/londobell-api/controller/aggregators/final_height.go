@@ -2,12 +2,14 @@ package aggregators
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
 
@@ -38,19 +40,32 @@ func GetFinalHeight(c *gin.Context) {
 
 func GetFinalHeightForFormalDB(ctx context.Context) ([]model.FinalHeightRes, error) {
 	var finalHeightRes []model.FinalHeightRes
-	pipe, err := Parse(model.Ctx{}, string(finalHeightAggregator))
-	if err != nil {
-		return nil, err
-	}
-	cur, err := mongoutil.FinalHeightCol.Aggregate(ctx, pipe)
-	if err != nil {
-		return nil, err
+
+	formal := multiquery.DBStateManager.GetFormalCfg()
+	cols, ok := multiquery.DBStateManager.GetDBCollections(formal.Url())
+	if !ok {
+		return nil, fmt.Errorf("url %v not found in DBCollectionsMap", formal.Url())
 	}
 
-	err = cur.All(ctx, &finalHeightRes)
-	if err != nil {
-		return nil, err
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == "FinalHeight" {
+			pipe, err := util.Parse(model.Ctx{}, string(finalHeightAggregator))
+			if err != nil {
+				return nil, err
+			}
+			cur, err := col.Aggregate(ctx, pipe)
+			if err != nil {
+				return nil, err
+			}
+
+			err = cur.All(ctx, &finalHeightRes)
+			if err != nil {
+				return nil, err
+			}
+
+			return finalHeightRes, nil
+		}
 	}
 
-	return finalHeightRes, nil
+	return nil, fmt.Errorf("no table FinalHeight")
 }

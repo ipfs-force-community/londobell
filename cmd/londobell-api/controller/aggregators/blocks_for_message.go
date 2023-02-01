@@ -1,11 +1,12 @@
 package aggregators
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"golang.org/x/net/context"
 )
@@ -24,29 +25,51 @@ func GetBlocksForMessage(c *gin.Context) {
 		return
 	}
 
-	var blocksForMessageRes []model.BlocksForMessage
-	pipe, err := Parse(model.Ctx{StartEpoch: req.StartEpoch, Cid: req.Cid}, string(blocksForMessageAggregator))
+	countUtils, err := multiquery.GetColsOnly(&multiquery.DBStateManager)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	cur, err := mongoutil.MessageBlockCol.Aggregate(ctx, pipe)
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(blocksForMessageAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	err = cur.All(ctx, &blocksForMessageRes)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
+	var blocksForMessageRes model.BlocksForMessage
 
-	// get near-height data from the temporary repository
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "BlockMessage")
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		raw := multiResult[0]
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		err = json.Unmarshal(rawByte, &blocksForMessageRes)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+	}
 
 	res.Data = blocksForMessageRes
 	c.JSON(http.StatusOK, res)

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+
 	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
 
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
@@ -53,7 +55,7 @@ func GetSectorNumberByDealID(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	api := API.GetAppropriateAPI()
+	api := fullnode.API.GetAppropriateAPI()
 
 	stor := store.ActorStore(context.TODO(), blockstore.NewAPIBlockstore(api))
 	addr, err := address.NewFromString(req.Miner)

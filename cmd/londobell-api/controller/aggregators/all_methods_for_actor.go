@@ -1,24 +1,27 @@
 package aggregators
 
 import (
+	"context"
 	"net/http"
-	"sync"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/ipfs-force-community/londobell/common"
-
+	"github.com/filecoin-project/go-address"
+	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
+	"github.com/ipfs-force-community/londobell/buildnet"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
-	"golang.org/x/net/context"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
-func GetAllMethodsForActor(c *gin.Context) {
+func GetAllActorMethods(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	alog := log.With("method", "GetAllMethodsForActor")
+	alog := log.With("method", "GetAllActorMethods")
 	req := model.CommonReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
@@ -28,69 +31,63 @@ func GetAllMethodsForActor(c *gin.Context) {
 		return
 	}
 
-	// avoid large query scope
-	latestEpoch := common.GetCurEpoch()
-	if req.EndEpoch > int64(latestEpoch) {
-		req.EndEpoch = int64(latestEpoch)
-	}
-
-	var (
-		allMethodsRess []model.AllMethodsRes
-		ewg            multierror.Group
-		mutex          sync.Mutex
-	)
-
-	for epoch := req.StartEpoch; epoch < req.EndEpoch; epoch++ {
-		curEpoch := epoch
-		ewg.Go(func() error {
-			var allMethodsRes []model.AllMethodsRes
-			pipe, err := Parse(model.Ctx{StartEpoch: curEpoch, Addr: req.Addr}, string(allMethodsForActorAggregator))
-			if err != nil {
-				return err
-			}
-
-			cur, err := mongoutil.MessageCol.Aggregate(ctx, pipe)
-			if err != nil {
-				return err
-			}
-
-			err = cur.All(ctx, &allMethodsRes)
-			if err != nil {
-				return err
-			}
-
-			mutex.Lock()
-			allMethodsRess = append(allMethodsRess, allMethodsRes...)
-			mutex.Unlock()
-			return nil
-		})
-	}
-
-	if err := ewg.Wait(); err != nil {
+	addr, err := address.NewFromString(buildnet.NetPrefix + req.Addr)
+	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	// get near-height data from the temporary repository
+	api := fullnode.API.GetAppropriateAPI()
 
-	var (
-		methodMap        = make(map[string]struct{})
-		allMethods       []string
-		allUniqueMethods []string
-	)
-
-	for _, methods := range allMethodsRess {
-		allMethods = append(allMethods, methods.AllMethods...)
+	ID, err := api.StateLookupID(ctx, addr, types.EmptyTSK)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
 	}
 
-	for _, method := range allMethods {
-		if _, ok := methodMap[method]; !ok {
-			methodMap[method] = struct{}{}
-			allUniqueMethods = append(allUniqueMethods, method)
-		}
+	actorID := ID.String()[1:]
+	curEpoch := common.GetCurEpoch()
+
+	actorMsgsByMethodNameMap, err := multiquery.GetAllActorMsgsByMethodNameMap(ctx, &multiquery.DBStateManager, actorID, curEpoch)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
 	}
 
-	res.Data = model.AllMethodsRes{AllMethods: allUniqueMethods}
+	var allMethods []model.AllMethodsRes
+	for methodName, count := range actorMsgsByMethodNameMap {
+		allMethods = append(allMethods, model.AllMethodsRes{MethodName: methodName, Count: count})
+	}
+
+	// create message
+	actor, err := api.StateGetActor(ctx, addr, types.EmptyTSK)
+	if err != nil {
+		log.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
+	switch {
+	case addr == sbuiltin.SystemActorAddr, addr == sbuiltin.InitActorAddr, addr == sbuiltin.RewardActorAddr, addr == sbuiltin.CronActorAddr, addr == sbuiltin.StoragePowerActorAddr,
+		addr == sbuiltin.VerifiedRegistryActorAddr, addr == sbuiltin.BurntFundsActorAddr, addr == sbuiltin.DatacapActorAddr, addr == sbuiltin.EthereumAddressManagerActorAddr,
+		builtin.IsAccountActor(actor.Code), builtin.IsEthAccountActor(actor.Code), builtin.IsPlaceholderActor(actor.Code):
+		res.Data = allMethods
+		c.JSON(http.StatusOK, res)
+		return
+	case builtin.IsStorageMinerActor(actor.Code):
+		// CreateMiner
+		allMethods = append(allMethods, model.AllMethodsRes{MethodName: "CreateMiner", Count: 1})
+	case builtin.IsEvmActor(actor.Code):
+		// CreateExternal
+		allMethods = append(allMethods, model.AllMethodsRes{MethodName: "CreateExternal", Count: 1})
+	default:
+		// Exec
+		allMethods = append(allMethods, model.AllMethodsRes{MethodName: "Exec", Count: 1})
+	}
+
+	res.Data = allMethods
 	c.JSON(http.StatusOK, res)
 }

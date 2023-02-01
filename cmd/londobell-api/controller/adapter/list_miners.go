@@ -8,6 +8,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
@@ -34,7 +35,7 @@ func GetListMiners(c *gin.Context) {
 		actorIDsRes model.ActorIDRes
 	)
 
-	api := API.GetAppropriateAPI()
+	api := fullnode.API.GetAppropriateAPI()
 
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)

@@ -6,13 +6,13 @@ import (
 )
 
 type MessageByMethodName struct {
-	Cid      string            `bson:"cid" json:"Cid"`
-	Epoch    abi.ChainEpoch    `bson:"epoch" json:"Epoch"`
-	From     string            `bson:"from" json:"From"`
-	To       string            `bson:"to" json:"To"`
-	Value    string            `bson:"value" json:"Value"`
-	ExitCode exitcode.ExitCode `bson:"exit_code" json:"ExitCode"`
-	Method   string            `bson:"method" json:"Method"`
+	SignedCid string
+	Epoch     abi.ChainEpoch
+	From      string
+	To        string
+	Value     string
+	ExitCode  exitcode.ExitCode
+	Method    string
 }
 
 type MessagesByMethodNameRes struct {

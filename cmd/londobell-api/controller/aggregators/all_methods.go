@@ -2,15 +2,12 @@ package aggregators
 
 import (
 	"net/http"
-	"sync"
-
-	"github.com/hashicorp/go-multierror"
-	"github.com/ipfs-force-community/londobell/common"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/common"
 	"golang.org/x/net/context"
 )
 
@@ -28,69 +25,20 @@ func GetAllMethods(c *gin.Context) {
 		return
 	}
 
-	// avoid large query scope
-	latestEpoch := common.GetCurEpoch()
-	if req.EndEpoch > int64(latestEpoch) {
-		req.EndEpoch = int64(latestEpoch)
-	}
+	curEpoch := common.GetCurEpoch()
 
-	var (
-		allMethodsRess []model.AllMethodsRes
-		ewg            multierror.Group
-		mutex          sync.Mutex
-	)
-
-	for epoch := req.StartEpoch; epoch < req.EndEpoch; epoch++ {
-		curEpoch := epoch
-		ewg.Go(func() error {
-			var allMethodsRes []model.AllMethodsRes
-			pipe, err := Parse(model.Ctx{StartEpoch: curEpoch}, string(allMethodsAggregator))
-			if err != nil {
-				return err
-			}
-
-			cur, err := mongoutil.MessageCol.Aggregate(ctx, pipe)
-			if err != nil {
-				return err
-			}
-
-			err = cur.All(ctx, &allMethodsRes)
-			if err != nil {
-				return err
-			}
-
-			mutex.Lock()
-			allMethodsRess = append(allMethodsRess, allMethodsRes...)
-			mutex.Unlock()
-			return nil
-		})
-	}
-
-	if err := ewg.Wait(); err != nil {
+	blockMsgsByMethodNameMap, err := multiquery.GetAllBlockMsgsByMethodNameMap(ctx, &multiquery.DBStateManager, curEpoch)
+	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	// get near-height data from the temporary repository
-
-	var (
-		methodMap        = make(map[string]struct{})
-		allMethods       []string
-		allUniqueMethods []string
-	)
-
-	for _, methods := range allMethodsRess {
-		allMethods = append(allMethods, methods.AllMethods...)
+	var allMethods []model.AllMethodsRes
+	for methodName, count := range blockMsgsByMethodNameMap {
+		allMethods = append(allMethods, model.AllMethodsRes{MethodName: methodName, Count: count})
 	}
 
-	for _, method := range allMethods {
-		if _, ok := methodMap[method]; !ok {
-			methodMap[method] = struct{}{}
-			allUniqueMethods = append(allUniqueMethods, method)
-		}
-	}
-
-	res.Data = model.AllMethodsRes{AllMethods: allUniqueMethods}
+	res.Data = allMethods
 	c.JSON(http.StatusOK, res)
 }

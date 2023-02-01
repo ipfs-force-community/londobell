@@ -1,14 +1,15 @@
 package aggregators
 
 import (
-	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/common"
+	"golang.org/x/net/context"
 )
 
 func GetChildEpoch(c *gin.Context) {
@@ -25,26 +26,44 @@ func GetChildEpoch(c *gin.Context) {
 		return
 	}
 
+	curEpoch := common.GetCurEpoch()
+
+	countUtils, err := multiquery.GetEpochRange(ctx, &multiquery.DBStateManager, curEpoch)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
 	var childEpochRes []model.ChildEpochRes
-	pipe, err := Parse(model.Ctx{StartEpoch: req.StartEpoch}, string(childEpochAggregator))
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, childEpochAggregator, req, "Tipset")
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 
-	cur, err := mongoutil.TipSetCol.Aggregate(ctx, pipe)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
 
-	err = cur.All(ctx, &childEpochRes)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
+		raw := multiResult
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		err = json.Unmarshal(rawByte, &childEpochRes)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 	}
 
 	res.Data = childEpochRes

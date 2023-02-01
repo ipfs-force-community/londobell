@@ -1,16 +1,17 @@
 package aggregators
 
 import (
-	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/common"
+	"golang.org/x/net/context"
 )
 
-// todo: 全网出块数量需统计上线高度以来各高度段的出块数量  历史出块数量 + 近期出块数量 cron sigma
 func GetTotalBlockCount(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -25,26 +26,45 @@ func GetTotalBlockCount(c *gin.Context) {
 		return
 	}
 
+	curEpoch := common.GetCurEpoch()
+
+	countUtils, err := multiquery.GetEpochRange(ctx, &multiquery.DBStateManager, curEpoch)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
 	var totalBlockCountRes []model.TotalBlockCountRes
-	pipe, err := Parse(model.Ctx{StartEpoch: req.StartEpoch, EndEpoch: req.EndEpoch}, string(totalBlockCountAggregator))
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
 
-	cur, err := mongoutil.TraceCol.Aggregate(ctx, pipe)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, totalBlockCountAggregator, req, "ExecTrace")
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 
-	err = cur.All(ctx, &totalBlockCountRes)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		raw := multiResult
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		err = json.Unmarshal(rawByte, &totalBlockCountRes)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 	}
 
 	res.Data = totalBlockCountRes

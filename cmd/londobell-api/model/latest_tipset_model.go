@@ -5,7 +5,7 @@ import (
 )
 
 type TipSetRes struct {
-	Epoch        abi.ChainEpoch `bson:"_id" json:"Epoch"`
+	Epoch        abi.ChainEpoch `bson:"_id" json:"_id"`
 	Cids         []string
 	MinTimestamp uint64
 	ChildEpoch   abi.ChainEpoch

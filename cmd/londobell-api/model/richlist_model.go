@@ -6,7 +6,7 @@ type RichListRes struct {
 }
 
 type Rich struct {
-	Actor   string `bson:"Addr"`
-	Balance string `bson:"Balance"`
-	Type    string `bson:"Code"`
+	Addr    string
+	Balance string
+	Code    string
 }

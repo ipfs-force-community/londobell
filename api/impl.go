@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
+
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
 
@@ -13,6 +15,7 @@ import (
 )
 
 var _ BellAPI = (*BellNodeAPI)(nil)
+var _ MultiAPI = (*MultiNodeAPI)(nil)
 var log = logging.Logger("rpc")
 
 type BellNodeAPI struct {
@@ -64,4 +67,24 @@ func (m *BellNodeAPI) SetSampleRate(ctx context.Context, rate float64) (old floa
 }
 func (m *BellNodeAPI) GetSampleRate(ctx context.Context) (float64, error) {
 	return tracing.GetSampleRate()
+}
+
+type MultiNodeAPI struct {
+	fx.In
+	DBSMgr *multiquery.StateManager
+}
+
+func (m *MultiNodeAPI) LoadDBState(url string) (multiquery.DataBaseState, error) {
+	dbState, found, err := m.DBSMgr.LoadDataBaseState(url)
+	if err != nil {
+		log.Error(err)
+		return multiquery.DataBaseState{}, err
+	}
+
+	if !found {
+		log.Warnf("url %v not found in dbState", url)
+		return multiquery.DataBaseState{}, nil
+	}
+
+	return dbState, nil
 }

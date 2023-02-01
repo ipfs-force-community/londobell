@@ -1,17 +1,15 @@
 package aggregators
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
-	"sort"
-	"sync"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
-	"golang.org/x/net/context"
 )
 
 func GetBlockMessagesByMethodName(c *gin.Context) {
@@ -28,118 +26,52 @@ func GetBlockMessagesByMethodName(c *gin.Context) {
 		return
 	}
 
-	// avoid large query scope
-	latestEpoch := common.GetCurEpoch()
-	if req.EndEpoch > int64(latestEpoch) {
-		req.EndEpoch = int64(latestEpoch)
-	}
+	curEpoch := common.GetCurEpoch()
 
-	var (
-		messagesByMethodNameRess []model.MessageByMethodName
-		ewg                      multierror.Group
-		mutex                    sync.Mutex
-	)
-
-	for epoch := req.StartEpoch; epoch < req.EndEpoch; epoch++ {
-		curEpoch := epoch
-		ewg.Go(func() error {
-			var messagesByMethodNameRes []model.MessageByMethodName
-			pipe, err := Parse(model.Ctx{StartEpoch: curEpoch, MethodName: req.MethodName}, string(blockMessagesByMethodNameAggregator))
-			if err != nil {
-				return err
-			}
-
-			cur, err := mongoutil.TraceCol.Aggregate(ctx, pipe)
-			if err != nil {
-				return err
-			}
-
-			err = cur.All(ctx, &messagesByMethodNameRes)
-			if err != nil {
-				return err
-			}
-
-			mutex.Lock()
-			messagesByMethodNameRess = append(messagesByMethodNameRess, messagesByMethodNameRes...)
-			mutex.Unlock()
-			return nil
-		})
-	}
-
-	if err := ewg.Wait(); err != nil {
+	countUtils, err := multiquery.GetTotalCountForBlockMsgsByMethodName(ctx, req.MethodName, &multiquery.DBStateManager, curEpoch)
+	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	// get near-height data from the temporary repository
-	sort.Slice(messagesByMethodNameRess, func(i, j int) bool {
-		return messagesByMethodNameRess[i].Epoch > messagesByMethodNameRess[j].Epoch
-	})
-
-	tmpStartEpoch := req.StartEpoch
-	if len(messagesByMethodNameRess) > 0 {
-		tmpStartEpoch = int64(messagesByMethodNameRess[0].Epoch) + 1
+	totalCount := int64(0)
+	for _, countUtil := range countUtils {
+		totalCount += countUtil.Count
 	}
 
-	var tmpMessagesByMethodNameRess []model.MessageByMethodName
-	for epoch := tmpStartEpoch; epoch < req.EndEpoch; epoch++ {
-		curEpoch := epoch
-		ewg.Go(func() error {
-			var tmpMessagesByMethodNameRes []model.MessageByMethodName
-			tmpPipe, err := Parse(model.Ctx{StartEpoch: curEpoch, MethodName: req.MethodName}, string(blockMessagesByMethodNameAggregator))
-			if err != nil {
-				return err
-			}
+	var messagesByMethodName []model.MessageByMethodName
 
-			tmpCur, err := mongoutil.TmpTraceCol.Aggregate(ctx, tmpPipe)
-			if err != nil {
-				return err
-			}
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, blockMessagesByMethodNameAggregator, req, "ExecTrace")
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 
-			err = tmpCur.All(ctx, &tmpMessagesByMethodNameRes)
-			if err != nil {
-				return err
-			}
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
 
-			mutex.Lock()
-			tmpMessagesByMethodNameRess = append(tmpMessagesByMethodNameRess, tmpMessagesByMethodNameRes...)
-			mutex.Unlock()
-			return nil
-		})
+		raw := multiResult
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		err = json.Unmarshal(rawByte, &messagesByMethodName)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 	}
 
-	if err := ewg.Wait(); err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	messagesByMethodNameRess = append(messagesByMethodNameRess, tmpMessagesByMethodNameRess...)
-
-	// sort
-	sort.Slice(messagesByMethodNameRess, func(i, j int) bool {
-		return messagesByMethodNameRess[i].Epoch > messagesByMethodNameRess[j].Epoch
-	})
-
-	if req.Index == 0 && req.Limit == 0 {
-		res.Data = model.MessagesByMethodNameRes{TotalCount: int64(len(messagesByMethodNameRess)), MessagesByMethodName: messagesByMethodNameRess}
-		c.JSON(http.StatusOK, res)
-		return
-	}
-
-	// paging
-	if req.Index*req.Limit >= int64(len(messagesByMethodNameRess)) {
-		c.JSON(http.StatusOK, res)
-		return
-	}
-
-	if (req.Index+1)*req.Limit >= int64(len(messagesByMethodNameRess)) {
-		res.Data = model.MessagesByMethodNameRes{TotalCount: int64(len(messagesByMethodNameRess[req.Index*req.Limit:])), MessagesByMethodName: messagesByMethodNameRess[req.Index*req.Limit:]}
-		c.JSON(http.StatusOK, res)
-		return
-	}
-
-	res.Data = model.MessagesByMethodNameRes{TotalCount: int64(len(messagesByMethodNameRess[req.Index*req.Limit : (req.Index+1)*req.Limit])), MessagesByMethodName: messagesByMethodNameRess[req.Index*req.Limit : (req.Index+1)*req.Limit]}
+	res.Data = model.MessagesByMethodNameRes{TotalCount: totalCount, MessagesByMethodName: messagesByMethodName}
 	c.JSON(http.StatusOK, res)
 }

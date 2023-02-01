@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v8/miner"
@@ -30,7 +32,7 @@ func GetSectorPowerInfo(c *gin.Context) {
 	defer cancel()
 
 	var ts *types.TipSet
-	api := API.GetAppropriateAPI()
+	api := fullnode.API.GetAppropriateAPI()
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)
 	} else {

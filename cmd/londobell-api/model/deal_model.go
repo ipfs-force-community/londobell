@@ -4,9 +4,8 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 )
 
-// todo: 结构变化
 type Deal struct {
-	ID                   int64 `bson:"_id" json:"ID"`
+	ID                   int64 `bson:"_id" json:"_id"`
 	Epoch                abi.ChainEpoch
 	PieceCID             string
 	PieceSize            uint64

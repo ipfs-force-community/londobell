@@ -5,22 +5,29 @@ import (
 	"fmt"
 	"net/http"
 
-	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
-
-	"github.com/filecoin-project/go-state-types/manifest"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/go-state-types/big"
 	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
+	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
 	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
 	util8 "github.com/filecoin-project/go-state-types/builtin/v8/util"
 	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
 	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
 	util9 "github.com/filecoin-project/go-state-types/builtin/v9/util"
 	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
+	"github.com/filecoin-project/go-state-types/manifest"
+	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/cron"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
+	"github.com/filecoin-project/lotus/chain/rand"
+	"github.com/filecoin-project/lotus/chain/stmgr"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/chain/vm"
 	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/filecoin-project/specs-actors/actors/util/adt"
 	builtin2 "github.com/filecoin-project/specs-actors/v2/actors/builtin"
@@ -33,21 +40,11 @@ import (
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 	"github.com/gin-gonic/gin"
-	"github.com/ipfs/go-cid"
-	"golang.org/x/xerrors"
-
-	"github.com/filecoin-project/lotus/build"
-	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/builtin"
-	"github.com/filecoin-project/lotus/chain/actors/builtin/cron"
-	"github.com/filecoin-project/lotus/chain/consensus/filcns"
-	"github.com/filecoin-project/lotus/chain/rand"
-	"github.com/filecoin-project/lotus/chain/stmgr"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/chain/vm"
-
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs/go-cid"
+	"golang.org/x/xerrors"
 )
 
 func GetPreCommitDepositToBurnInfo(c *gin.Context) {
@@ -81,14 +78,14 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 	}
 
 	curEpoch := abi.ChainEpoch(req.Epoch)
-	curTs, err := Components.Full.ChainGetTipSetByHeight(ctx, curEpoch, types.EmptyTSK)
+	curTs, err := fullnode.Components.Full.ChainGetTipSetByHeight(ctx, curEpoch, types.EmptyTSK)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	sm, ok := Components.SM.(*stmgr.StateManager)
+	sm, ok := fullnode.Components.SM.(*stmgr.StateManager)
 	if !ok {
 		err = fmt.Errorf("Components.SM is not *stmgr.StateManager type")
 		alog.Error(err)
@@ -154,7 +151,7 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 		}
 
 		parentTs = curTs
-		baseFee, err = Components.CS.ComputeBaseFee(ctx, curTs)
+		baseFee, err = fullnode.Components.CS.ComputeBaseFee(ctx, curTs)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
@@ -164,7 +161,7 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 		log.Infof("state at height %v is %v", curTs.Height(), pstate)
 	} else {
 		pstate = curTs.Blocks()[0].ParentStateRoot
-		parentTs, err = Components.CS.LoadTipSet(ctx, curTs.Parents())
+		parentTs, err = fullnode.Components.CS.LoadTipSet(ctx, curTs.Parents())
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
