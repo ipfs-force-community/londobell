@@ -13,6 +13,14 @@ var daemonCmd = &cli.Command{
 			Name:  "port",
 			Usage: "2345",
 		},
+		&cli.StringSliceFlag{
+			Name:  "apis",
+			Usage: "ws://112.124.1.253:1234/rpc/v0",
+		},
+		&cli.StringFlag{
+			Name:  "RPCListen",
+			Usage: "multiaddr of rpc",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		err := server.Run(cctx, false)

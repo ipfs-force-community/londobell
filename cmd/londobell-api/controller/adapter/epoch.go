@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/gin-gonic/gin"
@@ -26,7 +28,8 @@ func GetEpochInfo(c *gin.Context) {
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -34,7 +37,7 @@ func GetEpochInfo(c *gin.Context) {
 	defer cancel()
 
 	var ts *types.TipSet
-	api := API.GetAppropriateAPI()
+	api := fullnode.API.GetAppropriateAPI()
 
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)
@@ -43,7 +46,8 @@ func GetEpochInfo(c *gin.Context) {
 	}
 
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -54,7 +58,8 @@ func GetEpochInfo(c *gin.Context) {
 
 	pact, err := api.StateGetActor(ctx, power.Address, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
@@ -62,62 +67,72 @@ func GetEpochInfo(c *gin.Context) {
 
 	pst, err := power.Load(stor, pact)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	pc, err := pst.TotalPower()
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	ract, err := api.StateGetActor(ctx, reward.Address, ts.Key())
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	rst, err := reward.Load(stor, ract)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	currentTotalStoragePowerReward, err := rst.TotalStoragePowerReward()
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	parentTs, err := api.ChainGetTipSet(ctx, types.NewTipSetKey(ts.Blocks()[0].Parents...))
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	parentRoot := parentTs.ParentState()
 	parentTree, err := state.LoadStateTree(stor, parentRoot)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	pract, err := parentTree.GetActor(reward.Address)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	prst, err := reward.Load(stor, pract)
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
 	parentTotalStoragePowerReward, err := prst.TotalStoragePowerReward()
 	if err != nil {
-		util.ReturnOnErr(c, alog, err)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
