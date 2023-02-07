@@ -389,8 +389,17 @@
 		"WinCount": 0
 	},
 	"Epoch": 0,
+	"MessageCount": 0,
 	"Messages": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 	"Miner": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Ticket": {
+		"VRFProof": {
+			"$binary": {
+				"base64": "SGVsbG8=",
+				"subType": "00"
+			}
+		}
+	},
 	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
