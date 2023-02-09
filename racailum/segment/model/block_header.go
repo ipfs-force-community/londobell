@@ -27,6 +27,8 @@ type BlockHeader struct {
 	Epoch         abi.ChainEpoch `mir:"Height"`
 	Messages      cid.Cid
 	ElectionProof *types.ElectionProof
+	Ticket        *types.Ticket
+	MessageCount  int
 }
 
 // NewBlockHeader takes required fields from a raw *types.BlockHeader

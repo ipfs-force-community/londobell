@@ -70,8 +70,12 @@
 		"WinCount": "int64"
 	},
 	"Epoch": "abi.ChainEpoch",
+	"MessageCount": "int",
 	"Messages": "cid.Cid",
 	"Miner": "address.Address",
+	"Ticket": {
+		"VRFProof": "[]uint8"
+	},
 	"_id": "cid.Cid"
 }
 ```

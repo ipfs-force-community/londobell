@@ -111,10 +111,10 @@ var extractors = []extractor{
 		name:   "tipset",
 		method: extractTipSet,
 	},
-	//{
-	//	name:   "block-header",
-	//	method: extractBlochHeaders,
-	//},
+	{
+		name:   "block-header",
+		method: extractBlochHeaders,
+	},
 	{
 		name:   "exec-trace",
 		method: extractExecTrace,
@@ -165,6 +165,10 @@ func extractTipSet(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) 
 }
 
 func extractBlochHeaders(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error { // nolint: deadcode
+	if !ctx.Opts.EnabelExtract.EnableExtractBlockHeader {
+		return nil
+	}
+
 	rawBHs := ts.Blocks()
 	for bi := range rawBHs {
 		bh, err := model.NewBlockHeader(rawBHs[bi])
@@ -172,6 +176,12 @@ func extractBlochHeaders(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 			return err
 		}
 
+		bmsgs, smsgs, err := ctx.D.MessagesForBlock(ctx.C, rawBHs[bi])
+		if err != nil {
+			return err
+		}
+
+		bh.MessageCount = len(bmsgs) + len(smsgs)
 		res.Docs = append(res.Docs, bh)
 	}
 
