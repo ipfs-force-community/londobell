@@ -188,7 +188,7 @@ func extractTipSetForTmp(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	return nil
 }
 
-func extractBlochHeaders(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet) error { // nolint: deadcode
+func extractBlochHeaders(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error { // nolint: deadcode
 	if !ctx.Opts.EnabelExtract.EnableExtractBlockHeader {
 		return nil
 	}
