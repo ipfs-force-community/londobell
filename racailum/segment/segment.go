@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/network"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil/mdict"
 	"github.com/ipfs-force-community/londobell/metrics"
+	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
 	"github.com/ipfs-force-community/londobell/racailum/segment/aggregate"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
@@ -24,6 +26,31 @@ import (
 )
 
 var log = logging.Logger("segment")
+
+type ActorSet struct {
+	Version network.Version
+	Set     *actor.Set
+}
+
+var Actorset *ActorSet
+
+func NewActorSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet, allowNilChild bool) (*ActorSet, error) {
+	set, err := actor.NewSet(ctx, stm, ts, allowNilChild)
+	if err != nil {
+		return nil, fmt.Errorf("new actor set failed: %w", err)
+	}
+
+	version := stm.GetNetworkVersion(ctx, ts.Height())
+
+	return &ActorSet{
+		Version: version,
+		Set:     set,
+	}, nil
+}
+
+func ClearActorSet() {
+	Actorset = nil
+}
 
 // Anchor contains most significant info about a tipset
 type Anchor struct {
@@ -212,7 +239,7 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		return nil
 	}
 
-	tipsets, err := ExtractLinkedTipSets(s.dal.ChainStore, rawts, &hi)
+	tipsets, err := ExtractLinkedTipSets(s.dal.ChainStore, rawts, &hi, false)
 	if err != nil {
 		return err
 	}
@@ -240,7 +267,7 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		return nil
 	}
 
-	if err := s.ExtractTipSets(ctx, tipsets); err != nil {
+	if err := s.ExtractTipSets(ctx, tipsets, false); err != nil {
 		return err
 	}
 
@@ -257,6 +284,83 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 	}
 
 	return nil
+}
+
+func (s *Segment) ExtractToTemporaryDB(ctx context.Context, rawts *types.TipSet) error {
+	log.Infow("extract tipset to temporary db", "tipset.height", rawts.Height(), "tipset.cids", rawts.Key())
+	ctx, span := trace.StartSpan(ctx, "segment.ExtractToTemporaryDB")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(rawts.Height())))
+	defer span.End()
+
+	tmp := true
+
+	s.bound.Lock()
+	defer s.bound.Unlock()
+
+	tsh := rawts.Height()
+	hi := s.bound.Hi.Epoch
+	if hi >= tsh {
+		return fmt.Errorf("hi %v of tmp exceeds rawts height %v", hi, tsh)
+	}
+
+	tipsets, err := ExtractLinkedTipSets(s.dal.ChainStore, rawts, &hi, tmp)
+	if err != nil {
+		return err
+	}
+
+	for i := 1; i < len(tipsets); i++ {
+		tipsets[i].Parent = tipsets[i-1].TipSet
+	}
+
+	// extract (hi, rawts]
+	tipsets = tipsets[1:]
+
+	// preload Actorset
+	if Actorset == nil {
+		log.Warnw("load Actorset firstly")
+		Actorset, err = NewActorSet(ctx, s.dal.StateManager, tipsets[0], tmp)
+		if err != nil {
+			return fmt.Errorf("new actor set failed: %v", err)
+		}
+	} else {
+		version := s.dal.GetNetworkVersion(ctx, rawts.Height())
+		if version != Actorset.Version {
+			// upgrade occurs, then reload Actorset
+			log.Warnf("need reload Actorset for mismatched network version, Actorset.Version: %v, current version: %v", Actorset.Version, version)
+			Actorset, err = NewActorSet(ctx, s.dal.StateManager, tipsets[0], tmp)
+			if err != nil {
+				return fmt.Errorf("new actor set failed: %v", err)
+			}
+		}
+	}
+
+	if err := s.ExtractTipSets(ctx, tipsets, tmp); err != nil {
+		return err
+	}
+	if err := s.updateBoundary(ctx, tipsets[len(tipsets)-1], nil); err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (s *Segment) GetTmpFinalTipSet(ctx context.Context) (*types.TipSet, error) {
+	tmpFinalTipSet, err := s.dal.LoadTipSet(ctx, s.ReadBoundary().Hi.TSK)
+	if err != nil {
+		return nil, err
+	}
+
+	return tmpFinalTipSet, nil
+}
+
+func (s *Segment) GetTipSetByTSk(ctx context.Context, tsk types.TipSetKey) (*types.TipSet, error) {
+	ts, err := s.dal.LoadTipSet(ctx, tsk)
+	if err != nil {
+		return nil, err
+	}
+
+	return ts, nil
 }
 
 // Aggregate tries to do aggregationg with given tipsets
@@ -335,7 +439,7 @@ func (s *Segment) SaveFinalHeight(ctx context.Context, hi *common.LinkedTipSet) 
 
 	res.Docs = append(res.Docs, doc)
 	docs[0] = res.Docs
-	if err := s.insertMany(ctx, elog, docs); err != nil {
+	if err := s.insertMany(ctx, elog, docs, false); err != nil {
 		return fmt.Errorf("SaveFinalHeight err: %w", err)
 	}
 

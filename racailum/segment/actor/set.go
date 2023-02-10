@@ -16,12 +16,13 @@ import (
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 
+	"github.com/ipfs-force-community/londobell/common"
+
 	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
 	linit "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/ipfs-force-community/londobell/common"
 )
 
 var log = logging.Logger("actor")
@@ -32,13 +33,26 @@ var (
 )
 
 // NewSet loads actor codes and construct a actor set with the given tipset
-func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet) (*Set, error) {
+func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet, tmp bool) (*Set, error) {
 	_, span := trace.StartSpan(ctx, "actor.NewSet")
 	defer span.End()
 
 	m := map[address.Address]cid.Cid{}
 
-	root := ts.State()
+	var (
+		err  error
+		root cid.Cid
+	)
+
+	if tmp {
+		root, _, err = stm.TipSetState(ctx, ts.TipSet)
+		if err != nil {
+			return nil, fmt.Errorf("get state of tipset: %v", err)
+		}
+	} else {
+		root = ts.State()
+	}
+
 	tree, err := stm.StateTree(root)
 	if err != nil {
 		return nil, fmt.Errorf("load state tree: %w", err)
@@ -80,7 +94,7 @@ func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSe
 			if ok {
 				m[addr] = code
 			} else {
-				log.Warnf("code not found for actor id %d, but exists in init state", id)
+				log.Warnf("code not found for actor id %d, but exists in init state, tmp: %v", id, tmp)
 			}
 
 			return nil
@@ -89,7 +103,7 @@ func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSe
 		}
 	}
 
-	log.Infow("actor set loaded", "epoch", ts.Height(), "state", root, "count", count, "init-state", initCount, "total", len(m))
+	log.Infow("actor set loaded", "epoch", ts.Height(), "state", root, "count", count, "init-state", initCount, "total", len(m), "tmp", tmp)
 
 	return &Set{m: m}, nil
 }
@@ -139,6 +153,7 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 
 	// fall back to state inside tipset
 	if code == cid.Undef {
+		log.Warnf("LookupMethodInfo: can not find code in set.m, need to load from actor")
 		act, err := stm.LoadActor(ctx, call.To, ts)
 		if err != nil {
 			if errors.Is(err, types.ErrActorNotFound) {
@@ -164,6 +179,7 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 	}
 	vma := filcns.NewActorRegistry()
 
+	//todo: realcode
 	mi, ok := vma.Methods[code][call.Method]
 	if !ok {
 		return MethodInfo{}, fmt.Errorf("%w: lookup method for from=%s, to=%s, code=%s, meth=%d", ErrActorMethodNotFound, call.From, call.To, code, call.Method)

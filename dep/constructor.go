@@ -32,6 +32,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/debug"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
 	"github.com/ipfs-force-community/londobell/racailum/tracing"
+	"github.com/ipfs-force-community/londobell/tmpbell"
 )
 
 var (
@@ -97,6 +98,20 @@ type raIn struct {
 // NewRaCailum constructs an instance of RaCailum
 func NewRaCailum(in raIn) (*racailum.RaCailum, error) {
 	return racailum.New(in.Ctx, in.Cfg, in.Sub, in.CS, in.Stm, in.SegMgr, in.ShutDownCh)
+}
+
+type tmpIn struct {
+	fx.In
+	Ctx    GlobalContext
+	Cfg    racailum.Config
+	CS     common.ChainStore
+	Stm    common.StateManager
+	SegMgr *segment.Manager
+	Full   v0api.FullNode
+}
+
+func NewTmpBell(in tmpIn) (*tmpbell.TmpBell, error) {
+	return tmpbell.New(in.Ctx, in.Cfg, in.CS, in.Stm, in.SegMgr, in.Full)
 }
 
 // SegmentOpt is used to combine a group of option funcs

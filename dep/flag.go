@@ -94,7 +94,6 @@ func InjectChainRepo(cctx *cli.Context) dix.Option {
 		}
 
 		return modules.LockedRepo(lr)(lc)
-
 	})
 }
 

@@ -54,6 +54,7 @@ type StateManager interface {
 	GetNetworkVersion(ctx context.Context, height abi.ChainEpoch) network.Version
 	GetVMCirculatingSupplyDetailed(ctx context.Context, height abi.ChainEpoch, st *state.StateTree) (api.CirculatingSupply, error)
 	SearchForMessage(ctx context.Context, head *types.TipSet, mcid cid.Cid, lookbackLimit abi.ChainEpoch, allowReplaced bool) (*types.TipSet, *types.MessageReceipt, cid.Cid, error)
+	TipSetState(ctx context.Context, ts *types.TipSet) (st cid.Cid, rec cid.Cid, err error)
 }
 
 // ChainDict is a dict for enums
@@ -91,6 +92,7 @@ type IndexedDocument interface {
 type DocumentDB interface {
 	Insert(ctx context.Context, col string, docs []interface{}) (int, error)
 	Find(ctx context.Context, col string, filter interface{}, opts ...*options.FindOptions) (*mongo.Cursor, error)
+	Update(ctx context.Context, col string, filter, docs interface{}) (int, error)
 	Delete(ctx context.Context, col string, filter interface{}) (int, error)
 	Aggregate(ctx context.Context, col string, pipeline interface{}, res interface{}) error
 }

@@ -20,6 +20,7 @@ func NewMgoDocDB(ctx context.Context, cli *mongo.Client, db *mongo.Database) (*M
 		cli:       cli,
 		db:        db,
 		insertOpt: options.InsertMany().SetOrdered(false),
+		updateOpt: options.Update().SetUpsert(true),
 		aggOpt:    options.Aggregate(),
 	}
 
@@ -33,6 +34,7 @@ type MgoDocDB struct {
 	db  *mongo.Database
 
 	insertOpt *options.InsertManyOptions
+	updateOpt *options.UpdateOptions
 	aggOpt    *options.AggregateOptions
 
 	cols struct {
@@ -66,6 +68,16 @@ func (m *MgoDocDB) Find(ctx context.Context, colName string, filter interface{},
 	}
 
 	return cursor, nil
+}
+
+func (m *MgoDocDB) Update(ctx context.Context, colName string, filter, docs interface{}) (int, error) {
+	res, err := m.getCol(colName).UpdateMany(ctx, filter, docs, m.updateOpt)
+	var upserted int
+	if res != nil {
+		upserted = int(res.UpsertedCount) // todo: more log, such as UpsertedID
+	}
+
+	return upserted, err
 }
 
 // Delete impl common.DocumentDB
@@ -179,6 +191,22 @@ func (m *MultiDB) Find(ctx context.Context, col string, filter interface{},
 	}
 
 	return nil, err
+}
+
+func (m *MultiDB) Update(ctx context.Context, col string, filter, docs interface{}) (int, error) {
+	var (
+		upserted int
+		err      error
+	)
+
+	for _, db := range m.dbs {
+		upserted, err = db.Update(ctx, col, filter, docs)
+		if err != nil {
+			return upserted, err
+		}
+	}
+
+	return upserted, nil
 }
 
 func (m *MultiDB) Delete(ctx context.Context, col string, filter interface{}) (int, error) {

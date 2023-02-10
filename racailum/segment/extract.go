@@ -28,7 +28,7 @@ type persistCtx struct {
 	asyncPersistWaitGroup multierror.Group
 }
 
-func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet) error {
+func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet, tmp bool) error {
 	ctx, span := trace.StartSpan(ctx, "segment.ExtractTipSets")
 	defer span.End()
 
@@ -45,9 +45,17 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 	}()
 
 	size := len(tss)
-	aset, err := actor.NewSet(ctx, s.dal.StateManager, tss[size-1])
-	if err != nil {
-		return err
+	var (
+		aset *actor.Set
+		err  error
+	)
+	if !tmp {
+		aset, err = actor.NewSet(ctx, s.dal.StateManager, tss[size-1], tmp)
+		if err != nil {
+			return err
+		}
+	} else {
+		aset = Actorset.Set
 	}
 
 	pctx := &persistCtx{
@@ -66,7 +74,7 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		}
 
 		part := tss[start:end]
-		if err := s.extractPart(pctx, part); err != nil {
+		if err := s.extractPart(pctx, part, tmp); err != nil {
 			return err
 		}
 
@@ -83,7 +91,7 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 	return nil
 }
 
-func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) error {
+func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp bool) error {
 	if len(part) == 0 {
 		return nil
 	}
@@ -142,7 +150,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 
 			res := extract.NewRes(4096, regCap)
 
-			err = ets.Extract(ectx, res, ts)
+			err = ets.Extract(ectx, res, ts, tmp)
 			if err != nil {
 				return common.NonCtxCanceledErr(err)
 			}
@@ -159,9 +167,10 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 		return fmt.Errorf("extract part: %w", err)
 	}
 
+	upsert := tmp
 	if s.opts.Persist.Async {
 		ctx.asyncPersistWaitGroup.Go(func() error {
-			if err := s.insertMany(ctx.ctx, elog, docs); err != nil {
+			if err := s.insertMany(ctx.ctx, elog, docs, upsert); err != nil {
 				if nerr := common.NonCtxCanceledErr(err); nerr != nil {
 					stats.Record(ctx.ctx, metrics.ExtractError.M(1))
 					elog.Errorf("insert extracted documents from tipsets: %s", err)
@@ -172,9 +181,14 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet) erro
 			return nil
 		})
 	} else {
-		if err := s.insertMany(ctx.ctx, elog, docs); err != nil {
+		if err := s.insertMany(ctx.ctx, elog, docs, upsert); err != nil {
 			return fmt.Errorf("insert extracted documents from tipsets: %w", err)
 		}
+	}
+
+	// temporary db don't need to store state datas
+	if tmp {
+		return nil
 	}
 
 	// reset context
@@ -264,14 +278,14 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, pctx *persistCtx, heads
 
 	if s.opts.Persist.AsyncState {
 		pctx.asyncPersistWaitGroup.Go(func() error {
-			if err := s.insertMany(originCtx, ctx.L, docs); err != nil {
+			if err := s.insertMany(originCtx, ctx.L, docs, false); err != nil {
 				stats.Record(originCtx, metrics.ExtractError.M(1))
 				return fmt.Errorf("insert extracted documents from regular states: %w", err)
 			}
 			return nil
 		})
 	} else {
-		if err := s.insertMany(originCtx, ctx.L, docs); err != nil {
+		if err := s.insertMany(originCtx, ctx.L, docs, false); err != nil {
 			return fmt.Errorf("insert extracted documents from regular states: %w", err)
 		}
 	}
@@ -280,9 +294,9 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, pctx *persistCtx, heads
 }
 
 // DryExtract tries to extract all results from give tipset
-func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet) ([]*extract.Res, error) {
+func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet, allowNilChild bool) ([]*extract.Res, error) {
 	dryOptions := extract.DryOptions()
-	aset, err := actor.NewSet(ctx, s.dal.StateManager, ts)
+	aset, err := actor.NewSet(ctx, s.dal.StateManager, ts, allowNilChild)
 	if err != nil {
 		return nil, fmt.Errorf("new actor set: %w", err)
 	}
@@ -295,7 +309,7 @@ func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet) ([]*e
 
 	tres := extract.NewRes(1024, 0)
 
-	err = ets.Extract(ectx, tres, ts)
+	err = ets.Extract(ectx, tres, ts, allowNilChild)
 	if err != nil {
 		return nil, fmt.Errorf("extract tipset results: %w", err)
 	}

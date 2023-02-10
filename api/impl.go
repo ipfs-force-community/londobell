@@ -3,12 +3,11 @@ package api
 import (
 	"context"
 
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
 
-	"github.com/ipfs-force-community/londobell/common"
-	"github.com/ipfs-force-community/londobell/racailum"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
+
 	"github.com/ipfs-force-community/londobell/racailum/segment"
 	"github.com/ipfs-force-community/londobell/racailum/tracing"
 )
@@ -18,9 +17,9 @@ var log = logging.Logger("rpc")
 
 type BellNodeAPI struct {
 	fx.In
-	Ra         *racailum.RaCailum
-	CS         common.ChainStore
-	Notifier   common.HeadNotifier
+	//Ra         *racailum.RaCailum
+	//CS         common.ChainStore
+	//Notifier   common.HeadNotifier
 	ShutDownCh dtypes.ShutdownChan
 	SegMgr     *segment.Manager
 }
@@ -28,7 +27,7 @@ type BellNodeAPI struct {
 func (m *BellNodeAPI) SegmentDetail(ctx context.Context, name string) (*SegmentDetail, error) {
 	var res SegmentDetail
 	info, has, err := m.SegMgr.LoadInfo(name)
-	log.Info(info)
+	//log.Info(info)
 	if err != nil {
 		log.Infof("load %s info err: %v", name, err)
 		return nil, err
@@ -37,7 +36,7 @@ func (m *BellNodeAPI) SegmentDetail(ctx context.Context, name string) (*SegmentD
 		res.Info = &info
 	}
 	boundary, has, err := m.SegMgr.LoadBoundary(name)
-	log.Info(boundary)
+	//log.Info(boundary)
 	if err != nil {
 		log.Infof("load %s bound err: %v", name, err)
 		return nil, err

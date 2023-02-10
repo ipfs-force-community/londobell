@@ -26,6 +26,11 @@ type MockDAL struct {
 	mock.Mock
 }
 
+func (m *MockDAL) TipSetState(ctx context.Context, ts *types.TipSet) (st cid.Cid, rec cid.Cid, err error) {
+	args := m.Called(ctx, ts)
+	return args.Get(0).(cid.Cid), args.Get(1).(cid.Cid), args.Error(2)
+}
+
 func (m *MockDAL) ExecutionTrace(ctx context.Context, ts *types.TipSet) (cid.Cid, []*api.InvocResult, error) {
 	args := m.Called(ctx, ts)
 	return args.Get(0).(cid.Cid), args.Get(1).([]*api.InvocResult), args.Error(2)
