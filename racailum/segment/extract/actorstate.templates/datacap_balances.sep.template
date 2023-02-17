@@ -1,4 +1,4 @@
-ver:9
+ver:9-10
 package gen
 
 import (
@@ -24,14 +24,12 @@ func init() {
     })
 	reg.MustRegisterRegularExtractor("DatacapBalancesV{{ .Ver }}", extractDatacapBalancesV{{ .Ver }})
 
-    {{ if eq .Ver 9 -}}
 	schema.Register(
 		schema.Model{
-			Name: "datacap-balances",
+			Name: "datacap-balances-v{{ .Ver }}",
 			D:    &model.DatacapBalances{},
 		},
 	)
-	{{ end -}}
 }
 
 func extractDatacapBalancesV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *datacap{{ .Ver }}.State) error {

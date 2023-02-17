@@ -6,17 +6,25 @@ db.ActorState.createIndex({"Epoch":1,"Code":1,"Addr":1}, {"sparse": true});
 
 db.AllocatedSectors.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
-db.Allocations.createIndex({"ActorID":1}, {"sparse": true});
-db.Allocations.createIndex({"Epoch":1,"ActorID":1}, {"sparse": true});
-db.Allocations.createIndex({"Epoch":1,"ActorID":1,"AllocationID":1}, {"sparse": true});
+db.Allocations.createIndex({"Client":1}, {"sparse": true});
+db.Allocations.createIndex({"Provider":1}, {"sparse": true});
+db.Allocations.createIndex({"Data":1}, {"sparse": true});
+db.Allocations.createIndex({"Epoch":1,"Client":1}, {"sparse": true});
+db.Allocations.createIndex({"Epoch":1,"Provider":1}, {"sparse": true});
+db.Allocations.createIndex({"Epoch":1,"Client":1,"AllocationID":1}, {"sparse": true});
+db.Allocations.createIndex({"Epoch":1,"Provider":1,"AllocationID":1}, {"sparse": true});
 
 db.BlockHeader.createIndex({"Epoch":1,"Miner":1}, {"sparse": true});
 
 db.ClaimedPower.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
-db.Claims.createIndex({"Addr":1}, {"sparse": true});
-db.Claims.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
-db.Claims.createIndex({"Epoch":1,"Addr":1,"Detail.ClaimID":1}, {"sparse": true});
+db.Claims.createIndex({"Provider":1}, {"sparse": true});
+db.Claims.createIndex({"Client":1}, {"sparse": true});
+db.Claims.createIndex({"Data":1}, {"sparse": true});
+db.Claims.createIndex({"Epoch":1,"Provider":1}, {"sparse": true});
+db.Claims.createIndex({"Epoch":1,"Client":1}, {"sparse": true});
+db.Claims.createIndex({"Epoch":1,"Provider":1,"ClaimID":1}, {"sparse": true});
+db.Claims.createIndex({"Epoch":1,"Client":1,"ClaimID":1}, {"sparse": true});
 
 db.DatacapAllowances.createIndex({"Owner":1}, {"sparse": true});
 db.DatacapAllowances.createIndex({"Epoch":1,"Owner":1}, {"sparse": true});

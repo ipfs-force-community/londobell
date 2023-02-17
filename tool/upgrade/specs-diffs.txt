@@ -57,3 +57,6 @@ Specs v8 => v9:
 		+ NextAllocationId: verifreg.AllocationId
 		- VerifiedClients: cid.Cid
 
+Specs v9 => v10:
+	+ evm.State
+

@@ -12,9 +12,11 @@ var (
 	claimsEpochField                        = extractEpochFieldName(Claims{})
 )
 
-type ClaimsDetail struct {
+type Claims struct {
+	ID        string `bson:"_id"`
+	Epoch     abi.ChainEpoch
 	ClaimID   uint64
-	Provider  abi.ActorID
+	Provider  abi.ActorID // todo: ActorID is Provider, Is there going to be an illegal situation？
 	Client    abi.ActorID
 	Data      cid.Cid
 	Size      abi.PaddedPieceSize
@@ -22,11 +24,6 @@ type ClaimsDetail struct {
 	TermMax   abi.ChainEpoch
 	TermStart abi.ChainEpoch
 	Sector    abi.SectorNumber
-}
-
-type Claims struct {
-	ActorStateExBasic `bson:",inline"`
-	Detail            ClaimsDetail
 }
 
 func (c *Claims) CollectionName() string {
@@ -43,8 +40,12 @@ func (c *Claims) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 
 func (c *Claims) Indexes() [][]string {
 	return [][]string{
-		[]string{"Addr"},
-		[]string{claimsEpochField, "Addr"},
-		[]string{claimsEpochField, "Addr", "Detail.ClaimID"},
+		[]string{"Provider"},
+		[]string{"Client"},
+		[]string{"Data"},
+		[]string{claimsEpochField, "Provider"},
+		[]string{claimsEpochField, "Client"},
+		[]string{claimsEpochField, "Provider", "ClaimID"},
+		[]string{claimsEpochField, "Client", "ClaimID"},
 	}
 }

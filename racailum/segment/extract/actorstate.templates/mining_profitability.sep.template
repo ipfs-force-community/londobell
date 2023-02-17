@@ -103,7 +103,7 @@ func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, h
 	qaPower := miner{{ .Ver }}.QAPowerForWeight(sectorSize32GiB, 180, big.Zero(), big.Zero())
 
     {{ if ge .Ver 9 -}}
-    storagePledge := miner9.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, miner9.QAPowerMax(sectorSize32GiB), miner9.PreCommitDepositProjectionPeriod)
+    storagePledge := miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, miner{{ .Ver }}.QAPowerMax(sectorSize32GiB), miner{{ .Ver }}.PreCommitDepositProjectionPeriod)
 	{{- else -}}
     storagePledge := miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner{{ .Ver }}.InitialPledgeProjectionPeriod)
     {{- end }}

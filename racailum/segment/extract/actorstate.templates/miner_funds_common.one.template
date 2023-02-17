@@ -257,8 +257,16 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 
         {{ if ge .Ver 9 }}
         mInfo.Beneficiary = info.Beneficiary
-        mInfo.BeneficiaryTerm = info.BeneficiaryTerm
-        mInfo.PendingBeneficiaryTerm = info.PendingBeneficiaryTerm
+        mInfo.BeneficiaryTerm.Quota = info.BeneficiaryTerm.Quota
+        mInfo.BeneficiaryTerm.UsedQuota = info.BeneficiaryTerm.UsedQuota
+        mInfo.BeneficiaryTerm.Expiration = info.BeneficiaryTerm.Expiration
+        if mInfo.PendingBeneficiaryTerm != nil {
+            mInfo.PendingBeneficiaryTerm.NewBeneficiary = info.PendingBeneficiaryTerm.NewBeneficiary
+            mInfo.PendingBeneficiaryTerm.NewQuota = info.PendingBeneficiaryTerm.NewQuota
+            mInfo.PendingBeneficiaryTerm.NewExpiration = info.PendingBeneficiaryTerm.NewExpiration
+            mInfo.PendingBeneficiaryTerm.ApprovedByBeneficiary = info.PendingBeneficiaryTerm.ApprovedByBeneficiary
+            mInfo.PendingBeneficiaryTerm.ApprovedByNominee = info.PendingBeneficiaryTerm.ApprovedByNominee
+        }
         {{ end -}}
         mInfo.State = st
 	{{ end }}

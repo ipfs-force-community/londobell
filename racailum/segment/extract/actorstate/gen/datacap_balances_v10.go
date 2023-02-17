@@ -9,8 +9,8 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	datacap9 "github.com/filecoin-project/go-state-types/builtin/v9/datacap"
-	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
+	datacap10 "github.com/filecoin-project/go-state-types/builtin/v10/datacap"
+	adt10 "github.com/filecoin-project/go-state-types/builtin/v10/util/adt"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
@@ -20,23 +20,23 @@ import (
 )
 
 func init() {
-	reg.MustRegisterPreCheck("DatacapBalancesV9", func(ctx *extract.Ctx) bool {
+	reg.MustRegisterPreCheck("DatacapBalancesV10", func(ctx *extract.Ctx) bool {
 		return ctx.Opts.ZeroHourExtract.DatacapBalances
 	}, func(ctx *extract.Ctx) int {
 		return ctx.Opts.StateRegular.DatacapBalancesTicks
 	})
-	reg.MustRegisterRegularExtractor("DatacapBalancesV9", extractDatacapBalancesV9)
+	reg.MustRegisterRegularExtractor("DatacapBalancesV10", extractDatacapBalancesV10)
 
 	schema.Register(
 		schema.Model{
-			Name: "datacap-balances-v9",
+			Name: "datacap-balances-v10",
 			D:    &model.DatacapBalances{},
 		},
 	)
 }
 
-func extractDatacapBalancesV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *datacap9.State) error {
-	actorToHamtMap, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), st.Token.Balances, int(st.Token.HamtBitWidth))
+func extractDatacapBalancesV10(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *datacap10.State) error {
+	actorToHamtMap, err := adt10.AsMap(ctx.D.ActorStore(ctx.C), st.Token.Balances, int(st.Token.HamtBitWidth))
 	if err != nil {
 		return fmt.Errorf("couldn't get outer map: %w, st.Token.Balances: %v", err, st.Token.Balances)
 	}

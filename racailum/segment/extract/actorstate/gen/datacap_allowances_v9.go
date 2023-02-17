@@ -32,7 +32,7 @@ func init() {
 
 	schema.Register(
 		schema.Model{
-			Name: "datacap-allowances",
+			Name: "datacap-allowances-v9",
 			D:    &model.DatacapAllowances{},
 		},
 	)

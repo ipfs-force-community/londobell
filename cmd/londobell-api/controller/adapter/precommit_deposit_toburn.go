@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/filecoin-project/go-state-types/manifest"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -233,7 +235,7 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 func getDepositToBurnByCode(ctx context.Context, mact *types.Actor, stor adt.Store, curEpoch abi.ChainEpoch) (abi.TokenAmount, error) {
 	version := 0
 	if name, av, ok := actors.GetActorMetaByCode(mact.Code); ok {
-		if name != actors.MinerKey {
+		if name != manifest.MinerKey {
 			return abi.NewTokenAmount(0), fmt.Errorf("actor code is not miner: %s", name)
 		}
 

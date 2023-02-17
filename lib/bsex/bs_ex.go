@@ -3,7 +3,7 @@ package bsex
 import (
 	"context"
 
-	blocks "github.com/ipfs/go-block-format"
+	"github.com/ipfs/go-libipfs/blocks"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/ipfs-force-community/londobell/metrics"

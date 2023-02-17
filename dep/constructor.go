@@ -7,10 +7,10 @@ import (
 	"os"
 	"strconv"
 
-	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	dstore "github.com/ipfs/go-datastore"
 	levelds "github.com/ipfs/go-ds-leveldb"
+	"github.com/ipfs/go-libipfs/blocks"
 	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 	"go.uber.org/fx"
 

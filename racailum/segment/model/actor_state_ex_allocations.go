@@ -16,11 +16,10 @@ var (
 type AllocationID = verifreg9.AllocationId
 
 type Allocations struct {
-	ID           cid.Cid `bson:"_id"`
+	ID           string `bson:"_id"`
 	Epoch        abi.ChainEpoch
-	ActorID      abi.ActorID
 	AllocationID AllocationID
-	Client       abi.ActorID
+	Client       abi.ActorID // todo: ActorID is Client, Is there going to be an illegal situation？
 	Provider     abi.ActorID
 	Data         cid.Cid
 	Size         abi.PaddedPieceSize
@@ -43,8 +42,12 @@ func (a *Allocations) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bo
 
 func (a *Allocations) Indexes() [][]string {
 	return [][]string{
-		[]string{"ActorID"},
-		[]string{allocationsEpochField, "ActorID"},
-		[]string{allocationsEpochField, "ActorID", "AllocationID"},
+		[]string{"Client"},
+		[]string{"Provider"},
+		[]string{"Data"},
+		[]string{allocationsEpochField, "Client"},
+		[]string{allocationsEpochField, "Provider"},
+		[]string{allocationsEpochField, "Client", "AllocationID"},
+		[]string{allocationsEpochField, "Provider", "AllocationID"},
 	}
 }

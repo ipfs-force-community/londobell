@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/manifest"
 	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
 	builtin2 "github.com/filecoin-project/specs-actors/v2/actors/builtin"
 	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
@@ -26,7 +27,7 @@ import (
 
 func IsStoragePowerActor(c cid.Cid) bool {
 	if name, _, ok := actors.GetActorMetaByCode(c); ok {
-		if name != actors.PowerKey {
+		if name != manifest.PowerKey {
 			return false
 		}
 		return true
@@ -59,7 +60,7 @@ func IsStoragePowerActor(c cid.Cid) bool {
 
 func IsRewardActor(c cid.Cid) bool {
 	if name, _, ok := actors.GetActorMetaByCode(c); ok {
-		if name != actors.RewardKey {
+		if name != manifest.RewardKey {
 			return false
 		}
 		return true
@@ -92,7 +93,7 @@ func IsRewardActor(c cid.Cid) bool {
 
 func IsInitActor(c cid.Cid) bool {
 	if name, _, ok := actors.GetActorMetaByCode(c); ok {
-		if name != actors.InitKey {
+		if name != manifest.InitKey {
 			return false
 		}
 		return true
@@ -125,7 +126,7 @@ func IsInitActor(c cid.Cid) bool {
 
 func IsStorageMarketActor(c cid.Cid) bool {
 	if name, _, ok := actors.GetActorMetaByCode(c); ok {
-		if name != actors.MarketKey {
+		if name != manifest.MarketKey {
 			return false
 		}
 		return true
@@ -158,7 +159,7 @@ func IsStorageMarketActor(c cid.Cid) bool {
 
 func IsVerifiedRegistryActor(c cid.Cid) bool {
 	if name, _, ok := actors.GetActorMetaByCode(c); ok {
-		if name != actors.VerifregKey {
+		if name != manifest.VerifregKey {
 			return false
 		}
 		return true
@@ -191,7 +192,7 @@ func IsVerifiedRegistryActor(c cid.Cid) bool {
 
 func IsSystemActor(c cid.Cid) bool {
 	if name, _, ok := actors.GetActorMetaByCode(c); ok {
-		if name != actors.SystemKey {
+		if name != manifest.SystemKey {
 			return false
 		}
 		return true
@@ -232,7 +233,7 @@ func IsBurntFundsActor(addr address.Address) bool {
 
 func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
 	if name, av, ok := actors.GetActorMetaByCode(c); ok {
-		if name != actors.SystemKey {
+		if name != manifest.SystemKey {
 			return nil, fmt.Errorf("actor code is not system: %s", name)
 		}
 

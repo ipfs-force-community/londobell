@@ -7,7 +7,6 @@ package gen
 import (
 	"fmt"
 
-	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin"
 	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
@@ -17,8 +16,6 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
-	"github.com/multiformats/go-varint"
-
 	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 )
@@ -33,7 +30,7 @@ func init() {
 
 	schema.Register(
 		schema.Model{
-			Name: "claims",
+			Name: "claims-v9",
 			D:    &model.Claims{},
 		},
 	)
@@ -52,24 +49,6 @@ func extractClaimsV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead,
 			return fmt.Errorf("couldn't get outer map: %w, innerHamtCid: %v", err, innerHamtCid)
 		}
 
-		actorID, n, err := varint.FromUvarint([]byte(key))
-		if n != len([]byte(key)) {
-			return fmt.Errorf("could not get varint from address string")
-		}
-		if err != nil {
-			return err
-		}
-
-		addr, err := address.NewIDAddress(actorID) // just to generate unique ID
-		if err != nil {
-			return fmt.Errorf("parse ownerAddr from adt.Map key %s: %w, actorID: %v", key, err, actorID)
-		}
-
-		id, err := GenRegularHeadID(head.Head, addr, head.Epoch)
-		if err != nil {
-			return fmt.Errorf("gen regular id: %w", err)
-		}
-
 		var claim verifreg9.Claim
 		err = innerMap.ForEach(&claim, func(key string) error {
 			if head.Epoch >= claim.TermStart+claim.TermMax {
@@ -82,23 +61,17 @@ func extractClaimsV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead,
 			}
 
 			res.Docs = append(res.Docs, &model.Claims{
-				ActorStateExBasic: model.ActorStateExBasic{
-					ID:    id,
-					Path:  []cid.Cid{head.Head, cid.Cid(innerHamtCid), st.Claims},
-					Addr:  addr,
-					Epoch: head.Epoch,
-				},
-				Detail: model.ClaimsDetail{
-					ClaimID:   claimID,
-					Provider:  claim.Provider,
-					Client:    claim.Client,
-					Data:      claim.Data,
-					Size:      claim.Size,
-					TermMin:   claim.TermMin,
-					TermMax:   claim.TermMax,
-					TermStart: claim.TermStart,
-					Sector:    claim.Sector,
-				},
+				ID:        fmt.Sprintf("%s-%d-%d", claim.Provider, head.Epoch, claimID),
+				Epoch:     head.Epoch,
+				ClaimID:   claimID,
+				Provider:  claim.Provider,
+				Client:    claim.Client,
+				Data:      claim.Data,
+				Size:      claim.Size,
+				TermMin:   claim.TermMin,
+				TermMax:   claim.TermMax,
+				TermStart: claim.TermStart,
+				Sector:    claim.Sector,
 			})
 
 			return nil
