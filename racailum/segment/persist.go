@@ -159,7 +159,7 @@ func (s *Segment) GetLatestHeightForTipSet(ctx context.Context, l *zap.SugaredLo
 }
 
 func (s *Segment) DeleteItemsByEpoch(ctx context.Context, l *zap.SugaredLogger, epoch abi.ChainEpoch, many, before bool) error {
-	//ExecTrace: Epoch
+	//ExecTrace、BlockHeader: Epoch
 	//Message: Detail.PackedHeight
 	//Tipset: _id
 	var (
@@ -190,7 +190,8 @@ func (s *Segment) DeleteItemsByEpoch(ctx context.Context, l *zap.SugaredLogger, 
 	filterMap["ExecTrace"] = epochFilter
 	filterMap["Message"] = heightFilter
 	filterMap["Tipset"] = idFliter
-	tables := []string{"ExecTrace", "Message", "Tipset"}
+	filterMap["BlockHeader"] = epochFilter
+	tables := []string{"ExecTrace", "Message", "Tipset", "BlockHeader"}
 
 	for _, table := range tables {
 		//todo: 根据表名构造出document
