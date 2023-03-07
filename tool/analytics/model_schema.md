@@ -317,6 +317,16 @@
 }
 ```
 
+### MessageBlock
+
+```
+{
+	"Blocks": "[]cid.Cid",
+	"Epoch": "abi.ChainEpoch",
+	"_id": "cid.Cid"
+}
+```
+
 ### MinerDealSector
 
 ```
