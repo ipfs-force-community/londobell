@@ -24,7 +24,13 @@ struct	datacap.MintParams	github.com/filecoin-project/go-state-types/builtin/lat
 struct	datacap.RevokeAllowanceParams	github.com/filecoin-project/go-state-types/builtin/latest/datacap
 struct	datacap.TransferFromParams	github.com/filecoin-project/go-state-types/builtin/latest/datacap
 struct	datacap.TransferParams	github.com/filecoin-project/go-state-types/builtin/latest/datacap
+struct	eam.Create2Params	github.com/filecoin-project/go-state-types/builtin/latest/eam
+struct	eam.CreateParams	github.com/filecoin-project/go-state-types/builtin/latest/eam
+struct	evm.ConstructorParams	github.com/filecoin-project/go-state-types/builtin/latest/evm
+struct	evm.DelegateCallParams	github.com/filecoin-project/go-state-types/builtin/latest/evm
+struct	evm.GetStorageAtParams	github.com/filecoin-project/go-state-types/builtin/latest/evm
 struct	init.ConstructorParams	github.com/filecoin-project/go-state-types/builtin/latest/init
+struct	init.Exec4Params	github.com/filecoin-project/go-state-types/builtin/latest/init
 struct	init.ExecParams	github.com/filecoin-project/go-state-types/builtin/latest/init
 struct	market.ActivateDealsParams	github.com/filecoin-project/go-state-types/builtin/latest/market
 struct	market.ClientDealProposal	github.com/filecoin-project/go-state-types/builtin/latest/market
@@ -112,3 +118,4 @@ struct	crypto.Signature	github.com/filecoin-project/go-state-types/crypto
 struct	proof.PoStProof	github.com/filecoin-project/go-state-types/proof
 struct	proof.SealVerifyInfo	github.com/filecoin-project/go-state-types/proof
 struct	cid.Cid	github.com/ipfs/go-cid
+int64	typegen.CborInt	github.com/whyrusleeping/cbor-gen

@@ -7,7 +7,6 @@ package gen
 import (
 	"fmt"
 
-	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin"
 	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
@@ -17,8 +16,6 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate/reg"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
-	"github.com/multiformats/go-varint"
-
 	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 )
@@ -33,7 +30,7 @@ func init() {
 
 	schema.Register(
 		schema.Model{
-			Name: "allocations",
+			Name: "allocations-v9",
 			D:    &model.Allocations{},
 		},
 	)
@@ -47,24 +44,6 @@ func extractAllocationsV9(ctx *extract.Ctx, res *extract.Res, head *common.Actor
 
 	var innerHamtCid cbg.CborCid
 	err = actorToHamtMap.ForEach(&innerHamtCid, func(key string) error {
-		actorID, n, err := varint.FromUvarint([]byte(key))
-		if n != len([]byte(key)) {
-			return fmt.Errorf("could not get varint from address string")
-		}
-		if err != nil {
-			return err
-		}
-
-		addr, err := address.NewIDAddress(actorID) // just to generate unique ID
-		if err != nil {
-			return fmt.Errorf("parse addr from adt.Map key %s: %w, actorID: %v", key, err, actorID)
-		}
-
-		id, err := GenRegularHeadID(head.Head, addr, head.Epoch)
-		if err != nil {
-			return fmt.Errorf("gen regular id: %w", err)
-		}
-
 		innerMap, err := adt9.AsMap(ctx.D.ActorStore(ctx.C), cid.Cid(innerHamtCid), builtin.DefaultHamtBitwidth)
 		if err != nil {
 			return fmt.Errorf("couldn't get outer map: %w, innerHamtCid: %v", err, innerHamtCid)
@@ -82,9 +61,8 @@ func extractAllocationsV9(ctx *extract.Ctx, res *extract.Res, head *common.Actor
 			}
 
 			res.Docs = append(res.Docs, &model.Allocations{
-				ID:           id,
+				ID:           fmt.Sprintf("%s-%d", allocation.Client, allocationID), // todo: cannot extent allocation, don't need epoch
 				Epoch:        head.Epoch,
-				ActorID:      abi.ActorID(actorID),
 				AllocationID: model.AllocationID(allocationID),
 				Client:       allocation.Client,
 				Provider:     allocation.Provider,
@@ -93,8 +71,7 @@ func extractAllocationsV9(ctx *extract.Ctx, res *extract.Res, head *common.Actor
 				TermMin:      allocation.TermMin,
 				TermMax:      allocation.TermMax,
 				Expiration:   allocation.Expiration,
-			},
-			)
+			})
 
 			return nil
 		})

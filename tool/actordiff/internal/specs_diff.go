@@ -14,19 +14,21 @@ func ResolveSpecs(expectedVer int, exported []builtin.RegistryEntry) (*Specs, er
 	actors := map[string]resolvedActor{}
 
 	for _, actor := range exported {
-		stateTyp := reflect.TypeOf(actor.State()).Elem()
-		ver, name, err := getStateVer(stateTyp.PkgPath())
-		if err != nil {
-			return nil, fmt.Errorf("get specs version for %s in %s: %w", stateTyp, stateTyp.PkgPath(), err)
-		}
+		if actor.State() != nil {
+			stateTyp := reflect.TypeOf(actor.State()).Elem()
+			ver, name, err := getStateVer(stateTyp.PkgPath())
+			if err != nil {
+				return nil, fmt.Errorf("get specs version for %s in %s: %w", stateTyp, stateTyp.PkgPath(), err)
+			}
 
-		if ver != expectedVer {
-			return nil, fmt.Errorf("version not match, got %d for %s in %s", ver, stateTyp, stateTyp.PkgPath())
-		}
+			if ver != expectedVer {
+				return nil, fmt.Errorf("version not match, got %d for %s in %s", ver, stateTyp, stateTyp.PkgPath())
+			}
 
-		actors[name] = resolvedActor{
-			RegistryEntry: actor,
-			rtype:         stateTyp,
+			actors[name] = resolvedActor{
+				RegistryEntry: actor,
+				rtype:         stateTyp,
+			}
 		}
 	}
 

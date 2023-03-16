@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/filecoin-project/go-state-types/manifest"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
@@ -160,7 +162,7 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 	)
 
 	if name, av, ok := actors.GetActorMetaByCode(mact.Code); ok {
-		if name != actors.MinerKey {
+		if name != manifest.MinerKey {
 			return fmt.Errorf("actor code is not miner: %s", name)
 		}
 

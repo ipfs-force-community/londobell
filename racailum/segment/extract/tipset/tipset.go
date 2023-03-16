@@ -469,7 +469,7 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
 		addresses := []address.Address{addr, robustMap[addr]}
 		if builtin2.IsAccountActor(act.Code) {
-			pubAddr, err := vm.ResolveToKeyAddr(tree, store, addr)
+			pubAddr, err := vm.ResolveToDeterministicAddr(tree, store, addr)
 			if err != nil {
 				return err
 			}

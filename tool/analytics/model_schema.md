@@ -47,7 +47,6 @@
 
 ```
 {
-	"ActorID": "abi.ActorID",
 	"AllocationID": "verifreg.AllocationId",
 	"Client": "abi.ActorID",
 	"Data": "cid.Cid",
@@ -57,7 +56,7 @@
 	"Size": "abi.PaddedPieceSize",
 	"TermMax": "abi.ChainEpoch",
 	"TermMin": "abi.ChainEpoch",
-	"_id": "cid.Cid"
+	"_id": "string"
 }
 ```
 
@@ -96,21 +95,17 @@
 
 ```
 {
-	"Addr": "address.Address",
-	"Detail": {
-		"ClaimID": "uint64",
-		"Client": "abi.ActorID",
-		"Data": "cid.Cid",
-		"Provider": "abi.ActorID",
-		"Sector": "abi.SectorNumber",
-		"Size": "abi.PaddedPieceSize",
-		"TermMax": "abi.ChainEpoch",
-		"TermMin": "abi.ChainEpoch",
-		"TermStart": "abi.ChainEpoch"
-	},
+	"ClaimID": "uint64",
+	"Client": "abi.ActorID",
+	"Data": "cid.Cid",
 	"Epoch": "abi.ChainEpoch",
-	"Path": "[]cid.Cid",
-	"_id": "cid.Cid"
+	"Provider": "abi.ActorID",
+	"Sector": "abi.SectorNumber",
+	"Size": "abi.PaddedPieceSize",
+	"TermMax": "abi.ChainEpoch",
+	"TermMin": "abi.ChainEpoch",
+	"TermStart": "abi.ChainEpoch",
+	"_id": "string"
 }
 ```
 
@@ -244,6 +239,7 @@
 		"To": "address.Address"
 	},
 	"MsgRct": {
+		"EventsRoot": "*cid.Cid",
 		"ExitCode": "exitcode.ExitCode",
 		"GasUsed": "int64",
 		"Return": "[]uint8"

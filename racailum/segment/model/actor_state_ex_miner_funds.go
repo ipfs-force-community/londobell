@@ -3,7 +3,6 @@ package model
 import (
 	addr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v9/miner"
 	"github.com/ipfs-force-community/londobell/common"
 )
 
@@ -31,6 +30,20 @@ type WorkerKeyChange struct {
 	EffectiveAt abi.ChainEpoch
 }
 
+type BeneficiaryTerm struct {
+	Quota      abi.TokenAmount
+	UsedQuota  abi.TokenAmount
+	Expiration abi.ChainEpoch
+}
+
+type PendingBeneficiaryChange struct {
+	NewBeneficiary        addr.Address
+	NewQuota              abi.TokenAmount
+	NewExpiration         abi.ChainEpoch
+	ApprovedByBeneficiary bool
+	ApprovedByNominee     bool
+}
+
 type MinerInfo struct {
 	Owner                      addr.Address
 	Worker                     addr.Address
@@ -47,9 +60,9 @@ type MinerInfo struct {
 	AvailableBalance           abi.TokenAmount
 	FeeDebt                    abi.TokenAmount
 	PrecommitSectorCount       uint64
-	Beneficiary                addr.Address                    `mir:"-"`
-	BeneficiaryTerm            miner.BeneficiaryTerm           `mir:"-"`
-	PendingBeneficiaryTerm     *miner.PendingBeneficiaryChange `mir:"-"`
+	Beneficiary                addr.Address              `mir:"-"`
+	BeneficiaryTerm            BeneficiaryTerm           `mir:"-"`
+	PendingBeneficiaryTerm     *PendingBeneficiaryChange `mir:"-"`
 	State                      interface{}
 }
 
