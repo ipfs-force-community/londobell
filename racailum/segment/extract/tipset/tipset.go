@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -335,24 +334,10 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return fmt.Errorf("add gas trace names: %w", err)
 	}
 
-	// 得到SignedMessage
-	allsmsgs := make([]*types.SignedMessage, 0)
-	for _, b := range ts.TipSet.Blocks() {
-		_, smsgs, err := ctx.D.MessagesForBlock(ctx.C, b)
-		if err != nil {
-			return fmt.Errorf("get message for block err: %w", err)
-		}
-		allsmsgs = append(allsmsgs, smsgs...)
-	}
-
-	allsmsgsMap := make(map[string]*types.SignedMessage)
-	for _, smsg := range allsmsgs {
-		// 只取第一条被执行的SignedMessage
-		key := smsg.Message.From.String() + "-" + strconv.FormatUint(smsg.Message.Nonce, 10)
-		if _, ok := allsmsgsMap[key]; ok {
-			continue
-		}
-		allsmsgsMap[key] = smsg
+	// get replaced messages for tipset
+	cm, err := ctx.D.MessagesForTipset(ctx.C, ts.TipSet)
+	if err != nil {
+		return fmt.Errorf("get message for block err: %w", err)
 	}
 
 	dupmsgs := map[cid.Cid]struct{}{}
@@ -380,12 +365,19 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		mcid := msg.Cid()
 		var signedCid cid.Cid
 
-		key := msg.From.String() + "-" + strconv.FormatUint(msg.Nonce, 10)
-		if smsg, ok := allsmsgsMap[key]; ok {
-			signedCid = mcid
-			if mcid != smsg.Cid() {
-				signedCid = smsg.Cid()
-				elog.Infow("new messagecid", "newMcid", signedCid, "oldMcid", mcid)
+		for ii := range cm {
+			i := len(cm) - ii - 1
+			m := cm[i]
+			if m.VMMessage().From == msg.From {
+				if m.VMMessage().Nonce == msg.Nonce {
+					if m.Cid() != mcid {
+						signedCid = m.Cid()
+						elog.Infow("message was replaced", "replaceMcid", signedCid, "oldMcid", mcid)
+					}
+				}
+				if m.VMMessage().Nonce < msg.Nonce {
+					break
+				}
 			}
 		}
 
