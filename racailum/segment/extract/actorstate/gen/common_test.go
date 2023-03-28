@@ -107,6 +107,10 @@ func (m *MockDAL) ComputeBaseFee(ctx context.Context, ts *types.TipSet) (abi.Tok
 	args := m.Called(ctx, ts)
 	return args.Get(0).(abi.TokenAmount), args.Error(1)
 }
+func (m *MockDAL) MessagesForTipset(ctx context.Context, ts *types.TipSet) ([]types.ChainMsg, error) {
+	args := m.Called(ctx, ts)
+	return args.Get(0).([]types.ChainMsg), args.Error(1)
+}
 
 /*
 Network: calibration
