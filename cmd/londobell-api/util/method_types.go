@@ -56,6 +56,10 @@ func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to strin
 			return actor.MethodInfo{}, nil
 		}
 		actTypes := strings.Split(Actor, "/")
+		if len(actTypes) != 3 {
+			return actor.MethodInfo{}, fmt.Errorf("length of acttypes is not equal 3, epoch: %v, Method:%v, from: %v, to: %v, Actor: %v", epoch, Method, from, to, Actor)
+		}
+
 		actType = actTypes[2]
 		av, err := strconv.Atoi(actTypes[1])
 		if err != nil {

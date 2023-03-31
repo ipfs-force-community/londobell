@@ -53,7 +53,7 @@ var compareCmd = &cli.Command{
 
 		stopper, err := dix.New(
 			cctx.Context,
-			dep.Bell(cctx.Context, fxlog, false, &di),
+			dep.Bell(cctx.Context, fxlog, &di),
 			dep.InjectFullNode(cctx),
 			dep.InjectRepoPath(cctx),
 		)

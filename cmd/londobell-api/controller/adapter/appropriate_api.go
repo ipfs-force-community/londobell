@@ -184,7 +184,7 @@ func (a *AppropriateAPI) InjectNewFullNode(cctx *cli.Context) (bool, error) {
 	}
 
 	// inject new fullnode
-	stopFunc, err := dix.New(context.Background(), dep.Bell(context.Background(), Fxlog, false, &Components), dep.InjectRepoPath(cctx), InjectAppropriateFullNode(appropriateNode.api))
+	stopFunc, err := dix.New(context.Background(), dep.Bell(context.Background(), Fxlog, &Components), dep.InjectRepoPath(cctx), InjectAppropriateFullNode(appropriateNode.api))
 	if err != nil {
 		log.Errorf("inject dependencies failed: %v", err)
 		return true, err
