@@ -1073,6 +1073,21 @@
 ```
 
 
+### MessageBlock
+
+#### message-block
+
+```
+{
+	"Blocks": [
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	],
+	"Epoch": 0,
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+}
+```
+
+
 ### MinerDealSector
 
 #### miner-deal-sector

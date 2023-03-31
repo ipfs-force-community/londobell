@@ -115,6 +115,7 @@ type EnableExtractOptions struct {
 	EnableExtractFilSupply    bool
 	EnableExtractActorBalance bool
 	EnableExtractBlockHeader  bool
+	EnableExtractMessageBlock bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -126,6 +127,7 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractFilSupply:    true,
 		EnableExtractActorBalance: true,
 		EnableExtractBlockHeader:  true,
+		EnableExtractMessageBlock: true,
 	}
 }
 
