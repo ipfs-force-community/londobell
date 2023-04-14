@@ -162,6 +162,18 @@ func IsBurntFundsActor(addr address.Address) bool {
     return false
 }
 
+func IsDataCapActor(addr address.Address) bool {
+	return addr == builtin.DatacapActorAddr
+}
+
+func IsCronActor(addr address.Address) bool {
+	return addr == builtin.CronActorAddr
+}
+
+func IsEamActor(addr address.Address) bool {
+	return addr == builtin.EthereumAddressManagerActorAddr
+}
+
 func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
     if name, av, ok := actors.GetActorMetaByCode(c); ok {
 		if name != manifest.SystemKey {

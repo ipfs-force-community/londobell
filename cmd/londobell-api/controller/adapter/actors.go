@@ -2,7 +2,11 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+
+	"github.com/filecoin-project/lotus/chain/actors/builtin/datacap"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/evm"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -190,8 +194,60 @@ func GetActorsInfo(c *gin.Context) {
 				return
 			}
 			state = st.GetState()
-		case IsBurntFundsActor(addr):
-			actorType = "burnt"
+		//case IsBurntFundsActor(addr):
+		//	actorType = "burnt"
+		case IsCronActor(addr):
+			actorType = "cron"
+		case IsDataCapActor(addr):
+			actorType = "datacap"
+			st, err := datacap.Load(stor, act)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+		case builtin.IsEvmActor(act.Code):
+			actorType = "evm"
+			// todo: f2
+			if addr.Protocol() == address.ID {
+				actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
+				if err != nil {
+					util.ReturnOnErr(c, alog, err)
+					return
+				}
+			}
+
+			st, err := evm.Load(stor, act)
+			if err != nil {
+				util.ReturnOnErr(c, alog, err)
+				return
+			}
+			state = st.GetState()
+		case IsEamActor(addr):
+			actorType = "eam"
+		case builtin.IsEthAccountActor(act.Code):
+			actorType = "ethaccount"
+			// todo: f2
+			if addr.Protocol() == address.ID {
+				actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
+				if err != nil {
+					util.ReturnOnErr(c, alog, err)
+					return
+				}
+			}
+		case builtin.IsPlaceholderActor(act.Code):
+			// todo: f2
+			actorType = "placeholder"
+			if addr.Protocol() == address.ID {
+				actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
+				if err != nil {
+					util.ReturnOnErr(c, alog, err)
+					return
+				}
+			}
+		default:
+			util.ReturnOnErr(c, alog, fmt.Errorf("unknow actor type: %v", addr))
+			return
 		}
 
 		resData := model.ActorRes{
