@@ -8,8 +8,8 @@ require (
 	github.com/filecoin-project/go-address v1.1.0
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-jsonrpc v0.2.1
-	github.com/filecoin-project/go-state-types v0.10.0
-	github.com/filecoin-project/lotus v1.20.2
+	github.com/filecoin-project/go-state-types v0.11.1
+	github.com/filecoin-project/lotus v1.22.1
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v3 v3.1.2
@@ -116,7 +116,7 @@ require (
 	github.com/filecoin-project/go-legs v0.4.4 // indirect
 	github.com/filecoin-project/go-padreader v0.0.1 // indirect
 	github.com/filecoin-project/go-paramfetch v0.0.4 // indirect
-	github.com/filecoin-project/go-statemachine v1.0.2 // indirect
+	github.com/filecoin-project/go-statemachine v1.0.3 // indirect
 	github.com/filecoin-project/go-statestore v0.2.0 // indirect
 	github.com/filecoin-project/go-storedcounter v0.1.0 // indirect
 	github.com/filecoin-project/index-provider v0.9.1 // indirect

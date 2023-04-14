@@ -42,5 +42,9 @@ func (mi *MethodInfo) ReturnObj() cbor.Er {
 		return nil
 	}
 
+	if !mi.Method.Ret.Implements(reflect.TypeOf((*cbor.Er)(nil)).Elem()) {
+		return nil
+	}
+
 	return reflect.New(mi.Method.Ret.Elem()).Interface().(cbor.Er)
 }
