@@ -12,13 +12,19 @@ var daemonCmd = &cli.Command{
 	Usage: "Start api for chain data",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "port",
-			Usage: "1234",
+			Name:     "port",
+			Usage:    "1234",
+			Required: true,
 		},
-		&cli.StringSliceFlag{
-			Name:  "apis",
-			Usage: "ws://127.0.0.1:1234/rpc/v0",
+		&cli.StringFlag{
+			Name:     "nodeconfig",
+			Usage:    "The location of the node configuration, eg: ./config.json(api: token)",
+			Required: true,
 		},
+		//&cli.StringSliceFlag{
+		//	Name:  "apis",
+		//	Usage: "ws://127.0.0.1:1234/rpc/v0",
+		//},
 		dep.RepoFlag,
 	},
 	Action: func(cctx *cli.Context) error {

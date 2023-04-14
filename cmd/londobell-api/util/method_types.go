@@ -1,7 +1,10 @@
 package util
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +20,32 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
 	"github.com/ipfs/go-cid"
 )
+
+var Nodes []Node
+
+type Node struct {
+	URL   string `json:"node"`
+	Token string `json:"token"`
+}
+
+func ParseNodes(path string) error {
+	file, err := os.Open(path)
+	defer file.Close() //nolint:staticcheck
+	if err != nil {
+		panic(err)
+	}
+
+	configByte, err := ioutil.ReadAll(file)
+	if err != nil {
+		panic(err)
+	}
+	err = json.Unmarshal(configByte, &Nodes)
+	if err != nil {
+		panic(err)
+	}
+
+	return nil
+}
 
 type ActorSet struct {
 	m      map[address.Address]cid.Cid

@@ -4,13 +4,14 @@ import (
 	"context"
 	"time"
 
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/network"
-	"github.com/filecoin-project/lotus/api"
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
 	"github.com/filecoin-project/lotus/chain/state"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	"go.mongodb.org/mongo-driver/bson"
@@ -57,8 +58,6 @@ type StateManager interface {
 	SearchForMessage(ctx context.Context, head *types.TipSet, mcid cid.Cid, lookbackLimit abi.ChainEpoch, allowReplaced bool) (*types.TipSet, *types.MessageReceipt, cid.Cid, error)
 	TipSetState(ctx context.Context, ts *types.TipSet) (st cid.Cid, rec cid.Cid, err error)
 	LookupID(ctx context.Context, addr address.Address, ts *types.TipSet) (address.Address, error)
-	//EthGetTransactionHashByCid(ctx context.Context, cid cid.Cid) (*ethtypes.EthHash, error)
-
 }
 
 // ChainDict is a dict for enums

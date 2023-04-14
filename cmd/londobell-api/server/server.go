@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+
 	"github.com/gin-gonic/gin"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
@@ -37,7 +39,11 @@ func Run(cctx *cli.Context, useAPI bool) error {
 	)
 
 	if useAPI {
-		adapter.API = adapter.NewAppropriateAPI(cctx.StringSlice("apis"))
+		if err := util.ParseNodes(cctx.String("nodeconfig")); err != nil {
+			return err
+		}
+
+		adapter.API = adapter.NewAppropriateAPI(util.Nodes)
 		err = adapter.API.Choose(ctx)
 		if err != nil {
 			return err

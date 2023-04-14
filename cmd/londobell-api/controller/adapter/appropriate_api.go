@@ -3,7 +3,10 @@ package adapter
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
+
+	"github.com/filecoin-project/lotus/api/client"
 
 	"github.com/dtynn/dix"
 	"github.com/filecoin-project/go-jsonrpc"
@@ -19,7 +22,7 @@ import (
 
 type AppropriateAPI struct {
 	apiMx    sync.RWMutex
-	urls     []string
+	nodes    []util.Node
 	node     Node
 	lastNode Node
 }
@@ -30,8 +33,8 @@ type Node struct {
 	closer jsonrpc.ClientCloser
 }
 
-func NewAppropriateAPI(urls []string) *AppropriateAPI {
-	return &AppropriateAPI{urls: urls, node: Node{}, lastNode: Node{}}
+func NewAppropriateAPI(nodes []util.Node) *AppropriateAPI {
+	return &AppropriateAPI{nodes: nodes, node: Node{}, lastNode: Node{}}
 }
 
 func (a *AppropriateAPI) GetAppropriateAPI() v0api.FullNode {
@@ -76,14 +79,21 @@ func (a *AppropriateAPI) SetLastAppropriateAPI(api v0api.FullNode, url string, c
 
 func (a *AppropriateAPI) Choose(ctx context.Context) error {
 	a.apiMx.RLock()
-	urls := a.urls
+	nodes := a.nodes
 	a.apiMx.RUnlock()
 
-	candidates := make([]Candidate, 0, len(urls))
+	candidates := make([]Candidate, 0, len(nodes))
 
 	curEpoch := common.GetCurEpoch()
-	for _, url := range urls {
-		api, closer, err := GetFullNodeAPI(ctx, url)
+	for _, node := range nodes {
+		var requestHeader http.Header
+		token := node.Token
+		url := node.URL
+		if token != "" {
+			requestHeader = http.Header{"Authorization": []string{"Bearer " + token}}
+		}
+
+		api, closer, err := client.NewFullNodeRPCV0(ctx, url, requestHeader)
 		if err != nil {
 			log.Warnf("api:%v is not accessiable", url)
 			continue
@@ -105,7 +115,7 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 	}
 
 	if len(candidates) == 0 {
-		return fmt.Errorf("no available APIs: %v", urls)
+		return fmt.Errorf("no available APIs: %v", nodes)
 	}
 
 	for i := range candidates {

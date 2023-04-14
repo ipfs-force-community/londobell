@@ -4,8 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/ipfs-force-community/londobell/metrics"
+	vtypes "github.com/filecoin-project/venus/venus-shared/types"
+
 	"go.opencensus.io/stats"
+
+	"github.com/ipfs-force-community/londobell/metrics"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"go.uber.org/zap"
@@ -62,7 +65,7 @@ func (t *TmpBell) ExtractIncomingHead(ctx context.Context, tempDBCapacity uint) 
 		stats.Record(ctx, metrics.GetTipSetError.M(0))
 
 		if exist {
-			parent, err := t.activeSeg.GetTipSetByTSk(ctx, nextExtractTipSet.Parents())
+			parent, err := t.activeSeg.GetTipSetByTSk(ctx, types.NewTipSetKey(nextExtractTipSet.Parents().Cids()...))
 			if err != nil {
 				log.Errorf("get fork tipset's parent failed: %s", err)
 				stats.Record(ctx, metrics.GetTipSetError.M(1))
@@ -118,12 +121,24 @@ func (t *TmpBell) UpdateTemporaryBoundary(ctx context.Context, finalHeight abi.C
 		return err
 	}
 
-	hi, err := LoadLinkedTipSet(ctx, finalTipSet.Key(), t.Full)
+	ts, err := t.Full.ChainGetTipSet(ctx, finalTipSet.Key())
 	if err != nil {
 		return err
 	}
 
-	err = t.activeSeg.SetBoundary(ctx, hi, nil)
+	// parse vtypes.TipSetKey to types.TipSetKey
+	var ltsk = types.EmptyTSK
+	tskBytes, err := ts.Key().MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	err = ltsk.UnmarshalJSON(tskBytes)
+	if err != nil {
+		return err
+	}
+
+	err = t.activeSeg.SetHiBoundaryForTmp(ctx, ts.Height(), ltsk)
 	if err != nil {
 		return err
 	}
@@ -141,17 +156,17 @@ func (t *TmpBell) ClearTmpDB(ctx context.Context) error {
 	return nil
 }
 
-func (t *TmpBell) ForkExist(latestExtractTipset, nextTs *types.TipSet) (bool, error) {
-	if latestExtractTipset.Key() == nextTs.Key() {
+func (t *TmpBell) ForkExist(latestExtractTipset *types.TipSet, nextTs *types.TipSet) (bool, error) {
+	if types.CidArrsEqual(latestExtractTipset.Cids(), nextTs.Cids()) {
 		continuousNullTipSet++
 		log.Warnf("there is a null tipset after height %v", nextTs.Height())
 		return false, errNullTipSet
 	}
 
-	return latestExtractTipset.Key() != nextTs.Parents(), nil
+	return types.CidArrsEqual(latestExtractTipset.Cids(), nextTs.Parents().Cids()), nil
 }
 
-func (t *TmpBell) HandleFork(ctx context.Context, tmpFinalTipSet, nextExtractTipSet *types.TipSet, tempDBCapacity uint) error {
+func (t *TmpBell) HandleFork(ctx context.Context, tmpFinalTipSet *types.TipSet, nextExtractTipSet *types.TipSet, tempDBCapacity uint) error {
 	tlog := log.With("HandleFork", nextExtractTipSet.Height())
 
 	//在临时表中寻找公共祖先
@@ -184,29 +199,30 @@ func (t *TmpBell) HandleFork(ctx context.Context, tmpFinalTipSet, nextExtractTip
 	return nil
 }
 
-func (t *TmpBell) SearchCommonAncestor(ctx context.Context, base, external *types.TipSet, tempDBCapacity uint) (*types.TipSet, error) {
+func (t *TmpBell) SearchCommonAncestor(ctx context.Context, base *types.TipSet, external *types.TipSet, tempDBCapacity uint) (*types.TipSet, error) {
 	if base == nil || external == nil {
 		return nil, errZeroHeight //todo
 	}
 
 	var err error
+
 	for forkLength := uint(0); forkLength < tempDBCapacity; forkLength++ {
 		for external.Height() > base.Height() {
 			if external.Height() == 0 {
 				return nil, errZeroHeight
 			}
 
-			external, err = t.activeSeg.GetTipSetByTSk(ctx, external.Parents())
+			external, err = t.activeSeg.GetTipSetByTSk(ctx, types.NewTipSetKey(external.Parents().Cids()...))
 			if err != nil {
 				log.Warnf("get external.Parent from full node")
-				external, err = t.Full.ChainGetTipSet(ctx, external.Parents())
+				external, err = t.Full.ChainGetTipSet(ctx, types.NewTipSetKey(external.Parents().Cids()...))
 				if err != nil {
 					return nil, err
 				}
 			}
 		}
 
-		if base.Equals(external) {
+		if Equals(base, external) {
 			return base, nil
 		}
 
@@ -222,6 +238,59 @@ func (t *TmpBell) SearchCommonAncestor(ctx context.Context, base, external *type
 	}
 
 	return nil, errNoAncestor
+}
+
+func Equals(ts *types.TipSet, ots *types.TipSet) bool {
+	if ts == nil && ots == nil {
+		return true
+	}
+	if ts == nil || ots == nil {
+		return false
+	}
+
+	if ts.Height() != ots.Height() {
+		return false
+	}
+
+	if len(ts.Cids()) != len(ots.Cids()) {
+		return false
+	}
+
+	for i, cid := range ts.Cids() {
+		if cid != ots.Cids()[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func ConvertToVTipSet(ts *types.TipSet) (ots *vtypes.TipSet, err error) {
+	tsBytes, err := ts.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	err = ots.UnmarshalJSON(tsBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return ots, nil
+}
+
+func ConvertToLTipSet(ts *vtypes.TipSet) (ots *types.TipSet, err error) {
+	vtsBytes, err := ts.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	err = ots.UnmarshalJSON(vtsBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return ots, nil
 }
 
 func (t *TmpBell) PrepareExtractToTemporaryDB(ctx context.Context, ts *types.TipSet, tempDBCapacity uint) error {

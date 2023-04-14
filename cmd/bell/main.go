@@ -37,6 +37,7 @@ func main() {
 		Flags: []cli.Flag{
 			dep.RepoFlag,
 			dep.FullNodeAPIFlag,
+			dep.TokenFlag,
 			dep.OfflineChainStorageRepoFlag,
 		},
 	}
