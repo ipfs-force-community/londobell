@@ -5,7 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
+
+	"github.com/filecoin-project/lotus/chain/vm"
 
 	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	"go.opencensus.io/trace"
@@ -177,12 +180,22 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 		code = ccode
 		actorName = cname
 	}
+
+	if strings.Contains(actorName, "placeholder") {
+		return MethodInfo{
+			Actor: actorName,
+			Method: vm.MethodMeta{
+				Name: "Send(placeholder)",
+			},
+		}, nil
+	}
+
 	vma := filcns.NewActorRegistry()
 
 	//todo: realcode
 	mi, ok := vma.Methods[code][call.Method]
 	if !ok {
-		return MethodInfo{}, fmt.Errorf("%w: lookup method for from=%s, to=%s, code=%s, meth=%d", ErrActorMethodNotFound, call.From, call.To, code, call.Method)
+		return MethodInfo{Actor: actorName}, fmt.Errorf("%w: lookup method for from=%s, to=%s, code=%s, meth=%d", ErrActorMethodNotFound, call.From, call.To, code, call.Method)
 	}
 
 	return MethodInfo{
