@@ -1,7 +1,6 @@
 package tipset
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/cbor"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
@@ -353,8 +353,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					if mi.IsParamsImplemetsCbor() {
 						mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 					} else {
-						var params []byte
-						params, err = parseInvokeContractParams(msg, mi.Actor, mi.Method.Name)
+						params, err := parseInvokeContractParams(msg, mi.Actor, mi.Method.Name)
 						if err != nil {
 							return fmt.Errorf("parse params of InvokeContract failed: %w", err)
 						}
@@ -362,7 +361,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 						if params == nil {
 							mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, nil, ts.Height())
 						} else {
-							mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, *(*registry.HexString)(unsafe.Pointer(&params)), ts.Height())
+							mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, params, ts.Height())
 						}
 					}
 				}
@@ -413,7 +412,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 // when params is nil
 // todo: operate multiple types of errors separately
-func parseInvokeContractParams(raw *types.Message, act, meth string) ([]byte, error) {
+func parseInvokeContractParams(raw *types.Message, act, meth string) (cbor.Er, error) {
 	if len(raw.Params) > 0 {
 		if meth == "InvokeContract" && strings.Contains(act, "evm") {
 			// parse contract method
@@ -442,15 +441,10 @@ func parseInvokeContractParams(raw *types.Message, act, meth string) ([]byte, er
 
 			if ok {
 				// methodID has been recorded, replace Detail.Params
-				input, err := json.Marshal(inputData)
-				if err != nil {
-					return nil, err
-				}
-
-				return input, nil
+				return &inputData, nil
 			}
 
-			return hexParams, nil
+			return *(*registry.HexString)(unsafe.Pointer(&hexParams)), nil
 		}
 	}
 

@@ -83,7 +83,7 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, p
 	msg.Detail.Actor = act
 	msg.Detail.Method = meth
 
-	if params != nil && reflect.TypeOf(params) == reflect.ValueOf(registry.HexString("")).Type() {
+	if params != nil && (reflect.TypeOf(params) == reflect.ValueOf(registry.HexString("")).Type() || reflect.TypeOf(params) == reflect.ValueOf(&registry.InputData{}).Type()) {
 		msg.Detail.Params = params
 	} else {
 		if params != nil && len(raw.Params) > 0 {

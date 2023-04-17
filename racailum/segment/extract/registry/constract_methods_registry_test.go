@@ -222,6 +222,9 @@ func TestRegistryConstractMethods(t *testing.T) {
 func TestGetType(t *testing.T) {
 	p := HexString("hello")
 	require.Equal(t, true, reflect.TypeOf(cbor.Er(p)) == reflect.ValueOf(HexString("")).Type())
+
+	i := &InputData{Function: "totalSupply"}
+	require.Equal(t, true, reflect.TypeOf(cbor.Er(i)) == reflect.ValueOf(&InputData{}).Type())
 }
 
 func TestAssignData(t *testing.T) {
