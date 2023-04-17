@@ -8,7 +8,6 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	xerrors "golang.org/x/xerrors"
 )
 
 var _ = fmt.Errorf
@@ -38,7 +37,7 @@ func (t *InputData) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Function))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Function)); err != nil {
+	if _, err := io.WriteString(w, t.Function); err != nil {
 		return err
 	}
 
@@ -139,7 +138,7 @@ func (t *ConstractParams) MarshalCBOR(w io.Writer) error {
 
 	// t.Name (string) (string)
 	if len(t.Name) > cbg.MaxLength {
-		return xerrors.Errorf("Value in field t.Name was too long")
+		return fmt.Errorf("Value in field t.Name was too long")
 	}
 
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Name))); err != nil {
@@ -151,7 +150,7 @@ func (t *ConstractParams) MarshalCBOR(w io.Writer) error {
 
 	// t.Type (string) (string)
 	if len(t.Type) > cbg.MaxLength {
-		return xerrors.Errorf("Value in field t.Type was too long")
+		return fmt.Errorf("Value in field t.Type was too long")
 	}
 
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Type))); err != nil {
@@ -163,7 +162,7 @@ func (t *ConstractParams) MarshalCBOR(w io.Writer) error {
 
 	// t.Data (string) (string)
 	if len(t.Data) > cbg.MaxLength {
-		return xerrors.Errorf("Value in field t.Data was too long")
+		return fmt.Errorf("Value in field t.Data was too long")
 	}
 
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Data))); err != nil {
@@ -216,7 +215,7 @@ func (t *ConstractParams) UnmarshalCBOR(r io.Reader) (err error) {
 			return err
 		}
 
-		t.Type = string(sval)
+		t.Type = sval
 	}
 	// t.Data (string) (string)
 
@@ -226,7 +225,7 @@ func (t *ConstractParams) UnmarshalCBOR(r io.Reader) (err error) {
 			return err
 		}
 
-		t.Data = string(sval)
+		t.Data = sval
 	}
 	return nil
 }
