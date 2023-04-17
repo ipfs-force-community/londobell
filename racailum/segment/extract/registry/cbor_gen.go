@@ -168,7 +168,7 @@ func (t *ConstractParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Data))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Data)); err != nil {
+	if _, err := io.WriteString(w, t.Data); err != nil {
 		return err
 	}
 	return nil
@@ -205,7 +205,7 @@ func (t *ConstractParams) UnmarshalCBOR(r io.Reader) (err error) {
 			return err
 		}
 
-		t.Name = string(sval)
+		t.Name = sval
 	}
 	// t.Type (string) (string)
 
