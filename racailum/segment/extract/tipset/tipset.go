@@ -103,9 +103,13 @@ func init() {
 			Name: "final-height",
 			D:    &model.FinalHeight{},
 		},
+		//schema.Model{
+		//	Name: "message-block",
+		//	D:    &model.MessageBlock{},
+		//},
 		schema.Model{
-			Name: "message-block",
-			D:    &model.MessageBlock{},
+			Name: "block-message",
+			D:    &model.BlockMessage{},
 		},
 	)
 }
@@ -131,9 +135,13 @@ var extractors = []extractor{
 		name:   "actor-balance",
 		method: extractActorBalance,
 	},
+	//{
+	//	name:   "message-block",
+	//	method: extractMessageBlock,
+	//},
 	{
-		name:   "message-block",
-		method: extractMessageBlock,
+		name:   "block-message",
+		method: extractBlockMessage,
 	},
 }
 
@@ -594,19 +602,64 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	return nil
 }
 
-func extractMessageBlock(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
-	if !ctx.Opts.EnabelExtract.EnableExtractMessageBlock {
+//func extractMessageBlock(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+//	if !ctx.Opts.EnabelExtract.EnableExtractMessageBlock {
+//		return nil
+//	}
+//
+//	_, span := trace.StartSpan(ctx.C, "extractor.extractMessageBlock")
+//	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+//	defer span.End()
+//
+//	elog := ctx.L.With("epoch", ts.Height())
+//	elog.Infow("message-block extracted")
+//
+//	messageBlockMap := make(map[cid.Cid][]cid.Cid)
+//	for _, blk := range ts.Blocks() {
+//		// contain messages before the replacement
+//		bms, sms, err := ctx.D.MessagesForBlock(ctx.C, blk)
+//		if err != nil {
+//			return fmt.Errorf("get messages for block %v failed: %v", blk.Cid().String(), err)
+//		}
+//
+//		blockMessages := make([]types.ChainMsg, 0)
+//		for _, bmsg := range bms {
+//			blockMessages = append(blockMessages, bmsg)
+//		}
+//		for _, smsg := range sms {
+//			blockMessages = append(blockMessages, smsg)
+//		}
+//
+//		for _, message := range blockMessages {
+//			if _, ok := messageBlockMap[message.Cid()]; !ok {
+//				messageBlockMap[message.Cid()] = []cid.Cid{blk.Cid()}
+//			} else {
+//				messageBlockMap[message.Cid()] = append(messageBlockMap[message.Cid()], blk.Cid())
+//			}
+//		}
+//	}
+//
+//	for mcid, bcids := range messageBlockMap {
+//		messageBlock, _ := model.NewMessageBlock(mcid, ts.Height(), bcids)
+//		res.Docs = append(res.Docs, messageBlock)
+//	}
+//
+//	return nil
+//}
+
+func extractBlockMessage(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if !ctx.Opts.EnabelExtract.EnableExtractBlockMessage {
 		return nil
 	}
 
-	_, span := trace.StartSpan(ctx.C, "extractor.extractMessageBlock")
+	_, span := trace.StartSpan(ctx.C, "extractor.extractBlockMessage")
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 
 	elog := ctx.L.With("epoch", ts.Height())
-	elog.Infow("message-block extracted")
+	elog.Infow("block-message extracted")
 
-	messageBlockMap := make(map[cid.Cid][]cid.Cid)
+	blockMessageMap := make(map[cid.Cid][]cid.Cid)
 	for _, blk := range ts.Blocks() {
 		// contain messages before the replacement
 		bms, sms, err := ctx.D.MessagesForBlock(ctx.C, blk)
@@ -614,26 +667,17 @@ func extractMessageBlock(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 			return fmt.Errorf("get messages for block %v failed: %v", blk.Cid().String(), err)
 		}
 
-		blockMessages := make([]types.ChainMsg, 0)
 		for _, bmsg := range bms {
-			blockMessages = append(blockMessages, bmsg)
+			blockMessageMap[blk.Cid()] = append(blockMessageMap[blk.Cid()], bmsg.Cid())
 		}
 		for _, smsg := range sms {
-			blockMessages = append(blockMessages, smsg)
-		}
-
-		for _, message := range blockMessages {
-			if _, ok := messageBlockMap[message.Cid()]; !ok {
-				messageBlockMap[message.Cid()] = []cid.Cid{blk.Cid()}
-			} else {
-				messageBlockMap[message.Cid()] = append(messageBlockMap[message.Cid()], blk.Cid())
-			}
+			blockMessageMap[blk.Cid()] = append(blockMessageMap[blk.Cid()], smsg.Cid())
 		}
 	}
 
-	for mcid, bcids := range messageBlockMap {
-		messageBlock, _ := model.NewMessageBlock(mcid, ts.Height(), bcids)
-		res.Docs = append(res.Docs, messageBlock)
+	for bcid, mcids := range blockMessageMap {
+		blockMessage, _ := model.NewBlockMessage(bcid, ts.Height(), mcids)
+		res.Docs = append(res.Docs, blockMessage)
 	}
 
 	return nil

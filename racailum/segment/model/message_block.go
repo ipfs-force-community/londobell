@@ -31,7 +31,7 @@ func NewMessageBlock(mcid cid.Cid, epoch abi.ChainEpoch, bcids []cid.Cid) (*Mess
 // Indexes impl common.Indexed
 func (bh *MessageBlock) Indexes() [][]string {
 	return [][]string{
-		[]string{execTraceEpochField, "Blocks"},
+		[]string{messageBlockEpochField, "Blocks"},
 	}
 }
 
