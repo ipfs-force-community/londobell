@@ -353,7 +353,8 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					if mi.IsParamsImplemetsCbor() {
 						mmsg, err = model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 					} else {
-						params, err := parseInvokeContractParams(msg, mi.Actor, mi.Method.Name)
+						var params cbor.Er
+						params, err = parseInvokeContractParams(msg, mi.Actor, mi.Method.Name)
 						if err != nil {
 							return fmt.Errorf("parse params of InvokeContract failed: %w", err)
 						}

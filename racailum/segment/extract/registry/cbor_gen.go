@@ -11,7 +11,7 @@ import (
 	xerrors "golang.org/x/xerrors"
 )
 
-var _ = xerrors.Errorf
+var _ = fmt.Errorf
 var _ = cid.Undef
 var _ = math.E
 var _ = sort.Sort
@@ -32,7 +32,7 @@ func (t *InputData) MarshalCBOR(w io.Writer) error {
 
 	// t.Function (string) (string)
 	if len(t.Function) > cbg.MaxLength {
-		return xerrors.Errorf("Value in field t.Function was too long")
+		return fmt.Errorf("Value in field t.Function was too long")
 	}
 
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Function))); err != nil {
@@ -44,7 +44,7 @@ func (t *InputData) MarshalCBOR(w io.Writer) error {
 
 	// t.Params ([]*main.ConstractParams) (slice)
 	if len(t.Params) > cbg.MaxLength {
-		return xerrors.Errorf("Slice value in field t.Params was too long")
+		return fmt.Errorf("Slice value in field t.Params was too long")
 	}
 
 	if err := cw.WriteMajorTypeHeader(cbg.MajArray, uint64(len(t.Params))); err != nil {
@@ -89,7 +89,7 @@ func (t *InputData) UnmarshalCBOR(r io.Reader) (err error) {
 			return err
 		}
 
-		t.Function = string(sval)
+		t.Function = sval
 	}
 	// t.Params ([]*main.ConstractParams) (slice)
 
@@ -145,7 +145,7 @@ func (t *ConstractParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Name))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Name)); err != nil {
+	if _, err := io.WriteString(w, t.Name); err != nil {
 		return err
 	}
 
@@ -157,7 +157,7 @@ func (t *ConstractParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Type))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Type)); err != nil {
+	if _, err := io.WriteString(w, t.Type); err != nil {
 		return err
 	}
 
