@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
+	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
+	adt10 "github.com/filecoin-project/go-state-types/builtin/v10/util/adt"
+
 	"github.com/filecoin-project/go-state-types/manifest"
 
 	"github.com/filecoin-project/go-address"
@@ -347,6 +350,97 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 			}
 
 			var precommit miner9.SectorPreCommitOnChainInfo
+			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+				precommitSectorCount++
+				return nil
+			})
+
+			resData.State = state
+			resData.SectorCount = sectorCount
+			resData.FaultSectorCount = faultSectorCount
+			resData.ActiveSectorCount = activeSectorCount
+			resData.LiveSectorCount = liveSectorCount
+			resData.RecoverSectorCount = recoverSectorCount
+			resData.TerminateSectorCount = terminateSectorCount
+			resData.PrecommitSectorCount = precommitSectorCount
+
+			return nil
+		case actorstypes.Version10:
+			state := miner10.State{}
+			err = stor.Get(ctx, mact.Head, &state)
+			if err != nil {
+				return err
+			}
+
+			dls, err := state.LoadDeadlines(stor)
+			if err != nil {
+				return err
+			}
+
+			err = dls.ForEach(stor, func(dlIdx uint64, dl *miner10.Deadline) error {
+				partitions, err := dl.PartitionsArray(stor)
+				if err != nil {
+					return err
+				}
+				var part miner10.Partition
+				return partitions.ForEach(&part, func(partIdx int64) error {
+					sc, err := part.Sectors.Count()
+					if err != nil {
+						return err
+					}
+					sectorCount += sc
+
+					fc, err := part.Faults.Count()
+					if err != nil {
+						return err
+					}
+					faultSectorCount += fc
+
+					active, err := part.ActiveSectors()
+					if err != nil {
+						return err
+					}
+					ac, err := active.Count()
+					if err != nil {
+						return err
+					}
+					activeSectorCount += ac
+
+					live, err := part.LiveSectors()
+					if err != nil {
+						return err
+					}
+					lc, err := live.Count()
+					if err != nil {
+						return err
+					}
+					liveSectorCount += lc
+
+					rc, err := part.Recoveries.Count()
+					if err != nil {
+						return err
+					}
+					recoverSectorCount += rc
+
+					tc, err := part.Terminated.Count()
+					if err != nil {
+						return err
+					}
+					terminateSectorCount += tc
+
+					return nil
+				})
+			})
+			if err != nil {
+				return err
+			}
+
+			precommitted, err := adt10.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+			if err != nil {
+				return err
+			}
+
+			var precommit miner10.SectorPreCommitOnChainInfo
 			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
 				precommitSectorCount++
 				return nil
