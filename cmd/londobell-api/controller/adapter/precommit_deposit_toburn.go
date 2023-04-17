@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
+	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
+
 	"github.com/filecoin-project/go-state-types/manifest"
 
 	"github.com/filecoin-project/go-address"
@@ -258,6 +260,21 @@ func getDepositToBurnByCode(ctx context.Context, mact *types.Actor, stor adt.Sto
 			return depositToBurn, nil
 		case actorstypes.Version9:
 			state := &miner9.State{}
+			err := stor.Get(ctx, mact.Head, state)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+
+			if !state.PreCommittedSectorsCleanUp.Defined() {
+				return abi.NewTokenAmount(0), nil
+			}
+			depositToBurn, err := CleanUpExpiredPreCommits(state, stor, curEpoch)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+			return depositToBurn, nil
+		case actorstypes.Version10:
+			state := &miner10.State{}
 			err := stor.Get(ctx, mact.Head, state)
 			if err != nil {
 				return abi.NewTokenAmount(0), err
