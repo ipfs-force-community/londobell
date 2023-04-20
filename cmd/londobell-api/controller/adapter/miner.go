@@ -153,6 +153,9 @@ func GetMinerInfo(c *gin.Context) {
 	resData.VestingFunds = lockedFunds.VestingFunds
 	resData.LockedFunds = lockedFunds.PreCommitDeposits
 	resData.InitialPledgeRequirement = lockedFunds.InitialPledgeRequirement
+	resData.Beneficiary = mi.Beneficiary
+	resData.BeneficiaryTerm = mi.BeneficiaryTerm
+	resData.PendingBeneficiaryTerm = mi.PendingBeneficiaryTerm
 
 	err = getMinerResByCode(ctx, mact, stor, resData)
 	if err != nil {
