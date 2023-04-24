@@ -58,6 +58,7 @@ var (
 	countOfMessagesForBlockHeaderByMethodNameAggregator  []byte
 	blockHeaderMessagesByMethodNameAggregator            []byte
 	richListAggregator                                   []byte
+	dealByIDAggregator                                   []byte
 
 	BlockMsgsMap        map[abi.ChainEpoch]int64            // record totalCount for formal db, latestEpoch: blockMessagesCount todo: make
 	AllMethods          map[abi.ChainEpoch][]string         // latestEpoch: allMethods
@@ -142,4 +143,5 @@ func InitAggregators() {
 	countOfMessagesForBlockHeaderByMethodNameAggregator = monitor.GetCountOfMessagesForBlockHeaderByMethodNameAggregator()
 	blockHeaderMessagesByMethodNameAggregator = monitor.GetBlockHeaderMessagesByMethodNameAggregator()
 	richListAggregator = monitor.GetRichListAggregator()
+	dealByIDAggregator = monitor.GetDealByIDAggregator()
 }

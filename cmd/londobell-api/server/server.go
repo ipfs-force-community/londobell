@@ -204,6 +204,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/count_and_methods_of_messages_for_blockheader", aggregators.GetCountAndMethodsOfMessagesForBlockHeader)
 		group.POST("/blockheader_messages_by_methodname", aggregators.GetBlockHeaderMessagesByMethodName)
 		group.POST("/richlist", aggregators.GetRichList)
+		group.POST("/deal_by_id", aggregators.GetDealByID)
 	}
 }
 
