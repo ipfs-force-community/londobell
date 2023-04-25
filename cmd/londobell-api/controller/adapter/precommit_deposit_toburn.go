@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"net/http"
 
+	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
+	miner11 "github.com/filecoin-project/go-state-types/builtin/v11/miner"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/go-state-types/big"
 	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
-	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
 	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
 	util8 "github.com/filecoin-project/go-state-types/builtin/v8/util"
 	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
@@ -289,6 +291,21 @@ func getDepositToBurnByCode(ctx context.Context, mact *types.Actor, stor adt.Sto
 			return depositToBurn, nil
 		case actorstypes.Version10:
 			state := &miner10.State{}
+			err := stor.Get(ctx, mact.Head, state)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+
+			if !state.PreCommittedSectorsCleanUp.Defined() {
+				return abi.NewTokenAmount(0), nil
+			}
+			depositToBurn, err := CleanUpExpiredPreCommits(state, stor, curEpoch)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+			return depositToBurn, nil
+		case actorstypes.Version11:
+			state := &miner11.State{}
 			err := stor.Get(ctx, mact.Head, state)
 			if err != nil {
 				return abi.NewTokenAmount(0), err

@@ -156,6 +156,8 @@ func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
 			return system.MakeState(store, actorstypes.Version9, cid.Undef)
 		case actorstypes.Version10:
         	return system.MakeState(store, actorstypes.Version10, cid.Undef)
+        case actorstypes.Version11:
+        	return system.MakeState(store, actorstypes.Version11, cid.Undef)
 		}
 	}
 
