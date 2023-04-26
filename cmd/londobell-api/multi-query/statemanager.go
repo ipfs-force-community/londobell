@@ -58,3 +58,7 @@ func (m *StateManager) LoadDataBaseState(url string) (DataBaseState, bool, error
 	err = json.Unmarshal(data, &b)
 	return b, true, err
 }
+
+func (m *StateManager) DeleteDataBaseState(url string) error {
+	return m.state.Delete(context.Background(), datastore.NewKey(url))
+}

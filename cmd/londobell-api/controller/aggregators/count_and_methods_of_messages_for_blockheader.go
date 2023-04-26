@@ -35,7 +35,7 @@ func GetCountAndMethodsOfMessagesForBlockHeader(c *gin.Context) {
 		return
 	}
 
-	var countAndMethodsForBlockHeaderRes model.CountAndMethodsForBlockHeader
+	var countAndMethodsForBlockHeaderRes []model.CountAndMethodsForBlockHeader
 
 	// multi dbs query
 	{
@@ -51,7 +51,7 @@ func GetCountAndMethodsOfMessagesForBlockHeader(c *gin.Context) {
 			return
 		}
 
-		raw := multiResult[0]
+		raw := multiResult
 		rawByte, err := json.Marshal(raw)
 		if err != nil {
 			alog.Error(err)

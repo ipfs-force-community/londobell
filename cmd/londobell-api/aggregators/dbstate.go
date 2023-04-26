@@ -14,6 +14,7 @@ var dbstateCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		archiveCmd,
 		loadCmd,
+		deleteCmd,
 	},
 }
 
@@ -169,6 +170,41 @@ var loadCmd = &cli.Command{
 		}
 
 		log.Infof("dbState of url %v: %+v", cctx.String("url"), dbState)
+		return nil
+	},
+}
+
+var deleteCmd = &cli.Command{
+	Name: "delete",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name: "url",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		var components struct {
+			DBStMgr multiquery.DataBaseStateManager
+		}
+
+		stopper, err := dix.New(
+			cctx.Context,
+			multiquery.MultiQuery(context.TODO(), components.DBStMgr),
+			multiquery.InjectRepoPath(cctx),
+		)
+		if err != nil {
+			fmt.Println("stopper", err)
+			return err
+		}
+
+		defer stopper(cctx.Context) // nolint: errcheck
+
+		url := cctx.String("url")
+		err = components.DBStMgr.Stm.DeleteDataBaseState(url)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("delete dbstate of %v successfully", url)
 		return nil
 	},
 }
