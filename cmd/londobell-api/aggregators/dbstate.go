@@ -54,7 +54,7 @@ var archiveCmd = &cli.Command{
 
 		stopper, err := dix.New(
 			cctx.Context,
-			multiquery.MultiQuery(context.TODO(), components.DBStMgr),
+			multiquery.MultiQuery(context.TODO(), &components.DBStMgr),
 			multiquery.InjectRepoPath(cctx),
 		)
 		if err != nil {
@@ -188,7 +188,7 @@ var deleteCmd = &cli.Command{
 
 		stopper, err := dix.New(
 			cctx.Context,
-			multiquery.MultiQuery(context.TODO(), components.DBStMgr),
+			multiquery.MultiQuery(context.TODO(), &components.DBStMgr),
 			multiquery.InjectRepoPath(cctx),
 		)
 		if err != nil {
