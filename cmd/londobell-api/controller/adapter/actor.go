@@ -68,9 +68,10 @@ func GetActorInfo(c *gin.Context) {
 		state     interface{}
 	)
 
+	// todo: mask protocol details
 	if addr.Protocol() == address.ID {
 		actorID = addr
-	} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 {
+	} else if addr.Protocol() == address.BLS || addr.Protocol() == address.SECP256K1 || addr.Protocol() == address.Actor || addr.Protocol() == address.Delegated {
 		actorID, err = api.StateLookupID(ctx, addr, ts.Key())
 		if err != nil {
 			util.ReturnOnErr(c, alog, err)

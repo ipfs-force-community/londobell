@@ -35,8 +35,11 @@ func generate(in, out string) error {
 	for i := range actors.Versions {
 		ver := actors.Versions[i]
 		inPath := "github.com/filecoin-project/specs-actors"
-		if ver != 0 {
+		inPath2 := "github.com/filecoin-project/go-state-types/builtin"
+		if ver != 0 && ver < int(actors.Version8) {
 			inPath = fmt.Sprintf("%s/v%d", inPath, ver)
+		} else if ver >= int(actors.Version8) {
+			inPath = fmt.Sprintf("%s/v%d", inPath2, ver)
 		}
 
 		vers[i] = verInfo{
