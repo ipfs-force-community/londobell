@@ -7,6 +7,8 @@ db.ActorState.deleteMany({"Epoch":{$gt:488156}})
 
 db.BlockHeader.deleteMany({"Epoch":{$gt:488156}})
 
+db.BlockMessage.deleteMany({"Epoch":{$gt:488156}})
+
 db.ClaimedPower.deleteMany({"Epoch":{$gt:488156}})
 
 db.DealProposal.deleteMany({"Epoch":{$gt:488156}})

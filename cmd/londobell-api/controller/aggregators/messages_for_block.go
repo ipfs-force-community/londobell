@@ -40,7 +40,7 @@ func GetMessagesForBlock(c *gin.Context) {
 		req.Limit = math.MaxInt64
 	}
 
-	var messagesForBlockRes model.TraceForMessageRes
+	var messagesForBlockRes []model.TraceForMessageRes
 
 	// multi dbs query
 	{
