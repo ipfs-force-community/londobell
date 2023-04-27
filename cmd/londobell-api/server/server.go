@@ -229,6 +229,7 @@ func RegisterAdapterApi(router *gin.Engine) {
 		group.POST("/current_sector_initial_pledge", adapter.CurrentSectorInitialPledge)
 		group.POST("/sectornumber_by_dealID", adapter.GetSectorNumberByDealID)
 		group.POST("/changed_actors", adapter.GetStateChaingedActors)
+		group.POST("/version", adapter.GetVersion)
 	}
 }
 
@@ -286,6 +287,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/blockheader_messages_by_methodname", aggregators.GetBlockHeaderMessagesByMethodName)
 		group.POST("/all_methods", aggregators.GetAllMethods)
 		group.POST("/all_methods_for_actor", aggregators.GetAllActorMethods)
+		group.POST("/version", aggregators.GetVersion)
 	}
 }
 
