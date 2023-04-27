@@ -20,8 +20,7 @@ func GetVersion(c *gin.Context) {
 		util.ReturnOnErr(c, err)
 		return
 	}
-	
-	res.Data = build.UserVersion()
 
+	res.Data = build.UserVersion()
 	c.JSON(http.StatusOK, res)
 }
