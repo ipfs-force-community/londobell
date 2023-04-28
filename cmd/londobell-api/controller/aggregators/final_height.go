@@ -35,7 +35,9 @@ func GetFinalHeight(c *gin.Context) {
 		return
 	}
 
-	res.Data = model.FinalHeightRes{Epoch: finalHeight}
+	res.Data = []model.FinalHeightRes{model.FinalHeightRes{
+		Epoch: finalHeight,
+	}}
 	c.JSON(http.StatusOK, res)
 }
 
