@@ -14,5 +14,5 @@ type BellAPI interface {
 }
 
 type MultiAPI interface {
-	LoadDBState(url string) (multiquery.DataBaseState, error)
+	LoadDBState(url string) (multiquery.DataBaseState, bool, error)
 }

@@ -74,17 +74,6 @@ type MultiNodeAPI struct {
 	DBSMgr *multiquery.StateManager
 }
 
-func (m *MultiNodeAPI) LoadDBState(url string) (multiquery.DataBaseState, error) {
-	dbState, found, err := m.DBSMgr.LoadDataBaseState(url)
-	if err != nil {
-		log.Error(err)
-		return multiquery.DataBaseState{}, err
-	}
-
-	if !found {
-		log.Warnf("url %v not found in dbState", url)
-		return multiquery.DataBaseState{}, nil
-	}
-
-	return dbState, nil
+func (m *MultiNodeAPI) LoadDBState(url string) (multiquery.DataBaseState, bool, error) {
+	return m.DBSMgr.LoadDataBaseState(url)
 }

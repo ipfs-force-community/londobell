@@ -157,19 +157,59 @@ var loadCmd = &cli.Command{
 			Name:  "RPCListen",
 			Usage: "multiaddr of rpc",
 		},
+		&cli.BoolFlag{
+			Name:  "local",
+			Usage: "load locally if true, otherwise rpc call if false",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
-		api, _, err := GetAPIV0(cctx.Context, cctx.String("RPCListen"))
-		if err != nil {
-			return err
+		url := cctx.String("url")
+		local := cctx.Bool("local")
+
+		var (
+			dbState multiquery.DataBaseState
+			found   bool
+		)
+		if local {
+			var components struct {
+				DBStMgr multiquery.DataBaseStateManager
+			}
+
+			stopper, err := dix.New(
+				cctx.Context,
+				multiquery.MultiQuery(context.TODO(), &components.DBStMgr),
+				multiquery.InjectRepoPath(cctx),
+			)
+			if err != nil {
+				fmt.Println("stopper", err)
+				return err
+			}
+
+			defer stopper(cctx.Context) // nolint: errcheck
+
+			dbState, found, err = components.DBStMgr.Stm.LoadDataBaseState(url)
+			if err != nil {
+				return err
+			}
+		} else {
+			api, _, err := GetAPIV0(cctx.Context, cctx.String("RPCListen"))
+			if err != nil {
+				return err
+			}
+
+			dbState, found, err = api.LoadDBState(url)
+			if err != nil {
+				return err
+			}
 		}
 
-		dbState, err := api.LoadDBState(cctx.String("url"))
-		if err != nil {
-			return err
+		if !found {
+			log.Warnf("url %v not exist", url)
+			return nil
 		}
 
-		log.Infof("dbState of url %v: %+v", cctx.String("url"), dbState)
+		log.Infof("dbState of url %v: %+v", url, dbState)
+
 		return nil
 	},
 }
@@ -178,7 +218,13 @@ var deleteCmd = &cli.Command{
 	Name: "delete",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name: "url",
+			Name:     "url",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "type",
+			Usage:    "type: BlockMsgsCount, BlockMsgsByMethodNameMap, ActorMsgsByMethodNameMap, ActorMsgsCountMap, ActorTransfersCountMap, MinedMsgsMap, TransfersLargeAmountCount or all",
+			Required: true,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -199,12 +245,68 @@ var deleteCmd = &cli.Command{
 		defer stopper(cctx.Context) // nolint: errcheck
 
 		url := cctx.String("url")
-		err = components.DBStMgr.Stm.DeleteDataBaseState(url)
+		dtype := cctx.String("type")
+
+		err = deleteDataBaseStateForType(url, dtype, &components.DBStMgr)
 		if err != nil {
 			return err
 		}
 
-		log.Infof("delete dbstate of %v successfully", url)
+		log.Infof("delete dbstate of %v for %v successfully", url, dtype)
 		return nil
 	},
+}
+
+func deleteDataBaseStateForType(url, dtype string, dBStMgr *multiquery.DataBaseStateManager) error {
+	dbState, found, err := dBStMgr.Stm.LoadDataBaseState(url)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		log.Warnf("url %v not exist", url)
+		return nil
+	}
+
+	switch dtype {
+	case "BlockMsgsCount":
+		dbState.BlockMsgsCount = 0
+		dbState.NextEpochForBlockMsgsCount = dbState.StartEpoch
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "BlockMsgsByMethodNameMap":
+		dbState.BlockMsgsByMethodNameMap = make(map[string]int64)
+		dbState.NextEpochForBlockMsgsByMethodName = dbState.StartEpoch
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "ActorMsgsByMethodNameMap":
+		dbState.ActorMsgsByMethodNameMap = make(map[string]map[string]int64)
+		dbState.NextEpochForActorMsgsByMethodName = dbState.StartEpoch
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "ActorMsgsCountMap":
+		dbState.ActorMsgsCountMap = make(map[string]int64)
+		dbState.NextEpochForActorMsgsCount = dbState.StartEpoch
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "ActorTransfersCountMap":
+		dbState.ActorTransfersCountMap = make(map[string]int64)
+		dbState.NextEpochForActorTransfersCount = dbState.StartEpoch
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "MinedMsgsMap":
+		dbState.MinedMsgsMap = make(map[string]int64)
+		dbState.NextEpochForMinedMsgs = dbState.StartEpoch
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "TransfersLargeAmountCount":
+		dbState.TransfersLargeAmountCount = 0
+		dbState.NextEpochForTransfersLargeAmount = dbState.StartEpoch
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "all":
+		return dBStMgr.Stm.DeleteDataBaseState(url)
+	default:
+		return fmt.Errorf("invalid dtype: %v", dtype)
+	}
 }

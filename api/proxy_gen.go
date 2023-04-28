@@ -28,7 +28,7 @@ type BellAPIStub struct {
 
 type MultiAPIStruct struct {
 	Internal struct {
-		LoadDBState func(p0 string) (multiquery.DataBaseState, error) ``
+		LoadDBState func(p0 string) (multiquery.DataBaseState, bool, error) ``
 	}
 }
 
@@ -79,15 +79,15 @@ func (s *BellAPIStub) ShutDown(p0 context.Context) error {
 	return ErrNotSupported
 }
 
-func (s *MultiAPIStruct) LoadDBState(p0 string) (multiquery.DataBaseState, error) {
+func (s *MultiAPIStruct) LoadDBState(p0 string) (multiquery.DataBaseState, bool, error) {
 	if s.Internal.LoadDBState == nil {
-		return *new(multiquery.DataBaseState), ErrNotSupported
+		return *new(multiquery.DataBaseState), false, ErrNotSupported
 	}
 	return s.Internal.LoadDBState(p0)
 }
 
-func (s *MultiAPIStub) LoadDBState(p0 string) (multiquery.DataBaseState, error) {
-	return *new(multiquery.DataBaseState), ErrNotSupported
+func (s *MultiAPIStub) LoadDBState(p0 string) (multiquery.DataBaseState, bool, error) {
+	return *new(multiquery.DataBaseState), false, ErrNotSupported
 }
 
 var _ BellAPI = new(BellAPIStruct)
