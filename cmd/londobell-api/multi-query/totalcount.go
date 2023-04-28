@@ -55,10 +55,14 @@ func PeriodicRefreshDataBaseState(ctx context.Context, dbsm *DataBaseStateManage
 				continue
 			}
 
+			start := time.Now()
+			log.Infow("begin PeriodicRefreshDataBaseState for formal, finalHeight: %v", res[0].Epoch)
 			if err := RefreshFormalDataBaseState(ctx, dbsm, res[0].Epoch); err != nil {
 				log.Error(err)
 				continue
 			}
+
+			log.Infof("finish PeriodicRefreshDataBaseState for formal, elapsed: %v", time.Now().Sub(start).String())
 		}
 	}
 }
@@ -152,6 +156,8 @@ func RefreshFormalDataBaseState(ctx context.Context, dbsm *DataBaseStateManager,
 	if err := dbsm.Stm.SetDataBaseState(formal.Url(), dbState); err != nil {
 		return err
 	}
+
+	dbsm.DBStateCache.SetDataBase(formal.Url(), &dbState)
 
 	return nil
 }
