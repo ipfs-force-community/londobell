@@ -95,8 +95,10 @@ func GetMessagesForActor(c *gin.Context) {
 			return
 		}
 
-		messagesForActor = append(messagesForActor, *createMessage)
-		totalCount++
+		if createMessage != nil {
+			messagesForActor = append(messagesForActor, *createMessage)
+			totalCount++
+		}
 	}
 
 	res.Data = model.MessagesForActorRes{TotalCount: totalCount, MessagesForActor: messagesForActor}
