@@ -2,8 +2,9 @@ package aggregators
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+
+	"github.com/filecoin-project/go-state-types/abi"
 
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 
@@ -27,45 +28,23 @@ func GetFinalHeight(c *gin.Context) {
 		return
 	}
 
-	finalHeightRes, err := GetFinalHeightForFormalDB(ctx)
+	finalHeight, err := GetFinalHeightForFormalDB(ctx)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	res.Data = finalHeightRes
+	res.Data = model.FinalHeightRes{Epoch: finalHeight}
 	c.JSON(http.StatusOK, res)
 }
 
-func GetFinalHeightForFormalDB(ctx context.Context) ([]model.FinalHeightRes, error) {
-	var finalHeightRes []model.FinalHeightRes
-
+func GetFinalHeightForFormalDB(ctx context.Context) (abi.ChainEpoch, error) {
 	formal := multiquery.DBStateManager.GetFormalCfg()
-	cols, ok := multiquery.DBStateManager.GetDBCollections(formal.Url())
-	if !ok {
-		return nil, fmt.Errorf("url %v not found in DBCollectionsMap", formal.Url())
+	dbState, err := multiquery.DBStateManager.GetDataBase(formal.Url())
+	if err != nil {
+		return 0, err
 	}
 
-	for _, col := range cols.Cols {
-		if col != nil && col.Name() == "FinalHeight" {
-			pipe, err := util.Parse(model.Ctx{}, string(finalHeightAggregator))
-			if err != nil {
-				return nil, err
-			}
-			cur, err := col.Aggregate(ctx, pipe)
-			if err != nil {
-				return nil, err
-			}
-
-			err = cur.All(ctx, &finalHeightRes)
-			if err != nil {
-				return nil, err
-			}
-
-			return finalHeightRes, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no table FinalHeight")
+	return dbState.EndEpoch - 1, nil
 }

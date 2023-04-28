@@ -336,8 +336,6 @@ func updateBaseStateForType(ctx context.Context, url, name, utype string, dBStMg
 		return err
 	}
 
-	log.Infof("updateBaseStateForType, dbState: %+v, cols: %v", dbState, cols)
-
 	switch utype {
 	case "BlockMsgsCount":
 		dbState.BlockMsgsCount = 0
