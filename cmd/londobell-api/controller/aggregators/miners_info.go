@@ -41,7 +41,7 @@ func GetMinersInfo(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, minersInfoAggregator, req, "MinerFunds")
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, minersInfoAggregator, req, "MinerSectorHealth")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
