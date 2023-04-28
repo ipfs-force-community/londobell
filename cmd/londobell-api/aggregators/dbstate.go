@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+
 	"github.com/dtynn/dix"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/urfave/cli/v2"
@@ -232,8 +234,18 @@ var updateCmd = &cli.Command{
 			Usage:    "type: BlockMsgsCount, BlockMsgsByMethodNameMap, ActorMsgsByMethodNameMap, ActorMsgsCountMap, ActorTransfersCountMap, MinedMsgsMap, TransfersLargeAmountCount or all",
 			Required: true,
 		},
+		&cli.StringSliceFlag{
+			Name:  "apis",
+			Usage: "ws://112.124.1.253:1234/rpc/v0",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
+		fullnode.API = fullnode.NewAppropriateAPI(cctx.StringSlice("apis"))
+		err := fullnode.API.Choose(context.TODO())
+		if err != nil {
+			return err
+		}
+
 		var components struct {
 			DBStMgr multiquery.DataBaseStateManager
 		}
@@ -323,6 +335,8 @@ func updateBaseStateForType(ctx context.Context, url, name, utype string, dBStMg
 		log.Errorf("get collections for url %v failed: %v", url, err)
 		return err
 	}
+
+	log.Infof("updateBaseStateForType, dbState: %+v, cols: %v", dbState, cols)
 
 	switch utype {
 	case "BlockMsgsCount":
