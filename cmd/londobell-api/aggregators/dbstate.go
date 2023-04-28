@@ -14,6 +14,7 @@ var dbstateCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		archiveCmd,
 		loadCmd,
+		updateCmd,
 		deleteCmd,
 	},
 }
@@ -214,6 +215,55 @@ var loadCmd = &cli.Command{
 	},
 }
 
+// updateCmd reload dbState from StartEpoch to EndEpoch
+var updateCmd = &cli.Command{
+	Name: "delete",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "url",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "name",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "type",
+			Usage:    "type: BlockMsgsCount, BlockMsgsByMethodNameMap, ActorMsgsByMethodNameMap, ActorMsgsCountMap, ActorTransfersCountMap, MinedMsgsMap, TransfersLargeAmountCount or all",
+			Required: true,
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		var components struct {
+			DBStMgr multiquery.DataBaseStateManager
+		}
+
+		stopper, err := dix.New(
+			cctx.Context,
+			multiquery.MultiQuery(context.TODO(), &components.DBStMgr),
+			multiquery.InjectRepoPath(cctx),
+		)
+		if err != nil {
+			fmt.Println("stopper", err)
+			return err
+		}
+
+		defer stopper(cctx.Context) // nolint: errcheck
+
+		url := cctx.String("url")
+		name := cctx.String("name")
+		utype := cctx.String("type")
+
+		err = updateBaseStateForType(context.TODO(), url, name, utype, &components.DBStMgr)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("update dbstate of %v for %v successfully", url, utype)
+		return nil
+	},
+}
+
 var deleteCmd = &cli.Command{
 	Name: "delete",
 	Flags: []cli.Flag{
@@ -255,6 +305,136 @@ var deleteCmd = &cli.Command{
 		log.Infof("delete dbstate of %v for %v successfully", url, dtype)
 		return nil
 	},
+}
+
+func updateBaseStateForType(ctx context.Context, url, name, utype string, dBStMgr *multiquery.DataBaseStateManager) error {
+	dbState, found, err := dBStMgr.Stm.LoadDataBaseState(url)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		log.Warnf("url %v not exist", url)
+		return nil
+	}
+
+	cols, err := multiquery.GetCollectionsForDB(ctx, multiquery.NewDB(url, name))
+	if err != nil {
+		log.Errorf("get collections for url %v failed: %v", url, err)
+		return err
+	}
+
+	switch utype {
+	case "BlockMsgsCount":
+		dbState.BlockMsgsCount = 0
+		dbState.NextEpochForBlockMsgsCount = dbState.StartEpoch
+
+		if err := multiquery.RefreshBlockMsgs(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "BlockMsgsByMethodNameMap":
+		dbState.BlockMsgsByMethodNameMap = make(map[string]int64)
+		dbState.NextEpochForBlockMsgsByMethodName = dbState.StartEpoch
+
+		if err := multiquery.RefreshBlockMsgsByMethodName(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "ActorMsgsByMethodNameMap":
+		dbState.ActorMsgsByMethodNameMap = make(map[string]map[string]int64)
+		dbState.NextEpochForActorMsgsByMethodName = dbState.StartEpoch
+
+		if err := multiquery.RefreshActorMsgsByMethodName(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "ActorMsgsCountMap":
+		dbState.ActorMsgsCountMap = make(map[string]int64)
+		dbState.NextEpochForActorMsgsCount = dbState.StartEpoch
+
+		if err := multiquery.RefreshActorMsgs(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "ActorTransfersCountMap":
+		dbState.ActorTransfersCountMap = make(map[string]int64)
+		dbState.NextEpochForActorTransfersCount = dbState.StartEpoch
+
+		if err := multiquery.RefreshActorTransferMsgs(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "MinedMsgsMap":
+		dbState.MinedMsgsMap = make(map[string]int64)
+		dbState.NextEpochForMinedMsgs = dbState.StartEpoch
+
+		if err := multiquery.RefreshMinedMsgsMaps(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "TransfersLargeAmountCount":
+		dbState.TransfersLargeAmountCount = 0
+		dbState.NextEpochForTransfersLargeAmount = dbState.StartEpoch
+
+		if err := multiquery.RefreshTransfersForLargeAmount(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	case "all":
+		dbState.BlockMsgsCount = 0
+		dbState.NextEpochForBlockMsgsCount = dbState.StartEpoch
+		if err := multiquery.RefreshBlockMsgs(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		dbState.BlockMsgsByMethodNameMap = make(map[string]int64)
+		dbState.NextEpochForBlockMsgsByMethodName = dbState.StartEpoch
+		if err := multiquery.RefreshBlockMsgsByMethodName(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		dbState.ActorMsgsByMethodNameMap = make(map[string]map[string]int64)
+		dbState.NextEpochForActorMsgsByMethodName = dbState.StartEpoch
+		if err := multiquery.RefreshActorMsgsByMethodName(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		dbState.ActorMsgsCountMap = make(map[string]int64)
+		dbState.NextEpochForActorMsgsCount = dbState.StartEpoch
+		if err := multiquery.RefreshActorMsgs(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		dbState.ActorTransfersCountMap = make(map[string]int64)
+		dbState.NextEpochForActorTransfersCount = dbState.StartEpoch
+		if err := multiquery.RefreshActorTransferMsgs(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		dbState.MinedMsgsMap = make(map[string]int64)
+		dbState.NextEpochForMinedMsgs = dbState.StartEpoch
+		if err := multiquery.RefreshMinedMsgsMaps(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		dbState.TransfersLargeAmountCount = 0
+		dbState.NextEpochForTransfersLargeAmount = dbState.StartEpoch
+		if err := multiquery.RefreshTransfersForLargeAmount(ctx, &dbState, cols); err != nil {
+			return err
+		}
+
+		return dBStMgr.Stm.SetDataBaseState(url, dbState)
+	default:
+		return fmt.Errorf("invalid dtype: %v", utype)
+	}
 }
 
 func deleteDataBaseStateForType(url, dtype string, dBStMgr *multiquery.DataBaseStateManager) error {
