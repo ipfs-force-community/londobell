@@ -191,21 +191,21 @@ var loadCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
+
+			if !found {
+				log.Warnf("url %v not exist", url)
+				return nil
+			}
 		} else {
 			api, _, err := GetAPIV0(cctx.Context, cctx.String("RPCListen"))
 			if err != nil {
 				return err
 			}
 
-			dbState, found, err = api.LoadDBState(url)
+			dbState, err = api.LoadDBState(url)
 			if err != nil {
 				return err
 			}
-		}
-
-		if !found {
-			log.Warnf("url %v not exist", url)
-			return nil
 		}
 
 		log.Infof("dbState of url %v: %+v", url, dbState)
