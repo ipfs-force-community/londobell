@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/filecoin-project/lotus/api/v0api"
+
 	"github.com/filecoin-project/go-address"
 	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
@@ -85,63 +87,72 @@ func GetMessagesForActor(c *gin.Context) {
 		}
 	}
 
+	if int64(len(messagesForActor)) < req.Limit {
+		createMessage, err := getCreateMessage(ctx, req.Addr, api, countUtils)
+		if err != nil {
+			log.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		messagesForActor = append(messagesForActor, *createMessage)
+		totalCount++
+	}
+
+	res.Data = model.MessagesForActorRes{TotalCount: totalCount, MessagesForActor: messagesForActor}
+	c.JSON(http.StatusOK, res)
+}
+
+func getCreateMessage(ctx context.Context, addrReq string, api v0api.FullNode, countUtils []multiquery.CountUtil) (*model.MessageForActor, error) {
 	// create message
-	addr, err := address.NewFromString(buildnet.NetPrefix + req.Addr)
+	addr, err := address.NewFromString(buildnet.NetPrefix + addrReq)
 	if err != nil {
-		log.Error(err)
-		util.ReturnOnErr(c, err)
-		return
+		return nil, err
 	}
 
 	actor, err := api.StateGetActor(ctx, addr, types.EmptyTSK)
 	if err != nil {
-		log.Error(err)
-		util.ReturnOnErr(c, err)
-		return
+		return nil, err
 	}
+
+	var (
+		to     string
+		method uint64
+		robust string
+	)
 
 	switch {
 	case addr == sbuiltin.SystemActorAddr, addr == sbuiltin.InitActorAddr, addr == sbuiltin.RewardActorAddr, addr == sbuiltin.CronActorAddr, addr == sbuiltin.StoragePowerActorAddr,
 		addr == sbuiltin.VerifiedRegistryActorAddr, addr == sbuiltin.BurntFundsActorAddr, addr == sbuiltin.DatacapActorAddr, addr == sbuiltin.EthereumAddressManagerActorAddr,
 		builtin.IsAccountActor(actor.Code), builtin.IsEthAccountActor(actor.Code), builtin.IsPlaceholderActor(actor.Code):
-		res.Data = model.MessagesForActorRes{TotalCount: totalCount, MessagesForActor: messagesForActor}
-		c.JSON(http.StatusOK, res)
-		return
+		return nil, nil
 	case builtin.IsStorageMinerActor(actor.Code):
 		// CreateMiner
-		req.To = sbuiltin.StoragePowerActorAddr.String()[1:]
-		req.Method = 2
+		to = sbuiltin.StoragePowerActorAddr.String()[1:]
+		method = 2
 	case builtin.IsEvmActor(actor.Code):
 		// CreateExternal
-		req.To = sbuiltin.EthereumAddressManagerActorAddr.String()[1:]
-		req.Method = 4
+		to = sbuiltin.EthereumAddressManagerActorAddr.String()[1:]
+		method = 4
 	default:
 		// Exec
-		req.To = sbuiltin.InitActorAddr.String()[1:]
-		req.Method = 2
+		to = sbuiltin.InitActorAddr.String()[1:]
+		method = 2
 	}
 
 	ID, err := api.StateLookupID(ctx, addr, types.EmptyTSK)
 	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
+		return nil, err
 	}
 
-	robust, err := GetRobustByID(ctx, api, ID, actor)
+	robust, err = GetRobustByID(ctx, api, ID, actor)
 	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
+		return nil, err
 	}
 
-	req.Addr = robust
-
-	pipe, err := util.Parse(model.Ctx{Addr: req.Addr, To: req.To, Method: req.Method}, string(createMessageAggregator))
+	pipe, err := util.Parse(model.Ctx{Addr: robust, To: to, Method: method}, string(createMessageAggregator))
 	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
+		return nil, err
 	}
 
 	var createMessage model.MessageForActor
@@ -150,35 +161,25 @@ func GetMessagesForActor(c *gin.Context) {
 	{
 		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "ExecTrace")
 		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
+			return nil, err
 		}
 
 		if len(multiResult) == 0 {
-			c.JSON(http.StatusOK, res)
-			return
+			// todo: 未找到就先不管了
+			return nil, nil
 		}
 
 		raw := multiResult[0]
 		rawByte, err := json.Marshal(raw)
 		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
+			return nil, err
 		}
 
 		err = json.Unmarshal(rawByte, &createMessage)
 		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
+			return nil, err
 		}
 	}
 
-	messagesForActor = append(messagesForActor, createMessage)
-	totalCount++
-
-	res.Data = model.MessagesForActorRes{TotalCount: totalCount, MessagesForActor: messagesForActor}
-	c.JSON(http.StatusOK, res)
+	return &createMessage, nil
 }
