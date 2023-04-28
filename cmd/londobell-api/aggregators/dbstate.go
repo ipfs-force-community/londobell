@@ -217,7 +217,7 @@ var loadCmd = &cli.Command{
 
 // updateCmd reload dbState from StartEpoch to EndEpoch
 var updateCmd = &cli.Command{
-	Name: "delete",
+	Name: "update",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "url",
