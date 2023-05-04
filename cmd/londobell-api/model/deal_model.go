@@ -17,6 +17,7 @@ type Deal struct {
 	StoragePricePerEpoch string
 	ProviderCollateral   string
 	ClientCollateral     string
+	Label                interface{}
 }
 
 type DealsRes struct {
