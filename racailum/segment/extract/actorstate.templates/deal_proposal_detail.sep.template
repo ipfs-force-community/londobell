@@ -6,6 +6,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	{{- if ge .Ver 8 }}
+	"bytes"
 	lmarket "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	market{{ .Ver }} "{{ .ImportPath }}/market"
     adt{{ .Ver }} "{{ .ImportPath }}/util/adt"
@@ -127,10 +128,28 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
 			DealProposal: out,
 		})
 		{{ else }}
+		labelBytes := new(bytes.Buffer)
+        err = out.Label.MarshalCBOR(labelBytes)
+        if err != nil {
+            return fmt.Errorf("marshal label failed: %v", err)
+        }
+
 		dealProposals = append(dealProposals, model.DealProposalV8{
             ID:           int64(idx),
             Epoch:        head.Epoch,
-            DealProposal: out,
+            MDealProposalV8: model.MDealProposalV8{
+                PieceCID:             out.PieceCID,
+                PieceSize:            out.PieceSize,
+                VerifiedDeal:         out.VerifiedDeal,
+                Client:               out.Client,
+                Provider:             out.Provider,
+                Label:                labelBytes.Bytes(),
+                StartEpoch:           out.StartEpoch,
+                EndEpoch:             out.EndEpoch,
+                StoragePricePerEpoch: out.StoragePricePerEpoch,
+                ProviderCollateral:   out.ProviderCollateral,
+                ClientCollateral:     out.ClientCollateral,
+            },
         })
         {{ end }}
 		return nil
