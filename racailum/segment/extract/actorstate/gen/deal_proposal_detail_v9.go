@@ -7,6 +7,7 @@ package gen
 import (
 	"fmt"
 
+	"bytes"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	market9 "github.com/filecoin-project/go-state-types/builtin/v9/market"
@@ -84,10 +85,28 @@ func extractDealProposalDetailedV9(ctx *extract.Ctx, res *extract.Res, head *com
 			details[out.Provider].Detail.UnVerifiedDealEndCount++
 		}
 
+		labelBytes := new(bytes.Buffer)
+		err = out.Label.MarshalCBOR(labelBytes)
+		if err != nil {
+			return fmt.Errorf("marshal label failed: %v", err)
+		}
+
 		dealProposals = append(dealProposals, model.DealProposalV8{
-			ID:           int64(idx),
-			Epoch:        head.Epoch,
-			DealProposal: out,
+			ID:    int64(idx),
+			Epoch: head.Epoch,
+			MDealProposalV8: model.MDealProposalV8{
+				PieceCID:             out.PieceCID,
+				PieceSize:            out.PieceSize,
+				VerifiedDeal:         out.VerifiedDeal,
+				Client:               out.Client,
+				Provider:             out.Provider,
+				Label:                labelBytes.Bytes(),
+				StartEpoch:           out.StartEpoch,
+				EndEpoch:             out.EndEpoch,
+				StoragePricePerEpoch: out.StoragePricePerEpoch,
+				ProviderCollateral:   out.ProviderCollateral,
+				ClientCollateral:     out.ClientCollateral,
+			},
 		})
 
 		return nil

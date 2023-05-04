@@ -1,9 +1,10 @@
 package model
 
 import (
+	addr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	lmarket "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/filecoin-project/specs-actors/v5/actors/builtin/market"
+	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
 )
@@ -24,9 +25,23 @@ type DealProposal struct {
 }
 
 type DealProposalV8 struct {
-	ID                   int64 `bson:"_id"`
-	Epoch                abi.ChainEpoch
-	lmarket.DealProposal `bson:",inline"`
+	ID              int64 `bson:"_id"`
+	Epoch           abi.ChainEpoch
+	MDealProposalV8 `bson:",inline"`
+}
+
+type MDealProposalV8 struct {
+	PieceCID             cid.Cid `checked:"true"`
+	PieceSize            abi.PaddedPieceSize
+	VerifiedDeal         bool
+	Client               addr.Address
+	Provider             addr.Address
+	Label                []byte
+	StartEpoch           abi.ChainEpoch
+	EndEpoch             abi.ChainEpoch
+	StoragePricePerEpoch abi.TokenAmount
+	ProviderCollateral   abi.TokenAmount
+	ClientCollateral     abi.TokenAmount
 }
 
 // CollectionName impl CollectionName
