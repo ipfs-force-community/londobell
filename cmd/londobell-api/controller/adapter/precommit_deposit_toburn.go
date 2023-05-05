@@ -3,9 +3,10 @@ package adapter
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
 	miner11 "github.com/filecoin-project/go-state-types/builtin/v11/miner"
-	"net/http"
 
 	"github.com/filecoin-project/go-state-types/manifest"
 
