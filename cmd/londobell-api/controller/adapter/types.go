@@ -5,20 +5,54 @@
 package adapter
 
 import (
+	"context"
 	"fmt"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-bitfield"
+	"github.com/filecoin-project/go-state-types/abi"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
+	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin"
+	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
+	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
+	util10 "github.com/filecoin-project/go-state-types/builtin/v10/util"
+	adt10 "github.com/filecoin-project/go-state-types/builtin/v10/util/adt"
+	miner11 "github.com/filecoin-project/go-state-types/builtin/v11/miner"
+	util11 "github.com/filecoin-project/go-state-types/builtin/v11/util"
+	adt11 "github.com/filecoin-project/go-state-types/builtin/v11/util/adt"
+	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	util8 "github.com/filecoin-project/go-state-types/builtin/v8/util"
+	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
+	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
+	util9 "github.com/filecoin-project/go-state-types/builtin/v9/util"
+	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
 	"github.com/filecoin-project/go-state-types/manifest"
+	"github.com/filecoin-project/lotus/chain/types"
 	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
+	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
+	adt0 "github.com/filecoin-project/specs-actors/actors/util/adt"
 	builtin2 "github.com/filecoin-project/specs-actors/v2/actors/builtin"
+	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
+	adt2 "github.com/filecoin-project/specs-actors/v2/actors/util/adt"
 	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
+	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
+	adt3 "github.com/filecoin-project/specs-actors/v3/actors/util/adt"
 	builtin4 "github.com/filecoin-project/specs-actors/v4/actors/builtin"
+	miner4 "github.com/filecoin-project/specs-actors/v4/actors/builtin/miner"
+	adt4 "github.com/filecoin-project/specs-actors/v4/actors/util/adt"
 	builtin5 "github.com/filecoin-project/specs-actors/v5/actors/builtin"
+	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
+	adt5 "github.com/filecoin-project/specs-actors/v5/actors/util/adt"
 	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
+	miner6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/miner"
+	adt6 "github.com/filecoin-project/specs-actors/v6/actors/util/adt"
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
+	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
+	adt7 "github.com/filecoin-project/specs-actors/v7/actors/util/adt"
 	"github.com/ipfs/go-cid"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
@@ -238,7 +272,6 @@ func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
 		}
 
 		switch av {
-
 		case actorstypes.Version8:
 			return system.MakeState(store, actorstypes.Version8, cid.Undef)
 		case actorstypes.Version9:
@@ -273,4 +306,1621 @@ func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
 	}
 
 	return nil, fmt.Errorf("not system actor code: %v", c)
+}
+
+func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, resData *model.MinerRes) (err error) {
+	var (
+		sectorCount          = uint64(0)
+		faultSectorCount     = uint64(0)
+		activeSectorCount    = uint64(0)
+		liveSectorCount      = uint64(0)
+		recoverSectorCount   = uint64(0)
+		terminateSectorCount = uint64(0)
+		precommitSectorCount = uint64(0)
+	)
+
+	if name, av, ok := actors.GetActorMetaByCode(mact.Code); ok {
+		if name != manifest.MinerKey {
+			return fmt.Errorf("actor code is not miner: %s", name)
+		}
+
+		switch av {
+		case actorstypes.Version8:
+			state := miner8.State{}
+			err = stor.Get(ctx, mact.Head, &state)
+			if err != nil {
+				return err
+			}
+
+			dls, err := state.LoadDeadlines(stor)
+			if err != nil {
+				return err
+			}
+
+			err = dls.ForEach(stor, func(dlIdx uint64, dl *miner8.Deadline) error {
+				partitions, err := dl.PartitionsArray(stor)
+				if err != nil {
+					return err
+				}
+				var part miner8.Partition
+				return partitions.ForEach(&part, func(partIdx int64) error {
+					sc, err := part.Sectors.Count()
+					if err != nil {
+						return err
+					}
+					sectorCount += sc
+
+					fc, err := part.Faults.Count()
+					if err != nil {
+						return err
+					}
+					faultSectorCount += fc
+
+					active, err := part.ActiveSectors()
+					if err != nil {
+						return err
+					}
+					ac, err := active.Count()
+					if err != nil {
+						return err
+					}
+					activeSectorCount += ac
+
+					live, err := part.LiveSectors()
+					if err != nil {
+						return err
+					}
+					lc, err := live.Count()
+					if err != nil {
+						return err
+					}
+					liveSectorCount += lc
+
+					rc, err := part.Recoveries.Count()
+					if err != nil {
+						return err
+					}
+					recoverSectorCount += rc
+
+					tc, err := part.Terminated.Count()
+					if err != nil {
+						return err
+					}
+					terminateSectorCount += tc
+
+					return nil
+				})
+			})
+			if err != nil {
+				return err
+			}
+
+			precommitted, err := adt8.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+			if err != nil {
+				return err
+			}
+
+			var precommit miner8.SectorPreCommitOnChainInfo
+			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+				precommitSectorCount++
+				return nil
+			})
+
+			resData.State = state
+			resData.SectorCount = sectorCount
+			resData.FaultSectorCount = faultSectorCount
+			resData.ActiveSectorCount = activeSectorCount
+			resData.LiveSectorCount = liveSectorCount
+			resData.RecoverSectorCount = recoverSectorCount
+			resData.TerminateSectorCount = terminateSectorCount
+			resData.PrecommitSectorCount = precommitSectorCount
+
+			return nil
+		case actorstypes.Version9:
+			state := miner9.State{}
+			err = stor.Get(ctx, mact.Head, &state)
+			if err != nil {
+				return err
+			}
+
+			dls, err := state.LoadDeadlines(stor)
+			if err != nil {
+				return err
+			}
+
+			err = dls.ForEach(stor, func(dlIdx uint64, dl *miner9.Deadline) error {
+				partitions, err := dl.PartitionsArray(stor)
+				if err != nil {
+					return err
+				}
+				var part miner9.Partition
+				return partitions.ForEach(&part, func(partIdx int64) error {
+					sc, err := part.Sectors.Count()
+					if err != nil {
+						return err
+					}
+					sectorCount += sc
+
+					fc, err := part.Faults.Count()
+					if err != nil {
+						return err
+					}
+					faultSectorCount += fc
+
+					active, err := part.ActiveSectors()
+					if err != nil {
+						return err
+					}
+					ac, err := active.Count()
+					if err != nil {
+						return err
+					}
+					activeSectorCount += ac
+
+					live, err := part.LiveSectors()
+					if err != nil {
+						return err
+					}
+					lc, err := live.Count()
+					if err != nil {
+						return err
+					}
+					liveSectorCount += lc
+
+					rc, err := part.Recoveries.Count()
+					if err != nil {
+						return err
+					}
+					recoverSectorCount += rc
+
+					tc, err := part.Terminated.Count()
+					if err != nil {
+						return err
+					}
+					terminateSectorCount += tc
+
+					return nil
+				})
+			})
+			if err != nil {
+				return err
+			}
+
+			precommitted, err := adt9.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+			if err != nil {
+				return err
+			}
+
+			var precommit miner9.SectorPreCommitOnChainInfo
+			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+				precommitSectorCount++
+				return nil
+			})
+
+			resData.State = state
+			resData.SectorCount = sectorCount
+			resData.FaultSectorCount = faultSectorCount
+			resData.ActiveSectorCount = activeSectorCount
+			resData.LiveSectorCount = liveSectorCount
+			resData.RecoverSectorCount = recoverSectorCount
+			resData.TerminateSectorCount = terminateSectorCount
+			resData.PrecommitSectorCount = precommitSectorCount
+
+			return nil
+		case actorstypes.Version10:
+			state := miner10.State{}
+			err = stor.Get(ctx, mact.Head, &state)
+			if err != nil {
+				return err
+			}
+
+			dls, err := state.LoadDeadlines(stor)
+			if err != nil {
+				return err
+			}
+
+			err = dls.ForEach(stor, func(dlIdx uint64, dl *miner10.Deadline) error {
+				partitions, err := dl.PartitionsArray(stor)
+				if err != nil {
+					return err
+				}
+				var part miner10.Partition
+				return partitions.ForEach(&part, func(partIdx int64) error {
+					sc, err := part.Sectors.Count()
+					if err != nil {
+						return err
+					}
+					sectorCount += sc
+
+					fc, err := part.Faults.Count()
+					if err != nil {
+						return err
+					}
+					faultSectorCount += fc
+
+					active, err := part.ActiveSectors()
+					if err != nil {
+						return err
+					}
+					ac, err := active.Count()
+					if err != nil {
+						return err
+					}
+					activeSectorCount += ac
+
+					live, err := part.LiveSectors()
+					if err != nil {
+						return err
+					}
+					lc, err := live.Count()
+					if err != nil {
+						return err
+					}
+					liveSectorCount += lc
+
+					rc, err := part.Recoveries.Count()
+					if err != nil {
+						return err
+					}
+					recoverSectorCount += rc
+
+					tc, err := part.Terminated.Count()
+					if err != nil {
+						return err
+					}
+					terminateSectorCount += tc
+
+					return nil
+				})
+			})
+			if err != nil {
+				return err
+			}
+
+			precommitted, err := adt10.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+			if err != nil {
+				return err
+			}
+
+			var precommit miner10.SectorPreCommitOnChainInfo
+			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+				precommitSectorCount++
+				return nil
+			})
+
+			resData.State = state
+			resData.SectorCount = sectorCount
+			resData.FaultSectorCount = faultSectorCount
+			resData.ActiveSectorCount = activeSectorCount
+			resData.LiveSectorCount = liveSectorCount
+			resData.RecoverSectorCount = recoverSectorCount
+			resData.TerminateSectorCount = terminateSectorCount
+			resData.PrecommitSectorCount = precommitSectorCount
+
+			return nil
+		case actorstypes.Version11:
+			state := miner11.State{}
+			err = stor.Get(ctx, mact.Head, &state)
+			if err != nil {
+				return err
+			}
+
+			dls, err := state.LoadDeadlines(stor)
+			if err != nil {
+				return err
+			}
+
+			err = dls.ForEach(stor, func(dlIdx uint64, dl *miner11.Deadline) error {
+				partitions, err := dl.PartitionsArray(stor)
+				if err != nil {
+					return err
+				}
+				var part miner11.Partition
+				return partitions.ForEach(&part, func(partIdx int64) error {
+					sc, err := part.Sectors.Count()
+					if err != nil {
+						return err
+					}
+					sectorCount += sc
+
+					fc, err := part.Faults.Count()
+					if err != nil {
+						return err
+					}
+					faultSectorCount += fc
+
+					active, err := part.ActiveSectors()
+					if err != nil {
+						return err
+					}
+					ac, err := active.Count()
+					if err != nil {
+						return err
+					}
+					activeSectorCount += ac
+
+					live, err := part.LiveSectors()
+					if err != nil {
+						return err
+					}
+					lc, err := live.Count()
+					if err != nil {
+						return err
+					}
+					liveSectorCount += lc
+
+					rc, err := part.Recoveries.Count()
+					if err != nil {
+						return err
+					}
+					recoverSectorCount += rc
+
+					tc, err := part.Terminated.Count()
+					if err != nil {
+						return err
+					}
+					terminateSectorCount += tc
+
+					return nil
+				})
+			})
+			if err != nil {
+				return err
+			}
+
+			precommitted, err := adt11.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+			if err != nil {
+				return err
+			}
+
+			var precommit miner11.SectorPreCommitOnChainInfo
+			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+				precommitSectorCount++
+				return nil
+			})
+
+			resData.State = state
+			resData.SectorCount = sectorCount
+			resData.FaultSectorCount = faultSectorCount
+			resData.ActiveSectorCount = activeSectorCount
+			resData.LiveSectorCount = liveSectorCount
+			resData.RecoverSectorCount = recoverSectorCount
+			resData.TerminateSectorCount = terminateSectorCount
+			resData.PrecommitSectorCount = precommitSectorCount
+
+			return nil
+
+		}
+	}
+
+	switch mact.Code {
+
+	case builtin0.StorageMinerActorCodeID:
+		state := miner0.State{}
+		err = stor.Get(ctx, mact.Head, &state)
+		if err != nil {
+			return err
+		}
+
+		dls, err := state.LoadDeadlines(stor)
+		if err != nil {
+			return err
+		}
+
+		err = dls.ForEach(stor, func(dlIdx uint64, dl *miner0.Deadline) error {
+			partitions, err := dl.PartitionsArray(stor)
+			if err != nil {
+				return err
+			}
+			var part miner0.Partition
+			return partitions.ForEach(&part, func(partIdx int64) error {
+				sc, err := part.Sectors.Count()
+				if err != nil {
+					return err
+				}
+				sectorCount += sc
+
+				fc, err := part.Faults.Count()
+				if err != nil {
+					return err
+				}
+				faultSectorCount += fc
+
+				active, err := part.ActiveSectors()
+				if err != nil {
+					return err
+				}
+				ac, err := active.Count()
+				if err != nil {
+					return err
+				}
+				activeSectorCount += ac
+
+				live, err := part.LiveSectors()
+				if err != nil {
+					return err
+				}
+				lc, err := live.Count()
+				if err != nil {
+					return err
+				}
+				liveSectorCount += lc
+
+				rc, err := part.Recoveries.Count()
+				if err != nil {
+					return err
+				}
+				recoverSectorCount += rc
+
+				tc, err := part.Terminated.Count()
+				if err != nil {
+					return err
+				}
+				terminateSectorCount += tc
+
+				return nil
+			})
+		})
+		if err != nil {
+			return err
+		}
+
+		precommitted, err := adt0.AsMap(stor, state.PreCommittedSectors)
+
+		if err != nil {
+			return err
+		}
+
+		var precommit miner0.SectorPreCommitOnChainInfo
+		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			precommitSectorCount++
+			return nil
+		})
+
+		resData.State = state
+		resData.SectorCount = sectorCount
+		resData.FaultSectorCount = faultSectorCount
+		resData.ActiveSectorCount = activeSectorCount
+		resData.LiveSectorCount = liveSectorCount
+		resData.RecoverSectorCount = recoverSectorCount
+		resData.TerminateSectorCount = terminateSectorCount
+		resData.PrecommitSectorCount = precommitSectorCount
+
+		return nil
+
+	case builtin2.StorageMinerActorCodeID:
+		state := miner2.State{}
+		err = stor.Get(ctx, mact.Head, &state)
+		if err != nil {
+			return err
+		}
+
+		dls, err := state.LoadDeadlines(stor)
+		if err != nil {
+			return err
+		}
+
+		err = dls.ForEach(stor, func(dlIdx uint64, dl *miner2.Deadline) error {
+			partitions, err := dl.PartitionsArray(stor)
+			if err != nil {
+				return err
+			}
+			var part miner2.Partition
+			return partitions.ForEach(&part, func(partIdx int64) error {
+				sc, err := part.Sectors.Count()
+				if err != nil {
+					return err
+				}
+				sectorCount += sc
+
+				fc, err := part.Faults.Count()
+				if err != nil {
+					return err
+				}
+				faultSectorCount += fc
+
+				active, err := part.ActiveSectors()
+				if err != nil {
+					return err
+				}
+				ac, err := active.Count()
+				if err != nil {
+					return err
+				}
+				activeSectorCount += ac
+
+				live, err := part.LiveSectors()
+				if err != nil {
+					return err
+				}
+				lc, err := live.Count()
+				if err != nil {
+					return err
+				}
+				liveSectorCount += lc
+
+				rc, err := part.Recoveries.Count()
+				if err != nil {
+					return err
+				}
+				recoverSectorCount += rc
+
+				tc, err := part.Terminated.Count()
+				if err != nil {
+					return err
+				}
+				terminateSectorCount += tc
+
+				return nil
+			})
+		})
+		if err != nil {
+			return err
+		}
+
+		precommitted, err := adt2.AsMap(stor, state.PreCommittedSectors)
+
+		if err != nil {
+			return err
+		}
+
+		var precommit miner2.SectorPreCommitOnChainInfo
+		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			precommitSectorCount++
+			return nil
+		})
+
+		resData.State = state
+		resData.SectorCount = sectorCount
+		resData.FaultSectorCount = faultSectorCount
+		resData.ActiveSectorCount = activeSectorCount
+		resData.LiveSectorCount = liveSectorCount
+		resData.RecoverSectorCount = recoverSectorCount
+		resData.TerminateSectorCount = terminateSectorCount
+		resData.PrecommitSectorCount = precommitSectorCount
+
+		return nil
+
+	case builtin3.StorageMinerActorCodeID:
+		state := miner3.State{}
+		err = stor.Get(ctx, mact.Head, &state)
+		if err != nil {
+			return err
+		}
+
+		dls, err := state.LoadDeadlines(stor)
+		if err != nil {
+			return err
+		}
+
+		err = dls.ForEach(stor, func(dlIdx uint64, dl *miner3.Deadline) error {
+			partitions, err := dl.PartitionsArray(stor)
+			if err != nil {
+				return err
+			}
+			var part miner3.Partition
+			return partitions.ForEach(&part, func(partIdx int64) error {
+				sc, err := part.Sectors.Count()
+				if err != nil {
+					return err
+				}
+				sectorCount += sc
+
+				fc, err := part.Faults.Count()
+				if err != nil {
+					return err
+				}
+				faultSectorCount += fc
+
+				active, err := part.ActiveSectors()
+				if err != nil {
+					return err
+				}
+				ac, err := active.Count()
+				if err != nil {
+					return err
+				}
+				activeSectorCount += ac
+
+				live, err := part.LiveSectors()
+				if err != nil {
+					return err
+				}
+				lc, err := live.Count()
+				if err != nil {
+					return err
+				}
+				liveSectorCount += lc
+
+				rc, err := part.Recoveries.Count()
+				if err != nil {
+					return err
+				}
+				recoverSectorCount += rc
+
+				tc, err := part.Terminated.Count()
+				if err != nil {
+					return err
+				}
+				terminateSectorCount += tc
+
+				return nil
+			})
+		})
+		if err != nil {
+			return err
+		}
+
+		precommitted, err := adt3.AsMap(stor, state.PreCommittedSectors, builtin3.DefaultHamtBitwidth)
+
+		if err != nil {
+			return err
+		}
+
+		var precommit miner3.SectorPreCommitOnChainInfo
+		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			precommitSectorCount++
+			return nil
+		})
+
+		resData.State = state
+		resData.SectorCount = sectorCount
+		resData.FaultSectorCount = faultSectorCount
+		resData.ActiveSectorCount = activeSectorCount
+		resData.LiveSectorCount = liveSectorCount
+		resData.RecoverSectorCount = recoverSectorCount
+		resData.TerminateSectorCount = terminateSectorCount
+		resData.PrecommitSectorCount = precommitSectorCount
+
+		return nil
+
+	case builtin4.StorageMinerActorCodeID:
+		state := miner4.State{}
+		err = stor.Get(ctx, mact.Head, &state)
+		if err != nil {
+			return err
+		}
+
+		dls, err := state.LoadDeadlines(stor)
+		if err != nil {
+			return err
+		}
+
+		err = dls.ForEach(stor, func(dlIdx uint64, dl *miner4.Deadline) error {
+			partitions, err := dl.PartitionsArray(stor)
+			if err != nil {
+				return err
+			}
+			var part miner4.Partition
+			return partitions.ForEach(&part, func(partIdx int64) error {
+				sc, err := part.Sectors.Count()
+				if err != nil {
+					return err
+				}
+				sectorCount += sc
+
+				fc, err := part.Faults.Count()
+				if err != nil {
+					return err
+				}
+				faultSectorCount += fc
+
+				active, err := part.ActiveSectors()
+				if err != nil {
+					return err
+				}
+				ac, err := active.Count()
+				if err != nil {
+					return err
+				}
+				activeSectorCount += ac
+
+				live, err := part.LiveSectors()
+				if err != nil {
+					return err
+				}
+				lc, err := live.Count()
+				if err != nil {
+					return err
+				}
+				liveSectorCount += lc
+
+				rc, err := part.Recoveries.Count()
+				if err != nil {
+					return err
+				}
+				recoverSectorCount += rc
+
+				tc, err := part.Terminated.Count()
+				if err != nil {
+					return err
+				}
+				terminateSectorCount += tc
+
+				return nil
+			})
+		})
+		if err != nil {
+			return err
+		}
+
+		precommitted, err := adt4.AsMap(stor, state.PreCommittedSectors, builtin4.DefaultHamtBitwidth)
+
+		if err != nil {
+			return err
+		}
+
+		var precommit miner4.SectorPreCommitOnChainInfo
+		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			precommitSectorCount++
+			return nil
+		})
+
+		resData.State = state
+		resData.SectorCount = sectorCount
+		resData.FaultSectorCount = faultSectorCount
+		resData.ActiveSectorCount = activeSectorCount
+		resData.LiveSectorCount = liveSectorCount
+		resData.RecoverSectorCount = recoverSectorCount
+		resData.TerminateSectorCount = terminateSectorCount
+		resData.PrecommitSectorCount = precommitSectorCount
+
+		return nil
+
+	case builtin5.StorageMinerActorCodeID:
+		state := miner5.State{}
+		err = stor.Get(ctx, mact.Head, &state)
+		if err != nil {
+			return err
+		}
+
+		dls, err := state.LoadDeadlines(stor)
+		if err != nil {
+			return err
+		}
+
+		err = dls.ForEach(stor, func(dlIdx uint64, dl *miner5.Deadline) error {
+			partitions, err := dl.PartitionsArray(stor)
+			if err != nil {
+				return err
+			}
+			var part miner5.Partition
+			return partitions.ForEach(&part, func(partIdx int64) error {
+				sc, err := part.Sectors.Count()
+				if err != nil {
+					return err
+				}
+				sectorCount += sc
+
+				fc, err := part.Faults.Count()
+				if err != nil {
+					return err
+				}
+				faultSectorCount += fc
+
+				active, err := part.ActiveSectors()
+				if err != nil {
+					return err
+				}
+				ac, err := active.Count()
+				if err != nil {
+					return err
+				}
+				activeSectorCount += ac
+
+				live, err := part.LiveSectors()
+				if err != nil {
+					return err
+				}
+				lc, err := live.Count()
+				if err != nil {
+					return err
+				}
+				liveSectorCount += lc
+
+				rc, err := part.Recoveries.Count()
+				if err != nil {
+					return err
+				}
+				recoverSectorCount += rc
+
+				tc, err := part.Terminated.Count()
+				if err != nil {
+					return err
+				}
+				terminateSectorCount += tc
+
+				return nil
+			})
+		})
+		if err != nil {
+			return err
+		}
+
+		precommitted, err := adt5.AsMap(stor, state.PreCommittedSectors, builtin5.DefaultHamtBitwidth)
+
+		if err != nil {
+			return err
+		}
+
+		var precommit miner5.SectorPreCommitOnChainInfo
+		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			precommitSectorCount++
+			return nil
+		})
+
+		resData.State = state
+		resData.SectorCount = sectorCount
+		resData.FaultSectorCount = faultSectorCount
+		resData.ActiveSectorCount = activeSectorCount
+		resData.LiveSectorCount = liveSectorCount
+		resData.RecoverSectorCount = recoverSectorCount
+		resData.TerminateSectorCount = terminateSectorCount
+		resData.PrecommitSectorCount = precommitSectorCount
+
+		return nil
+
+	case builtin6.StorageMinerActorCodeID:
+		state := miner6.State{}
+		err = stor.Get(ctx, mact.Head, &state)
+		if err != nil {
+			return err
+		}
+
+		dls, err := state.LoadDeadlines(stor)
+		if err != nil {
+			return err
+		}
+
+		err = dls.ForEach(stor, func(dlIdx uint64, dl *miner6.Deadline) error {
+			partitions, err := dl.PartitionsArray(stor)
+			if err != nil {
+				return err
+			}
+			var part miner6.Partition
+			return partitions.ForEach(&part, func(partIdx int64) error {
+				sc, err := part.Sectors.Count()
+				if err != nil {
+					return err
+				}
+				sectorCount += sc
+
+				fc, err := part.Faults.Count()
+				if err != nil {
+					return err
+				}
+				faultSectorCount += fc
+
+				active, err := part.ActiveSectors()
+				if err != nil {
+					return err
+				}
+				ac, err := active.Count()
+				if err != nil {
+					return err
+				}
+				activeSectorCount += ac
+
+				live, err := part.LiveSectors()
+				if err != nil {
+					return err
+				}
+				lc, err := live.Count()
+				if err != nil {
+					return err
+				}
+				liveSectorCount += lc
+
+				rc, err := part.Recoveries.Count()
+				if err != nil {
+					return err
+				}
+				recoverSectorCount += rc
+
+				tc, err := part.Terminated.Count()
+				if err != nil {
+					return err
+				}
+				terminateSectorCount += tc
+
+				return nil
+			})
+		})
+		if err != nil {
+			return err
+		}
+
+		precommitted, err := adt6.AsMap(stor, state.PreCommittedSectors, builtin6.DefaultHamtBitwidth)
+
+		if err != nil {
+			return err
+		}
+
+		var precommit miner6.SectorPreCommitOnChainInfo
+		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			precommitSectorCount++
+			return nil
+		})
+
+		resData.State = state
+		resData.SectorCount = sectorCount
+		resData.FaultSectorCount = faultSectorCount
+		resData.ActiveSectorCount = activeSectorCount
+		resData.LiveSectorCount = liveSectorCount
+		resData.RecoverSectorCount = recoverSectorCount
+		resData.TerminateSectorCount = terminateSectorCount
+		resData.PrecommitSectorCount = precommitSectorCount
+
+		return nil
+
+	case builtin7.StorageMinerActorCodeID:
+		state := miner7.State{}
+		err = stor.Get(ctx, mact.Head, &state)
+		if err != nil {
+			return err
+		}
+
+		dls, err := state.LoadDeadlines(stor)
+		if err != nil {
+			return err
+		}
+
+		err = dls.ForEach(stor, func(dlIdx uint64, dl *miner7.Deadline) error {
+			partitions, err := dl.PartitionsArray(stor)
+			if err != nil {
+				return err
+			}
+			var part miner7.Partition
+			return partitions.ForEach(&part, func(partIdx int64) error {
+				sc, err := part.Sectors.Count()
+				if err != nil {
+					return err
+				}
+				sectorCount += sc
+
+				fc, err := part.Faults.Count()
+				if err != nil {
+					return err
+				}
+				faultSectorCount += fc
+
+				active, err := part.ActiveSectors()
+				if err != nil {
+					return err
+				}
+				ac, err := active.Count()
+				if err != nil {
+					return err
+				}
+				activeSectorCount += ac
+
+				live, err := part.LiveSectors()
+				if err != nil {
+					return err
+				}
+				lc, err := live.Count()
+				if err != nil {
+					return err
+				}
+				liveSectorCount += lc
+
+				rc, err := part.Recoveries.Count()
+				if err != nil {
+					return err
+				}
+				recoverSectorCount += rc
+
+				tc, err := part.Terminated.Count()
+				if err != nil {
+					return err
+				}
+				terminateSectorCount += tc
+
+				return nil
+			})
+		})
+		if err != nil {
+			return err
+		}
+
+		precommitted, err := adt7.AsMap(stor, state.PreCommittedSectors, builtin7.DefaultHamtBitwidth)
+
+		if err != nil {
+			return err
+		}
+
+		var precommit miner7.SectorPreCommitOnChainInfo
+		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			precommitSectorCount++
+			return nil
+		})
+
+		resData.State = state
+		resData.SectorCount = sectorCount
+		resData.FaultSectorCount = faultSectorCount
+		resData.ActiveSectorCount = activeSectorCount
+		resData.LiveSectorCount = liveSectorCount
+		resData.RecoverSectorCount = recoverSectorCount
+		resData.TerminateSectorCount = terminateSectorCount
+		resData.PrecommitSectorCount = precommitSectorCount
+
+		return nil
+
+	}
+
+	return fmt.Errorf("unknown actor code %s", mact.Code)
+}
+
+func getDepositToBurnByCode(ctx context.Context, mact *types.Actor, stor adt.Store, curEpoch abi.ChainEpoch) (abi.TokenAmount, error) {
+	version := 0
+	if name, av, ok := actors.GetActorMetaByCode(mact.Code); ok {
+		if name != manifest.MinerKey {
+			return abi.NewTokenAmount(0), fmt.Errorf("actor code is not miner: %s", name)
+		}
+
+		switch av {
+
+		case actorstypes.Version8:
+			state := &miner8.State{}
+			err := stor.Get(ctx, mact.Head, state)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+
+			if !state.PreCommittedSectorsCleanUp.Defined() {
+				return abi.NewTokenAmount(0), nil
+			}
+			depositToBurn, err := CleanUpExpiredPreCommits(state, stor, curEpoch)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+			return depositToBurn, nil
+
+		case actorstypes.Version9:
+			state := &miner9.State{}
+			err := stor.Get(ctx, mact.Head, state)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+
+			if !state.PreCommittedSectorsCleanUp.Defined() {
+				return abi.NewTokenAmount(0), nil
+			}
+			depositToBurn, err := CleanUpExpiredPreCommits(state, stor, curEpoch)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+			return depositToBurn, nil
+
+		case actorstypes.Version10:
+			state := &miner10.State{}
+			err := stor.Get(ctx, mact.Head, state)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+
+			if !state.PreCommittedSectorsCleanUp.Defined() {
+				return abi.NewTokenAmount(0), nil
+			}
+			depositToBurn, err := CleanUpExpiredPreCommits(state, stor, curEpoch)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+			return depositToBurn, nil
+
+		case actorstypes.Version11:
+			state := &miner11.State{}
+			err := stor.Get(ctx, mact.Head, state)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+
+			if !state.PreCommittedSectorsCleanUp.Defined() {
+				return abi.NewTokenAmount(0), nil
+			}
+			depositToBurn, err := CleanUpExpiredPreCommits(state, stor, curEpoch)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+			return depositToBurn, nil
+
+		}
+	}
+
+	switch mact.Code {
+
+	case builtin0.StorageMinerActorCodeID:
+		return abi.NewTokenAmount(0), fmt.Errorf("no PreCommittedSectorsCleanUp in state%v", version)
+
+	case builtin2.StorageMinerActorCodeID:
+		return abi.NewTokenAmount(0), fmt.Errorf("no PreCommittedSectorsCleanUp in state%v", version)
+
+	case builtin3.StorageMinerActorCodeID:
+		return abi.NewTokenAmount(0), fmt.Errorf("no PreCommittedSectorsCleanUp in state%v", version)
+
+	case builtin4.StorageMinerActorCodeID:
+		return abi.NewTokenAmount(0), fmt.Errorf("no PreCommittedSectorsCleanUp in state%v", version)
+
+	case builtin5.StorageMinerActorCodeID:
+		state := miner5.State{}
+		err := stor.Get(ctx, mact.Head, &state)
+		if err != nil {
+			return abi.NewTokenAmount(0), err
+		}
+
+		if !state.PreCommittedSectorsCleanUp.Defined() {
+			return abi.NewTokenAmount(0), nil
+		}
+		depositToBurn, err := state.CleanUpExpiredPreCommits(stor, curEpoch)
+		if err != nil {
+			return abi.NewTokenAmount(0), err
+		}
+		return depositToBurn, nil
+
+	case builtin6.StorageMinerActorCodeID:
+		state := miner6.State{}
+		err := stor.Get(ctx, mact.Head, &state)
+		if err != nil {
+			return abi.NewTokenAmount(0), err
+		}
+
+		if !state.PreCommittedSectorsCleanUp.Defined() {
+			return abi.NewTokenAmount(0), nil
+		}
+		depositToBurn, err := state.CleanUpExpiredPreCommits(stor, curEpoch)
+		if err != nil {
+			return abi.NewTokenAmount(0), err
+		}
+		return depositToBurn, nil
+
+	case builtin7.StorageMinerActorCodeID:
+		state := miner7.State{}
+		err := stor.Get(ctx, mact.Head, &state)
+		if err != nil {
+			return abi.NewTokenAmount(0), err
+		}
+
+		if !state.PreCommittedSectorsCleanUp.Defined() {
+			return abi.NewTokenAmount(0), nil
+		}
+		depositToBurn, err := state.CleanUpExpiredPreCommits(stor, curEpoch)
+		if err != nil {
+			return abi.NewTokenAmount(0), err
+		}
+		return depositToBurn, nil
+
+	}
+
+	return abi.NewTokenAmount(0), fmt.Errorf("unknown actor code %s", mact.Code)
+}
+
+func CleanUpExpiredPreCommits(state interface{}, store adt.Store, currEpoch abi.ChainEpoch) (depositToBurn abi.TokenAmount, err error) {
+	switch state.(type) {
+	case *miner8.State:
+		st := state.(*miner8.State)
+		depositToBurn = abi.NewTokenAmount(0)
+
+		// cleanup expired pre-committed sectors
+		cleanUpQ, err := util8.LoadBitfieldQueue(store, st.PreCommittedSectorsCleanUp, st.QuantSpecEveryDeadline(), miner8.PrecommitCleanUpAmtBitwidth)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to load sector expiry queue: %w", err)
+		}
+
+		sectors, modified, err := PopUntil(cleanUpQ, currEpoch)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to pop expired sectors: %w", err)
+		}
+
+		if modified {
+			st.PreCommittedSectorsCleanUp, err = cleanUpQ.Root()
+			if err != nil {
+				return depositToBurn, xerrors.Errorf("failed to save pre commit clean up queue: %w", err)
+			}
+		}
+
+		var precommitsToDelete []abi.SectorNumber
+		if err = sectors.ForEach(func(i uint64) error {
+			sectorNo := abi.SectorNumber(i)
+			sector, found, err := st.GetPrecommittedSector(store, sectorNo)
+			if err != nil {
+				return err
+			}
+			if !found {
+				// already committed/deleted
+				return nil
+			}
+
+			// mark it for deletion
+			precommitsToDelete = append(precommitsToDelete, sectorNo)
+
+			// increment deposit to burn
+			depositToBurn = big.Add(depositToBurn, sector.PreCommitDeposit)
+			return nil
+		}); err != nil {
+			return big.Zero(), xerrors.Errorf("failed to check pre-commit expiries: %w", err)
+		}
+
+		// Actually delete it.
+		if len(precommitsToDelete) > 0 {
+			if err := DeletePrecommittedSectors(st, store, precommitsToDelete...); err != nil {
+				return big.Zero(), fmt.Errorf("failed to delete pre-commits: %w", err)
+			}
+		}
+
+		st.PreCommitDeposits = big.Sub(st.PreCommitDeposits, depositToBurn)
+		if st.PreCommitDeposits.LessThan(big.Zero()) {
+			return big.Zero(), xerrors.Errorf("pre-commit clean up caused negative deposits: %v", st.PreCommitDeposits)
+		}
+
+		// This deposit was locked separately to pledge collateral so there's no pledge change here.
+		return depositToBurn, nil
+
+	case *miner9.State:
+		st := state.(*miner9.State)
+		depositToBurn = abi.NewTokenAmount(0)
+
+		// cleanup expired pre-committed sectors
+		cleanUpQ, err := util9.LoadBitfieldQueue(store, st.PreCommittedSectorsCleanUp, st.QuantSpecEveryDeadline(), miner9.PrecommitCleanUpAmtBitwidth)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to load sector expiry queue: %w", err)
+		}
+
+		sectors, modified, err := PopUntil(cleanUpQ, currEpoch)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to pop expired sectors: %w", err)
+		}
+
+		if modified {
+			st.PreCommittedSectorsCleanUp, err = cleanUpQ.Root()
+			if err != nil {
+				return depositToBurn, xerrors.Errorf("failed to save pre commit clean up queue: %w", err)
+			}
+		}
+
+		var precommitsToDelete []abi.SectorNumber
+		if err = sectors.ForEach(func(i uint64) error {
+			sectorNo := abi.SectorNumber(i)
+			sector, found, err := st.GetPrecommittedSector(store, sectorNo)
+			if err != nil {
+				return err
+			}
+			if !found {
+				// already committed/deleted
+				return nil
+			}
+
+			// mark it for deletion
+			precommitsToDelete = append(precommitsToDelete, sectorNo)
+
+			// increment deposit to burn
+			depositToBurn = big.Add(depositToBurn, sector.PreCommitDeposit)
+			return nil
+		}); err != nil {
+			return big.Zero(), xerrors.Errorf("failed to check pre-commit expiries: %w", err)
+		}
+
+		// Actually delete it.
+		if len(precommitsToDelete) > 0 {
+			if err := DeletePrecommittedSectors(st, store, precommitsToDelete...); err != nil {
+				return big.Zero(), fmt.Errorf("failed to delete pre-commits: %w", err)
+			}
+		}
+
+		st.PreCommitDeposits = big.Sub(st.PreCommitDeposits, depositToBurn)
+		if st.PreCommitDeposits.LessThan(big.Zero()) {
+			return big.Zero(), xerrors.Errorf("pre-commit clean up caused negative deposits: %v", st.PreCommitDeposits)
+		}
+
+		// This deposit was locked separately to pledge collateral so there's no pledge change here.
+		return depositToBurn, nil
+
+	case *miner10.State:
+		st := state.(*miner10.State)
+		depositToBurn = abi.NewTokenAmount(0)
+
+		// cleanup expired pre-committed sectors
+		cleanUpQ, err := util10.LoadBitfieldQueue(store, st.PreCommittedSectorsCleanUp, st.QuantSpecEveryDeadline(), miner10.PrecommitCleanUpAmtBitwidth)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to load sector expiry queue: %w", err)
+		}
+
+		sectors, modified, err := PopUntil(cleanUpQ, currEpoch)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to pop expired sectors: %w", err)
+		}
+
+		if modified {
+			st.PreCommittedSectorsCleanUp, err = cleanUpQ.Root()
+			if err != nil {
+				return depositToBurn, xerrors.Errorf("failed to save pre commit clean up queue: %w", err)
+			}
+		}
+
+		var precommitsToDelete []abi.SectorNumber
+		if err = sectors.ForEach(func(i uint64) error {
+			sectorNo := abi.SectorNumber(i)
+			sector, found, err := st.GetPrecommittedSector(store, sectorNo)
+			if err != nil {
+				return err
+			}
+			if !found {
+				// already committed/deleted
+				return nil
+			}
+
+			// mark it for deletion
+			precommitsToDelete = append(precommitsToDelete, sectorNo)
+
+			// increment deposit to burn
+			depositToBurn = big.Add(depositToBurn, sector.PreCommitDeposit)
+			return nil
+		}); err != nil {
+			return big.Zero(), xerrors.Errorf("failed to check pre-commit expiries: %w", err)
+		}
+
+		// Actually delete it.
+		if len(precommitsToDelete) > 0 {
+			if err := DeletePrecommittedSectors(st, store, precommitsToDelete...); err != nil {
+				return big.Zero(), fmt.Errorf("failed to delete pre-commits: %w", err)
+			}
+		}
+
+		st.PreCommitDeposits = big.Sub(st.PreCommitDeposits, depositToBurn)
+		if st.PreCommitDeposits.LessThan(big.Zero()) {
+			return big.Zero(), xerrors.Errorf("pre-commit clean up caused negative deposits: %v", st.PreCommitDeposits)
+		}
+
+		// This deposit was locked separately to pledge collateral so there's no pledge change here.
+		return depositToBurn, nil
+
+	case *miner11.State:
+		st := state.(*miner11.State)
+		depositToBurn = abi.NewTokenAmount(0)
+
+		// cleanup expired pre-committed sectors
+		cleanUpQ, err := util11.LoadBitfieldQueue(store, st.PreCommittedSectorsCleanUp, st.QuantSpecEveryDeadline(), miner11.PrecommitCleanUpAmtBitwidth)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to load sector expiry queue: %w", err)
+		}
+
+		sectors, modified, err := PopUntil(cleanUpQ, currEpoch)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to pop expired sectors: %w", err)
+		}
+
+		if modified {
+			st.PreCommittedSectorsCleanUp, err = cleanUpQ.Root()
+			if err != nil {
+				return depositToBurn, xerrors.Errorf("failed to save pre commit clean up queue: %w", err)
+			}
+		}
+
+		var precommitsToDelete []abi.SectorNumber
+		if err = sectors.ForEach(func(i uint64) error {
+			sectorNo := abi.SectorNumber(i)
+			sector, found, err := st.GetPrecommittedSector(store, sectorNo)
+			if err != nil {
+				return err
+			}
+			if !found {
+				// already committed/deleted
+				return nil
+			}
+
+			// mark it for deletion
+			precommitsToDelete = append(precommitsToDelete, sectorNo)
+
+			// increment deposit to burn
+			depositToBurn = big.Add(depositToBurn, sector.PreCommitDeposit)
+			return nil
+		}); err != nil {
+			return big.Zero(), xerrors.Errorf("failed to check pre-commit expiries: %w", err)
+		}
+
+		// Actually delete it.
+		if len(precommitsToDelete) > 0 {
+			if err := DeletePrecommittedSectors(st, store, precommitsToDelete...); err != nil {
+				return big.Zero(), fmt.Errorf("failed to delete pre-commits: %w", err)
+			}
+		}
+
+		st.PreCommitDeposits = big.Sub(st.PreCommitDeposits, depositToBurn)
+		if st.PreCommitDeposits.LessThan(big.Zero()) {
+			return big.Zero(), xerrors.Errorf("pre-commit clean up caused negative deposits: %v", st.PreCommitDeposits)
+		}
+
+		// This deposit was locked separately to pledge collateral so there's no pledge change here.
+		return depositToBurn, nil
+
+	default:
+		return big.Zero(), fmt.Errorf("CleanUpExpiredPreCommits gets invalid type: %v", state)
+	}
+}
+
+func PopUntil(queue interface{}, until abi.ChainEpoch) (values bitfield.BitField, modified bool, err error) {
+	var poppedValues []bitfield.BitField
+	var poppedKeys []uint64
+
+	stopErr := fmt.Errorf("stop")
+	switch queue.(type) {
+	case util8.BitfieldQueue:
+		q := queue.(util8.BitfieldQueue)
+		if err = q.ForEach(func(epoch abi.ChainEpoch, bf bitfield.BitField) error {
+			if epoch > until {
+				return stopErr
+			}
+			poppedKeys = append(poppedKeys, uint64(epoch))
+			poppedValues = append(poppedValues, bf)
+			return err
+		}); err != nil && err != stopErr {
+			return bitfield.BitField{}, false, err
+		}
+
+		// Nothing expired.
+		if len(poppedKeys) == 0 {
+			return bitfield.New(), false, nil
+		}
+
+		if err = q.BatchDelete(poppedKeys, true); err != nil {
+			return bitfield.BitField{}, false, err
+		}
+		merged, err := bitfield.MultiMerge(poppedValues...)
+		if err != nil {
+			return bitfield.BitField{}, false, err
+		}
+
+		return merged, true, nil
+	case util9.BitfieldQueue:
+		q := queue.(util9.BitfieldQueue)
+		if err = q.ForEach(func(epoch abi.ChainEpoch, bf bitfield.BitField) error {
+			if epoch > until {
+				return stopErr
+			}
+			poppedKeys = append(poppedKeys, uint64(epoch))
+			poppedValues = append(poppedValues, bf)
+			return err
+		}); err != nil && err != stopErr {
+			return bitfield.BitField{}, false, err
+		}
+
+		// Nothing expired.
+		if len(poppedKeys) == 0 {
+			return bitfield.New(), false, nil
+		}
+
+		if err = q.BatchDelete(poppedKeys, true); err != nil {
+			return bitfield.BitField{}, false, err
+		}
+		merged, err := bitfield.MultiMerge(poppedValues...)
+		if err != nil {
+			return bitfield.BitField{}, false, err
+		}
+
+		return merged, true, nil
+	case util10.BitfieldQueue:
+		q := queue.(util10.BitfieldQueue)
+		if err = q.ForEach(func(epoch abi.ChainEpoch, bf bitfield.BitField) error {
+			if epoch > until {
+				return stopErr
+			}
+			poppedKeys = append(poppedKeys, uint64(epoch))
+			poppedValues = append(poppedValues, bf)
+			return err
+		}); err != nil && err != stopErr {
+			return bitfield.BitField{}, false, err
+		}
+
+		// Nothing expired.
+		if len(poppedKeys) == 0 {
+			return bitfield.New(), false, nil
+		}
+
+		if err = q.BatchDelete(poppedKeys, true); err != nil {
+			return bitfield.BitField{}, false, err
+		}
+		merged, err := bitfield.MultiMerge(poppedValues...)
+		if err != nil {
+			return bitfield.BitField{}, false, err
+		}
+
+		return merged, true, nil
+	case util11.BitfieldQueue:
+		q := queue.(util11.BitfieldQueue)
+		if err = q.ForEach(func(epoch abi.ChainEpoch, bf bitfield.BitField) error {
+			if epoch > until {
+				return stopErr
+			}
+			poppedKeys = append(poppedKeys, uint64(epoch))
+			poppedValues = append(poppedValues, bf)
+			return err
+		}); err != nil && err != stopErr {
+			return bitfield.BitField{}, false, err
+		}
+
+		// Nothing expired.
+		if len(poppedKeys) == 0 {
+			return bitfield.New(), false, nil
+		}
+
+		if err = q.BatchDelete(poppedKeys, true); err != nil {
+			return bitfield.BitField{}, false, err
+		}
+		merged, err := bitfield.MultiMerge(poppedValues...)
+		if err != nil {
+			return bitfield.BitField{}, false, err
+		}
+
+		return merged, true, nil
+
+	default:
+		return bitfield.BitField{}, false, fmt.Errorf("PopUntil gets invalid type: %v", queue)
+	}
+}
+
+func DeletePrecommittedSectors(state interface{}, store adt.Store, sectorNos ...abi.SectorNumber) error {
+	switch state.(type) {
+	case *miner8.State:
+		st := state.(*miner8.State)
+		precommitted, err := adt8.AsMap(store, st.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+		if err != nil {
+			return err
+		}
+
+		for _, sectorNo := range sectorNos {
+			err = precommitted.Delete(miner8.SectorKey(sectorNo))
+			if err != nil {
+				return xerrors.Errorf("failed to delete precommitment for %v: %w", sectorNo, err)
+			}
+		}
+		st.PreCommittedSectors, err = precommitted.Root()
+		return err
+	case *miner9.State:
+		st := state.(*miner9.State)
+		precommitted, err := adt9.AsMap(store, st.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+		if err != nil {
+			return err
+		}
+
+		for _, sectorNo := range sectorNos {
+			err = precommitted.Delete(miner9.SectorKey(sectorNo))
+			if err != nil {
+				return xerrors.Errorf("failed to delete precommitment for %v: %w", sectorNo, err)
+			}
+		}
+		st.PreCommittedSectors, err = precommitted.Root()
+		return err
+	case *miner10.State:
+		st := state.(*miner10.State)
+		precommitted, err := adt10.AsMap(store, st.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+		if err != nil {
+			return err
+		}
+
+		for _, sectorNo := range sectorNos {
+			err = precommitted.Delete(miner10.SectorKey(sectorNo))
+			if err != nil {
+				return xerrors.Errorf("failed to delete precommitment for %v: %w", sectorNo, err)
+			}
+		}
+		st.PreCommittedSectors, err = precommitted.Root()
+		return err
+	case *miner11.State:
+		st := state.(*miner11.State)
+		precommitted, err := adt11.AsMap(store, st.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+		if err != nil {
+			return err
+		}
+
+		for _, sectorNo := range sectorNos {
+			err = precommitted.Delete(miner11.SectorKey(sectorNo))
+			if err != nil {
+				return xerrors.Errorf("failed to delete precommitment for %v: %w", sectorNo, err)
+			}
+		}
+		st.PreCommittedSectors, err = precommitted.Root()
+		return err
+
+	default:
+		return fmt.Errorf("DeletePrecommittedSectors gets invalid type: %v", state)
+	}
 }
