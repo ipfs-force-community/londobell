@@ -79,6 +79,16 @@
 }
 ```
 
+### BlockMessage
+
+```
+{
+	"Epoch": "abi.ChainEpoch",
+	"Messages": "[]cid.Cid",
+	"_id": "cid.Cid"
+}
+```
+
 ### ClaimedPower
 
 ```
@@ -309,16 +319,6 @@
 		"Params": "model.MessageParams"
 	},
 	"SignedCid": "cid.Cid",
-	"_id": "cid.Cid"
-}
-```
-
-### MessageBlock
-
-```
-{
-	"Blocks": "[]cid.Cid",
-	"Epoch": "abi.ChainEpoch",
 	"_id": "cid.Cid"
 }
 ```
