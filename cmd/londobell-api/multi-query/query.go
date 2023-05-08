@@ -12,8 +12,9 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"go.mongodb.org/mongo-driver/bson"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 )
 
 func GetFinalHeightForFormalDB(ctx context.Context, dbsm *DataBaseStateManager) ([]model.FinalHeightRes, error) {
@@ -248,11 +249,41 @@ func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []Cou
 		lock   sync.RWMutex
 	)
 
-	// todo: 所有库都查询一次，最终查询时间为最慢库的查询时间，费时
-	// 先查询formal，再并发查询冷库？
-	for i := range countLists {
+	// 优先查询tmp和formal，未查到再并发查询冷库
+	priorityLists := make([]CountUtil, 0)
+	delayedLists := make([]CountUtil, 0)
+	for _, countList := range countLists {
+		if countList.Tmp || countList.Formal {
+			priorityLists = append(priorityLists, countList)
+		} else {
+			delayedLists = append(delayedLists, countList)
+		}
+	}
+
+	for _, countList := range priorityLists {
+		for _, col := range countList.Cols.Cols {
+			if col != nil && col.Name() == tableName {
+				cur, err := col.Aggregate(ctx, pipe)
+				if err != nil {
+					return nil, err
+				}
+
+				err = cur.All(ctx, &result)
+				if err != nil {
+					return nil, err
+				}
+
+				if len(result) > 0 {
+					return result, nil
+				}
+			}
+		}
+	}
+
+	for i := range delayedLists {
 		i := i
-		countList := countLists[i]
+		countList := delayedLists[i]
+
 		ewg.Go(func() error {
 			var res []bson.M
 

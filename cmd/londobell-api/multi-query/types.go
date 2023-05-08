@@ -11,6 +11,9 @@ type CountUtil struct {
 	Count int64
 
 	Cols Collections
+
+	Tmp    bool
+	Formal bool
 }
 
 type aggUtil struct {

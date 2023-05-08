@@ -1341,8 +1341,25 @@ func GetColsOnly(dbsm *DataBaseStateManager) ([]CountUtil, error) {
 	formal := dbsm.GetFormalCfg()
 	tmp := dbsm.GetTmpCfg()
 
-	dbs := make([]DB, len(colds)+2)
-	dbs = append(dbs, formal, tmp)
+	if !tmp.IsInvalidDB() {
+		cols, ok := dbsm.GetDBCollections(tmp.Url())
+		if !ok {
+			return nil, fmt.Errorf("url %v not found in DBCollectionsMap", tmp.Url())
+		}
+
+		countUtils = append(countUtils, CountUtil{Cols: cols, Tmp: true})
+	}
+
+	if !formal.IsInvalidDB() {
+		cols, ok := dbsm.GetDBCollections(formal.Url())
+		if !ok {
+			return nil, fmt.Errorf("url %v not found in DBCollectionsMap", formal.Url())
+		}
+
+		countUtils = append(countUtils, CountUtil{Cols: cols, Formal: true})
+	}
+
+	dbs := make([]DB, len(colds))
 	dbs = append(dbs, colds...)
 
 	// cold db状态已加载
