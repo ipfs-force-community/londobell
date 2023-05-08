@@ -47,7 +47,7 @@ func TestBalance(t *testing.T) {
 
 	for _, addr := range addrs {
 		addr = addr[1:]
-		pipe, err := util.Parse(model.Ctx{Addr: addr}, string(js))
+		pipe, err := util.Parse(model.Ctx{Addr: addr}, js)
 		require.NoError(t, err, "failed")
 
 		var res []bson.M
@@ -67,27 +67,4 @@ func TestBalance(t *testing.T) {
 
 	fmt.Printf("notfound: %v\n", len(notfound))
 
-}
-
-func ReadLine2(filename string, addrs *[]string) error {
-	f, _ := os.Open(filename)
-	defer f.Close()
-	r := bufio.NewReader(f)
-	for {
-		err := readLine(r, addrs)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func readLine(r *bufio.Reader, addrs *[]string) error {
-	line, _, err := r.ReadLine()
-	for err == nil {
-		_, _, err = r.ReadLine()
-		*addrs = append(*addrs, string(line))
-	}
-	return err
 }
