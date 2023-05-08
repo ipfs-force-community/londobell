@@ -3,7 +3,9 @@ package adapter
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 
 	"github.com/filecoin-project/lotus/chain/actors/builtin/datacap"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/evm"
@@ -25,6 +27,8 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
+
+	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -252,4 +256,81 @@ func GetActorInfo(c *gin.Context) {
 
 	res.Data = resData
 	c.JSON(http.StatusOK, res)
+
+	alog.Infof("begin test...")
+	// test
+	nts, err := api.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(2830320), types.EmptyTSK)
+	if err != nil {
+		return
+	}
+	iact, err := api.StateGetActor(ctx, _init.Address, nts.Key())
+	if err != nil {
+		return
+	}
+
+	ist, err := _init.Load(stor, iact)
+	if err != nil {
+		return
+	}
+
+	robustMap := make(map[address.Address]address.Address)
+	err = ist.ForEachActor(func(id abi.ActorID, addr address.Address) error {
+		idAddr, err := address.NewIDAddress(uint64(id))
+		if err != nil {
+			return fmt.Errorf("failed to write to addr map: %w", err)
+		}
+
+		robustMap[idAddr] = addr
+
+		return nil
+	})
+
+	if err != nil {
+		return
+	}
+
+	actors, err := api.StateListActors(ctx, nts.Key())
+	if err != nil {
+		return
+	}
+
+	alog.Infof("being write...")
+	file, err := os.OpenFile("/Users/zhoulin/londobell/cmd/londobell-api/aggregators/ist.txt", os.O_WRONLY|os.O_APPEND, os.ModeAppend)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	tfile, err := os.OpenFile("/Users/zhoulin/londobell/cmd/londobell-api/aggregators/tree.txt", os.O_WRONLY|os.O_APPEND, os.ModeAppend)
+	if err != nil {
+		return
+	}
+	defer tfile.Close()
+
+	for addr := range robustMap {
+		_, err = io.WriteString(file, addr.String())
+		if err != nil {
+			return
+		}
+
+		_, err = io.WriteString(file, "\n")
+		if err != nil {
+			return
+		}
+	}
+
+	for _, addr := range actors {
+		_, err = io.WriteString(tfile, addr.String())
+		if err != nil {
+			return
+		}
+
+		_, err = io.WriteString(tfile, "\n")
+		if err != nil {
+			return
+		}
+	}
+
+	alog.Info(len(robustMap), len(actors))
+
 }
