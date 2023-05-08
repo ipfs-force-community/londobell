@@ -1,4 +1,4 @@
-// equality --> sort --> range
+// equality --> sort(-1 or 1) --> range
 db.ActorBalance.createIndex({"Addresses":1}, {"sparse": true});
 db.ActorBalance.createIndex({"Epoch": 1, "Addr": 1}, {"sparse": true});
 db.ActorBalance.createIndex({"Epoch": 1, "Addr": 1, "Balance": 1}, {"sparse": true}); // 待定
@@ -7,10 +7,10 @@ db.ActorBalance.createIndex({"Epoch": 1, "Balance": -1, "Code": 1}, {"sparse": t
 
 db.ActorState.createIndex({"Epoch":1, "Code":1, "Addr":1}, {"sparse": true});
 
-db.ExecTrace.createIndex({"Epoch": 1, "Depth": 1, "Msg.From": 1},{"sparse": true}); // Msg.To
+db.ExecTrace.createIndex({"Depth": 1, "Msg.From": 1, "Epoch": 1},{"sparse": true}); // Msg.To
 db.ExecTrace.createIndex({"Msg.To":1, "Msg.Method":1, "Detail.Return.RobustAddress":1}, {"sparse": true});
 db.ExecTrace.createIndex({"Depth":1, "Msg.To":1, "Epoch":1, "Msg.Method": 1},{"sparse": true});
-db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":1},{"sparse": true});
+db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":-1},{"sparse": true});
 db.ExecTrace.createIndex({"Depth":1, "Cid":1, "SignedCid": 1, "Msg.From": 1},{"sparse": true});
 // db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":1, "Msg.From":1, "Msg.To":1}, {"sparse": true});
 

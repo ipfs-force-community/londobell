@@ -4,3 +4,8 @@
 4. 检查全局变量multiquery.DBStateManager有无冲突
 5. multi state备份
 6. 检查所有脚本响应速度，是否使用索引
+
+
+
+// todo:
+大额转账目前1m,随着数据增多，可能会越来越慢
