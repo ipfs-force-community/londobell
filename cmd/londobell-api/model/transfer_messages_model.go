@@ -8,7 +8,7 @@ type TransferMessage struct {
 	From   string
 	To     string
 	Value  string
-	Method int
+	Method string
 }
 
 type TransferMessagesRes struct {
