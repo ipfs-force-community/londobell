@@ -11,6 +11,7 @@ db.ExecTrace.createIndex({"Epoch": 1, "Depth": 1, "Msg.From": 1},{"sparse": true
 db.ExecTrace.createIndex({"Msg.To":1, "Msg.Method":1, "Detail.Return.RobustAddress":1}, {"sparse": true});
 db.ExecTrace.createIndex({"Depth":1, "Msg.To":1, "Epoch":1, "Msg.Method": 1},{"sparse": true});
 db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":1},{"sparse": true});
+db.ExecTrace.createIndex({"Depth":1, "Cid":1, "SignedCid": 1, "Msg.From": 1},{"sparse": true});
 // db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":1, "Msg.From":1, "Msg.To":1}, {"sparse": true});
 
 db.MinerFunds.createIndex({"Epoch":1, "Info.Owner": 1, "Addr": 1}, {"sparse": true});
