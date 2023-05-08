@@ -43,7 +43,7 @@ func GetTransferMessageForLargeAmount(c *gin.Context) {
 		totalCount += countUtil.Count
 	}
 
-	var transferMessageForLargeAmount []model.TransferMessageForLargeAmount
+	var transferMessageForLargeAmount []model.TransferMessage
 
 	// multi dbs query
 	{
