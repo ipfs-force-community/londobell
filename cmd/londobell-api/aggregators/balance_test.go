@@ -58,8 +58,8 @@ func TestBalance(t *testing.T) {
 		require.NoError(t, err, "failed")
 
 		if len(res) == 0 {
-			io.WriteString(file, addr)
-			io.WriteString(file, "\n")
+			_, err = io.WriteString(file, addr)
+			_, err = io.WriteString(file, "\n")
 
 			notfound = append(notfound, addr)
 		}
