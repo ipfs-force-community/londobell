@@ -204,7 +204,8 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "datacap"
 		st, err := datacap.Load(stor, act)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
@@ -214,14 +215,16 @@ func GetActorInfo(c *gin.Context) {
 		if addr.Protocol() == address.ID {
 			actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 		}
 
 		st, err := evm.Load(stor, act)
 		if err != nil {
-			util.ReturnOnErr(c, alog, err)
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
 		state = st.GetState()
@@ -233,7 +236,8 @@ func GetActorInfo(c *gin.Context) {
 		if addr.Protocol() == address.ID {
 			actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 		}
@@ -243,12 +247,15 @@ func GetActorInfo(c *gin.Context) {
 		if addr.Protocol() == address.ID {
 			actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
 			if err != nil {
-				util.ReturnOnErr(c, alog, err)
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
 				return
 			}
 		}
 	default:
-		util.ReturnOnErr(c, alog, fmt.Errorf("unknow actor type: %v", addr))
+		err = fmt.Errorf("unknow actor type: %v", addr)
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
 		return
 	}
 
