@@ -1,8 +1,6 @@
 db.ActorBalance.createIndex({"Addresses":1}, {"sparse": true});
 db.ActorBalance.createIndex({"Code":1}, {"sparse": true});
 db.ActorBalance.createIndex({"Addresses":1,"Code":1}, {"sparse": true});
-db.ActorBalance.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
-db.ActorBalance.createIndex({"Epoch":1,"Code":1}, {"sparse": true});
 
 db.ActorState.createIndex({"Epoch":1,"Code":1,"Addr":1}, {"sparse": true});
 
