@@ -20,7 +20,7 @@ require (
 	github.com/gin-gonic/gin v1.8.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230508064126-50f616091070
+	github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230508095954-b36875e67f4c
 	github.com/ipfs/go-block-format v0.1.1
 	github.com/ipfs/go-blockservice v0.4.0
 	github.com/ipfs/go-cid v0.3.2

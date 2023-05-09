@@ -5,16 +5,19 @@ db.ActorBalance.createIndex({"Epoch": 1, "Addr": 1, "Balance": 1}, {"sparse": tr
 db.ActorBalance.createIndex({"Epoch": 1, "Balance": 1}, {"sparse": true}); // 待定
 db.ActorBalance.createIndex({"Epoch": 1, "Balance": -1, "Code": 1}, {"sparse": true}); // 待定
 
+db.ActorState.createIndex({"Epoch": 1, "Addr": 1}, {"sparse": true});
 db.ActorState.createIndex({"Epoch":1, "Code":1, "Addr":1}, {"sparse": true});
 
 db.ExecTrace.createIndex({"Depth": 1, "Msg.From": 1, "Epoch": 1},{"sparse": true}); // Msg.To
 db.ExecTrace.createIndex({"Msg.To":1, "Msg.Method":1, "Detail.Return.RobustAddress":1}, {"sparse": true});
-db.ExecTrace.createIndex({"Depth":1, "Msg.To":1, "Epoch":1, "Msg.Method": 1},{"sparse": true});
+db.ExecTrace.createIndex({"Depth":1, "Msg.To":1, "Epoch":1, "Msg.Method": 1},{"sparse": true}); // 待优化
 db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":-1},{"sparse": true});
 db.ExecTrace.createIndex({"Depth":1, "Cid":1, "SignedCid": 1, "Msg.From": 1},{"sparse": true});
-// db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":1, "Msg.From":1, "Msg.To":1}, {"sparse": true});
+// db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch": -1, "Msg.From":1, "Msg.To": 1},{"sparse": true}); // 和使用 MsgRct.ExitCode":1, "Epoch":-1 无差
+db.ExecTrace.createIndex({"Depth":1, "Epoch":-1, "Msg.From": 1, "Msg.To": 1},{"sparse": true});
+db.ExecTrace.createIndex({"Depth":1, "MsgRct.ExitCode":1, "Epoch": 1, "Msg.Method": 1},{"sparse": true}); // 待定 agg_pre_netfee
 
-db.MinerFunds.createIndex({"Epoch":1, "Info.Owner": 1, "Addr": 1}, {"sparse": true});
+db.MinerFunds.createIndex({"Info.Owner": 1, "Epoch":1, "Addr": 1}, {"sparse": true});
 
 db.BlockHeader.createIndex({"Epoch":1, "Miner":1}, {"sparse": true});
 
