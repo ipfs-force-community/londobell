@@ -100,6 +100,12 @@ func CurrentSectorInitialPledge(c *gin.Context) {
 	}
 
 	initPledge, err := rst.InitialPledgeForPower(big.MustFromString(req.QualityAdjPower), abi.NewTokenAmount(0), &QualityAdjPowerSmoothed, circ.FilCirculating)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
 	circulatingf, err := strconv.ParseFloat(circ.FilCirculating.String(), 64)
 	if err != nil {
 		alog.Error(err)
