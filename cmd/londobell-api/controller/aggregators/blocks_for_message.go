@@ -5,10 +5,11 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/net/context"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
-	"golang.org/x/net/context"
 )
 
 func GetBlocksForMessage(c *gin.Context) {
@@ -39,7 +40,7 @@ func GetBlocksForMessage(c *gin.Context) {
 		return
 	}
 
-	var blocksForMessageRes model.BlocksForMessage
+	var blocksForMessageRes []model.BlockHeader
 
 	// multi dbs query
 	{
@@ -55,7 +56,7 @@ func GetBlocksForMessage(c *gin.Context) {
 			return
 		}
 
-		raw := multiResult[0]
+		raw := multiResult
 		rawByte, err := json.Marshal(raw)
 		if err != nil {
 			alog.Error(err)
