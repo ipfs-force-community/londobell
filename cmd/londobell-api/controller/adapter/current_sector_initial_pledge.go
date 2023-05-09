@@ -94,23 +94,12 @@ func CurrentSectorInitialPledge(c *gin.Context) {
 		return
 	}
 
-	//thisEpochBaselinePower, err := rst.ThisEpochBaselinePower()
-	//if err != nil {
-	//	alog.Error(err)
-	//	util.ReturnOnErr(c, err)
-	//	return
-	//}
+	// default 1TB: 1099511627776
+	if req.QualityAdjPower == "" {
+		req.QualityAdjPower = "1099511627776"
+	}
 
-	//thisEpochRewardSmoothed, err := rst.ThisEpochRewardSmoothed()
-	//if err != nil {
-	//	alog.Error(err)
-	//	util.ReturnOnErr(c, err)
-	//	return
-	//}
-
-	// 1TB: 1099511627776
 	initPledge, err := rst.InitialPledgeForPower(big.MustFromString(req.QualityAdjPower), abi.NewTokenAmount(0), &QualityAdjPowerSmoothed, circ.FilCirculating)
-	//initPledge := miner9.InitialPledgeForPower(big.MustFromString(req.QualityAdjPower), thisEpochBaselinePower, smoothing.FilterEstimate(thisEpochRewardSmoothed), smoothing.FilterEstimate(QualityAdjPowerSmoothed), circ.FilCirculating)
 	circulatingf, err := strconv.ParseFloat(circ.FilCirculating.String(), 64)
 	if err != nil {
 		alog.Error(err)
