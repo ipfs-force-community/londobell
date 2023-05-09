@@ -11,12 +11,11 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 
 	"github.com/filecoin-project/go-state-types/big"
-	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
-	"github.com/filecoin-project/go-state-types/builtin/v9/util/smoothing"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/reward"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/gin-gonic/gin"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -24,7 +23,7 @@ import (
 
 func CurrentSectorInitialPledge(c *gin.Context) {
 	alog := log.With("method", "CurrentSectorInitialPledge")
-	req := model.EpochReq{}
+	req := model.CurrentSectorInitialPledgeReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
 	if err != nil {
@@ -95,21 +94,23 @@ func CurrentSectorInitialPledge(c *gin.Context) {
 		return
 	}
 
-	thisEpochBaselinePower, err := rst.ThisEpochBaselinePower()
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
+	//thisEpochBaselinePower, err := rst.ThisEpochBaselinePower()
+	//if err != nil {
+	//	alog.Error(err)
+	//	util.ReturnOnErr(c, err)
+	//	return
+	//}
 
-	thisEpochRewardSmoothed, err := rst.ThisEpochRewardSmoothed()
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
+	//thisEpochRewardSmoothed, err := rst.ThisEpochRewardSmoothed()
+	//if err != nil {
+	//	alog.Error(err)
+	//	util.ReturnOnErr(c, err)
+	//	return
+	//}
 
-	initPledge := miner9.InitialPledgeForPower(big.MustFromString("1099511627776"), thisEpochBaselinePower, smoothing.FilterEstimate(thisEpochRewardSmoothed), smoothing.FilterEstimate(QualityAdjPowerSmoothed), circ.FilCirculating)
+	// 1TB: 1099511627776
+	initPledge, err := rst.InitialPledgeForPower(big.MustFromString(req.QualityAdjPower), abi.NewTokenAmount(0), &QualityAdjPowerSmoothed, circ.FilCirculating)
+	//initPledge := miner9.InitialPledgeForPower(big.MustFromString(req.QualityAdjPower), thisEpochBaselinePower, smoothing.FilterEstimate(thisEpochRewardSmoothed), smoothing.FilterEstimate(QualityAdjPowerSmoothed), circ.FilCirculating)
 	circulatingf, err := strconv.ParseFloat(circ.FilCirculating.String(), 64)
 	if err != nil {
 		alog.Error(err)
