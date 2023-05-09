@@ -6,11 +6,12 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/net/context"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
-	"golang.org/x/net/context"
 )
 
 func GetMessagesForBlock(c *gin.Context) {
@@ -40,11 +41,18 @@ func GetMessagesForBlock(c *gin.Context) {
 		req.Limit = math.MaxInt64
 	}
 
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid, Skip: req.Index * req.Limit, Limit: req.Limit}, string(messagesForBlockAggregator))
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
 	var messagesForBlockRes []model.TraceForMessageRes
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, messagesForBlockAggregator, req, "BlockMessage")
+		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "BlockMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

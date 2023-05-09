@@ -16,7 +16,7 @@
 
 - totalCount相关
 1. RefreshBlockMsgs  7m53.546029338s
-2. RefreshBlockMsgsByMethodName  4h34m13.029812671s
+2. RefreshBlockMsgsByMethodName  countOfBlockMessagesByMethodNameAggregator  4h34m13.029812671s
 3. RefreshActorMsgsByMethodName  6h28m58.773335516s
 4. RefreshActorMsgs  14m2.735117765s
 5. RefreshActorTransferMsgs  22h56m42.5278149s
@@ -101,9 +101,9 @@ db.MinerSectorHealth.createIndex
 
 db.DealProposal.createIndex({"Epoch":1,"_id":-1,"Client":1, "Provider":1},{"sparse": true})
 
-db.BlockHeader.createIndex 索引全部失效
+db.BlockHeader.createIndex({"Epoch": -1, "Miner": 1}, {"sparse": true});  索引全部失效
 
-db.BlockMessage.createIndex({"Messages":1,"Epoch":1}, {"sparse": true})
+db.BlockMessage.createIndex({"Epoch":1, "Messages":1}, {"sparse": true})
 
 
 //GasCost不为null 说明是显式消息？？
