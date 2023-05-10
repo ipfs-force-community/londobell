@@ -5,50 +5,50 @@ import (
 )
 
 var (
-	addressAggregator                                    []byte
-	aggPreNetfeeAggregator                               []byte
-	aggProNetfeeAggregator                               []byte
-	blockAggregator                                      []byte
-	finalHeightAggregator                                []byte
-	minerBlockrewardAggregator                           []byte
-	minersInfoAggregator                                 []byte
-	minersMinedAggregator                                []byte
-	multisigMessageAggregator                            []byte
-	punishmentAggregator                                 []byte
-	wincountZlAggregator                                 []byte
-	tracesAggregator                                     []byte
-	childEpochAggregator                                 []byte
-	minersBlockrewardAggregator                          []byte
-	burnMonitorAggregator                                []byte
-	latestTipSetAggregator                               []byte
-	totalBlockCountAggregator                            []byte
-	actorStateAggregator                                 []byte
-	tipsetAggregator                                     []byte
-	minerInfoAggregator                                  []byte
-	balanceAggregator                                    []byte
-	minersForOwnerAggregator                             []byte
-	messagesForActorAggregator                           []byte
-	transferMessagesAggregator                           []byte
-	timeOfTraceAggregator                                []byte
-	createTimeAggregator                                 []byte
-	createMessageAggregator                              []byte
-	gasCostForSectorAggregator                           []byte
-	transferMessageForLargeAmountAggregator              []byte
-	dealsAggregator                                      []byte
-	dealByIDAggregator                                   []byte
-	dealsByAddrAggregator                                []byte
-	detailForDealAggregator                              []byte
-	blockHeaderAggregator                                []byte
-	traceForMessageAggregator                            []byte
-	batchTraceForMessageAggregator                       []byte
-	childTransfersForMessageAggregator                   []byte
-	allOwnersAggregator                                  []byte
-	parentTipSetAggregator                               []byte
-	blockHeaderByCidAggregator                           []byte
-	blockMessagesByMethodNameAggregator                  []byte
-	actorMessagesByMethodNameAggregator                  []byte
-	blockHeadersByMinerAggregator                        []byte
-	allMethodsAggregator                                 []byte
+	addressAggregator                       []byte
+	aggPreNetfeeAggregator                  []byte
+	aggProNetfeeAggregator                  []byte
+	blockAggregator                         []byte
+	finalHeightAggregator                   []byte
+	minerBlockrewardAggregator              []byte
+	minersInfoAggregator                    []byte
+	minersMinedAggregator                   []byte
+	multisigMessageAggregator               []byte
+	punishmentAggregator                    []byte
+	wincountZlAggregator                    []byte
+	tracesAggregator                        []byte
+	childEpochAggregator                    []byte
+	minersBlockrewardAggregator             []byte
+	burnMonitorAggregator                   []byte
+	latestTipSetAggregator                  []byte
+	totalBlockCountAggregator               []byte
+	actorStateAggregator                    []byte
+	tipsetAggregator                        []byte
+	minerInfoAggregator                     []byte
+	balanceAggregator                       []byte
+	minersForOwnerAggregator                []byte
+	messagesForActorAggregator              []byte
+	transferMessagesAggregator              []byte
+	timeOfTraceAggregator                   []byte
+	createTimeAggregator                    []byte
+	createMessageAggregator                 []byte
+	gasCostForSectorAggregator              []byte
+	transferMessageForLargeAmountAggregator []byte
+	dealsAggregator                         []byte
+	dealByIDAggregator                      []byte
+	dealsByAddrAggregator                   []byte
+	detailForDealAggregator                 []byte
+	blockHeaderAggregator                   []byte
+	traceForMessageAggregator               []byte
+	batchTraceForMessageAggregator          []byte
+	childTransfersForMessageAggregator      []byte
+	allOwnersAggregator                     []byte
+	parentTipSetAggregator                  []byte
+	blockHeaderByCidAggregator              []byte
+	blockMessagesByMethodNameAggregator     []byte
+	actorMessagesByMethodNameAggregator     []byte
+	blockHeadersByMinerAggregator           []byte
+	//allMethodsAggregator                                 []byte
 	blocksForMessageAggregator                           []byte
 	countAndMethodNameOfMessagesForBlockHeaderAggregator []byte
 	messagesForBlockAggregator                           []byte
@@ -124,7 +124,7 @@ func InitAggregators() {
 	actorMessagesByMethodNameAggregator = monitor.GetActorMessagesByMethodNameAggregator()
 	blockHeadersByMinerAggregator = monitor.GetBlockHeadersByMinerAggregator()
 	dealsByAddrAggregator = monitor.GetDealsByAddrAggregator()
-	allMethodsAggregator = monitor.GetAllMethodsAggregator()
+	//allMethodsAggregator = monitor.GetAllMethodsAggregator()
 	blocksForMessageAggregator = monitor.GetBlocksForMessageAggregator()
 	countAndMethodNameOfMessagesForBlockHeaderAggregator = monitor.GetCountAndMethodNameOfMessagesForBlockHeaderAggregator()
 	messagesForBlockAggregator = monitor.GetMessagesForBlockAggregator()

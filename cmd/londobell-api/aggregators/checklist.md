@@ -10,18 +10,18 @@
 优化方向： 1. 外层表使用最合适的索引；2. 内联表也建立索引； 3. 裁剪中间过程中的project
 // todo:
 - MultiPagingQuery相关: 随着数据增多，可能会越来越慢; 分页到后面可能会很慢
-1. 大额转账、actor转账 目前1m  db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":-1},{"sparse": true});
-2. actormessage_by_methodname、block、blockmessages_by_methodname、messages_for_actor   db.ExecTrace.createIndex({"Depth":1, "Epoch":-1, "Msg.From": 1, "Msg.To": 1},{"sparse": true});
+1. 大额转账、actor转账 目前1m  db.Message.createIndex({"Detail.PackedHeight": -1, "Value": 1}, {"sparse": true})   待Value加入完成
+2. actormessage_by_methodname(29s)、block(ms)、blockmessages_by_methodname(IDHACk ms)、messages_for_actor(6s,trace索引？？)   db.ExecTrace.createIndex({"Depth":1, "Epoch":-1, "Msg.From": 1, "Msg.To": 1},{"sparse": true});
 3. blockheaders_by_miner 没有使用到索引？？
 
 - totalCount相关
 1. RefreshBlockMsgs  7m53.546029338s
-2. RefreshBlockMsgsByMethodName  countOfBlockMessagesByMethodNameAggregator  4h34m13.029812671s
-3. RefreshActorMsgsByMethodName  6h28m58.773335516s
-4. RefreshActorMsgs  14m2.735117765s
-5. RefreshActorTransferMsgs  22h56m42.5278149s
-6. RefreshMinedMsgsMaps  35.186860441s
-7. RefreshTransfersForLargeAmount  19h28m56.153828691s
+2. RefreshBlockMsgsByMethodName  4h34m13.029812671s  countOfBlockMessagesByMethodNameAggregator  Depth_1_Epoch_-1_Msg.From_1_Msg.To_1 和 Depth_1_Msg.From_1_Msg.To_1_Msg.Method_1_Epoch_1  90高度6s
+3. RefreshActorMsgsByMethodName  6h28m58.773335516s  countOfActorMessagesByMethodNameAggregator  2s
+4. RefreshActorMsgs  14m2.735117765s  allActorsForBlockMessageAggregator  ms
+5. RefreshActorTransferMsgs  22h56m42.5278149s  countOfTransfersForActor2Aggregator  ms
+6. RefreshMinedMsgsMaps  35.186860441s  minedCountForMinersAggregator  ms
+7. RefreshTransfersForLargeAmount  19h28m56.153828691s  countOfLargeAmountTransfersAggregator  10s
 
 
 
@@ -86,6 +86,11 @@ db.ExecTrace.createIndex({"Epoch":-1,"Msg.From":1,"Msg.To":1},{"sparse": true});
 db.ExecTrace.createIndex({"Msg.To":1,"Msg.Method":1,"Detail.Return.RobustAddress":1},{"sparse": true});
 db.ExecTrace.createIndex({"Cid":1},{"sparse": true});
 db.ExecTrace.createIndex({"SignedCid":1},{"sparse": true});
+
+db.ExecTrace.createIndex({"Depth":1,"MsgRct.GasUsed":1,"Epoch":1, "Msg.From":1, "Msg.To":1},{"sparse": true});
+db.ExecTrace.createIndex({"Depth":1,"Msg.From":1, "Msg.To":1, "MsgRct.GasUsed":1,"Epoch":1,},{"sparse": true});
+
+// db.ExecTrace.createIndex({"Epoch": -1},{"sparse": true});
 
 db.ActorBalance.createIndex({"Addresses":1}, {"sparse": true});
 db.ActorBalance.createIndex({"Epoch": 1, "Addr": 1}, {"sparse": true});
