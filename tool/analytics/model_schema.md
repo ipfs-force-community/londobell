@@ -246,7 +246,8 @@
 	"Msg": {
 		"From": "address.Address",
 		"Method": "abi.MethodNum",
-		"To": "address.Address"
+		"To": "address.Address",
+		"Value": "big.Int"
 	},
 	"MsgRct": {
 		"EventsRoot": "*cid.Cid",

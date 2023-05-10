@@ -926,19 +926,20 @@
 	"Epoch": 0,
 	"Error": "",
 	"GasCost": {
-		"BaseFeeBurn": "340282591298641078465964189926313473653",
-		"GasUsed": "1073741824",
+		"BaseFeeBurn": "1024",
+		"GasUsed": "340282591298641078465964189926313473653",
 		"Message": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-		"MinerPenalty": "1073741824",
-		"MinerTip": "340282591298641078465964189926313473653",
-		"OverEstimationBurn": "1024",
-		"Refund": "1024",
-		"TotalCost": "1073741824"
+		"MinerPenalty": "340282591298641078465964189926313473653",
+		"MinerTip": "1024",
+		"OverEstimationBurn": "1073741824",
+		"Refund": "1073741824",
+		"TotalCost": "340282591298641078465964189926313473653"
 	},
 	"Msg": {
 		"From": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 		"Method": 2,
-		"To": "073366"
+		"To": "073366",
+		"Value": "1073741824"
 	},
 	"MsgRct": {
 		"EventsRoot": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
@@ -974,12 +975,12 @@
 ```
 {
 	"CirculatingSupply": {
-		"FilBurnt": "1073741824",
-		"FilCirculating": "1024",
-		"FilLocked": "340282591298641078465964189926313473653",
-		"FilMined": "1024",
-		"FilReserveDisbursed": "1073741824",
-		"FilVested": "340282591298641078465964189926313473653"
+		"FilBurnt": "340282591298641078465964189926313473653",
+		"FilCirculating": "1073741824",
+		"FilLocked": "1024",
+		"FilMined": "1073741824",
+		"FilReserveDisbursed": "340282591298641078465964189926313473653",
+		"FilVested": "1024"
 	},
 	"_id": 0
 }
@@ -1009,18 +1010,18 @@
 	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
 		"ClientUnLockCollateralInFuture": [
-			"1024"
-		],
-		"ClientUnlockStorageFeeInFuture": [
-			"340282591298641078465964189926313473653"
-		],
-		"ProviderUnLockCollateralInFuture": [
 			"1073741824"
 		],
-		"TotalClientLockedCollateral": "1024",
-		"TotalClientStorageFee": "340282591298641078465964189926313473653",
-		"TotalLocked": "340282591298641078465964189926313473653",
-		"TotalProviderLockedCollateral": "1073741824"
+		"ClientUnlockStorageFeeInFuture": [
+			"1024"
+		],
+		"ProviderUnLockCollateralInFuture": [
+			"340282591298641078465964189926313473653"
+		],
+		"TotalClientLockedCollateral": "1073741824",
+		"TotalClientStorageFee": "1024",
+		"TotalLocked": "1024",
+		"TotalProviderLockedCollateral": "340282591298641078465964189926313473653"
 	},
 	"Epoch": 0,
 	"Path": [
@@ -1106,7 +1107,7 @@
 				}
 			},
 			"To": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
-			"Value": "1024"
+			"Value": "1073741824"
 		}
 	},
 	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
@@ -1131,7 +1132,7 @@
 				}
 			},
 			"To": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
-			"Value": "1073741824"
+			"Value": "340282591298641078465964189926313473653"
 		}
 	},
 	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
@@ -1149,14 +1150,14 @@
 	"DealIDs": [
 		0
 	],
-	"DealWeight": "340282591298641078465964189926313473653",
+	"DealWeight": "1024",
 	"Epoch": 0,
-	"InitialPledge": "1073741824",
+	"InitialPledge": "340282591298641078465964189926313473653",
 	"Miner": "073366",
-	"QAPower": "340282591298641078465964189926313473653",
+	"QAPower": "1024",
 	"SealProof": 0,
 	"SectorNumber": 0,
-	"VerifiedDealWeight": "1024",
+	"VerifiedDealWeight": "1073741824",
 	"_id": ""
 }
 ```
@@ -1170,32 +1171,32 @@
 {
 	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
-		"FeeDebt": "340282591298641078465964189926313473653",
-		"InitialPledge": "1024",
-		"LockedFunds": "1073741824",
+		"FeeDebt": "1024",
+		"InitialPledge": "1073741824",
+		"LockedFunds": "340282591298641078465964189926313473653",
 		"PledgeRelease": [
-			"340282591298641078465964189926313473653"
+			"1024"
 		],
-		"PreCommitDeposits": "1024",
+		"PreCommitDeposits": "1073741824",
 		"VestInFuture": [
-			"1073741824"
+			"340282591298641078465964189926313473653"
 		]
 	},
 	"Epoch": 0,
 	"Info": {
-		"AvailableBalance": "1073741824",
-		"Balance": "1024",
+		"AvailableBalance": "340282591298641078465964189926313473653",
+		"Balance": "1073741824",
 		"Beneficiary": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 		"BeneficiaryTerm": {
 			"Expiration": 0,
-			"Quota": "1024",
-			"UsedQuota": "1073741824"
+			"Quota": "1073741824",
+			"UsedQuota": "340282591298641078465964189926313473653"
 		},
 		"ConsensusFaultElapsed": 0,
 		"ControlAddresses": [
 			"073366"
 		],
-		"FeeDebt": "340282591298641078465964189926313473653",
+		"FeeDebt": "1024",
 		"Multiaddrs": [
 			{
 				"$binary": {
@@ -1216,7 +1217,7 @@
 			"ApprovedByNominee": false,
 			"NewBeneficiary": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 			"NewExpiration": 0,
-			"NewQuota": "340282591298641078465964189926313473653"
+			"NewQuota": "1024"
 		},
 		"PendingOwnerAddress": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 		"PendingWorkerKey": {
@@ -1252,10 +1253,10 @@
 				"DealCount": 0,
 				"LowerBound": 0,
 				"SectorCount": 0,
-				"TotalDealWeight": "1024",
-				"TotalInitialPledge": "340282591298641078465964189926313473653",
-				"TotalV1InitialPledge": "1024",
-				"TotalVerifiedDealWeight": "1073741824",
+				"TotalDealWeight": "1073741824",
+				"TotalInitialPledge": "1024",
+				"TotalV1InitialPledge": "1073741824",
+				"TotalVerifiedDealWeight": "340282591298641078465964189926313473653",
 				"UpperBound": 0,
 				"V1SectorCount": 0
 			}
@@ -1278,13 +1279,13 @@
 {
 	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
-		"ExpectedDayReward": "1073741824",
-		"InitialConsensusPledge": "1024",
-		"InitialPledge": "340282591298641078465964189926313473653",
-		"InitialStoragePledge": "1073741824",
-		"Mined": "1073741824",
-		"ProjectionOfFaultFee": "1024",
-		"ProjectionOfInitialPledge": "340282591298641078465964189926313473653"
+		"ExpectedDayReward": "340282591298641078465964189926313473653",
+		"InitialConsensusPledge": "1073741824",
+		"InitialPledge": "1024",
+		"InitialStoragePledge": "340282591298641078465964189926313473653",
+		"Mined": "340282591298641078465964189926313473653",
+		"ProjectionOfFaultFee": "1073741824",
+		"ProjectionOfInitialPledge": "1024"
 	},
 	"Epoch": 0,
 	"Path": [
@@ -1303,11 +1304,11 @@
 {
 	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
-		"Locked": "340282591298641078465964189926313473653",
+		"Locked": "1024",
 		"VestInFuture": [
-			"1073741824"
+			"340282591298641078465964189926313473653"
 		],
-		"Vested": "1024"
+		"Vested": "1073741824"
 	},
 	"Epoch": 0,
 	"Path": [
@@ -1337,7 +1338,7 @@
 		},
 		"To": "073366",
 		"TxnID": 0,
-		"Value": "340282591298641078465964189926313473653"
+		"Value": "1024"
 	},
 	"Epoch": 0,
 	"Path": [
@@ -1354,7 +1355,7 @@
 
 ```
 {
-	"BaseFee": "1073741824",
+	"BaseFee": "340282591298641078465964189926313473653",
 	"ChildEpoch": 0,
 	"Cids": [
 		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
@@ -1362,7 +1363,7 @@
 	"MinTimestamp": 0,
 	"Receipts": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 	"State": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-	"Weight": "1024",
+	"Weight": "1073741824",
 	"_id": 0
 }
 ```
@@ -1376,7 +1377,7 @@
 {
 	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
-		"Cap": "340282591298641078465964189926313473653",
+		"Cap": "1024",
 		"Type": ""
 	},
 	"Epoch": 0,
