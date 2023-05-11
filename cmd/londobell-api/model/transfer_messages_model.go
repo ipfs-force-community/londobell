@@ -9,6 +9,7 @@ type TransferMessage struct {
 	To     string
 	Value  string
 	Method string
+	Depth  int
 }
 
 type TransferMessagesRes struct {
