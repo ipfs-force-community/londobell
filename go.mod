@@ -39,7 +39,7 @@ require (
 	github.com/robertkrimen/otto v0.0.0-20200922221731-ef014fd054ac
 	github.com/stretchr/testify v1.8.1
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
-	github.com/urfave/cli/v2 v2.16.3
+	github.com/urfave/cli/v2 v2.21.0
 	github.com/whyrusleeping/cbor-gen v0.0.0-20221021053955-c138aae13722
 	go.mongodb.org/mongo-driver v1.5.0
 	go.opencensus.io v0.23.0

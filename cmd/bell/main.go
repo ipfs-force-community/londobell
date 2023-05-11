@@ -41,6 +41,7 @@ func main() {
 		},
 	}
 
+	app.SliceFlagSeparator = ";"
 	app.Setup()
 
 	if err := app.Run(os.Args); err != nil {
