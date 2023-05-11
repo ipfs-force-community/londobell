@@ -126,6 +126,7 @@ type ExecTrace struct {
 		From   address.Address
 		To     address.Address
 		Method abi.MethodNum
+		Value  abi.TokenAmount
 	}
 
 	// raw infos
