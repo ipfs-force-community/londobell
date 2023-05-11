@@ -11,7 +11,7 @@
 // todo:
 - MultiPagingQuery相关: 随着数据增多，可能会越来越慢; 分页到后面可能会很慢
 1. 大额转账、actor转账 目前1m  db.Message.createIndex({"Detail.PackedHeight": -1, "Value": 1}, {"sparse": true})   待Value加入完成
-2. actormessage_by_methodname(29s)、block(ms)、blockmessages_by_methodname(IDHACk ms)、messages_for_actor(6s,trace索引？？)   db.ExecTrace.createIndex({"Depth":1, "Epoch":-1, "Msg.From": 1, "Msg.To": 1},{"sparse": true});
+2. actormessage_by_methodname(29s)、block(ms)、blockmessages_by_methodname(3s)、messages_for_actor(6s,trace索引？？)   db.ExecTrace.createIndex({"Depth":1, "Epoch":-1, "Msg.From": 1, "Msg.To": 1},{"sparse": true});
 3. blockheaders_by_miner 没有使用到索引？？
 
 - totalCount相关
@@ -91,6 +91,8 @@ db.ExecTrace.createIndex({"Depth":1,"MsgRct.GasUsed":1,"Epoch":1, "Msg.From":1, 
 db.ExecTrace.createIndex({"Depth":1,"Msg.From":1, "Msg.To":1, "MsgRct.GasUsed":1,"Epoch":1,},{"sparse": true});
 
 // db.ExecTrace.createIndex({"Epoch": -1},{"sparse": true});
+
+db.Message.createIndex({"Detail.PackedHeight": 1}, {"sparse": true})
 
 db.ActorBalance.createIndex({"Addresses":1}, {"sparse": true});
 db.ActorBalance.createIndex({"Epoch": 1, "Addr": 1}, {"sparse": true});
