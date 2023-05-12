@@ -8,6 +8,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -132,33 +134,43 @@ func RefreshFormalDataBaseState(ctx context.Context, dbsm *DataBaseStateManager,
 
 	dbState.EndEpoch = finalHeight + 1
 
-	if err := RefreshBlockMsgs(ctx, &dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshBlockMsgsByMethodName(ctx, &dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshActorMsgsByMethodName(ctx, &dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshActorMsgs(ctx, &dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshActorTransferMsgs(ctx, &dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshMinedMsgsMaps(ctx, &dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshTransfersForLargeAmount(ctx, &dbState, cols); err != nil {
-		return err
-	}
+	var ewg multierror.Group
+	ewg.Go(func() error {
+		if err := RefreshBlockMsgs(ctx, &dbState, cols); err != nil {
+			return err
+		}
+		if err := RefreshBlockMsgsByMethodName(ctx, &dbState, cols); err != nil {
+			return err
+		}
+		if err := RefreshActorMsgsByMethodName(ctx, &dbState, cols); err != nil {
+			return err
+		}
+		if err := RefreshActorMsgs(ctx, &dbState, cols); err != nil {
+			return err
+		}
+		if err := RefreshActorTransferMsgs(ctx, &dbState, cols); err != nil {
+			return err
+		}
+		if err := RefreshMinedMsgsMaps(ctx, &dbState, cols); err != nil {
+			return err
+		}
+		//if err := RefreshTransfersForLargeAmount(ctx, &dbState, cols); err != nil { // todo
+		//	return err
+		//}
 
-	if err := dbsm.Stm.SetDataBaseState(formal.Url(), dbState); err != nil {
+		if err := dbsm.Stm.SetDataBaseState(formal.Url(), dbState); err != nil {
+			return err
+		}
+
+		dbsm.DBStateCache.SetDataBase(formal.Url(), &dbState)
+
+		return nil
+	})
+
+	if err := ewg.Wait(); err != nil {
+		log.Error("RefreshFormalDataBaseState failed: %v", err)
 		return err
 	}
-
-	dbsm.DBStateCache.SetDataBase(formal.Url(), &dbState)
 
 	return nil
 }
