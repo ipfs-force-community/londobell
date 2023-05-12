@@ -9,25 +9,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-
-	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"github.com/filecoin-project/lotus/api/v0api"
-	"go.uber.org/zap"
-
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
-
-	"go.mongodb.org/mongo-driver/bson"
-
-	logging "github.com/ipfs/go-log/v2"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/hashicorp/go-multierror"
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
+	logging "github.com/ipfs/go-log/v2"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.uber.org/zap"
 
 	"github.com/ipfs-force-community/londobell/buildnet"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
@@ -186,12 +180,14 @@ func RefreshFormalDataBaseState(ctx context.Context, dbsm *DataBaseStateManager,
 	////	return err
 	////}
 	//
-	
+
 	if err := dbsm.Stm.SetDataBaseState(formal.Url(), dbState); err != nil {
 		return err
 	}
 
 	dbsm.DBStateCache.SetDataBase(formal.Url(), &dbState)
+
+	log.Infof("RefreshFormalDataBaseState successfully, dbState.EndEpoch: %v", finalHeight+1)
 
 	return nil
 }
