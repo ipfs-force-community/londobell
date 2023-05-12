@@ -48,6 +48,7 @@ var (
 	blockMessagesByMethodNameAggregator     []byte
 	actorMessagesByMethodNameAggregator     []byte
 	blockHeadersByMinerAggregator           []byte
+	minedByMinerRangeAggregator             []byte
 	//allMethodsAggregator                                 []byte
 	blocksForMessageAggregator                           []byte
 	countAndMethodNameOfMessagesForBlockHeaderAggregator []byte
@@ -123,6 +124,7 @@ func InitAggregators() {
 	blockMessagesByMethodNameAggregator = monitor.GetBlockMessagesByMethodNameAggregator()
 	actorMessagesByMethodNameAggregator = monitor.GetActorMessagesByMethodNameAggregator()
 	blockHeadersByMinerAggregator = monitor.GetBlockHeadersByMinerAggregator()
+	minedByMinerRangeAggregator = monitor.GetMinedByMinerRangeAggregator()
 	dealsByAddrAggregator = monitor.GetDealsByAddrAggregator()
 	//allMethodsAggregator = monitor.GetAllMethodsAggregator()
 	blocksForMessageAggregator = monitor.GetBlocksForMessageAggregator()

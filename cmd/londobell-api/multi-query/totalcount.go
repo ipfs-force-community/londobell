@@ -186,11 +186,12 @@ func RefreshFormalDataBaseState(ctx context.Context, dbsm *DataBaseStateManager,
 	////	return err
 	////}
 	//
-	//if err := dbsm.Stm.SetDataBaseState(formal.Url(), dbState); err != nil {
-	//	return err
-	//}
-	//
-	//dbsm.DBStateCache.SetDataBase(formal.Url(), &dbState)
+	
+	if err := dbsm.Stm.SetDataBaseState(formal.Url(), dbState); err != nil {
+		return err
+	}
+
+	dbsm.DBStateCache.SetDataBase(formal.Url(), &dbState)
 
 	return nil
 }

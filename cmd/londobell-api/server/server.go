@@ -11,18 +11,20 @@ import (
 
 	"github.com/dtynn/dix"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/multiformats/go-multiaddr"
+
 	"github.com/ipfs-force-community/londobell/api"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
-	"github.com/multiformats/go-multiaddr"
 
 	"github.com/filecoin-project/lotus/node"
 
 	"github.com/gin-gonic/gin"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/urfave/cli/v2"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/urfave/cli/v2"
 )
 
 var (
@@ -282,7 +284,8 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/blockheader", aggregators.GetBlockHeader)
 		group.POST("/blockheader_by_cid", aggregators.GetBlockHeaderByCid)
 		group.POST("/blockheaders_by_miner", aggregators.GetBlockHeadersByMiner) // 出块列表，出块奖励额外获取
-		group.POST("/blocks_for_message", aggregators.GetBlocksForMessage)       // todo: epoch可不要，遍历查询即可
+		//group.POST("/mined_by_miner_range", aggregators.GetMinedByMinerForRange)
+		group.POST("/blocks_for_message", aggregators.GetBlocksForMessage) // todo: epoch可不要，遍历查询即可
 		group.POST("/count_and_methods_of_messages_for_blockheader", aggregators.GetCountAndMethodsOfMessagesForBlockHeader)
 		group.POST("/messages_for_block", aggregators.GetMessagesForBlock)
 		group.POST("/blockheader_messages_by_methodname", aggregators.GetBlockHeaderMessagesByMethodName)
