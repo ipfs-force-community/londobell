@@ -107,6 +107,15 @@ func (m *MockDAL) ComputeBaseFee(ctx context.Context, ts *types.TipSet) (abi.Tok
 	args := m.Called(ctx, ts)
 	return args.Get(0).(abi.TokenAmount), args.Error(1)
 }
+func (m *MockDAL) LookupID(ctx context.Context, addr address.Address, ts *types.TipSet) (address.Address, error) {
+	args := m.Called(ctx, ts)
+	return args.Get(0).(address.Address), args.Error(1)
+}
+
+func (m *MockDAL) GetSignedMessage(ctx context.Context, c cid.Cid) (*types.SignedMessage, error) {
+	args := m.Called(ctx, c)
+	return args.Get(0).(*types.SignedMessage), args.Error(1)
+}
 
 func (m *MockDAL) LookupID(ctx context.Context, addr address.Address, ts *types.TipSet) (address.Address, error) {
 	args := m.Called(ctx, ts)

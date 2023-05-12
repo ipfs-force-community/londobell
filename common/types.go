@@ -42,6 +42,7 @@ type ChainStore interface {
 	MessagesForBlock(ctx context.Context, b *types.BlockHeader) ([]*types.Message, []*types.SignedMessage, error)
 	ComputeBaseFee(ctx context.Context, ts *types.TipSet) (abi.TokenAmount, error)
 	MessagesForTipset(ctx context.Context, ts *types.TipSet) ([]types.ChainMsg, error)
+	GetSignedMessage(ctx context.Context, c cid.Cid) (*types.SignedMessage, error)
 }
 
 // StateManager manages the state on chain
