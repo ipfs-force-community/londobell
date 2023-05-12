@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -39,6 +40,17 @@ var (
 var (
 	IncrementalEndEpoch = abi.ChainEpoch(1960619)
 )
+
+var (
+	refreshOnce sync.Once
+	refreshes   = make([]func(ctx context.Context, ds *DataBaseState, cols Collections) error, 0)
+)
+
+func init() {
+	refreshOnce.Do(func() {
+		refreshes = append(refreshes, RefreshBlockMsgs, RefreshBlockMsgsByMethodName, RefreshActorMsgsByMethodName, RefreshActorMsgs, RefreshActorTransferMsgs, RefreshMinedMsgsMaps /*RefreshTransfersForLargeAmount*/)
+	})
+}
 
 func PeriodicRefreshDataBaseState(ctx context.Context, dbsm *DataBaseStateManager) {
 	tick := time.NewTicker(30 * time.Minute)
@@ -135,42 +147,50 @@ func RefreshFormalDataBaseState(ctx context.Context, dbsm *DataBaseStateManager,
 	dbState.EndEpoch = finalHeight + 1
 
 	var ewg multierror.Group
-	ewg.Go(func() error {
-		if err := RefreshBlockMsgs(ctx, &dbState, cols); err != nil {
-			return err
-		}
-		if err := RefreshBlockMsgsByMethodName(ctx, &dbState, cols); err != nil {
-			return err
-		}
-		if err := RefreshActorMsgsByMethodName(ctx, &dbState, cols); err != nil {
-			return err
-		}
-		if err := RefreshActorMsgs(ctx, &dbState, cols); err != nil {
-			return err
-		}
-		if err := RefreshActorTransferMsgs(ctx, &dbState, cols); err != nil {
-			return err
-		}
-		if err := RefreshMinedMsgsMaps(ctx, &dbState, cols); err != nil {
-			return err
-		}
-		//if err := RefreshTransfersForLargeAmount(ctx, &dbState, cols); err != nil { // todo
-		//	return err
-		//}
+	for i := range refreshes {
+		i := i
+		refresh := refreshes[i]
+		ewg.Go(func() error {
+			if err := refresh(ctx, &dbState, cols); err != nil {
+				return err
+			}
 
-		if err := dbsm.Stm.SetDataBaseState(formal.Url(), dbState); err != nil {
-			return err
-		}
-
-		dbsm.DBStateCache.SetDataBase(formal.Url(), &dbState)
-
-		return nil
-	})
+			return nil
+		})
+	}
 
 	if err := ewg.Wait(); err != nil {
-		log.Error("RefreshFormalDataBaseState failed: %v", err)
+		log.Errorf("RefreshFormalDataBaseState failed: %v", err)
 		return err
 	}
+
+	//if err := RefreshBlockMsgs(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	//if err := RefreshBlockMsgsByMethodName(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	//if err := RefreshActorMsgsByMethodName(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	//if err := RefreshActorMsgs(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	//if err := RefreshActorTransferMsgs(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	//if err := RefreshMinedMsgsMaps(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	////if err := RefreshTransfersForLargeAmount(ctx, &dbState, cols); err != nil { // todo
+	////	return err
+	////}
+	//
+	//if err := dbsm.Stm.SetDataBaseState(formal.Url(), dbState); err != nil {
+	//	return err
+	//}
+	//
+	//dbsm.DBStateCache.SetDataBase(formal.Url(), &dbState)
 
 	return nil
 }
