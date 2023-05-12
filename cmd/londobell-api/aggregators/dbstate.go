@@ -7,8 +7,9 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 
 	"github.com/dtynn/dix"
-	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/urfave/cli/v2"
+
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 )
 
 var dbstateCmd = &cli.Command{
@@ -16,7 +17,7 @@ var dbstateCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		archiveCmd,
 		loadCmd,
-		updateCmd,
+		updateCmd, // 清空重新存state
 		deleteCmd,
 	},
 }
