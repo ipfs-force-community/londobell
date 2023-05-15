@@ -92,6 +92,8 @@ db.ExecTrace.createIndex({"SignedCid":1},{"sparse": true});
 
 db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":-1, "Msg.From":1, "Msg.To":1},{"sparse": true});
 
+db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":-1, "Msg.From":1, "Msg.To":1, "Msg.Value": 1},{"sparse": true});
+
 
 // db.ExecTrace.createIndex({"Epoch": -1},{"sparse": true});
 

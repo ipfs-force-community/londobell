@@ -3,6 +3,7 @@ package aggregators
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 
 	"github.com/filecoin-project/lotus/api/v0api"
 
@@ -11,13 +12,14 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/net/context"
+
 	"github.com/ipfs-force-community/londobell/buildnet"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
-	"golang.org/x/net/context"
 )
 
 func GetMessagesForActor(c *gin.Context) {
@@ -100,6 +102,10 @@ func GetMessagesForActor(c *gin.Context) {
 			totalCount++
 		}
 	}
+
+	sort.Slice(messagesForActor, func(i, j int) bool {
+		return messagesForActor[i].Epoch > messagesForActor[j].Epoch
+	})
 
 	res.Data = model.MessagesForActorRes{TotalCount: totalCount, MessagesForActor: messagesForActor}
 	c.JSON(http.StatusOK, res)

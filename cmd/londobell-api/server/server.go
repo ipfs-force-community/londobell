@@ -31,7 +31,7 @@ var (
 	log = logging.Logger("server")
 )
 
-func Run(cctx *cli.Context, adapter bool) error {
+func Run(cctx *cli.Context, adapter bool, limit, interval int) error {
 	router := gin.New()
 	router.Use(CrosHandler())
 	router.Use(gin.Logger())
@@ -112,6 +112,11 @@ func Run(cctx *cli.Context, adapter bool) error {
 
 		os.Exit(1)
 	} else {
+		if limit == 0 || interval == 0 {
+			log.Errorf("invalid limit %v or interval %v", limit, interval)
+			return err
+		}
+
 		tick := time.NewTicker(15 * time.Second)
 		defer tick.Stop()
 		go func() {
@@ -163,7 +168,7 @@ func Run(cctx *cli.Context, adapter bool) error {
 		//multiquery.TestPeriodicRefreshDataBaseState(cctx.Context, &multiquery.DBStateManager) //todo:test
 		//fmt.Printf("PeriodicRefreshDataBaseState done, elapsed: %v\n", time.Now().Sub(start))
 
-		go multiquery.PeriodicRefreshDataBaseState(cctx.Context, &multiquery.DBStateManager)
+		go multiquery.PeriodicRefreshDataBaseState(cctx.Context, &multiquery.DBStateManager, limit, interval)
 
 		aggregators.InitAggregators()
 		RegisterAggregatorsApi(router)

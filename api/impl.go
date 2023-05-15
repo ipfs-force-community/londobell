@@ -71,11 +71,13 @@ func (m *BellNodeAPI) GetSampleRate(ctx context.Context) (float64, error) {
 
 type MultiNodeAPI struct {
 	fx.In
-	DBSMgr *multiquery.StateManager
+	//DBSMgr *multiquery.StateManager
+	DBStMgr multiquery.DataBaseStateManager
 }
 
 func (m *MultiNodeAPI) LoadDBState(url string) (multiquery.DataBaseState, error) {
-	dbState, found, err := m.DBSMgr.LoadDataBaseState(url)
+	dbState, found, err := m.DBStMgr.Seg.Find(context.TODO(), url)
+	//dbState, found, err := m.DBSMgr.LoadDataBaseState(url)
 	if err != nil {
 		return multiquery.DataBaseState{}, err
 	}
