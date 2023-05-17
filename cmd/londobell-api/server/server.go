@@ -220,6 +220,7 @@ func RegisterAdapterApi(router *gin.Engine) {
 		group.POST("/actors", adapter.GetActorsInfo)
 		group.POST("/actor_ids", adapter.GetActorIDs)
 		group.POST("/epoch", adapter.GetEpochInfo)
+		group.POST("/last_epoch", adapter.GetLastEpochInfo)
 		group.POST("/miner", adapter.GetMinerInfo)
 		group.POST("/sector", adapter.GetSectorInfo)
 		group.POST("/batchminers", adapter.GetBatchMinersInfo)
