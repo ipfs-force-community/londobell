@@ -16,6 +16,7 @@ var (
 	multisigMessageAggregator               []byte
 	punishmentAggregator                    []byte
 	wincountZlAggregator                    []byte
+	wincountForMinerAggregator              []byte
 	tracesAggregator                        []byte
 	childEpochAggregator                    []byte
 	minersBlockrewardAggregator             []byte
@@ -93,6 +94,7 @@ func InitAggregators() {
 	multisigMessageAggregator = monitor.GetMultisigMessageAggregator()
 	punishmentAggregator = monitor.GetPunishmentAggregator()
 	wincountZlAggregator = monitor.GetWincountZlAggregator()
+	wincountForMinerAggregator = monitor.GetWincountForMinerAggregator()
 	tracesAggregator = monitor.GetTracesAggregator()
 	childEpochAggregator = monitor.GetChildEpochAggregator()
 	minersBlockrewardAggregator = monitor.GetMinersBlockRewardAggregator()

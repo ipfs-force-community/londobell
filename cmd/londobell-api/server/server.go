@@ -248,6 +248,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/agg_pre_netfee", aggregators.GetAggPreNetFee)
 		group.POST("/agg_pro_netfee", aggregators.GetAggProNetFee)
 		group.POST("/block", aggregators.GetBlock)
+		group.POST("/count_of_blockmessages", aggregators.GetCountOfBlockMessages)
 		group.POST("/traces", aggregators.GetTraces) // only tianyou
 		group.POST("/trace_for_message", aggregators.GetTraceForMessage)
 		group.POST("/batch_trace_for_message", aggregators.GetBatchTraceForMessage)
@@ -256,7 +257,8 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/miner_blockreward", aggregators.GetMinerBlockReward)
 		group.POST("/miners_blockreward", aggregators.GetMinersBlockReward)
 		group.POST("/miners_mined", aggregators.GetMinersMined)
-		group.POST("/wincount", aggregators.GetWinCount)                 // todo: 全网至今总wincount
+		group.POST("/wincount", aggregators.GetWinCount) // todo: 全网至今总wincount
+		group.POST("/wincount_for_miner", aggregators.GetWinCountForMiner)
 		group.POST("/total_block_count", aggregators.GetTotalBlockCount) // todo: 全网至今总爆块数
 		group.POST("/miners_for_owner", aggregators.GetMinersForOwner)   // only query from formal
 		group.POST("/all_owners", aggregators.GetAllOwners)              // only query from formal

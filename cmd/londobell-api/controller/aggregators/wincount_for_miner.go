@@ -13,11 +13,11 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 )
 
-func GetWinCount(c *gin.Context) {
+func GetWinCountForMiner(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	alog := log.With("method", "GetWinCount")
+	alog := log.With("method", "GetWinCountForMiner")
 	req := model.CommonReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
@@ -36,11 +36,19 @@ func GetWinCount(c *gin.Context) {
 		return
 	}
 
-	var winCountRes []model.WinCountRes
+	//api := fullnode.API.GetAppropriateAPI()
+	//addrs, err := GetAllAddrs(ctx, req.Addr, api)
+	//if err != nil {
+	//	alog.Error(err)
+	//	util.ReturnOnErr(c, err)
+	//	return
+	//}
+
+	var winCountForMiner []model.WinCountForMiner
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, wincountZlAggregator, req, "ExecTrace")
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, wincountForMinerAggregator, req, "ExecTrace")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
@@ -60,7 +68,7 @@ func GetWinCount(c *gin.Context) {
 			return
 		}
 
-		err = json.Unmarshal(rawByte, &winCountRes)
+		err = json.Unmarshal(rawByte, &winCountForMiner)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
@@ -68,6 +76,17 @@ func GetWinCount(c *gin.Context) {
 		}
 	}
 
-	res.Data = winCountRes
+	//var winCountForMinerRes model.WinCountForMinerRes
+	//for _, wm := range winCountForMiner {
+	//	//for _, addr := range addrs {
+	//	if wm.Miner == req.Addr {
+	//		winCountForMinerRes.TotalWinCount += wm.WinCount
+	//		//winCountForMinerRes.TotalGasReward += wm.GasReward
+	//		//break
+	//	}
+	//	//}
+	//}
+
+	res.Data = winCountForMiner
 	c.JSON(http.StatusOK, res)
 }
