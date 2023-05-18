@@ -1,13 +1,9 @@
 package tipset
 
 import (
-	"context"
-
 	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
-
-	"github.com/ipfs-force-community/londobell/common"
 )
 
 func init() {
@@ -21,13 +17,13 @@ func init() {
 
 var expensiveNetworkVersions = map[network.Version]struct{}{}
 
-func isExpensive(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet) bool {
-	prev := stm.GetNetworkVersion(ctx, ts.Parent.Height())
-	next := stm.GetNetworkVersion(ctx, ts.Height())
-	if prev == next {
-		return false
-	}
-
-	_, is := expensiveNetworkVersions[next]
-	return is
-}
+//func isExpensive(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet) bool {
+//	prev := stm.GetNetworkVersion(ctx, ts.Parent.Height())
+//	next := stm.GetNetworkVersion(ctx, ts.Height())
+//	if prev == next {
+//		return false
+//	}
+//
+//	_, is := expensiveNetworkVersions[next]
+//	return is
+//}

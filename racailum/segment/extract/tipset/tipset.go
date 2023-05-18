@@ -17,6 +17,8 @@ import (
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
 	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
+	"go.opencensus.io/trace"
+
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mir"
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
@@ -24,7 +26,6 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
-	"go.opencensus.io/trace"
 
 	"github.com/filecoin-project/lotus/api"
 	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
@@ -261,11 +262,11 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	elog := ctx.L.With("epoch", ts.Height())
 
-	if isExpensive(ctx.C, ctx.D, ts) {
-		// TODO: extract simple invoc results here
-		elog.Warn("ignore expensive epoch exec trace")
-		return nil
-	}
+	//if isExpensive(ctx.C, ctx.D, ts) {
+	//	// TODO: extract simple invoc results here
+	//	elog.Warn("ignore expensive epoch exec trace")
+	//	return nil
+	//}
 
 	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage {
 		return nil
