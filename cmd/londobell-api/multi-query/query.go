@@ -4,11 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"sort"
 	"sync"
 	"time"
-
-	"github.com/ipfs-force-community/londobell/lib/limiter"
 
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
@@ -84,13 +81,13 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 			// 最后一次
 			qlog.Infof("skipflag && limitflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v, start: %v, end: %v", i, skip, limit, requestTotalCount, countlist.Start, countlist.End)
 
-			aggLists = append(aggLists, &aggUtil{startEpoch: countlist.Start, endEpoch: countlist.End, skip: skip, limit: limit, cols: countlist.Cols, InnerStates: countlist.InnerStates})
+			aggLists = append(aggLists, &aggUtil{startEpoch: countlist.Start, endEpoch: countlist.End, skip: skip, limit: limit, cols: countlist.Cols})
 			break
 		}
 		if skipflag && !limitflag {
 			qlog.Infof("skipflag && !limitflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v", i, skip, limit, requestTotalCount)
 
-			aggLists = append(aggLists, &aggUtil{startEpoch: countlist.Start, endEpoch: countlist.End, skip: skip, limit: limit, cols: countlist.Cols, InnerStates: countlist.InnerStates})
+			aggLists = append(aggLists, &aggUtil{startEpoch: countlist.Start, endEpoch: countlist.End, skip: skip, limit: limit, cols: countlist.Cols})
 			skip = 0
 			limit = requestTotalCount - countlist.Count
 			requestTotalCount = requestTotalCount - countlist.Count // skip 1, limit 5  tmp 8
@@ -105,47 +102,6 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 		}
 	}
 
-	// inner
-	innerAggLists := make([]*aggUtil, 0)
-	for i := range aggLists {
-		aggList := aggLists[i]
-		sort.Slice(aggList.InnerStates, func(i, j int) bool {
-			return aggList.InnerStates[i].Start > aggList.InnerStates[j].Start
-		})
-
-		skip := aggList.skip
-		limit := aggList.limit
-		requestTotalCount := skip + limit
-
-		for i, innerState := range aggList.InnerStates {
-			skipflag := skipTag(skip, innerState.Count)
-			limitflag := limitTag(requestTotalCount, innerState.Count)
-			if skipflag && limitflag {
-				// 最后一次
-				qlog.Infof("skipflag && limitflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v, start: %v, end: %v", i, skip, limit, requestTotalCount, innerState.Start, innerState.End)
-
-				innerAggLists = append(innerAggLists, &aggUtil{startEpoch: innerState.Start, endEpoch: innerState.End, skip: skip, limit: limit, cols: aggList.cols})
-				break
-			}
-			if skipflag && !limitflag {
-				qlog.Infof("skipflag && !limitflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v", i, skip, limit, requestTotalCount)
-
-				innerAggLists = append(innerAggLists, &aggUtil{startEpoch: innerState.Start, endEpoch: innerState.End, skip: skip, limit: limit, cols: aggList.cols})
-				skip = 0
-				limit = requestTotalCount - innerState.Count
-				requestTotalCount = requestTotalCount - innerState.Count // skip 1, limit 5  tmp 8
-				continue
-			}
-			if !skipflag {
-				qlog.Infof("!skipflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v", i, skip, limit, requestTotalCount)
-
-				skip = skip - innerState.Count
-				requestTotalCount = skip + limit
-				continue
-			}
-		}
-	}
-
 	qlog.Infof("get aggLists done!!")
 
 	// concurrent agg
@@ -153,21 +109,12 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 		res    = make([][]bson.M, len(aggLists))
 		result = make([]bson.M, 0)
 		ewg    multierror.Group
-		lim    = limiter.New(16)
 	)
 
-	for i := range innerAggLists {
+	for i := range aggLists {
 		i := i
-		aggList := innerAggLists[i]
+		aggList := aggLists[i]
 		ewg.Go(func() error {
-			if !lim.Acquire(context.TODO()) {
-				return nil
-			}
-
-			defer func() {
-				lim.Release(context.TODO())
-			}()
-
 			start := time.Now()
 			var aggRes []bson.M
 
@@ -220,20 +167,18 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 	start := startEpoch
 	end := endEpoch
 	aggLists := make([]*aggUtil, 0)
-
-	// 定位库
 	for i := range countUtils {
 		i := i
 		countList := countUtils[i]
 		if start >= countList.Start {
 			// [start, end)
-			aggLists = append(aggLists, &aggUtil{startEpoch: start, endEpoch: end, cols: countList.Cols, InnerStates: countList.InnerStates})
+			aggLists = append(aggLists, &aggUtil{startEpoch: start, endEpoch: end, cols: countList.Cols})
 			break
 		}
 
 		if end > countList.Start {
 			//[countList.Start, end)
-			aggLists = append(aggLists, &aggUtil{startEpoch: countList.Start, endEpoch: end, cols: countList.Cols, InnerStates: countList.InnerStates})
+			aggLists = append(aggLists, &aggUtil{startEpoch: countList.Start, endEpoch: end, cols: countList.Cols})
 			end = countList.Start
 			continue
 		} else {
@@ -241,58 +186,16 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 		}
 	}
 
-	sort.Slice(aggLists, func(i, j int) bool {
-		return aggLists[i].startEpoch > aggLists[j].startEpoch
-	})
-
-	// 定位库中范围
-	innerAggLists := make([]*aggUtil, 0)
-	for i := range aggLists {
-		aggList := aggLists[i]
-		sort.Slice(aggList.InnerStates, func(i, j int) bool {
-			return aggList.InnerStates[i].Start > aggList.InnerStates[j].Start
-		})
-
-		for i := range aggList.InnerStates {
-			i := i
-			countList := aggList.InnerStates[i]
-			if start >= countList.Start {
-				// [start, end)
-				innerAggLists = append(innerAggLists, &aggUtil{startEpoch: start, endEpoch: end, cols: aggList.cols})
-				break
-			}
-
-			if end > countList.Start {
-				//[countList.Start, end)
-				innerAggLists = append(innerAggLists, &aggUtil{startEpoch: countList.Start, endEpoch: end, cols: aggList.cols})
-				end = countList.Start
-				continue
-			} else {
-				continue
-			}
-		}
-
-	}
-
 	var (
 		ewg    multierror.Group
-		res    = make([][]bson.M, len(innerAggLists))
+		res    = make([][]bson.M, len(aggLists))
 		result = make([]bson.M, 0)
-		lim    = limiter.New(16)
 	)
 
-	for i := range innerAggLists {
+	for i := range aggLists {
 		i := i
-		innerAggList := innerAggLists[i]
+		aggList := aggLists[i]
 		ewg.Go(func() error {
-			if !lim.Acquire(context.TODO()) {
-				return nil
-			}
-
-			defer func() {
-				lim.Release(context.TODO())
-			}()
-
 			start := time.Now()
 			var aggRes []bson.M
 
@@ -301,12 +204,12 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 				req.Limit = math.MaxInt64
 			}
 
-			pipe, err := util.Parse(model.Ctx{StartEpoch: innerAggList.startEpoch, EndEpoch: innerAggList.endEpoch, Addr: req.Addr, Addrs: req.Addrs, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, Cids: req.Cids, ID: req.ID, Sort: req.Sort, To: req.To, Skip: req.Index * req.Limit, Limit: req.Limit}, string(aggregator))
+			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.startEpoch, EndEpoch: aggList.endEpoch, Addr: req.Addr, Addrs: req.Addrs, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, Cids: req.Cids, ID: req.ID, Sort: req.Sort, To: req.To, Skip: req.Index * req.Limit, Limit: req.Limit}, string(aggregator))
 			if err != nil {
 				return err
 			}
 
-			for _, col := range innerAggList.cols.Cols {
+			for _, col := range aggList.cols.Cols {
 				if col != nil && col.Name() == tableName {
 					cur, err := col.Aggregate(ctx, pipe)
 					if err != nil {
@@ -322,7 +225,7 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 				}
 			}
 
-			qlog.Infof("agg successfully for block, innerAggList %+v spent %v", innerAggList, time.Now().Sub(start))
+			qlog.Infof("agg successfully for block, aggulist %+v spent %v", aggList, time.Now().Sub(start))
 			return nil
 		})
 	}
@@ -344,7 +247,6 @@ func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []Cou
 		ewg    multierror.Group
 		result = make([]bson.M, 0)
 		lock   sync.RWMutex
-		lim    = limiter.New(16)
 	)
 
 	// 优先查询tmp和formal，未查到再并发查询冷库
@@ -383,14 +285,6 @@ func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []Cou
 		countList := delayedLists[i]
 
 		ewg.Go(func() error {
-			if !lim.Acquire(context.TODO()) {
-				return nil
-			}
-
-			defer func() {
-				lim.Release(context.TODO())
-			}()
-
 			var res []bson.M
 
 			for _, col := range countList.Cols.Cols {
@@ -439,7 +333,6 @@ func MultiUnionQuery(ctx context.Context, pipe interface{}, countLists []CountUt
 		ewg    multierror.Group
 		res    = make([][]bson.M, len(countLists))
 		result = make([]bson.M, 0)
-		lim    = limiter.New(16)
 	)
 
 	// todo: 所有库都查询一次，最终查询时间为最慢库的查询时间，费时
@@ -448,14 +341,6 @@ func MultiUnionQuery(ctx context.Context, pipe interface{}, countLists []CountUt
 		i := i
 		countList := countLists[i]
 		ewg.Go(func() error {
-			if !lim.Acquire(context.TODO()) {
-				return nil
-			}
-
-			defer func() {
-				lim.Release(context.TODO())
-			}()
-
 			var aggRees []bson.M
 
 			for _, col := range countList.Cols.Cols {

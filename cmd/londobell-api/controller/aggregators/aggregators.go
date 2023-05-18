@@ -58,9 +58,9 @@ var (
 	blockHeaderMessagesByMethodNameAggregator            []byte
 	richListAggregator                                   []byte
 	allActorsForBlockMessageAggregator                   []byte
-	//transferCountForActorAggregator                      []byte
-	countOfTransfersForActor2Aggregator   []byte
-	countOfLargeAmountTransfersAggregator []byte
+	transferCountForActorAggregator                      []byte
+	countOfTransfersForActor2Aggregator                  []byte
+	countOfLargeAmountTransfersAggregator                []byte
 )
 
 type Methodlist struct {
@@ -136,7 +136,7 @@ func InitAggregators() {
 	blockHeaderMessagesByMethodNameAggregator = monitor.GetBlockHeaderMessagesByMethodNameAggregator()
 	richListAggregator = monitor.GetRichListAggregator()
 	allActorsForBlockMessageAggregator = monitor.GetAllActorsForBlockMessageAggregator()
-	//transferCountForActorAggregator = monitor.GetTransferCountForActorAggregator()
+	transferCountForActorAggregator = monitor.GetTransferCountForActorAggregator()
 	countOfTransfersForActor2Aggregator = monitor.GetCountOfTransfersForActor2Aggregator()
 	countOfLargeAmountTransfersAggregator = monitor.GetCountOfLargeAmountTransfersAggregator()
 }

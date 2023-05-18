@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"sort"
 
 	"github.com/gin-gonic/gin"
-
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -74,10 +72,6 @@ func GetBlock(c *gin.Context) {
 			return
 		}
 	}
-
-	sort.Slice(blockMessages, func(i, j int) bool {
-		return blockMessages[i].Epoch > blockMessages[j].Epoch
-	})
 
 	res.Data = model.BlockMessagesRes{TotalCount: totalCount, BlockMessages: blockMessages}
 	c.JSON(http.StatusOK, res)

@@ -22,7 +22,7 @@ var daemonCmd = &cli.Command{
 		dep.RepoFlag,
 	},
 	Action: func(cctx *cli.Context) error {
-		err := server.Run(cctx, true, 0, 0)
+		err := server.Run(cctx, true)
 		if err != nil {
 			return err
 		}
