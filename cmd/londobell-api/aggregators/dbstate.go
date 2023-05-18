@@ -118,6 +118,8 @@ var archiveCmd = &cli.Command{
 		// todo: formalState.startEpoch 不会与colds范围重合
 
 		// 覆盖cold
+		formalState.Formal = false
+		formalState.Tmp = false
 		if err := components.DBStMgr.Stm.SetDataBaseState(coldURL, formalState); err != nil {
 			return err
 		}

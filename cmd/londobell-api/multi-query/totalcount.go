@@ -42,7 +42,7 @@ var (
 
 func init() {
 	refreshOnce.Do(func() {
-		refreshes = append(refreshes, RefreshBlockMsgs, RefreshBlockMsgsByMethodName, RefreshActorMsgsByMethodName, RefreshActorMsgs, RefreshActorTransferMsgs, RefreshMinedMsgsMaps /*RefreshTransfersForLargeAmount*/)
+		refreshes = append(refreshes, RefreshBlockMsgs, RefreshBlockMsgsByMethodName, RefreshActorMsgsByMethodName, RefreshActorMsgs, RefreshActorTransferMsgs, RefreshMinedMsgsMaps, RefreshTransfersForLargeAmount)
 	})
 }
 
