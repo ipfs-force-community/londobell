@@ -23,6 +23,7 @@ func main() {
 		Commands: []*cli.Command{
 			multiQueryCfgCmd,
 			dbstateCmd,
+			multiQuerySegmentCmd,
 			daemonCmd,
 		},
 		Flags: []cli.Flag{
@@ -31,6 +32,7 @@ func main() {
 		Version: build.UserVersion(),
 	}
 
+	app.SliceFlagSeparator = ";"
 	app.Setup()
 	if err := app.Run(os.Args); err != nil {
 		log.Errorf("cli error: %s", err)

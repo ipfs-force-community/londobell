@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sort"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
@@ -87,6 +89,10 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 	}
+
+	sort.Slice(transferMessages, func(i, j int) bool {
+		return transferMessages[i].Epoch > transferMessages[j].Epoch
+	})
 
 	res.Data = model.TransferMessagesRes{TotalCount: totalCount, TransferMessages: transferMessages}
 	c.JSON(http.StatusOK, res)

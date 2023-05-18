@@ -20,20 +20,19 @@ require (
 	github.com/gin-gonic/gin v1.8.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230516105236-a27b57a9afad
-	github.com/ipfs/go-block-format v0.1.1
+	github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230518042852-c5cd3815ce88
 	github.com/ipfs/go-blockservice v0.4.0
 	github.com/ipfs/go-cid v0.3.2
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/go-ipfs-exchange-offline v0.3.0
-	github.com/ipfs/go-ipld-cbor v0.0.6
 	github.com/ipfs/go-ipld-format v0.4.0
 	github.com/ipfs/go-libipfs v0.4.1
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/ipfs/go-merkledag v0.8.1
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipld/go-car v0.4.0
+	github.com/libp2p/go-libp2p v0.23.4
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-multiaddr v0.8.0
 	github.com/multiformats/go-multihash v0.2.1
@@ -41,7 +40,7 @@ require (
 	github.com/robertkrimen/otto v0.0.0-20200922221731-ef014fd054ac
 	github.com/stretchr/testify v1.8.1
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
-	github.com/urfave/cli/v2 v2.16.3
+	github.com/urfave/cli/v2 v2.21.0
 	github.com/whyrusleeping/cbor-gen v0.0.0-20221021053955-c138aae13722
 	go.mongodb.org/mongo-driver v1.5.0
 	go.opencensus.io v0.23.0
@@ -169,6 +168,7 @@ require (
 	github.com/icza/backscanner v0.0.0-20210726202459-ac2ffc679f94 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.0.0 // indirect
+	github.com/ipfs/go-block-format v0.1.1 // indirect
 	github.com/ipfs/go-cidutil v0.1.0 // indirect
 	github.com/ipfs/go-ds-badger2 v0.1.2 // indirect
 	github.com/ipfs/go-ds-measure v0.2.0 // indirect
@@ -187,6 +187,7 @@ require (
 	github.com/ipfs/go-ipfs-pq v0.0.3 // indirect
 	github.com/ipfs/go-ipfs-routing v0.3.0 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.2 // indirect
+	github.com/ipfs/go-ipld-cbor v0.0.6 // indirect
 	github.com/ipfs/go-ipld-legacy v0.1.1 // indirect
 	github.com/ipfs/go-ipns v0.3.0 // indirect
 	github.com/ipfs/go-log v1.0.5 // indirect
@@ -219,7 +220,6 @@ require (
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
-	github.com/libp2p/go-libp2p v0.23.4 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-connmgr v0.4.0 // indirect
 	github.com/libp2p/go-libp2p-consensus v0.0.1 // indirect

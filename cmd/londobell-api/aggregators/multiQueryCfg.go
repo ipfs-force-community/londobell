@@ -16,6 +16,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// multiquery-cfg init; multiquery-segment update; multiquery-cfg update;
 var multiQueryCfgCmd = &cli.Command{
 	Name: "multiquery-cfg",
 	Subcommands: []*cli.Command{
@@ -90,6 +91,13 @@ var cfgUpdateCmd = &cli.Command{
 			Name:  "apis",
 			Usage: "ws://112.124.1.253:1234/rpc/v0",
 		},
+		&cli.IntFlag{
+			Name: "limit",
+		},
+		&cli.IntFlag{
+			Name: "interval",
+		},
+
 		//&cli.BoolFlag{
 		//	Name:  "reverse",
 		//	Value: false,
@@ -103,6 +111,11 @@ var cfgUpdateCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		start := time.Now()
+
+		limit, interval := cctx.Int("limit"), cctx.Int("interval")
+		if limit == 0 || interval == 0 {
+			return fmt.Errorf("invalid limit %v or interval %v", limit, interval)
+		}
 
 		fullnode.API = fullnode.NewAppropriateAPI(cctx.StringSlice("apis"))
 		err := fullnode.API.Choose(context.TODO())
@@ -179,7 +192,8 @@ var cfgUpdateCmd = &cli.Command{
 
 		if !tmp {
 			// todo: 如果load存在？
-			_, ok, err := components.DBStMgr.Stm.LoadDataBaseState(newDB.Url())
+			_, ok, err := components.DBStMgr.Seg.Find(cctx.Context, newDB.Url())
+			//_, ok, err := components.DBStMgr.Stm.LoadDataBaseState(newDB.Url())
 			if err != nil {
 				log.Errorf("load dbState for newDB %v failed: %v", newDB, err)
 			} else if ok && !force {
@@ -187,7 +201,7 @@ var cfgUpdateCmd = &cli.Command{
 			} else if ok && force || !ok {
 				log.Infof("set dbState for newDB %v, ok: %v, force: %v", newDB, ok, force)
 
-				err = components.DBStMgr.FirstSetDataBaseState(cctx.Context, newDB, dbType, formal, tmp)
+				err = components.DBStMgr.FirstSetDataBaseState(cctx.Context, newDB, dbType, formal, tmp, limit, interval)
 				if err != nil {
 					return err
 				}
