@@ -3,7 +3,6 @@ package aggregators
 import (
 	"encoding/json"
 	"net/http"
-	"sort"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/net/context"
@@ -78,10 +77,6 @@ func GetTransferMessageForLargeAmount(c *gin.Context) {
 			return
 		}
 	}
-
-	sort.Slice(transferMessageForLargeAmount, func(i, j int) bool {
-		return transferMessageForLargeAmount[i].Epoch > transferMessageForLargeAmount[j].Epoch
-	})
 
 	res.Data = model.TransferMessagesForLargeAmountRes{TotalCount: totalCount, TransferMessagesForLargeAmount: transferMessageForLargeAmount}
 	c.JSON(http.StatusOK, res)

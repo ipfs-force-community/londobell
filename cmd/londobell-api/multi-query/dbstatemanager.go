@@ -10,19 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ipfs-force-community/londobell/lib/mgoutil"
-
-	"github.com/ipfs-force-community/londobell/common"
-
-	"github.com/hashicorp/go-multierror"
-
 	"go.uber.org/fx"
 
 	"github.com/filecoin-project/lotus/node/config"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
-
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 
@@ -42,88 +35,9 @@ var (
 	ErrNotFoundInDBCollectionsMap = fmt.Errorf("not found in DBCollectionsMap")
 )
 
-type Segment struct {
-	Name string
-
-	DB common.DocumentDB
-}
-
-func NewSegment(ctx GlobalContext, mgr *StateManager) (*Segment, error) {
-	name, has, err := mgr.LoadActive()
-	if err != nil {
-		return nil, err
-	}
-
-	if !has {
-		return nil, fmt.Errorf("no active segment")
-	}
-
-	info, ihas, err := mgr.LoadInfo(name)
-	if err != nil {
-		return nil, fmt.Errorf("load info: %w", err)
-	}
-
-	if !ihas {
-		return nil, fmt.Errorf("info not found")
-	}
-
-	multiWdocs := &mgoutil.MultiDB{}
-
-	for _, write := range info.DSN.NewWrite {
-		wcli, err := mgoutil.Connect(ctx, write)
-		if err != nil {
-			return nil, fmt.Errorf("connect to write db: %w", err)
-		}
-
-		wdb := wcli.Database(name)
-
-		wdoc, err := mgoutil.NewMgoDocDB(ctx, wcli, wdb)
-		if err != nil {
-			return nil, fmt.Errorf("construct write doc db: %w", err)
-		}
-
-		err = multiWdocs.SetDbs(wdoc)
-		if err != nil {
-			return nil, fmt.Errorf("multiwdocs setdbs: %w", err)
-		}
-	}
-
-	return &Segment{
-		Name: name,
-		DB:   multiWdocs,
-	}, nil
-}
-
-func (s *Segment) Update(ctx context.Context, url string, dbState DataBaseState) (int, error) {
-	return s.DB.Update(ctx, "state", bson.D{{Key: "URL", Value: url}}, bson.D{{Key: "$set", Value: dbState}})
-}
-
-func (s *Segment) Find(ctx context.Context, url string) (DataBaseState, bool, error) {
-	//findOpts := make([]*options.FindOptions, 0)
-	//findOpts = append(findOpts, options.Find().SetLimit(-1))
-
-	cursor, err := s.DB.Find(ctx, "state", bson.D{{Key: "URL", Value: url}})
-	if err != nil {
-		return DataBaseState{}, false, err
-	}
-
-	var results []DataBaseState
-
-	if err = cursor.All(ctx, &results); err != nil {
-		return DataBaseState{}, false, err
-	}
-
-	if len(results) == 0 {
-		return DataBaseState{}, false, nil
-	}
-
-	return results[0], true, nil
-}
-
 type DataBaseStateManager struct {
 	fx.In
 	Stm          *StateManager
-	Seg          *Segment
 	DBStateCache *DataBaseStateCache
 	DBCfg        *DBCollectionsConfigMgr
 
@@ -166,8 +80,7 @@ func (dbsm *DataBaseStateManager) GetRepoPath() RepoPath {
 func (dbsm *DataBaseStateManager) GetDataBase(url string) (*DataBaseState, error) {
 	var dbState *DataBaseState
 	if dsc, ok := dbsm.DBStateCache.GetDataBase(url); !ok {
-		ds, found, err := dbsm.Seg.Find(context.TODO(), url)
-		//ds, found, err := dbsm.Stm.LoadDataBaseState(url)
+		ds, found, err := dbsm.Stm.LoadDataBaseState(url)
 		if err != nil {
 			return nil, err
 		}
@@ -432,8 +345,7 @@ func (dbsm *DataBaseStateManager) LoadDBStateCache() error {
 		}
 
 		if _, ok := dbsm.DBStateCache.GetDataBase(cold.Url()); !ok {
-			dbState, found, err := dbsm.Seg.Find(context.TODO(), cold.Url())
-			//dbState, found, err := dbsm.Stm.LoadDataBaseState(cold.Url())
+			dbState, found, err := dbsm.Stm.LoadDataBaseState(cold.Url())
 			if err != nil {
 				return err
 			}
@@ -450,8 +362,7 @@ func (dbsm *DataBaseStateManager) LoadDBStateCache() error {
 		log.Warnf("db %v is invalid", formal)
 	} else {
 		if _, ok := dbsm.DBStateCache.GetDataBase(formal.Url()); !ok {
-			dbState, found, err := dbsm.Seg.Find(context.TODO(), formal.Url())
-			//_, found, err := dbsm.Stm.LoadDataBaseState(formal.Url())
+			_, found, err := dbsm.Stm.LoadDataBaseState(formal.Url())
 			if err != nil {
 				return err
 			}
@@ -460,8 +371,6 @@ func (dbsm *DataBaseStateManager) LoadDBStateCache() error {
 			if !found {
 				return fmt.Errorf("db %v not found in DataBaseState, please run cfgUpdateCmd firstly", formal.Url())
 			}
-
-			dbsm.DBStateCache.SetDataBase(formal.Url(), &dbState)
 		}
 	}
 
@@ -572,8 +481,7 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols Col
 			continue
 		}
 
-		dbState, ok, err := dbsm.Seg.Find(ctx, cold.Url())
-		//dbState, ok, err := dbsm.Stm.LoadDataBaseState(cold.Url())
+		dbState, ok, err := dbsm.Stm.LoadDataBaseState(cold.Url())
 		if err != nil || !ok {
 			return Boundrary{}, fmt.Errorf("load dbState for cold %v failed", cold.Url())
 		}
@@ -620,8 +528,7 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols Col
 		// [2,3)  [5,8)  [10,11)  [13, ...)   [2,5) [8,10) [11,13)
 	case "cold":
 		if !cfg.Formal.IsInvalidDB() {
-			formalState, found, err := dbsm.Seg.Find(ctx, cfg.Formal.Url())
-			//formalState, found, err := dbsm.Stm.LoadDataBaseState(cfg.Formal.Url())
+			formalState, found, err := dbsm.Stm.LoadDataBaseState(cfg.Formal.Url())
 			if err != nil || !found {
 				return Boundrary{}, fmt.Errorf("load dbState for formal %v failed", cfg.Formal.Url())
 			}
@@ -741,7 +648,7 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols Col
 	}
 }
 
-func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, newDB DB, dbType string, formal, tmp bool, limit, interval int) error {
+func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, newDB DB, dbType string, formal, tmp bool) error {
 	cols, err := GetCollectionsForDB(ctx, newDB)
 	if err != nil {
 		log.Errorf("get collections for DB %v failed: %v", newDB, cols)
@@ -762,50 +669,102 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 	}
 
 	log.Infow("begin RefreshDataBaseState...")
-	endEpoch := dbState.EndEpoch
-	dbState.EndEpoch = dbState.StartEpoch
-	for dbState.EndEpoch <= endEpoch {
-		dbState.EndEpoch = dbState.EndEpoch + abi.ChainEpoch(limit*interval)
-		if dbState.EndEpoch > endEpoch {
-			dbState.EndEpoch = endEpoch
-		}
+	//if err := RefreshDataBaseState(ctx, dbState, cols); err != nil {
+	//	log.Errorf("refresh DataBaseState failed: %v", err)
+	//	return err
+	//}
 
-		if err := RefreshDataBaseState(ctx, dbState, cols, limit, interval); err != nil {
-			log.Errorf("refresh DataBaseState failed: %v", err)
-			return err
-		}
-
-		updated, err := dbsm.Seg.Update(ctx, newDB.Url(), *dbState)
-		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState)
-		if err != nil {
-			log.Errorf("set DataBaseState failed: %v", err)
-			return err
-		}
-
-		log.Infof("FirstSetDataBaseState successfully for part, dbState.EndEpoch: %v, updated: %v", dbState.EndEpoch, updated)
+	log.Infow("begin RefreshBlockMsgs...")
+	if err := RefreshBlockMsgs(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		log.Errorf("set DataBaseState failed: %v", err)
+		return err
 	}
 
-	log.Infof("FirstSetDataBaseState successfully, dbState.EndEpoch: %v", dbState.EndEpoch)
+	log.Infow("begin RefreshBlockMsgsByMethodName...")
+	if err := RefreshBlockMsgsByMethodName(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		log.Errorf("set DataBaseState failed: %v", err)
+		return err
+	}
+
+	log.Infow("begin RefreshActorMsgsByMethodName...")
+	if err := RefreshActorMsgsByMethodName(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		log.Errorf("set DataBaseState failed: %v", err)
+		return err
+	}
+
+	log.Infow("begin RefreshActorMsgs...")
+	if err := RefreshActorMsgs(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		log.Errorf("set DataBaseState failed: %v", err)
+		return err
+	}
+
+	log.Infow("begin RefreshActorTransferMsgs...")
+	if err := RefreshActorTransferMsgs(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		log.Errorf("set DataBaseState failed: %v", err)
+		return err
+	}
+
+	log.Infow("begin RefreshMinedMsgsMaps...")
+	if err := RefreshMinedMsgsMaps(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		log.Errorf("set DataBaseState failed: %v", err)
+		return err
+	}
+
+	log.Infow("begin RefreshTransfersForLargeAmount...")
+	if err := RefreshTransfersForLargeAmount(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		log.Errorf("set DataBaseState failed: %v", err)
+		return err
+	}
+
+	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+	//	log.Errorf("set DataBaseState failed: %v", err)
+	//	return err
+	//}
 
 	return nil
 }
 
-func RefreshDataBaseState(ctx context.Context, dbState *DataBaseState, cols Collections, limit, interval int) error {
-	var ewg multierror.Group
-	for i := range Refreshes {
-		i := i
-		refresh := Refreshes[i]
-		ewg.Go(func() error {
-			if err := refresh(ctx, dbState, cols, limit, interval); err != nil {
-				return err
-			}
-
-			return nil
-		})
+func RefreshDataBaseState(ctx context.Context, dbState *DataBaseState, cols Collections) error {
+	if err := RefreshBlockMsgs(ctx, dbState, cols); err != nil {
+		return err
 	}
-
-	if err := ewg.Wait(); err != nil {
-		log.Errorf("RefreshFormalDataBaseState failed: %v", err)
+	if err := RefreshBlockMsgsByMethodName(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := RefreshActorMsgsByMethodName(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := RefreshActorMsgs(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := RefreshActorTransferMsgs(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := RefreshMinedMsgsMaps(ctx, dbState, cols); err != nil {
+		return err
+	}
+	if err := RefreshTransfersForLargeAmount(ctx, dbState, cols); err != nil {
 		return err
 	}
 

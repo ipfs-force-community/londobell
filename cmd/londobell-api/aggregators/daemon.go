@@ -21,15 +21,9 @@ var daemonCmd = &cli.Command{
 			Name:  "RPCListen",
 			Usage: "multiaddr of rpc",
 		},
-		&cli.IntFlag{
-			Name: "limit",
-		},
-		&cli.IntFlag{
-			Name: "interval",
-		},
 	},
 	Action: func(cctx *cli.Context) error {
-		err := server.Run(cctx, false, cctx.Int("limit"), cctx.Int("interval"))
+		err := server.Run(cctx, false)
 		if err != nil {
 			return err
 		}

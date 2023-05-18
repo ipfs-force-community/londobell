@@ -27,13 +27,6 @@ func DBStateManagerOption() dix.Option {
 		dix.Override(new(Config), LoadRaConfig),
 		dix.Override(new(*DataBaseStateCache), NewDataBaseStateCache),
 		dix.Override(new(*DBCollectionsConfigMgr), NewDBCollectionsConfigMgr),
-		SegmentManager(),
-		dix.Override(new(*Segment), NewSegment))
-}
-
-func SegmentManager() dix.Option {
-	return dix.Options(
-		//dix.Override(new(Config), LoadRaConfig),
 		dix.Override(new(SegmentMetaDS), OpenSegmentDS),
 		dix.Override(new(*StateManager), NewStateManagerDS))
 }
@@ -85,13 +78,8 @@ func MultiQuery(ctx context.Context, target ...interface{}) dix.Option {
 
 		dix.If(len(target) > 0, dix.Populate(invokePopulate, target...)),
 
-		//DBStateManagerOption(),
-
-		dix.Override(new(Config), LoadRaConfig),
-		dix.Override(new(*DataBaseStateCache), NewDataBaseStateCache),
-		dix.Override(new(*DBCollectionsConfigMgr), NewDBCollectionsConfigMgr),
-		SegmentManager(),
-		dix.Override(new(*Segment), NewSegment),
+		//dix.Override(new(dtypes.UniversalBlockstore), modules.UniversalBlockstore),
+		DBStateManagerOption(),
 	)
 }
 

@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"sort"
 
 	"github.com/gin-gonic/gin"
-
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -67,10 +65,6 @@ func GetBlockHeader(c *gin.Context) {
 			return
 		}
 	}
-
-	sort.Slice(blockHeaderRes, func(i, j int) bool {
-		return blockHeaderRes[i].Epoch > blockHeaderRes[j].Epoch
-	})
 
 	res.Data = blockHeaderRes
 	c.JSON(http.StatusOK, res)

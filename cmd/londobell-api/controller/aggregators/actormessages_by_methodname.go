@@ -3,16 +3,14 @@ package aggregators
 import (
 	"encoding/json"
 	"net/http"
-	"sort"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/net/context"
-
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
+	"golang.org/x/net/context"
 )
 
 func GetActorMessagesByMethodName(c *gin.Context) {
@@ -83,10 +81,6 @@ func GetActorMessagesByMethodName(c *gin.Context) {
 			return
 		}
 	}
-
-	sort.Slice(messagesByMethodName, func(i, j int) bool {
-		return messagesByMethodName[i].Epoch > messagesByMethodName[j].Epoch
-	})
 
 	res.Data = model.MessagesByMethodNameRes{TotalCount: totalCount, MessagesByMethodName: messagesByMethodName}
 	c.JSON(http.StatusOK, res)
