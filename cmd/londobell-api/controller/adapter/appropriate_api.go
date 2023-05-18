@@ -9,9 +9,10 @@ import (
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/urfave/cli/v2"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/dep"
-	"github.com/urfave/cli/v2"
 
 	"github.com/ipfs-force-community/londobell/common"
 )
@@ -121,8 +122,7 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 
 	// close all inappropriate nodes
 	if candidate.gap > 10 {
-		closeNonCandidate(candidates)
-		return fmt.Errorf("no available APIs: %v, for gap: %v", urls, candidate.gap)
+		log.Warnf("gap %v of candidate %v more than 10", candidate.gap, candidate.url)
 	}
 
 	nonCandidates := make([]Candidate, 0, len(candidates)-1)
