@@ -3,19 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"reflect"
+
 	"github.com/hashicorp/go-multierror"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/common"
-	"github.com/ipfs-force-community/londobell/lib/limiter"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/xuri/excelize/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"io/ioutil"
-	"reflect"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/limiter"
 )
 
 type CountRes struct {
@@ -169,15 +171,39 @@ func WriteToExcel(res []Result) error {
 	f := excelize.NewFile()
 	for i := 0; i < len(res); i++ {
 		if i == 0 {
-			f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+1), "Date")
-			f.SetCellValue("Sheet1", fmt.Sprintf("B%d", i+1), "PowerMessagesCount")
-			f.SetCellValue("Sheet1", fmt.Sprintf("C%d", i+1), "FvmMessagesCount")
-			f.SetCellValue("Sheet1", fmt.Sprintf("D%d", i+1), "AllMessagesCount")
+			err := f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+1), "Date")
+			if err != nil {
+				return err
+			}
+			err = f.SetCellValue("Sheet1", fmt.Sprintf("B%d", i+1), "PowerMessagesCount")
+			if err != nil {
+				return err
+			}
+			err = f.SetCellValue("Sheet1", fmt.Sprintf("C%d", i+1), "FvmMessagesCount")
+			if err != nil {
+				return err
+			}
+			err = f.SetCellValue("Sheet1", fmt.Sprintf("D%d", i+1), "AllMessagesCount")
+			if err != nil {
+				return err
+			}
 		}
-		f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+2), res[i].Date)
-		f.SetCellValue("Sheet1", fmt.Sprintf("B%d", i+2), res[i].PowerCount)
-		f.SetCellValue("Sheet1", fmt.Sprintf("C%d", i+2), res[i].FvmCount)
-		f.SetCellValue("Sheet1", fmt.Sprintf("C%d", i+2), res[i].AllCount)
+		err := f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+2), res[i].Date)
+		if err != nil {
+			return err
+		}
+		err = f.SetCellValue("Sheet1", fmt.Sprintf("B%d", i+2), res[i].PowerCount)
+		if err != nil {
+			return err
+		}
+		err = f.SetCellValue("Sheet1", fmt.Sprintf("C%d", i+2), res[i].FvmCount)
+		if err != nil {
+			return err
+		}
+		err = f.SetCellValue("Sheet1", fmt.Sprintf("D%d", i+2), res[i].AllCount)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := f.SaveAs("excel/messages.xlsx"); err != nil {
