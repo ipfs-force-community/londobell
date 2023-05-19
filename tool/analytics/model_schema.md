@@ -246,6 +246,7 @@
 	"Msg": {
 		"From": "address.Address",
 		"Method": "abi.MethodNum",
+		"MethodName": "string",
 		"To": "address.Address",
 		"Value": "big.Int"
 	},

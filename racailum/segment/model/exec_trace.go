@@ -49,7 +49,7 @@ func NewExecTrace(
 	seq []int,
 	raw *common.ExecutionTraceCompact,
 	returnObj cbor.Er,
-	cost *api.MsgGasCost,
+	cost *api.MsgGasCost, meth string,
 ) (*ExecTrace, *ExecGas, error) {
 	me := &ExecTrace{
 		Cid:          mcid,
@@ -66,6 +66,7 @@ func NewExecTrace(
 		return nil, nil, fmt.Errorf("mirroring message exec: %w", err)
 	}
 
+	me.Msg.MethodName = meth
 	me.SeqIndex = make([][]int, len(seq))
 	for i := range seq {
 		me.SeqIndex[i] = seq[:i+1]
@@ -123,10 +124,11 @@ type ExecTrace struct {
 	Ver string `mir:"-"`
 
 	Msg struct {
-		From   address.Address
-		To     address.Address
-		Method abi.MethodNum
-		Value  abi.TokenAmount
+		From       address.Address
+		To         address.Address
+		Method     abi.MethodNum
+		Value      abi.TokenAmount
+		MethodName string
 	}
 
 	// raw infos
@@ -149,9 +151,11 @@ func (et *ExecTrace) Indexes() [][]string {
 	return [][]string{
 		[]string{execTraceEpochField, "Msg.To", "Msg.Method", "MsgRct.ExitCode"},
 		[]string{execTraceEpochField, "Msg.To", "Seq"},
-		[]string{execTraceEpochField, "Depth"},
 		[]string{"Cid"},
 		[]string{"SignedCid"},
+
+		[]string{"Depth", execTraceEpochField},
+		[]string{"Depth", "Msg.MethodName", execTraceEpochField},
 	}
 }
 
