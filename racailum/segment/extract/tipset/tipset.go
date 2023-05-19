@@ -112,6 +112,11 @@ func init() {
 			Name: "block-message",
 			D:    &model.BlockMessage{},
 		},
+
+		schema.Model{
+			Name: "actor-message",
+			D:    &model.ActorMessage{},
+		},
 	)
 }
 
@@ -268,7 +273,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return nil
 	}
 
-	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage {
+	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage {
 		return nil
 	}
 
@@ -374,7 +379,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	dupmsgs := map[cid.Cid]struct{}{}
 
-	var msgcnt, tracecnt int
+	var msgcnt, tracecnt, actormsgcnt int
 
 	for i := range etraces {
 		p := etraces[i]
@@ -429,6 +434,72 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				//if meg != nil && len(meg.Charges) > 0 {
 				//	res.Docs = append(res.Docs, meg)
 				//}
+			}
+		}
+
+		if ctx.Opts.EnabelExtract.EnableExtractActorMessage {
+			isBlock := false
+			if len(p.seq) == 1 && (strings.HasPrefix(msg.From.String()[1:], "1") || strings.HasPrefix(msg.From.String()[1:], "3") || strings.HasPrefix(msg.From.String()[1:], "4")) {
+				isBlock = true
+			}
+
+			fromErr, toErr := false, false
+			fromActorID, err := ctx.D.LookupID(ctx.C, msg.From, ts.TipSet)
+			if err != nil {
+				elog.Warnf("lookup ID for %v at %v failed: %v", msg.From, ts.Height(), err)
+				fromErr = true
+			}
+
+			toActorID, err := ctx.D.LookupID(ctx.C, msg.To, ts.TipSet)
+			if err != nil {
+				elog.Warnf("lookup ID for %v at %v failed: %v", msg.To, ts.Height(), err)
+				toErr = true
+			}
+
+			if fromErr && toErr {
+				elog.Errorw("lookup ID failed for from & to ", "from", msg.From, "to", msg.To)
+			} else if !fromErr && !toErr {
+				if fromActorID == toActorID {
+					amsg, err := model.NewActorMessage(fromActorID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, "from", msg.From, msg.To, isBlock)
+					if err != nil {
+						elog.Errorw("convert to model.ActorMessage", "fromActorID", fromActorID, "mcid", mcid, "signedCid", signedCid)
+					} else {
+						actormsgcnt++
+						res.Docs = append(res.Docs, amsg)
+					}
+				} else {
+					amsgf, err := model.NewActorMessage(fromActorID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, "from", msg.From, msg.To, isBlock)
+					if err != nil {
+						elog.Errorw("convert to model.ActorMessage", "fromActorID", fromActorID, "mcid", mcid, "signedCid", signedCid)
+					} else {
+						actormsgcnt++
+						res.Docs = append(res.Docs, amsgf)
+					}
+
+					amsgt, err := model.NewActorMessage(toActorID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, "to", msg.From, msg.To, isBlock)
+					if err != nil {
+						elog.Errorw("convert to model.ActorMessage", "fromActorID", fromActorID, "mcid", mcid, "signedCid", signedCid)
+					} else {
+						actormsgcnt++
+						res.Docs = append(res.Docs, amsgt)
+					}
+				}
+			} else if !fromErr {
+				amsg, err := model.NewActorMessage(fromActorID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, "from", msg.From, msg.To, isBlock)
+				if err != nil {
+					elog.Errorw("convert to model.ActorMessage", "fromActorID", fromActorID, "mcid", mcid, "signedCid", signedCid)
+				} else {
+					actormsgcnt++
+					res.Docs = append(res.Docs, amsg)
+				}
+			} else if !toErr {
+				amsg, err := model.NewActorMessage(toActorID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, "from", msg.From, msg.To, isBlock)
+				if err != nil {
+					elog.Errorw("convert to model.ActorMessage", "toActorID", toActorID, "mcid", mcid, "signedCid", signedCid)
+				} else {
+					actormsgcnt++
+					res.Docs = append(res.Docs, amsg)
+				}
 			}
 		}
 	}
