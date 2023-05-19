@@ -49,15 +49,19 @@ func main() {
 	ctx := context.TODO()
 	startEpoch, endEpoch := int64(2599920), int64(2867760)
 	parts := make([]Range, 0)
-	for epoch := startEpoch; epoch < endEpoch; epoch++ {
+	for epoch := startEpoch; epoch < endEpoch; {
 		start := epoch
-		end := epoch + 2880
+		end := start + 2880
 		if end > endEpoch {
 			end = endEpoch
 		}
 
 		parts = append(parts, Range{Start: start, End: end})
+
+		epoch += 2880
 	}
+
+	log.Infof("parts: %v", parts)
 
 	uri := "mongodb://guest:read-only@dds-uf655172d52c38641.mongodb.rds.aliyuncs.com:3717/bell?replicaSet=mgset-65444697"
 	//uri := "mongodb://guest:read-only@dds-uf655172d52c38641732-pub.mongodb.rds.aliyuncs.com:3717/bell?replicaSet=mgset-65444697"
