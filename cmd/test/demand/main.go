@@ -96,6 +96,7 @@ func main() {
 		i := i
 		part := parts[i]
 		ewg.Go(func() error {
+			log.Infof("part: %v", part)
 			if !lim.Acquire(ctx) {
 				return nil
 			}
