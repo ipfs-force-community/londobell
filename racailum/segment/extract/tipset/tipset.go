@@ -17,6 +17,8 @@ import (
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
 	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
+	"go.opencensus.io/trace"
+
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mir"
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
@@ -24,7 +26,6 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
-	"go.opencensus.io/trace"
 
 	"github.com/filecoin-project/lotus/api"
 	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
@@ -419,7 +420,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractExecTrace {
-			met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas)
+			met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name)
 			if err != nil {
 				elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
