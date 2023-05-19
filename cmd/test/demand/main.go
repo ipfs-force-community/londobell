@@ -49,7 +49,7 @@ func main() {
 	ctx := context.TODO()
 	startEpoch, endEpoch := int64(2599920), int64(2867760)
 	parts := make([]Range, 0)
-	for epoch := startEpoch; epoch <= endEpoch; epoch++ {
+	for epoch := startEpoch; epoch < endEpoch; epoch++ {
 		start := epoch
 		end := epoch + 2880
 		if end > endEpoch {
@@ -157,7 +157,7 @@ func main() {
 			}
 
 			result[i] = Result{Date: common.CalcTimeByEpoch(uint64(part.Start)).String(), PowerCount: powerCount, FvmCount: fvmCount, AllCount: allCount}
-			log.Infof("agg successfully for start: %v, res: %+v", part.Start, Result{Date: common.CalcTimeByEpoch(uint64(part.Start)).String(), PowerCount: powerCount, FvmCount: fvmCount, AllCount: allCount})
+			log.Infof("agg successfully for start: %v, end: %v, res: %+v", part.Start, part.End, Result{Date: common.CalcTimeByEpoch(uint64(part.Start)).String(), PowerCount: powerCount, FvmCount: fvmCount, AllCount: allCount})
 			return nil
 		})
 	}
@@ -171,6 +171,8 @@ func main() {
 		log.Error("WriteToExcel faled: %v", err)
 		return
 	}
+
+	log.Infof("write to excel succssflly")
 }
 
 func WriteToExcel(res []Result) error {
