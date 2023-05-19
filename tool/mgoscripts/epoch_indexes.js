@@ -2,6 +2,10 @@ db.ActorBalance.createIndex({"Addresses":1}, {"sparse": true});
 db.ActorBalance.createIndex({"Code":1}, {"sparse": true});
 db.ActorBalance.createIndex({"Addresses":1,"Code":1}, {"sparse": true});
 
+db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"Epoch":1}, {"sparse": true});
+db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"MethodName":1,"Epoch":1}, {"sparse": true});
+db.ActorMessage.createIndex({"ActorID":1,"ExitCode":1,"Type":1,"Epoch":1,"Value":1}, {"sparse": true});
+
 db.ActorState.createIndex({"Epoch":1,"Code":1,"Addr":1}, {"sparse": true});
 
 db.AllocatedSectors.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});

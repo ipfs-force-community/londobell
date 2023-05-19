@@ -6,6 +6,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
+	"testing"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 
@@ -182,3 +191,28 @@ func MockDefaultConfig() Config {
 //	_, err = io.WriteString(file, fmt.Sprintf("startEpoch: %v, endEpoch: %v, NextEpochForBlockMsgsCount: %v, BlockMsgsCount: %v\n", dbState.StartEpoch, dbState.EndEpoch, dbState.NextEpochForBlockMsgsCount, dbState.BlockMsgsCount))
 //	require.NoError(t, err, "write failed")
 //}
+
+func TestGetBlockMsgsCount(t *testing.T) {
+	ctx := context.TODO()
+	uri := "mongodb://guest:read-only@dds-uf655172d52c38641732-pub.mongodb.rds.aliyuncs.com:3717/bell?replicaSet=mgset-65444697"
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri).SetRegistry(bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{})).Build()))
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	db := client.Database("bell")
+	traceCol := db.Collection("ExecTrace")
+
+	fmt.Println("begin query")
+	starttime := time.Now()
+	//{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: 2500422}}}, {Key: "Epoch", Value: bson.D{{Key: "$lt", Value: 2869677}}},
+	//blockFilter := bson.D{{Key: "Depth", Value: 1}, {Key: "$or", Value: []bson.M{{"Msg.From": bson.D{{Key: "$regex", Value: "^1"}}}, {"Msg.From": bson.D{{Key: "$regex", Value: "^3"}}}, {"Msg.From": bson.D{{Key: "$regex", Value: "^4"}}}}}}
+	blockFilter := bson.D{{Key: "Depth", Value: 1}, {Key: "Epoch", Value: bson.D{{Key: "$gte", Value: 2500422}}}, {Key: "Epoch", Value: bson.D{{Key: "$lt", Value: 2869677}}}}
+	count, err := traceCol.CountDocuments(ctx, blockFilter)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	fmt.Printf("count: %v, elapsed: %v\n", count, time.Now().Sub(starttime).String())
+}

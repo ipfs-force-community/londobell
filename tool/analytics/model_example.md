@@ -20,45 +20,34 @@
 ```
 
 
+### ActorMessage
+
+#### actor-message
+
+```
+{
+	"ActorID": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Cid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"Epoch": 0,
+	"ExitCode": 0,
+	"From": "073366",
+	"IsBlock": false,
+	"MethodName": "",
+	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"To": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Type": "",
+	"Value": "340282591298641078465964189926313473653"
+}
+```
+
+
 ### ActorState
 
 #### actor-state: miner.State v0
 
 ```
 {
-	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
-	"Balance": "340282591298641078465964189926313473653",
-	"Code": "",
-	"Detail": {
-		"AllocatedSectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-		"CurrentDeadline": 0,
-		"Deadlines": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-		"EarlyTerminations": {
-			"$binary": {
-				"base64": "UgAQIf/3P/n///0fyP/////+Rw==",
-				"subType": "00"
-			}
-		},
-		"Info": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-		"InitialPledgeRequirement": "340282591298641078465964189926313473653",
-		"LockedFunds": "1073741824",
-		"PreCommitDeposits": "1024",
-		"PreCommittedSectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-		"PreCommittedSectorsExpiry": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-		"ProvingPeriodStart": 0,
-		"Sectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-		"VestingFunds": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
-	},
-	"Epoch": 0,
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
-}
-```
-
-#### actor-state: miner.State v2
-
-```
-{
-	"Addr": "073366",
+	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Balance": "1024",
 	"Code": "",
 	"Detail": {
@@ -67,13 +56,12 @@
 		"Deadlines": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 		"EarlyTerminations": {
 			"$binary": {
-				"base64": "QA==",
+				"base64": "UgAQIf/3P/n///0fyP/////+Rw==",
 				"subType": "00"
 			}
 		},
-		"FeeDebt": "1024",
 		"Info": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-		"InitialPledge": "1073741824",
+		"InitialPledgeRequirement": "1024",
 		"LockedFunds": "340282591298641078465964189926313473653",
 		"PreCommitDeposits": "1073741824",
 		"PreCommittedSectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
@@ -87,12 +75,12 @@
 }
 ```
 
-#### actor-state: miner.State v3
+#### actor-state: miner.State v2
 
 ```
 {
-	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
-	"Balance": "340282591298641078465964189926313473653",
+	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Balance": "1073741824",
 	"Code": "",
 	"Detail": {
 		"AllocatedSectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
@@ -100,15 +88,15 @@
 		"Deadlines": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 		"EarlyTerminations": {
 			"$binary": {
-				"base64": "UgAQIf/3P/n///0fyP/////+Rw==",
+				"base64": "QA==",
 				"subType": "00"
 			}
 		},
-		"FeeDebt": "340282591298641078465964189926313473653",
+		"FeeDebt": "1073741824",
 		"Info": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-		"InitialPledge": "1024",
-		"LockedFunds": "1073741824",
-		"PreCommitDeposits": "1024",
+		"InitialPledge": "340282591298641078465964189926313473653",
+		"LockedFunds": "1024",
+		"PreCommitDeposits": "340282591298641078465964189926313473653",
 		"PreCommittedSectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 		"PreCommittedSectorsExpiry": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 		"ProvingPeriodStart": 0,
@@ -120,29 +108,28 @@
 }
 ```
 
-#### actor-state: miner.State v4
+#### actor-state: miner.State v3
 
 ```
 {
-	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
-	"Balance": "1073741824",
+	"Addr": "073366",
+	"Balance": "1024",
 	"Code": "",
 	"Detail": {
 		"AllocatedSectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 		"CurrentDeadline": 0,
-		"DeadlineCronActive": false,
 		"Deadlines": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 		"EarlyTerminations": {
 			"$binary": {
-				"base64": "QA==",
+				"base64": "UgAQIf/3P/n///0fyP/////+Rw==",
 				"subType": "00"
 			}
 		},
-		"FeeDebt": "1073741824",
+		"FeeDebt": "1024",
 		"Info": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-		"InitialPledge": "340282591298641078465964189926313473653",
-		"LockedFunds": "1024",
-		"PreCommitDeposits": "340282591298641078465964189926313473653",
+		"InitialPledge": "1073741824",
+		"LockedFunds": "340282591298641078465964189926313473653",
+		"PreCommitDeposits": "1073741824",
 		"PreCommittedSectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 		"PreCommittedSectorsExpiry": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 		"ProvingPeriodStart": 0,
@@ -154,12 +141,12 @@
 }
 ```
 
-#### actor-state: miner.State v5
+#### actor-state: miner.State v4
 
 ```
 {
-	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
-	"Balance": "1024",
+	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Balance": "340282591298641078465964189926313473653",
 	"Code": "",
 	"Detail": {
 		"AllocatedSectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
@@ -168,23 +155,57 @@
 		"Deadlines": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 		"EarlyTerminations": {
 			"$binary": {
-				"base64": "UgAQIf/3P/n///0fyP/////+Rw==",
+				"base64": "QA==",
 				"subType": "00"
 			}
 		},
-		"FeeDebt": "1024",
+		"FeeDebt": "340282591298641078465964189926313473653",
 		"Info": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-		"InitialPledge": "1073741824",
-		"LockedFunds": "340282591298641078465964189926313473653",
-		"PreCommitDeposits": "1073741824",
+		"InitialPledge": "1024",
+		"LockedFunds": "1073741824",
+		"PreCommitDeposits": "1024",
 		"PreCommittedSectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-		"PreCommittedSectorsCleanUp": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+		"PreCommittedSectorsExpiry": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 		"ProvingPeriodStart": 0,
 		"Sectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 		"VestingFunds": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	},
 	"Epoch": 0,
 	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+}
+```
+
+#### actor-state: miner.State v5
+
+```
+{
+	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"Balance": "1073741824",
+	"Code": "",
+	"Detail": {
+		"AllocatedSectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+		"CurrentDeadline": 0,
+		"DeadlineCronActive": false,
+		"Deadlines": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+		"EarlyTerminations": {
+			"$binary": {
+				"base64": "UgAQIf/3P/n///0fyP/////+Rw==",
+				"subType": "00"
+			}
+		},
+		"FeeDebt": "1073741824",
+		"Info": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+		"InitialPledge": "340282591298641078465964189926313473653",
+		"LockedFunds": "1024",
+		"PreCommitDeposits": "340282591298641078465964189926313473653",
+		"PreCommittedSectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+		"PreCommittedSectorsCleanUp": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+		"ProvingPeriodStart": 0,
+		"Sectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+		"VestingFunds": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	},
+	"Epoch": 0,
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -192,33 +213,33 @@
 
 ```
 {
-	"Addr": "073366",
-	"Balance": "340282591298641078465964189926313473653",
+	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Balance": "1024",
 	"Code": "",
 	"Detail": {
-		"AllocatedSectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+		"AllocatedSectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 		"CurrentDeadline": 0,
 		"DeadlineCronActive": false,
-		"Deadlines": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+		"Deadlines": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 		"EarlyTerminations": {
 			"$binary": {
 				"base64": "QA==",
 				"subType": "00"
 			}
 		},
-		"FeeDebt": "340282591298641078465964189926313473653",
-		"Info": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-		"InitialPledge": "1024",
-		"LockedFunds": "1073741824",
-		"PreCommitDeposits": "1024",
-		"PreCommittedSectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-		"PreCommittedSectorsCleanUp": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+		"FeeDebt": "1024",
+		"Info": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+		"InitialPledge": "1073741824",
+		"LockedFunds": "340282591298641078465964189926313473653",
+		"PreCommitDeposits": "1073741824",
+		"PreCommittedSectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+		"PreCommittedSectorsCleanUp": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 		"ProvingPeriodStart": 0,
-		"Sectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-		"VestingFunds": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"Sectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+		"VestingFunds": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	},
 	"Epoch": 0,
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -226,8 +247,76 @@
 
 ```
 {
+	"Addr": "073366",
+	"Balance": "340282591298641078465964189926313473653",
+	"Code": "",
+	"Detail": {
+		"AllocatedSectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+		"CurrentDeadline": 0,
+		"DeadlineCronActive": false,
+		"Deadlines": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+		"EarlyTerminations": {
+			"$binary": {
+				"base64": "UgAQIf/3P/n///0fyP/////+Rw==",
+				"subType": "00"
+			}
+		},
+		"FeeDebt": "340282591298641078465964189926313473653",
+		"Info": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+		"InitialPledge": "1024",
+		"LockedFunds": "1073741824",
+		"PreCommitDeposits": "1024",
+		"PreCommittedSectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+		"PreCommittedSectorsCleanUp": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+		"ProvingPeriodStart": 0,
+		"Sectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+		"VestingFunds": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	},
+	"Epoch": 0,
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+}
+```
+
+#### actor-state: miner.State v8
+
+```
+{
 	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Balance": "1073741824",
+	"Code": "",
+	"Detail": {
+		"AllocatedSectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+		"CurrentDeadline": 0,
+		"DeadlineCronActive": false,
+		"Deadlines": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+		"EarlyTerminations": {
+			"$binary": {
+				"base64": "QA==",
+				"subType": "00"
+			}
+		},
+		"FeeDebt": "1073741824",
+		"Info": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+		"InitialPledge": "340282591298641078465964189926313473653",
+		"LockedFunds": "1024",
+		"PreCommitDeposits": "340282591298641078465964189926313473653",
+		"PreCommittedSectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+		"PreCommittedSectorsCleanUp": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+		"ProvingPeriodStart": 0,
+		"Sectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+		"VestingFunds": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	},
+	"Epoch": 0,
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+}
+```
+
+#### actor-state: miner.State v9
+
+```
+{
+	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"Balance": "1024",
 	"Code": "",
 	"Detail": {
 		"AllocatedSectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
@@ -240,11 +329,11 @@
 				"subType": "00"
 			}
 		},
-		"FeeDebt": "1073741824",
+		"FeeDebt": "1024",
 		"Info": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-		"InitialPledge": "340282591298641078465964189926313473653",
-		"LockedFunds": "1024",
-		"PreCommitDeposits": "340282591298641078465964189926313473653",
+		"InitialPledge": "1073741824",
+		"LockedFunds": "340282591298641078465964189926313473653",
+		"PreCommitDeposits": "1073741824",
 		"PreCommittedSectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 		"PreCommittedSectorsCleanUp": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 		"ProvingPeriodStart": 0,
@@ -256,12 +345,12 @@
 }
 ```
 
-#### actor-state: miner.State v8
+#### actor-state: miner.State v10
 
 ```
 {
-	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
-	"Balance": "1024",
+	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Balance": "340282591298641078465964189926313473653",
 	"Code": "",
 	"Detail": {
 		"AllocatedSectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
@@ -274,11 +363,11 @@
 				"subType": "00"
 			}
 		},
-		"FeeDebt": "1024",
+		"FeeDebt": "340282591298641078465964189926313473653",
 		"Info": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-		"InitialPledge": "1073741824",
-		"LockedFunds": "340282591298641078465964189926313473653",
-		"PreCommitDeposits": "1073741824",
+		"InitialPledge": "1024",
+		"LockedFunds": "1073741824",
+		"PreCommitDeposits": "1024",
 		"PreCommittedSectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 		"PreCommittedSectorsCleanUp": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 		"ProvingPeriodStart": 0,
@@ -290,12 +379,12 @@
 }
 ```
 
-#### actor-state: miner.State v9
+#### actor-state: miner.State v11
 
 ```
 {
-	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
-	"Balance": "340282591298641078465964189926313473653",
+	"Addr": "073366",
+	"Balance": "1073741824",
 	"Code": "",
 	"Detail": {
 		"AllocatedSectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
@@ -308,11 +397,11 @@
 				"subType": "00"
 			}
 		},
-		"FeeDebt": "340282591298641078465964189926313473653",
+		"FeeDebt": "1073741824",
 		"Info": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-		"InitialPledge": "1024",
-		"LockedFunds": "1073741824",
-		"PreCommitDeposits": "1024",
+		"InitialPledge": "340282591298641078465964189926313473653",
+		"LockedFunds": "1024",
+		"PreCommitDeposits": "340282591298641078465964189926313473653",
 		"PreCommittedSectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 		"PreCommittedSectorsCleanUp": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 		"ProvingPeriodStart": 0,
@@ -321,74 +410,6 @@
 	},
 	"Epoch": 0,
 	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
-}
-```
-
-#### actor-state: miner.State v10
-
-```
-{
-	"Addr": "073366",
-	"Balance": "1073741824",
-	"Code": "",
-	"Detail": {
-		"AllocatedSectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-		"CurrentDeadline": 0,
-		"DeadlineCronActive": false,
-		"Deadlines": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-		"EarlyTerminations": {
-			"$binary": {
-				"base64": "QA==",
-				"subType": "00"
-			}
-		},
-		"FeeDebt": "1073741824",
-		"Info": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-		"InitialPledge": "340282591298641078465964189926313473653",
-		"LockedFunds": "1024",
-		"PreCommitDeposits": "340282591298641078465964189926313473653",
-		"PreCommittedSectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-		"PreCommittedSectorsCleanUp": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-		"ProvingPeriodStart": 0,
-		"Sectors": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-		"VestingFunds": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
-	},
-	"Epoch": 0,
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
-}
-```
-
-#### actor-state: miner.State v11
-
-```
-{
-	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
-	"Balance": "1024",
-	"Code": "",
-	"Detail": {
-		"AllocatedSectors": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-		"CurrentDeadline": 0,
-		"DeadlineCronActive": false,
-		"Deadlines": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-		"EarlyTerminations": {
-			"$binary": {
-				"base64": "UgAQIf/3P/n///0fyP/////+Rw==",
-				"subType": "00"
-			}
-		},
-		"FeeDebt": "1024",
-		"Info": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-		"InitialPledge": "1073741824",
-		"LockedFunds": "340282591298641078465964189926313473653",
-		"PreCommitDeposits": "1073741824",
-		"PreCommittedSectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-		"PreCommittedSectorsCleanUp": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-		"ProvingPeriodStart": 0,
-		"Sectors": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-		"VestingFunds": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
-	},
-	"Epoch": 0,
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -399,7 +420,7 @@
 
 ```
 {
-	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
 		"Count": 0,
 		"RawBytes": 0,
@@ -413,9 +434,9 @@
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -428,7 +449,7 @@
 {
 	"AllocationID": 0,
 	"Client": 0,
-	"Data": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"Data": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 	"Epoch": 0,
 	"Expiration": 0,
 	"Provider": 0,
@@ -445,7 +466,7 @@
 {
 	"AllocationID": 0,
 	"Client": 0,
-	"Data": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"Data": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 	"Epoch": 0,
 	"Expiration": 0,
 	"Provider": 0,
@@ -474,8 +495,8 @@
 	},
 	"Epoch": 0,
 	"MessageCount": 0,
-	"Messages": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-	"Miner": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Messages": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+	"Miner": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Ticket": {
 		"VRFProof": {
 			"$binary": {
@@ -484,7 +505,7 @@
 			}
 		}
 	},
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -497,9 +518,9 @@
 {
 	"Epoch": 0,
 	"Messages": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -510,16 +531,16 @@
 
 ```
 {
-	"Addr": "073366",
+	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 	"Detail": {
-		"QualityAdjPower": "1024",
-		"RawBytePower": "340282591298641078465964189926313473653"
+		"QualityAdjPower": "1073741824",
+		"RawBytePower": "1024"
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	],
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -527,17 +548,17 @@
 
 ```
 {
-	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Addr": "073366",
 	"Detail": {
-		"QualityAdjPower": "340282591298641078465964189926313473653",
-		"RawBytePower": "1073741824",
+		"QualityAdjPower": "1024",
+		"RawBytePower": "340282591298641078465964189926313473653",
 		"WindowPoStProofType": 0
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -545,17 +566,17 @@
 
 ```
 {
-	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
-		"QualityAdjPower": "1073741824",
-		"RawBytePower": "1024",
+		"QualityAdjPower": "340282591298641078465964189926313473653",
+		"RawBytePower": "1073741824",
 		"WindowPoStProofType": 0
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -563,17 +584,17 @@
 
 ```
 {
-	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
-		"QualityAdjPower": "1024",
-		"RawBytePower": "340282591298641078465964189926313473653",
+		"QualityAdjPower": "1073741824",
+		"RawBytePower": "1024",
 		"SealProofType": 0
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	],
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -581,6 +602,24 @@
 
 ```
 {
+	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Detail": {
+		"QualityAdjPower": "1024",
+		"RawBytePower": "340282591298641078465964189926313473653",
+		"WindowPoStProofType": 0
+	},
+	"Epoch": 0,
+	"Path": [
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	],
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+}
+```
+
+#### claimed-power-v4
+
+```
+{
 	"Addr": "073366",
 	"Detail": {
 		"QualityAdjPower": "340282591298641078465964189926313473653",
@@ -589,13 +628,13 @@
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
-#### claimed-power-v4
+#### claimed-power-v5
 
 ```
 {
@@ -607,13 +646,13 @@
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	],
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
-#### claimed-power-v5
+#### claimed-power-v6
 
 ```
 {
@@ -625,13 +664,13 @@
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
-#### claimed-power-v6
+#### claimed-power-v7
 
 ```
 {
@@ -643,13 +682,13 @@
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
-#### claimed-power-v7
+#### claimed-power-v8
 
 ```
 {
@@ -661,13 +700,13 @@
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	],
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
-#### claimed-power-v8
+#### claimed-power-v9
 
 ```
 {
@@ -679,27 +718,9 @@
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
-}
-```
-
-#### claimed-power-v9
-
-```
-{
-	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
-	"Detail": {
-		"QualityAdjPower": "340282591298641078465964189926313473653",
-		"RawBytePower": "1073741824",
-		"WindowPoStProofType": 0
-	},
-	"Epoch": 0,
-	"Path": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
-	],
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -712,7 +733,7 @@
 {
 	"ClaimID": 0,
 	"Client": 0,
-	"Data": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"Data": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 	"Epoch": 0,
 	"Provider": 0,
 	"Sector": 0,
@@ -730,7 +751,7 @@
 {
 	"ClaimID": 0,
 	"Client": 0,
-	"Data": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+	"Data": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 	"Epoch": 0,
 	"Provider": 0,
 	"Sector": 0,
@@ -749,11 +770,11 @@
 
 ```
 {
-	"Amount": "1024",
+	"Amount": "1073741824",
 	"Epoch": 0,
 	"Operator": 0,
 	"Owner": 0,
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -761,11 +782,11 @@
 
 ```
 {
-	"Amount": "1073741824",
+	"Amount": "340282591298641078465964189926313473653",
 	"Epoch": 0,
 	"Operator": 0,
 	"Owner": 0,
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -776,10 +797,10 @@
 
 ```
 {
-	"Amount": "340282591298641078465964189926313473653",
+	"Amount": "1024",
 	"Epoch": 0,
 	"Owner": 0,
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -787,10 +808,10 @@
 
 ```
 {
-	"Amount": "1024",
+	"Amount": "1073741824",
 	"Epoch": 0,
 	"Owner": 0,
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -801,17 +822,17 @@
 
 ```
 {
-	"Client": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
-	"ClientCollateral": "1024",
+	"Client": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"ClientCollateral": "1073741824",
 	"EndEpoch": 0,
 	"Epoch": 0,
 	"Label": "",
-	"PieceCID": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"PieceCID": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 	"PieceSize": 0,
-	"Provider": "073366",
-	"ProviderCollateral": "340282591298641078465964189926313473653",
+	"Provider": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"ProviderCollateral": "1024",
 	"StartEpoch": 0,
-	"StoragePricePerEpoch": "1073741824",
+	"StoragePricePerEpoch": "340282591298641078465964189926313473653",
 	"VerifiedDeal": false,
 	"_id": 0
 }
@@ -825,12 +846,12 @@
 ```
 {
 	"ActorStateExBasic": {
-		"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+		"Addr": "073366",
 		"Epoch": 0,
 		"Path": [
-			"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+			"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 		],
-		"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	},
 	"Detail": {
 		"UnVerifiedDealCount": 0,
@@ -849,28 +870,28 @@
 ```
 {
 	"ActorStateExBasic": {
-		"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+		"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 		"Epoch": 0,
 		"Path": [
-			"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+			"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 		],
-		"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+		"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	},
 	"Detail": {
 		"Regular": {
-			"ClientCollateral": "1024",
+			"ClientCollateral": "1073741824",
 			"Clients": 0,
 			"Count": 0,
-			"PieceSize": "1073741824",
-			"ProviderCollateral": "340282591298641078465964189926313473653",
+			"PieceSize": "340282591298641078465964189926313473653",
+			"ProviderCollateral": "1024",
 			"Providers": 0
 		},
 		"Verified": {
-			"ClientCollateral": "1024",
+			"ClientCollateral": "1073741824",
 			"Clients": 0,
 			"Count": 0,
-			"PieceSize": "1073741824",
-			"ProviderCollateral": "340282591298641078465964189926313473653",
+			"PieceSize": "340282591298641078465964189926313473653",
+			"ProviderCollateral": "1024",
 			"Providers": 0
 		}
 	}
@@ -908,7 +929,7 @@
 
 ```
 {
-	"Cid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"Cid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 	"Depth": 0,
 	"Detail": {
 		"Return": {
@@ -926,19 +947,19 @@
 	"Epoch": 0,
 	"Error": "",
 	"GasCost": {
-		"BaseFeeBurn": "340282591298641078465964189926313473653",
-		"GasUsed": "1073741824",
-		"Message": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-		"MinerPenalty": "1073741824",
-		"MinerTip": "340282591298641078465964189926313473653",
-		"OverEstimationBurn": "1024",
-		"Refund": "1024",
-		"TotalCost": "1073741824"
+		"BaseFeeBurn": "1024",
+		"GasUsed": "340282591298641078465964189926313473653",
+		"Message": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+		"MinerPenalty": "340282591298641078465964189926313473653",
+		"MinerTip": "1024",
+		"OverEstimationBurn": "1073741824",
+		"Refund": "1073741824",
+		"TotalCost": "340282591298641078465964189926313473653"
 	},
 	"Msg": {
-		"From": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+		"From": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 		"Method": 2,
-		"To": "073366"
+		"To": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla"
 	},
 	"MsgRct": {
 		"EventsRoot": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
@@ -959,7 +980,7 @@
 			0
 		]
 	],
-	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 	"SubCallCount": 0,
 	"Ver": "",
 	"_id": ""
@@ -974,12 +995,12 @@
 ```
 {
 	"CirculatingSupply": {
-		"FilBurnt": "1073741824",
-		"FilCirculating": "1024",
-		"FilLocked": "340282591298641078465964189926313473653",
-		"FilMined": "1024",
-		"FilReserveDisbursed": "1073741824",
-		"FilVested": "340282591298641078465964189926313473653"
+		"FilBurnt": "340282591298641078465964189926313473653",
+		"FilCirculating": "1073741824",
+		"FilLocked": "1024",
+		"FilMined": "1073741824",
+		"FilReserveDisbursed": "340282591298641078465964189926313473653",
+		"FilVested": "1024"
 	},
 	"_id": 0
 }
@@ -993,7 +1014,7 @@
 ```
 {
 	"Cids": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
 	"_id": 0
 }
@@ -1006,27 +1027,27 @@
 
 ```
 {
-	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Addr": "073366",
 	"Detail": {
 		"ClientUnLockCollateralInFuture": [
-			"1024"
-		],
-		"ClientUnlockStorageFeeInFuture": [
-			"340282591298641078465964189926313473653"
-		],
-		"ProviderUnLockCollateralInFuture": [
 			"1073741824"
 		],
-		"TotalClientLockedCollateral": "1024",
-		"TotalClientStorageFee": "340282591298641078465964189926313473653",
-		"TotalLocked": "340282591298641078465964189926313473653",
-		"TotalProviderLockedCollateral": "1073741824"
+		"ClientUnlockStorageFeeInFuture": [
+			"1024"
+		],
+		"ProviderUnLockCollateralInFuture": [
+			"340282591298641078465964189926313473653"
+		],
+		"TotalClientLockedCollateral": "1073741824",
+		"TotalClientStorageFee": "1024",
+		"TotalLocked": "1024",
+		"TotalProviderLockedCollateral": "340282591298641078465964189926313473653"
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -1052,12 +1073,12 @@
 			"ReplaceSectorPartition": 0,
 			"SealProof": 0,
 			"SealRandEpoch": 0,
-			"SealedCID": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+			"SealedCID": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 			"SectorNumber": 0
 		}
 	},
-	"SignedCid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -1080,12 +1101,12 @@
 			"ReplaceSectorPartition": 0,
 			"SealProof": 0,
 			"SealRandEpoch": 0,
-			"SealedCID": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+			"SealedCID": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 			"SectorNumber": 0
 		}
 	},
-	"SignedCid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -1105,12 +1126,12 @@
 					"subType": "00"
 				}
 			},
-			"To": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
-			"Value": "1024"
+			"To": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+			"Value": "1073741824"
 		}
 	},
-	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -1130,12 +1151,12 @@
 					"subType": "00"
 				}
 			},
-			"To": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
-			"Value": "1073741824"
+			"To": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+			"Value": "340282591298641078465964189926313473653"
 		}
 	},
-	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"SignedCid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -1149,14 +1170,14 @@
 	"DealIDs": [
 		0
 	],
-	"DealWeight": "340282591298641078465964189926313473653",
+	"DealWeight": "1024",
 	"Epoch": 0,
-	"InitialPledge": "1073741824",
-	"Miner": "073366",
-	"QAPower": "340282591298641078465964189926313473653",
+	"InitialPledge": "340282591298641078465964189926313473653",
+	"Miner": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"QAPower": "1024",
 	"SealProof": 0,
 	"SectorNumber": 0,
-	"VerifiedDealWeight": "1024",
+	"VerifiedDealWeight": "1073741824",
 	"_id": ""
 }
 ```
@@ -1168,34 +1189,34 @@
 
 ```
 {
-	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Addr": "073366",
 	"Detail": {
-		"FeeDebt": "340282591298641078465964189926313473653",
-		"InitialPledge": "1024",
-		"LockedFunds": "1073741824",
+		"FeeDebt": "1024",
+		"InitialPledge": "1073741824",
+		"LockedFunds": "340282591298641078465964189926313473653",
 		"PledgeRelease": [
-			"340282591298641078465964189926313473653"
+			"1024"
 		],
-		"PreCommitDeposits": "1024",
+		"PreCommitDeposits": "1073741824",
 		"VestInFuture": [
-			"1073741824"
+			"340282591298641078465964189926313473653"
 		]
 	},
 	"Epoch": 0,
 	"Info": {
-		"AvailableBalance": "1073741824",
-		"Balance": "1024",
-		"Beneficiary": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+		"AvailableBalance": "340282591298641078465964189926313473653",
+		"Balance": "1073741824",
+		"Beneficiary": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 		"BeneficiaryTerm": {
 			"Expiration": 0,
-			"Quota": "1024",
-			"UsedQuota": "1073741824"
+			"Quota": "1073741824",
+			"UsedQuota": "340282591298641078465964189926313473653"
 		},
 		"ConsensusFaultElapsed": 0,
 		"ControlAddresses": [
-			"073366"
+			"3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla"
 		],
-		"FeeDebt": "340282591298641078465964189926313473653",
+		"FeeDebt": "1024",
 		"Multiaddrs": [
 			{
 				"$binary": {
@@ -1204,7 +1225,7 @@
 				}
 			}
 		],
-		"Owner": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+		"Owner": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 		"PeerID": {
 			"$binary": {
 				"base64": "SGVsbG8=",
@@ -1214,26 +1235,26 @@
 		"PendingBeneficiaryTerm": {
 			"ApprovedByBeneficiary": false,
 			"ApprovedByNominee": false,
-			"NewBeneficiary": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+			"NewBeneficiary": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 			"NewExpiration": 0,
-			"NewQuota": "340282591298641078465964189926313473653"
+			"NewQuota": "1024"
 		},
 		"PendingOwnerAddress": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 		"PendingWorkerKey": {
 			"EffectiveAt": 0,
-			"NewWorker": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq"
+			"NewWorker": "073366"
 		},
 		"PrecommitSectorCount": 0,
 		"SectorSize": 0,
 		"State": null,
 		"WindowPoStPartitionSectors": 0,
 		"WindowPoStProofType": 0,
-		"Worker": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla"
+		"Worker": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q"
 	},
 	"Path": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -1244,7 +1265,7 @@
 
 ```
 {
-	"Addr": "073366",
+	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 	"Detail": {
 		"CommittedCapacity": 0,
 		"Summaries": [
@@ -1252,39 +1273,14 @@
 				"DealCount": 0,
 				"LowerBound": 0,
 				"SectorCount": 0,
-				"TotalDealWeight": "1024",
-				"TotalInitialPledge": "340282591298641078465964189926313473653",
-				"TotalV1InitialPledge": "1024",
-				"TotalVerifiedDealWeight": "1073741824",
+				"TotalDealWeight": "1073741824",
+				"TotalInitialPledge": "1024",
+				"TotalV1InitialPledge": "1073741824",
+				"TotalVerifiedDealWeight": "340282591298641078465964189926313473653",
 				"UpperBound": 0,
 				"V1SectorCount": 0
 			}
 		]
-	},
-	"Epoch": 0,
-	"Path": [
-		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
-	],
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
-}
-```
-
-
-### MiningProfitability
-
-#### mining-profitability
-
-```
-{
-	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
-	"Detail": {
-		"ExpectedDayReward": "1073741824",
-		"InitialConsensusPledge": "1024",
-		"InitialPledge": "340282591298641078465964189926313473653",
-		"InitialStoragePledge": "1073741824",
-		"Mined": "1073741824",
-		"ProjectionOfFaultFee": "1024",
-		"ProjectionOfInitialPledge": "340282591298641078465964189926313473653"
 	},
 	"Epoch": 0,
 	"Path": [
@@ -1295,19 +1291,21 @@
 ```
 
 
-### MultisigBalance
+### MiningProfitability
 
-#### multisig-balance
+#### mining-profitability
 
 ```
 {
-	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"Addr": "073366",
 	"Detail": {
-		"Locked": "340282591298641078465964189926313473653",
-		"VestInFuture": [
-			"1073741824"
-		],
-		"Vested": "1024"
+		"ExpectedDayReward": "340282591298641078465964189926313473653",
+		"InitialConsensusPledge": "1073741824",
+		"InitialPledge": "1024",
+		"InitialStoragePledge": "340282591298641078465964189926313473653",
+		"Mined": "340282591298641078465964189926313473653",
+		"ProjectionOfFaultFee": "1073741824",
+		"ProjectionOfInitialPledge": "1024"
 	},
 	"Epoch": 0,
 	"Path": [
@@ -1318,26 +1316,19 @@
 ```
 
 
-### PendingTxns
+### MultisigBalance
 
-#### pending-txns
+#### multisig-balance
 
 ```
 {
-	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
-		"Approved": [
-			"1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq"
+		"Locked": "1024",
+		"VestInFuture": [
+			"340282591298641078465964189926313473653"
 		],
-		"Params": {
-			"$binary": {
-				"base64": "SGVsbG8=",
-				"subType": "00"
-			}
-		},
-		"To": "073366",
-		"TxnID": 0,
-		"Value": "340282591298641078465964189926313473653"
+		"Vested": "1073741824"
 	},
 	"Epoch": 0,
 	"Path": [
@@ -1348,21 +1339,51 @@
 ```
 
 
+### PendingTxns
+
+#### pending-txns
+
+```
+{
+	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"Detail": {
+		"Approved": [
+			"073366"
+		],
+		"Params": {
+			"$binary": {
+				"base64": "SGVsbG8=",
+				"subType": "00"
+			}
+		},
+		"To": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+		"TxnID": 0,
+		"Value": "1024"
+	},
+	"Epoch": 0,
+	"Path": [
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	],
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+}
+```
+
+
 ### Tipset
 
 #### tipset
 
 ```
 {
-	"BaseFee": "1073741824",
+	"BaseFee": "340282591298641078465964189926313473653",
 	"ChildEpoch": 0,
 	"Cids": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
 	"MinTimestamp": 0,
-	"Receipts": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-	"State": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-	"Weight": "1024",
+	"Receipts": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"State": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+	"Weight": "1073741824",
 	"_id": 0
 }
 ```
@@ -1374,16 +1395,16 @@
 
 ```
 {
-	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
-		"Cap": "340282591298641078465964189926313473653",
+		"Cap": "1024",
 		"Type": ""
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 

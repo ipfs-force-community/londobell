@@ -13,6 +13,24 @@
 }
 ```
 
+### ActorMessage
+
+```
+{
+	"ActorID": "address.Address",
+	"Cid": "cid.Cid",
+	"Epoch": "abi.ChainEpoch",
+	"ExitCode": "exitcode.ExitCode",
+	"From": "address.Address",
+	"IsBlock": "bool",
+	"MethodName": "string",
+	"SignedCid": "cid.Cid",
+	"To": "address.Address",
+	"Type": "string",
+	"Value": "big.Int"
+}
+```
+
 ### ActorState
 
 ```
