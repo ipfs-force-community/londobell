@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"reflect"
 
+	"github.com/filecoin-project/lotus/lib/lotuslog"
+
 	"github.com/hashicorp/go-multierror"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/xuri/excelize/v2"
@@ -40,6 +42,10 @@ var log = logging.Logger("demand")
 
 func main() {
 	// 2/14-5/18
+	lotuslog.SetupLogLevels()
+	logging.SetLogLevel("rpc", "FATAL")
+
+	log.Info("begin demand")
 	ctx := context.TODO()
 	startEpoch, endEpoch := int64(2599920), int64(2867760)
 	parts := make([]Range, 0)
