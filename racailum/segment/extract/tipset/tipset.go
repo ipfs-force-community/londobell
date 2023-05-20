@@ -488,13 +488,11 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				storeMap[toActorID] = "to"
 			}
 
-			elog.Infof("storeMap at %v: %v", ts.TipSet.Height(), storeMap)
 			for ID, mtype := range storeMap {
 				amsg, err := model.NewActorMessage(ID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock)
 				if err != nil {
 					elog.Errorw("convert to model.ActorMessage", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
 				} else {
-					elog.Infow("convert to model.ActorMessage successfully", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
 					actorMsgCnt++
 					res.Docs = append(res.Docs, amsg)
 				}
@@ -502,7 +500,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 	}
 
-	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt)
+	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt)
 
 	return nil
 }

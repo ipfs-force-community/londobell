@@ -192,7 +192,8 @@ func (s *Segment) DeleteItemsByEpoch(ctx context.Context, l *zap.SugaredLogger, 
 	filterMap["Tipset"] = idFliter
 	//filterMap["MessageBlock"] = epochFilter
 	filterMap["BlockMessage"] = epochFilter
-	tables := []string{"ExecTrace", "Message", "Tipset", "BlockMessage"}
+	filterMap["ActorMessage"] = epochFilter
+	tables := []string{"ExecTrace", "Message", "Tipset", "BlockMessage", "ActorMessage"}
 
 	for _, table := range tables {
 		//todo: 根据表名构造出document
