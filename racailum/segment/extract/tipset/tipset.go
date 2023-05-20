@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/go-address"
@@ -112,6 +113,11 @@ func init() {
 			Name: "block-message",
 			D:    &model.BlockMessage{},
 		},
+
+		schema.Model{
+			Name: "actor-message",
+			D:    &model.ActorMessage{},
+		},
 	)
 }
 
@@ -144,6 +150,32 @@ var extractors = []extractor{
 		name:   "block-message",
 		method: extractBlockMessage,
 	},
+}
+
+var ActorIDMapping = NewActorIDMap()
+
+type ActorIDMap struct {
+	m  map[address.Address]address.Address
+	lk sync.RWMutex
+}
+
+func NewActorIDMap() *ActorIDMap {
+	return &ActorIDMap{m: make(map[address.Address]address.Address)}
+}
+
+func (am *ActorIDMap) GetActorID(addr address.Address) (address.Address, bool) {
+	am.lk.RLock()
+	defer am.lk.RUnlock()
+
+	actorID, ok := am.m[addr]
+	return actorID, ok
+}
+
+func (am *ActorIDMap) SetActorID(addr, actorID address.Address) {
+	am.lk.Lock()
+	defer am.lk.Unlock()
+
+	am.m[addr] = actorID
 }
 
 type extractor struct {
@@ -268,7 +300,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return nil
 	}
 
-	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage {
+	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage {
 		return nil
 	}
 
@@ -374,7 +406,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	dupmsgs := map[cid.Cid]struct{}{}
 
-	var msgcnt, tracecnt int
+	var msgcnt, tracecnt, actorMsgCnt int
 
 	for i := range etraces {
 		p := etraces[i]
@@ -431,11 +463,67 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				//}
 			}
 		}
+
+		if ctx.Opts.EnabelExtract.EnableExtractActorMessage {
+			isBlock := IsBlock(p.seq, msg.From)
+			storeMap := make(map[address.Address]string)
+
+			fromActorID, err := LookupID(ctx, msg.From, ts.TipSet)
+			if err != nil {
+				elog.Warnf("lookup ID for %v at %v failed: %v", msg.From, ts.Height(), err)
+				fromActorID = msg.From
+			}
+
+			if _, ok := storeMap[fromActorID]; !ok {
+				storeMap[fromActorID] = "from"
+			}
+
+			toActorID, err := LookupID(ctx, msg.To, ts.TipSet)
+			if err != nil {
+				elog.Warnf("lookup ID for %v at %v failed: %v", msg.To, ts.Height(), err)
+				toActorID = msg.To
+			}
+
+			if _, ok := storeMap[toActorID]; !ok {
+				storeMap[toActorID] = "to"
+			}
+
+			elog.Infof("storeMap at %v: %v", ts.TipSet.Height(), storeMap)
+			for ID, mtype := range storeMap {
+				amsg, err := model.NewActorMessage(ID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock)
+				if err != nil {
+					elog.Errorw("convert to model.ActorMessage", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
+				} else {
+					elog.Infow("convert to model.ActorMessage successfully", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
+					actorMsgCnt++
+					res.Docs = append(res.Docs, amsg)
+				}
+			}
+		}
 	}
 
 	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt)
 
 	return nil
+}
+
+func IsBlock(seq []int, from address.Address) bool {
+	return len(seq) == 1 && (strings.HasPrefix(from.String()[1:], "1") || strings.HasPrefix(from.String()[1:], "3") || strings.HasPrefix(from.String()[1:], "4"))
+}
+
+func LookupID(ctx *extract.Ctx, addr address.Address, ts *types.TipSet) (address.Address, error) {
+	var err error
+	actorID, ok := ActorIDMapping.GetActorID(addr)
+	if !ok {
+		actorID, err = ctx.D.LookupID(ctx.C, addr, ts)
+		if err != nil {
+			return address.Undef, err
+		}
+
+		ActorIDMapping.SetActorID(addr, actorID)
+	}
+
+	return actorID, nil
 }
 
 func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {

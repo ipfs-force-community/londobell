@@ -117,6 +117,8 @@ type EnableExtractOptions struct {
 	EnableExtractBlockHeader  bool
 	//EnableExtractMessageBlock bool
 	EnableExtractBlockMessage bool
+
+	EnableExtractActorMessage bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -130,6 +132,8 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractBlockHeader:  true,
 		//EnableExtractMessageBlock: true,
 		EnableExtractBlockMessage: true,
+
+		EnableExtractActorMessage: true,
 	}
 }
 
