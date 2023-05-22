@@ -27,7 +27,8 @@
 	"SignedCid": "cid.Cid",
 	"To": "address.Address",
 	"Type": "string",
-	"Value": "big.Int"
+	"Value": "big.Int",
+	"_id": "string"
 }
 ```
 
@@ -261,6 +262,7 @@
 		"Refund": "big.Int",
 		"TotalCost": "big.Int"
 	},
+	"IsBlock": "bool",
 	"Msg": {
 		"From": "address.Address",
 		"Method": "abi.MethodNum",

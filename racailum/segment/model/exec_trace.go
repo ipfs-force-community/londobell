@@ -49,7 +49,7 @@ func NewExecTrace(
 	seq []int,
 	raw *common.ExecutionTraceCompact,
 	returnObj cbor.Er,
-	cost *api.MsgGasCost, meth string,
+	cost *api.MsgGasCost, meth string, isBlock bool,
 ) (*ExecTrace, *ExecGas, error) {
 	me := &ExecTrace{
 		Cid:          mcid,
@@ -60,6 +60,7 @@ func NewExecTrace(
 		Ver:          build.CurrentCommit,
 		SubCallCount: len(raw.Subcalls),
 		GasCost:      cost,
+		IsBlock:      isBlock,
 	}
 
 	if err := mir.Mirror(me, raw); err != nil {
@@ -144,6 +145,7 @@ type ExecTrace struct {
 	} `mir:"-"`
 
 	GasCost *api.MsgGasCost `mir:"-"`
+	IsBlock bool
 }
 
 // Indexes impl common.Indexed

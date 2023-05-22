@@ -36,7 +36,8 @@
 	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 	"To": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Type": "",
-	"Value": "340282591298641078465964189926313473653"
+	"Value": "340282591298641078465964189926313473653",
+	"_id": ""
 }
 ```
 
@@ -956,6 +957,7 @@
 		"Refund": "340282591298641078465964189926313473653",
 		"TotalCost": "1024"
 	},
+	"IsBlock": false,
 	"Msg": {
 		"From": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 		"Method": 2,
