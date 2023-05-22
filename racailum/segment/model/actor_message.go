@@ -1,6 +1,9 @@
 package model
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/exitcode"
@@ -17,7 +20,7 @@ var (
 
 // ActorMessage records messages for actor
 type ActorMessage struct {
-	//ID         string `mir:"-" bson:"_id"`
+	ID         string `mir:"-" bson:"_id"`
 	ActorID    address.Address
 	Epoch      abi.ChainEpoch `mir:"-"`
 	Cid        cid.Cid
@@ -31,8 +34,8 @@ type ActorMessage struct {
 	IsBlock    bool // 是否是块消息
 }
 
-func NewActorMessage(actorID address.Address, epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, mtype string, from, to address.Address, isBlock bool) (*ActorMessage, error) {
-	return &ActorMessage{
+func NewActorMessage(actorID address.Address, epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, mtype string, from, to address.Address, isBlock bool, seq []int) (*ActorMessage, error) {
+	am := &ActorMessage{
 		ActorID:    actorID,
 		Epoch:      epoch,
 		Cid:        cid,
@@ -44,7 +47,11 @@ func NewActorMessage(actorID address.Address, epoch abi.ChainEpoch, cid, signedC
 		From:       from,
 		To:         to,
 		IsBlock:    isBlock,
-	}, nil
+	}
+
+	am.genID(epoch, mtype, seq)
+
+	return am, nil
 }
 
 // Indexes impl common.Indexed
@@ -69,4 +76,13 @@ func (am *ActorMessage) EpochField() *string {
 // ResetPolicy impl common.Document
 func (am *ActorMessage) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(actorMessageEpochField, lower, upper), true
+}
+
+func (am *ActorMessage) genID(epoch abi.ChainEpoch, mtype string, seq []int) {
+	seqStrs := make([]string, 0, len(seq))
+	for i := range seq {
+		seqStrs = append(seqStrs, fmt.Sprintf("%05d", seq[i]))
+	}
+
+	am.ID = fmt.Sprintf("%d-%s-%s", epoch, strings.Join(seqStrs, "-"), mtype)
 }
