@@ -118,3 +118,12 @@ db.BlockMessage.createIndex({"Epoch":1, "Messages":1}, {"sparse": true})
 
 
 //GasCost不为null 说明是显式消息？？
+
+
+
+// fix/jiaoge/londobell_query方案：加ActorMessage
+richlist: 18s
+blockmessages_by_methodname:3s
+transfer_message_for_largeAmount: 很慢 13m
+
+TransferMessage 结构变了

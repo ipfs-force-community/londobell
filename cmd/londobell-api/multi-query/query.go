@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/go-state-types/abi"
+
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -17,37 +19,35 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 )
 
-func GetFinalHeightForFormalDB(ctx context.Context, dbsm *DataBaseStateManager) ([]model.FinalHeightRes, error) {
+func GetFinalHeight(ctx context.Context, cols Collections) (abi.ChainEpoch, error) {
 	var finalHeightRes []model.FinalHeightRes
-
-	formal := dbsm.GetFormalCfg()
-	cols, ok := dbsm.GetDBCollections(formal.Url())
-	if !ok {
-		return nil, fmt.Errorf("url %v not found in DBCollectionsMap", formal.Url())
-	}
 
 	pipe, err := util.Parse(model.Ctx{}, string(monitor.GetFinalHeightAggregator()))
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == "FinalHeight" {
 			cur, err := col.Aggregate(ctx, pipe)
 			if err != nil {
-				return nil, err
+				return 0, err
 			}
 
 			err = cur.All(ctx, &finalHeightRes)
 			if err != nil {
-				return nil, err
+				return 0, err
 			}
 
-			return finalHeightRes, nil
+			if len(finalHeightRes) == 0 {
+				return 0, nil
+			}
+
+			return finalHeightRes[0].Epoch, nil
 		}
 	}
 
-	return nil, fmt.Errorf("no table FinalHeight")
+	return 0, fmt.Errorf("no FinalHeight collection")
 }
 
 // MultiPagingQuery 对多库进行分页查询  todo: 磁盘state更改会影响dbStates（map）吗？
@@ -123,7 +123,7 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 			//	//pipe1...
 			//}
 
-			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.startEpoch, EndEpoch: aggList.endEpoch, Skip: aggList.skip, Limit: aggList.limit, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, Sort: req.Sort, To: req.To, Addrs: req.Addrs}, string(aggregator)) // todo: methodName
+			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.startEpoch, EndEpoch: aggList.endEpoch, Skip: aggList.skip, Limit: aggList.limit, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, Sort: req.Sort, To: req.To, Addrs: req.Addrs, Addr: req.Addr}, string(aggregator)) // todo: methodName
 			if err != nil {
 				return err
 			}

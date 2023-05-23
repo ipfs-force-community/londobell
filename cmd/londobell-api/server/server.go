@@ -163,7 +163,7 @@ func Run(cctx *cli.Context, adapter bool) error {
 		//multiquery.TestPeriodicRefreshDataBaseState(cctx.Context, &multiquery.DBStateManager) //todo:test
 		//fmt.Printf("PeriodicRefreshDataBaseState done, elapsed: %v\n", time.Now().Sub(start))
 
-		go multiquery.PeriodicRefreshDataBaseState(cctx.Context, &multiquery.DBStateManager)
+		//go multiquery.PeriodicRefreshDataBaseState(cctx.Context, &multiquery.DBStateManager)
 
 		aggregators.InitAggregators()
 		RegisterAggregatorsApi(router)

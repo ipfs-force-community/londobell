@@ -20,6 +20,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
+
 	"github.com/ipfs-force-community/londobell/buildnet"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 
@@ -37,6 +38,9 @@ var (
 
 	DealsByAddrCountMap = make(map[string]map[abi.ChainEpoch]int64) // ID: {epoch: count}
 	DALock              sync.RWMutex
+
+	ActorIDMap = make(map[string]string) // robust: ID
+	ALock      sync.RWMutex
 )
 
 // todo: 有无必要加缓存？
@@ -50,11 +54,23 @@ func GetIDByAddr(ctx context.Context, addrStr string) (string, error) {
 	case address.ID:
 		return addrStr, nil
 	case address.SECP256K1, address.Actor, address.BLS, address.Delegated:
+		ALock.RLock()
+		if actorID, ok := ActorIDMap[addrStr]; ok {
+			defer ALock.RUnlock()
+			return actorID, nil
+		}
+
+		ALock.RUnlock()
+
 		api := fullnode.API.GetAppropriateAPI()
 		ID, err := api.StateLookupID(ctx, addr, types.EmptyTSK)
 		if err != nil {
 			return "", err
 		}
+
+		ALock.Lock()
+		ActorIDMap[addrStr] = ID.String()[1:]
+		ALock.Unlock()
 
 		return ID.String()[1:], nil
 	default:

@@ -2,6 +2,7 @@ package aggregators
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -42,11 +43,10 @@ func GetFinalHeight(c *gin.Context) {
 }
 
 func GetFinalHeightForFormalDB(ctx context.Context) (abi.ChainEpoch, error) {
-	formal := multiquery.DBStateManager.GetFormalCfg()
-	dbState, err := multiquery.DBStateManager.GetDataBase(formal.Url())
-	if err != nil {
-		return 0, err
+	cols, ok := multiquery.DBStateManager.GetDBCollections(multiquery.DBStateManager.GetFormalCfg().Url())
+	if !ok {
+		return 0, fmt.Errorf("url %v not found in DBCollectionsMap", multiquery.DBStateManager.GetFormalCfg().Url())
 	}
 
-	return dbState.EndEpoch - 1, nil
+	return multiquery.GetFinalHeight(ctx, cols)
 }

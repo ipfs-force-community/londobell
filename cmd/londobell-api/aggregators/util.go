@@ -5,6 +5,7 @@ import (
 
 	"github.com/filecoin-project/go-jsonrpc"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
+
 	"github.com/ipfs-force-community/londobell/api"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 )
@@ -21,31 +22,31 @@ func ColdsIsExists(db multiquery.DB, colds []multiquery.DB) bool {
 	return exist
 }
 
-func CompleteDataBaseState(ctx context.Context, ds *multiquery.DataBaseState, cols multiquery.Collections) error {
-	if err := multiquery.RefreshBlockMsgs(ctx, ds, cols); err != nil {
-		return err
-	}
-	if err := multiquery.RefreshBlockMsgsByMethodName(ctx, ds, cols); err != nil {
-		return err
-	}
-	if err := multiquery.RefreshActorMsgsByMethodName(ctx, ds, cols); err != nil {
-		return err
-	}
-	if err := multiquery.RefreshActorMsgs(ctx, ds, cols); err != nil {
-		return err
-	}
-	if err := multiquery.RefreshActorTransferMsgs(ctx, ds, cols); err != nil {
-		return err
-	}
-	if err := multiquery.RefreshMinedMsgsMaps(ctx, ds, cols); err != nil {
-		return err
-	}
-	if err := multiquery.RefreshTransfersForLargeAmount(ctx, ds, cols); err != nil {
-		return err
-	}
-
-	return nil
-}
+//func CompleteDataBaseState(ctx context.Context, ds *multiquery.DataBaseState, cols multiquery.Collections) error {
+//	if err := multiquery.RefreshBlockMsgs(ctx, ds, cols); err != nil {
+//		return err
+//	}
+//	if err := multiquery.RefreshBlockMsgsByMethodName(ctx, ds, cols); err != nil {
+//		return err
+//	}
+//	if err := multiquery.RefreshActorMsgsByMethodName(ctx, ds, cols); err != nil {
+//		return err
+//	}
+//	if err := multiquery.RefreshActorMsgs(ctx, ds, cols); err != nil {
+//		return err
+//	}
+//	if err := multiquery.RefreshActorTransferMsgs(ctx, ds, cols); err != nil {
+//		return err
+//	}
+//	if err := multiquery.RefreshMinedMsgsMaps(ctx, ds, cols); err != nil {
+//		return err
+//	}
+//	if err := multiquery.RefreshTransfersForLargeAmount(ctx, ds, cols); err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}
 
 func GetAPIV0(ctx context.Context, muladdr string) (api.MultiAPI, jsonrpc.ClientCloser, error) {
 	var res api.MultiAPIStruct

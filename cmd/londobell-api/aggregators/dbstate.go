@@ -15,7 +15,7 @@ import (
 var dbstateCmd = &cli.Command{
 	Name: "dbstate",
 	Subcommands: []*cli.Command{
-		archiveCmd,
+		//archiveCmd,
 		loadCmd,
 		updateCmd, // 清空重新存state
 		deleteCmd,
@@ -30,126 +30,126 @@ var dbstateCmd = &cli.Command{
 // cold startEpoch从上个冷库的endEpoch开始，cold endEpoch总是等于finalHeight+1
 // 确保目前的colds是正确的
 // formal和cold的数据库是一致的
-var archiveCmd = &cli.Command{
-	Name: "archive",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name: "formal-url",
-		},
-		&cli.StringFlag{
-			Name: "formal-name",
-		},
-		&cli.StringFlag{
-			Name: "cold-url",
-		},
-		&cli.StringFlag{
-			Name: "cold-name",
-		},
-		&cli.BoolFlag{
-			Name:  "force",
-			Value: false,
-			Usage: "delete the original data of cold if force is true",
-		},
-	},
-	Action: func(cctx *cli.Context) error {
-		var components struct {
-			DBStMgr multiquery.DataBaseStateManager
-		}
-
-		stopper, err := dix.New(
-			cctx.Context,
-			multiquery.MultiQuery(context.TODO(), &components.DBStMgr),
-			multiquery.InjectRepoPath(cctx),
-		)
-		if err != nil {
-			fmt.Println("stopper", err)
-			return err
-		}
-
-		defer stopper(cctx.Context) // nolint: errcheck
-
-		formalURL := cctx.String("formal-url")
-		coldURL := cctx.String("cold-url")
-		formalName := cctx.String("formal-name")
-		coldName := cctx.String("cold-name")
-
-		coldDB := multiquery.NewDB(coldURL, coldName)
-		formalDB := multiquery.NewDB(formalURL, formalName)
-
-		if formalDB.IsInvalidDB() || coldDB.IsInvalidDB() {
-			log.Errorf("formal %v or cold %v is invalid db", formalDB, coldDB)
-			return nil
-		}
-
-		cols, err := multiquery.GetCollectionsForDB(cctx.Context, formalDB)
-		if err != nil {
-			log.Errorf("get collections for DB %v failed: %v", formalDB, cols)
-			return err
-		}
-
-		formalState, found, err := components.DBStMgr.Stm.LoadDataBaseState(formalURL)
-		if !found {
-			log.Errorf("no url %v found in dbstate", formalURL)
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-
-		err = CompleteDataBaseState(cctx.Context, &formalState, cols)
-		if err != nil {
-			return err
-		}
-
-		// todo: formal-url的dbstate就不用补了
-		_, found, err = components.DBStMgr.Stm.LoadDataBaseState(coldURL)
-		if err != nil {
-			log.Errorf("load dbState for %v failed: %v", coldURL, err)
-			return err
-		}
-
-		if found {
-			if !cctx.Bool("force") {
-				log.Errorf("url %v found in dbstate, but force is not true", coldURL)
-				return nil
-			}
-		}
-
-		// todo: formalState.startEpoch 不会与colds范围重合
-
-		// 覆盖cold
-		formalState.Formal = false
-		formalState.Tmp = false
-		if err := components.DBStMgr.Stm.SetDataBaseState(coldURL, formalState); err != nil {
-			return err
-		}
-
-		cfg := components.DBStMgr.GetCfg()
-		exist := ColdsIsExists(coldDB, cfg.Colds)
-
-		// 更新config
-		if !exist {
-			cfg.Formal = multiquery.DB{}
-			validColds := make([]multiquery.DB, 0)
-			for _, cold := range cfg.Colds {
-				if cold.IsInvalidDB() {
-					log.Warnw("invalid cold", "url", cold.Url(), "name", cold.Name())
-				}
-
-				validColds = append(validColds, cold)
-			}
-
-			cfg.Colds = append(validColds, coldDB)
-
-			err = multiquery.WriteToConfig(multiquery.ConfigFilePath(components.DBStMgr.GetRepoPath()), cfg)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	},
-}
+//var archiveCmd = &cli.Command{
+//	Name: "archive",
+//	Flags: []cli.Flag{
+//		&cli.StringFlag{
+//			Name: "formal-url",
+//		},
+//		&cli.StringFlag{
+//			Name: "formal-name",
+//		},
+//		&cli.StringFlag{
+//			Name: "cold-url",
+//		},
+//		&cli.StringFlag{
+//			Name: "cold-name",
+//		},
+//		&cli.BoolFlag{
+//			Name:  "force",
+//			Value: false,
+//			Usage: "delete the original data of cold if force is true",
+//		},
+//	},
+//	Action: func(cctx *cli.Context) error {
+//		var components struct {
+//			DBStMgr multiquery.DataBaseStateManager
+//		}
+//
+//		stopper, err := dix.New(
+//			cctx.Context,
+//			multiquery.MultiQuery(context.TODO(), &components.DBStMgr),
+//			multiquery.InjectRepoPath(cctx),
+//		)
+//		if err != nil {
+//			fmt.Println("stopper", err)
+//			return err
+//		}
+//
+//		defer stopper(cctx.Context) // nolint: errcheck
+//
+//		formalURL := cctx.String("formal-url")
+//		coldURL := cctx.String("cold-url")
+//		formalName := cctx.String("formal-name")
+//		coldName := cctx.String("cold-name")
+//
+//		coldDB := multiquery.NewDB(coldURL, coldName)
+//		formalDB := multiquery.NewDB(formalURL, formalName)
+//
+//		if formalDB.IsInvalidDB() || coldDB.IsInvalidDB() {
+//			log.Errorf("formal %v or cold %v is invalid db", formalDB, coldDB)
+//			return nil
+//		}
+//
+//		cols, err := multiquery.GetCollectionsForDB(cctx.Context, formalDB)
+//		if err != nil {
+//			log.Errorf("get collections for DB %v failed: %v", formalDB, cols)
+//			return err
+//		}
+//
+//		formalState, found, err := components.DBStMgr.Stm.LoadDataBaseState(formalURL)
+//		if !found {
+//			log.Errorf("no url %v found in dbstate", formalURL)
+//			return nil
+//		}
+//		if err != nil {
+//			return err
+//		}
+//
+//		err = CompleteDataBaseState(cctx.Context, &formalState, cols)
+//		if err != nil {
+//			return err
+//		}
+//
+//		// todo: formal-url的dbstate就不用补了
+//		_, found, err = components.DBStMgr.Stm.LoadDataBaseState(coldURL)
+//		if err != nil {
+//			log.Errorf("load dbState for %v failed: %v", coldURL, err)
+//			return err
+//		}
+//
+//		if found {
+//			if !cctx.Bool("force") {
+//				log.Errorf("url %v found in dbstate, but force is not true", coldURL)
+//				return nil
+//			}
+//		}
+//
+//		// todo: formalState.startEpoch 不会与colds范围重合
+//
+//		// 覆盖cold
+//		formalState.Formal = false
+//		formalState.Tmp = false
+//		if err := components.DBStMgr.Stm.SetDataBaseState(coldURL, formalState); err != nil {
+//			return err
+//		}
+//
+//		cfg := components.DBStMgr.GetCfg()
+//		exist := ColdsIsExists(coldDB, cfg.Colds)
+//
+//		// 更新config
+//		if !exist {
+//			cfg.Formal = multiquery.DB{}
+//			validColds := make([]multiquery.DB, 0)
+//			for _, cold := range cfg.Colds {
+//				if cold.IsInvalidDB() {
+//					log.Warnw("invalid cold", "url", cold.Url(), "name", cold.Name())
+//				}
+//
+//				validColds = append(validColds, cold)
+//			}
+//
+//			cfg.Colds = append(validColds, coldDB)
+//
+//			err = multiquery.WriteToConfig(multiquery.ConfigFilePath(components.DBStMgr.GetRepoPath()), cfg)
+//			if err != nil {
+//				return err
+//			}
+//		}
+//
+//		return nil
+//	},
+//}
 
 // 除loadCmd外，其他接口访问都要停止进程？
 var loadCmd = &cli.Command{
@@ -342,109 +342,158 @@ func updateBaseStateForType(ctx context.Context, url, name, utype string, dBStMg
 	switch utype {
 	case "BlockMsgsCount":
 		dbState.BlockMsgsCount = 0
-		dbState.NextEpochForBlockMsgsCount = dbState.StartEpoch
 
-		if err := multiquery.RefreshBlockMsgs(ctx, &dbState, cols); err != nil {
+		count, err := multiquery.RefreshBlockMsgs(ctx, &dbState, cols, "", "")
+		if err != nil {
 			return err
 		}
+
+		dbState.BlockMsgsCount = count
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "BlockMsgsByMethodNameMap":
 		dbState.BlockMsgsByMethodNameMap = make(map[string]int64)
-		dbState.NextEpochForBlockMsgsByMethodName = dbState.StartEpoch
 
-		if err := multiquery.RefreshBlockMsgsByMethodName(ctx, &dbState, cols); err != nil {
+		allBlockMethodNames, err := multiquery.GetAllBlockMethodNames(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
 			return err
+		}
+
+		for _, allBlockMethodName := range allBlockMethodNames {
+			dbState.BlockMsgsByMethodNameMap[allBlockMethodName.MethodName] += allBlockMethodName.Count
 		}
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "ActorMsgsByMethodNameMap":
 		dbState.ActorMsgsByMethodNameMap = make(map[string]map[string]int64)
-		dbState.NextEpochForActorMsgsByMethodName = dbState.StartEpoch
 
-		if err := multiquery.RefreshActorMsgsByMethodName(ctx, &dbState, cols); err != nil {
+		allActorsMethods, err := multiquery.GetAllActorsMethods(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
 			return err
+		}
+
+		for _, allActorMethods := range allActorsMethods {
+			if _, ok := dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName]; !ok {
+				dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] = allActorMethods.Count
+			} else {
+				dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] += allActorMethods.Count
+			}
 		}
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "ActorMsgsCountMap":
 		dbState.ActorMsgsCountMap = make(map[string]int64)
-		dbState.NextEpochForActorMsgsCount = dbState.StartEpoch
 
-		if err := multiquery.RefreshActorMsgs(ctx, &dbState, cols); err != nil {
+		allActorsMsgsCount, err := multiquery.GetAllActorsMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
 			return err
+		}
+
+		for _, allActorMsgsCount := range allActorsMsgsCount {
+			dbState.ActorMsgsCountMap[allActorMsgsCount.ActorID] += allActorMsgsCount.Count
 		}
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "ActorTransfersCountMap":
 		dbState.ActorTransfersCountMap = make(map[string]int64)
-		dbState.NextEpochForActorTransfersCount = dbState.StartEpoch
 
-		if err := multiquery.RefreshActorTransferMsgs(ctx, &dbState, cols); err != nil {
+		allActorsTransferMsgsCount, err := multiquery.GetAllActorsTransferMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
 			return err
+		}
+
+		for _, allActorTransferMsgsCount := range allActorsTransferMsgsCount {
+			dbState.ActorTransfersCountMap[allActorTransferMsgsCount.ActorID] += allActorTransferMsgsCount.Count
 		}
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "MinedMsgsMap":
 		dbState.MinedMsgsMap = make(map[string]int64)
-		dbState.NextEpochForMinedMsgs = dbState.StartEpoch
 
-		if err := multiquery.RefreshMinedMsgsMaps(ctx, &dbState, cols); err != nil {
+		allMinersMinedCount, err := multiquery.GetAllMinersMinedCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
 			return err
+		}
+
+		for _, allMinerMinedCount := range allMinersMinedCount {
+			dbState.MinedMsgsMap[allMinerMinedCount.ActorID] += allMinerMinedCount.Count
 		}
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "TransfersLargeAmountCount":
 		dbState.TransfersLargeAmountCount = 0
-		dbState.NextEpochForTransfersLargeAmount = dbState.StartEpoch
 
-		if err := multiquery.RefreshTransfersForLargeAmount(ctx, &dbState, cols); err != nil {
+		transfersLargeAmountCount, err := multiquery.RefreshTransfersForLargeAmount(ctx, &dbState, cols, "", "")
+		if err != nil {
 			return err
 		}
+
+		dbState.TransfersLargeAmountCount = transfersLargeAmountCount
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "all":
 		dbState.BlockMsgsCount = 0
-		dbState.NextEpochForBlockMsgsCount = dbState.StartEpoch
-		if err := multiquery.RefreshBlockMsgs(ctx, &dbState, cols); err != nil {
+		count, err := multiquery.RefreshBlockMsgs(ctx, &dbState, cols, "", "")
+		if err != nil {
 			return err
 		}
+		dbState.BlockMsgsCount = count
 
 		dbState.BlockMsgsByMethodNameMap = make(map[string]int64)
-		dbState.NextEpochForBlockMsgsByMethodName = dbState.StartEpoch
-		if err := multiquery.RefreshBlockMsgsByMethodName(ctx, &dbState, cols); err != nil {
+		allBlockMethodNames, err := multiquery.GetAllBlockMethodNames(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
 			return err
+		}
+		for _, allBlockMethodName := range allBlockMethodNames {
+			dbState.BlockMsgsByMethodNameMap[allBlockMethodName.MethodName] += allBlockMethodName.Count
 		}
 
 		dbState.ActorMsgsByMethodNameMap = make(map[string]map[string]int64)
-		dbState.NextEpochForActorMsgsByMethodName = dbState.StartEpoch
-		if err := multiquery.RefreshActorMsgsByMethodName(ctx, &dbState, cols); err != nil {
+		allActorsMethods, err := multiquery.GetAllActorsMethods(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
 			return err
+		}
+		for _, allActorMethods := range allActorsMethods {
+			if _, ok := dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName]; !ok {
+				dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] = allActorMethods.Count
+			} else {
+				dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] += allActorMethods.Count
+			}
 		}
 
 		dbState.ActorMsgsCountMap = make(map[string]int64)
-		dbState.NextEpochForActorMsgsCount = dbState.StartEpoch
-		if err := multiquery.RefreshActorMsgs(ctx, &dbState, cols); err != nil {
+		allActorsMsgsCount, err := multiquery.GetAllActorsMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
 			return err
+		}
+		for _, allActorMsgsCount := range allActorsMsgsCount {
+			dbState.ActorMsgsCountMap[allActorMsgsCount.ActorID] += allActorMsgsCount.Count
 		}
 
 		dbState.ActorTransfersCountMap = make(map[string]int64)
-		dbState.NextEpochForActorTransfersCount = dbState.StartEpoch
-		if err := multiquery.RefreshActorTransferMsgs(ctx, &dbState, cols); err != nil {
+		allActorsTransferMsgsCount, err := multiquery.GetAllActorsTransferMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
 			return err
+		}
+		for _, allActorTransferMsgsCount := range allActorsTransferMsgsCount {
+			dbState.ActorTransfersCountMap[allActorTransferMsgsCount.ActorID] += allActorTransferMsgsCount.Count
 		}
 
 		dbState.MinedMsgsMap = make(map[string]int64)
-		dbState.NextEpochForMinedMsgs = dbState.StartEpoch
-		if err := multiquery.RefreshMinedMsgsMaps(ctx, &dbState, cols); err != nil {
+		allMinersMinedCount, err := multiquery.GetAllMinersMinedCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
 			return err
+		}
+		for _, allMinerMinedCount := range allMinersMinedCount {
+			dbState.MinedMsgsMap[allMinerMinedCount.ActorID] += allMinerMinedCount.Count
 		}
 
 		dbState.TransfersLargeAmountCount = 0
-		dbState.NextEpochForTransfersLargeAmount = dbState.StartEpoch
-		if err := multiquery.RefreshTransfersForLargeAmount(ctx, &dbState, cols); err != nil {
+		transfersLargeAmountCount, err := multiquery.RefreshTransfersForLargeAmount(ctx, &dbState, cols, "", "")
+		if err != nil {
 			return err
 		}
+		dbState.TransfersLargeAmountCount = transfersLargeAmountCount
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	default:
@@ -466,37 +515,30 @@ func deleteDataBaseStateForType(url, dtype string, dBStMgr *multiquery.DataBaseS
 	switch dtype {
 	case "BlockMsgsCount":
 		dbState.BlockMsgsCount = 0
-		dbState.NextEpochForBlockMsgsCount = dbState.StartEpoch
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "BlockMsgsByMethodNameMap":
 		dbState.BlockMsgsByMethodNameMap = make(map[string]int64)
-		dbState.NextEpochForBlockMsgsByMethodName = dbState.StartEpoch
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "ActorMsgsByMethodNameMap":
 		dbState.ActorMsgsByMethodNameMap = make(map[string]map[string]int64)
-		dbState.NextEpochForActorMsgsByMethodName = dbState.StartEpoch
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "ActorMsgsCountMap":
 		dbState.ActorMsgsCountMap = make(map[string]int64)
-		dbState.NextEpochForActorMsgsCount = dbState.StartEpoch
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "ActorTransfersCountMap":
 		dbState.ActorTransfersCountMap = make(map[string]int64)
-		dbState.NextEpochForActorTransfersCount = dbState.StartEpoch
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "MinedMsgsMap":
 		dbState.MinedMsgsMap = make(map[string]int64)
-		dbState.NextEpochForMinedMsgs = dbState.StartEpoch
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "TransfersLargeAmountCount":
 		dbState.TransfersLargeAmountCount = 0
-		dbState.NextEpochForTransfersLargeAmount = dbState.StartEpoch
 
 		return dBStMgr.Stm.SetDataBaseState(url, dbState)
 	case "all":
