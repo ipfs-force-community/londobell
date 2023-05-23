@@ -83,7 +83,7 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, p
 
 	if params != nil && len(raw.Params) > 0 {
 		err := params.UnmarshalCBOR(bytes.NewReader(raw.Params))
-		if err != nil {
+		if err != nil && meth != "InvokeContract" {
 			return nil, fmt.Errorf("unmarshal cbor for message params: %w", err)
 		}
 
