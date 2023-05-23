@@ -533,7 +533,7 @@ func GetAllBlockMsgsByMethodName(ctx context.Context, dbsm *DataBaseStateManager
 
 			tmpStartEpoch = dbState.EndEpoch
 		} else {
-			for methodName, _ := range dbState.BlockMsgsByMethodNameMap {
+			for methodName := range dbState.BlockMsgsByMethodNameMap {
 				blockMsgsByMethodNames = append(blockMsgsByMethodNames, methodName)
 			}
 		}
