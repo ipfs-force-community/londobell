@@ -168,7 +168,7 @@ var cfgUpdateCmd = &cli.Command{
 				}
 
 				// delete exist newDB
-				multiquery.DBStateManager.ReplaceColdsCfg(validColds)
+				components.DBStMgr.ReplaceColdsCfg(validColds)
 			}
 
 			cfg.Colds = append(validColds, newDB)

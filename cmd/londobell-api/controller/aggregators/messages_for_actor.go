@@ -11,13 +11,14 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/net/context"
+
 	"github.com/ipfs-force-community/londobell/buildnet"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
-	"golang.org/x/net/context"
 )
 
 func GetMessagesForActor(c *gin.Context) {
@@ -49,20 +50,20 @@ func GetMessagesForActor(c *gin.Context) {
 	}
 
 	api := fullnode.API.GetAppropriateAPI()
-	addrs, err := GetAllAddrs(ctx, req.Addr, api)
+	actorID, err := GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	req.Addrs = addrs
+	req.Addr = actorID
 
 	var messagesForActor []model.MessageForActor
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, messagesForActorAggregator, req, "ExecTrace")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, messagesForActorAggregator, req, "ActorMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

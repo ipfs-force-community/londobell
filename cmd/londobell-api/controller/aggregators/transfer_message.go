@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
-
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 
 	"github.com/ipfs-force-community/londobell/common"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
@@ -32,6 +31,13 @@ func GetTransferMessages(c *gin.Context) {
 
 	curEpoch := common.GetCurEpoch()
 
+	req.Addr, err = GetIDByAddr(ctx, req.Addr)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
 	countUtils, err := multiquery.GetTotalCountForActorTransferMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
 	if err != nil {
 		alog.Error(err)
@@ -44,22 +50,11 @@ func GetTransferMessages(c *gin.Context) {
 		totalCount += countUtil.Count
 	}
 
-	api := fullnode.API.GetAppropriateAPI()
-	addrs, err := GetAllAddrs(ctx, req.Addr, api)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	req.Addrs = addrs
-
 	var transferMessages []model.TransferMessage
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, transferMessagesAggregator, req, "ExecTrace")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, transferMsgsForActorAggregator, req, "ActorMessage")
 		if err != nil {
-			alog.Error(err)
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
@@ -74,14 +69,12 @@ func GetTransferMessages(c *gin.Context) {
 		rawByte, err := json.Marshal(raw)
 		if err != nil {
 			alog.Error(err)
-			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
 		}
 
 		err = json.Unmarshal(rawByte, &transferMessages)
 		if err != nil {
-			alog.Error(err)
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return

@@ -5,12 +5,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/net/context"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
-	"golang.org/x/net/context"
 )
 
 func GetBlockHeadersByMiner(c *gin.Context) {
@@ -28,6 +29,13 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 	}
 
 	curEpoch := common.GetCurEpoch()
+
+	req.Addr, err = GetIDByAddr(ctx, req.Addr)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
 
 	countUtils, err := multiquery.GetTotalCountForMinedMsgsMap(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
 	if err != nil {

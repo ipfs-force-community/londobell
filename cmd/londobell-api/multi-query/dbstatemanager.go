@@ -16,6 +16,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 
@@ -299,9 +300,10 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		//messageBlockCol := database.Collection("MessageBlock")
 		blockMessageCol := database.Collection("BlockMessage")
 		blockHeaderCol := database.Collection("BlockHeader")
+		actorMessageCol := database.Collection("ActorMessage")
 
 		cols := make([]*mongo.Collection, 0)
-		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol)
+		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol)
 		dbsm.UpdateDBCollectionsMap(db.Url(), Collections{DB: database, Cols: cols})
 	}
 
@@ -323,9 +325,10 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 	//messageBlockCol := database.Collection("MessageBlock")
 	blockMessageCol := database.Collection("BlockMessage")
 	blockHeaderCol := database.Collection("BlockHeader")
+	actorMessageCol := database.Collection("ActorMessage")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol)
+	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol)
 	dbsm.UpdateDBCollectionsMap(tmp.Url(), Collections{DB: database, Cols: cols})
 
 	return nil
@@ -399,9 +402,10 @@ func GetCollectionsForDB(ctx context.Context, db DB) (Collections, error) {
 	//messageBlockCol := database.Collection("MessageBlock")
 	blockMessageCol := database.Collection("BlockMessage")
 	blockHeaderCol := database.Collection("BlockHeader")
+	actorMessageCol := database.Collection("ActorMessage")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol)
+	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol)
 
 	return Collections{DB: database, Cols: cols}, nil
 }
@@ -527,6 +531,12 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols Col
 		// [start, end) [1,6) [3,6) [3,4) [1,4)  [2,4)（大，小】 [11,2)
 		// [2,3)  [5,8)  [10,11)  [13, ...)   [2,5) [8,10) [11,13)
 	case "cold":
+		// 添加上下边界
+		minStartEpoch := int64(0)
+		if len(countUtils) > 0 {
+			minStartEpoch = countUtils[len(countUtils)-1].Start
+		}
+
 		if !cfg.Formal.IsInvalidDB() {
 			formalState, found, err := dbsm.Stm.LoadDataBaseState(cfg.Formal.Url())
 			if err != nil || !found {
@@ -540,14 +550,9 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols Col
 			})
 		}
 
-		// 添加上下边界
-		minStartEpoch := int64(0)
-		if len(countUtils) > 0 {
-			minStartEpoch = countUtils[len(countUtils)-1].Start
-		}
 		countUtils = append(countUtils, CountUtil{Start: 0, End: minStartEpoch}, CountUtil{Start: math.MaxInt64, End: math.MaxInt64})
 		sort.Slice(countUtils, func(i, j int) bool {
-			return countUtils[i].End > countUtils[j].End
+			return countUtils[i].Start > countUtils[j].Start
 		})
 
 		// 找出不连续的段
@@ -668,105 +673,151 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 		return err
 	}
 
-	log.Infow("begin RefreshDataBaseState...")
-	//if err := RefreshDataBaseState(ctx, dbState, cols); err != nil {
-	//	log.Errorf("refresh DataBaseState failed: %v", err)
-	//	return err
-	//}
+	if !tmp && !formal {
+		log.Infow("begin RefreshDataBaseState...")
+		//if err := RefreshDataBaseState(ctx, dbState, cols); err != nil {
+		//	log.Errorf("refresh DataBaseState failed: %v", err)
+		//	return err
+		//}
 
-	log.Infow("begin RefreshBlockMsgs...")
-	if err := RefreshBlockMsgs(ctx, dbState, cols); err != nil {
-		return err
+		log.Infow("begin RefreshBlockMsgs...")
+		count, err := RefreshBlockMsgs(ctx, dbState, cols, "", "")
+		if err != nil {
+			return err
+		}
+
+		dbState.BlockMsgsCount = count
+		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+			log.Errorf("set DataBaseState failed: %v", err)
+			return err
+		}
+
+		log.Infow("begin RefreshBlockMsgsByMethodName...")
+		allBlockMethodNames, err := GetAllBlockMethodNamesMap(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
+			return err
+		}
+
+		for _, allBlockMethodName := range allBlockMethodNames {
+			dbState.BlockMsgsByMethodNameMap[allBlockMethodName.MethodName] += allBlockMethodName.Count
+		}
+
+		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+			log.Errorf("set DataBaseState failed: %v", err)
+			return err
+		}
+
+		log.Infow("begin RefreshActorMsgsByMethodName...")
+		allActorsMethods, err := GetAllActorsMethods(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
+			return err
+		}
+
+		for _, allActorMethods := range allActorsMethods {
+			if _, ok := dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName]; !ok {
+				dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName] = make(map[string]int64)
+				dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] = allActorMethods.Count
+			} else {
+				dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] += allActorMethods.Count
+			}
+		}
+
+		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+			log.Errorf("set DataBaseState failed: %v", err)
+			return err
+		}
+
+		log.Infow("begin RefreshActorMsgs...")
+		allActorsMsgsCount, err := GetAllActorsMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
+			return err
+		}
+
+		for _, allActorMsgsCount := range allActorsMsgsCount {
+			dbState.ActorMsgsCountMap[allActorMsgsCount.ActorID] += allActorMsgsCount.Count
+		}
+
+		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+			log.Errorf("set DataBaseState failed: %v", err)
+			return err
+		}
+
+		log.Infow("begin RefreshActorTransferMsgs...")
+		allActorsTransferMsgsCount, err := GetAllActorsTransferMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
+			return err
+		}
+
+		for _, allActorTransferMsgsCount := range allActorsTransferMsgsCount {
+			dbState.ActorTransfersCountMap[allActorTransferMsgsCount.ActorID] += allActorTransferMsgsCount.Count
+		}
+
+		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+			log.Errorf("set DataBaseState failed: %v", err)
+			return err
+		}
+
+		log.Infow("begin RefreshMinedMsgsMaps...")
+		allMinersMinedCount, err := GetAllMinersMinedCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		if err != nil {
+			return err
+		}
+
+		for _, allMinerMinedCount := range allMinersMinedCount {
+			dbState.MinedMsgsMap[allMinerMinedCount.ActorID] += allMinerMinedCount.Count
+		}
+
+		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+			log.Errorf("set DataBaseState failed: %v", err)
+			return err
+		}
+
+		log.Infow("begin RefreshTransfersForLargeAmount...")
+		transfersLargeAmountCount, err := RefreshTransfersForLargeAmount(ctx, dbState, cols, "", "")
+		if err != nil {
+			return err
+		}
+
+		dbState.TransfersLargeAmountCount = transfersLargeAmountCount
+
+		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+			log.Errorf("set DataBaseState failed: %v", err)
+			return err
+		}
+
+		return nil
 	}
+
 	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
 		log.Errorf("set DataBaseState failed: %v", err)
 		return err
 	}
-
-	log.Infow("begin RefreshBlockMsgsByMethodName...")
-	if err := RefreshBlockMsgsByMethodName(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		log.Errorf("set DataBaseState failed: %v", err)
-		return err
-	}
-
-	log.Infow("begin RefreshActorMsgsByMethodName...")
-	if err := RefreshActorMsgsByMethodName(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		log.Errorf("set DataBaseState failed: %v", err)
-		return err
-	}
-
-	log.Infow("begin RefreshActorMsgs...")
-	if err := RefreshActorMsgs(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		log.Errorf("set DataBaseState failed: %v", err)
-		return err
-	}
-
-	log.Infow("begin RefreshActorTransferMsgs...")
-	if err := RefreshActorTransferMsgs(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		log.Errorf("set DataBaseState failed: %v", err)
-		return err
-	}
-
-	log.Infow("begin RefreshMinedMsgsMaps...")
-	if err := RefreshMinedMsgsMaps(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		log.Errorf("set DataBaseState failed: %v", err)
-		return err
-	}
-
-	log.Infow("begin RefreshTransfersForLargeAmount...")
-	if err := RefreshTransfersForLargeAmount(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		log.Errorf("set DataBaseState failed: %v", err)
-		return err
-	}
-
-	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-	//	log.Errorf("set DataBaseState failed: %v", err)
-	//	return err
-	//}
 
 	return nil
 }
 
-func RefreshDataBaseState(ctx context.Context, dbState *DataBaseState, cols Collections) error {
-	if err := RefreshBlockMsgs(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshBlockMsgsByMethodName(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshActorMsgsByMethodName(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshActorMsgs(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshActorTransferMsgs(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshMinedMsgsMaps(ctx, dbState, cols); err != nil {
-		return err
-	}
-	if err := RefreshTransfersForLargeAmount(ctx, dbState, cols); err != nil {
-		return err
-	}
-
-	return nil
-}
+//func RefreshDataBaseState(ctx context.Context, dbState *DataBaseState, cols Collections) error {
+//	if err := RefreshBlockMsgs(ctx, dbState, cols); err != nil {
+//		return err
+//	}
+//	if err := RefreshBlockMsgsByMethodName(ctx, dbState, cols); err != nil {
+//		return err
+//	}
+//	if err := RefreshActorMsgsByMethodName(ctx, dbState, cols); err != nil {
+//		return err
+//	}
+//	if err := RefreshActorMsgs(ctx, dbState, cols); err != nil {
+//		return err
+//	}
+//	if err := RefreshActorTransferMsgs(ctx, dbState, cols); err != nil {
+//		return err
+//	}
+//	if err := RefreshMinedMsgsMaps(ctx, dbState, cols); err != nil {
+//		return err
+//	}
+//	if err := RefreshTransfersForLargeAmount(ctx, dbState, cols); err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -27,12 +29,6 @@ func GetCountOfBlockMessages(c *gin.Context) {
 		util.ReturnOnErr(c, err)
 		return
 	}
-	//
-	//blockFilter := bson.D{{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: req.StartEpoch}}}, {Key: "Epoch", Value: bson.D{{Key: "$lt", Value: req.EndEpoch}}}, {Key: "Depth", Value: 1}, {Key: "$or", Value: []bson.M{{"Msg.From": bson.D{{Key: "$regex", Value: "^1"}}}, {"Msg.From": bson.D{{Key: "$regex", Value: "^3"}}}, {"Msg.From": bson.D{{Key: "$regex", Value: "^4"}}}}}}
-	//count, err = col.CountDocuments(ctx, blockFilter)
-	//if err != nil {
-	//	return err
-	//}
 
 	curEpoch := common.GetCurEpoch()
 
@@ -48,13 +44,11 @@ func GetCountOfBlockMessages(c *gin.Context) {
 		totalCount += countUtil.Count
 	}
 
-	js := []byte(" [\n    {\n        $match: {\n            $and: [\n                {\"Depth\": 1},\n                {\"Epoch\": {$gte: ctx.StartEpoch, $lt: ctx.EndEpoch}},\n                {$or: [{\"Msg.From\":{$regex: /^1/}}, {\"Msg.From\":{$regex: /^3/}}, {\"Msg.From\":{$regex: /^4/}}]},\n            ]\n        }\n    },\n        {\n            $group: {\n                _id: 0,\n                Count: {$sum:1}\n            }\n        }\n        ]")
-
 	var blockCount []model.BlockCountRes
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, js, req, "ExecTrace")
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, monitor.GetCountOfBlockMessagesAggregator(), req, "ExecTrace")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

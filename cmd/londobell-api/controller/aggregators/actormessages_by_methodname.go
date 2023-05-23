@@ -5,12 +5,12 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+	"golang.org/x/net/context"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
-	"golang.org/x/net/context"
 )
 
 func GetActorMessagesByMethodName(c *gin.Context) {
@@ -29,6 +29,13 @@ func GetActorMessagesByMethodName(c *gin.Context) {
 
 	curEpoch := common.GetCurEpoch()
 
+	req.Addr, err = GetIDByAddr(ctx, req.Addr)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
 	countUtils, err := multiquery.GetTotalCountForActorMsgByMethodName(ctx, req.Addr, req.MethodName, &multiquery.DBStateManager, curEpoch)
 	if err != nil {
 		alog.Error(err)
@@ -41,20 +48,10 @@ func GetActorMessagesByMethodName(c *gin.Context) {
 		totalCount += countUtil.Count
 	}
 
-	api := fullnode.API.GetAppropriateAPI()
-	addrs, err := GetAllAddrs(ctx, req.Addr, api)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	req.Addrs = addrs
-
 	var messagesByMethodName []model.MessageByMethodName
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, actorMessagesByMethodNameAggregator, req, "ExecTrace")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, actorMessagesByMethodNameAggregator, req, "ActorMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
