@@ -354,7 +354,7 @@ func updateBaseStateForType(ctx context.Context, url, name, utype string, dBStMg
 	case "BlockMsgsByMethodNameMap":
 		dbState.BlockMsgsByMethodNameMap = make(map[string]int64)
 
-		allBlockMethodNames, err := multiquery.GetAllBlockMethodNames(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		allBlockMethodNames, err := multiquery.GetAllBlockMethodNamesMap(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
 		if err != nil {
 			return err
 		}
@@ -440,7 +440,7 @@ func updateBaseStateForType(ctx context.Context, url, name, utype string, dBStMg
 		dbState.BlockMsgsCount = count
 
 		dbState.BlockMsgsByMethodNameMap = make(map[string]int64)
-		allBlockMethodNames, err := multiquery.GetAllBlockMethodNames(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		allBlockMethodNames, err := multiquery.GetAllBlockMethodNamesMap(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
 		if err != nil {
 			return err
 		}

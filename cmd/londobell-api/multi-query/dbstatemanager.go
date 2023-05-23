@@ -693,7 +693,7 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 		}
 
 		log.Infow("begin RefreshBlockMsgsByMethodName...")
-		allBlockMethodNames, err := GetAllBlockMethodNames(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		allBlockMethodNames, err := GetAllBlockMethodNamesMap(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
 		if err != nil {
 			return err
 		}

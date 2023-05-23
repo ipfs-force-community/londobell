@@ -8,7 +8,7 @@ import (
 	"sort"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -35,17 +35,14 @@ func GetLatestTimeOfTrace(c *gin.Context) {
 		return
 	}
 
-	api := fullnode.API.GetAppropriateAPI()
-	addrs, err := GetAllAddrs(ctx, req.Addr, api)
+	req.Addr, err = GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	req.Addrs = addrs
-
-	pipe, err := util.Parse(model.Ctx{StartEpoch: 0, EndEpoch: math.MaxInt64, Addrs: req.Addrs, Sort: -1}, string(timeOfTraceAggregator))
+	pipe, err := util.Parse(model.Ctx{StartEpoch: 0, EndEpoch: math.MaxInt64, Addr: req.Addr, Sort: -1}, string(timeOfTraceAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -56,7 +53,7 @@ func GetLatestTimeOfTrace(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiUnionQuery(ctx, pipe, countUtils, "ExecTrace")
+		multiResult, err := multiquery.MultiUnionQuery(ctx, pipe, countUtils, "ActorMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

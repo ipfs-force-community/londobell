@@ -4,11 +4,12 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/net/context"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
-	"golang.org/x/net/context"
 )
 
 func GetAllMethods(c *gin.Context) {
@@ -27,7 +28,7 @@ func GetAllMethods(c *gin.Context) {
 
 	curEpoch := common.GetCurEpoch()
 
-	blockMsgsByMethodNameMap, err := multiquery.GetAllBlockMsgsByMethodNameMap(ctx, &multiquery.DBStateManager, curEpoch)
+	blockMsgsByMethodNames, err := multiquery.GetAllBlockMsgsByMethodName(ctx, &multiquery.DBStateManager, curEpoch)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -35,7 +36,7 @@ func GetAllMethods(c *gin.Context) {
 	}
 
 	var allMethods []model.AllMethodsRes
-	for methodName, count := range blockMsgsByMethodNameMap {
+	for methodName, count := range blockMsgsByMethodNames {
 		allMethods = append(allMethods, model.AllMethodsRes{MethodName: methodName, Count: count})
 	}
 

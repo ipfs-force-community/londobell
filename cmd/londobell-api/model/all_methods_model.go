@@ -24,3 +24,7 @@ type AllActorsMsgsCountRes struct {
 	ActorID string `bson:"_id" json:"_id"`
 	Count   int64
 }
+
+type AllBlockMethodNamesRes struct {
+	MethodNames []string
+}

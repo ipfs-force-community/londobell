@@ -34,12 +34,17 @@ var (
 var (
 	refreshOnce sync.Once
 	refreshes   = make([]func(ctx context.Context, ds *DataBaseState, cols Collections, actorID, methodName string) (int64, error), 0)
+
+	AllMethods     = make(map[string]int64, 0)
+	alk            sync.RWMutex
+	lastUpdateTime time.Time
 )
 
 func init() {
 	refreshOnce.Do(func() {
 		refreshes = append(refreshes, RefreshBlockMsgs, RefreshBlockMsgsByMethodName, RefreshActorMsgsByMethodName, RefreshActorMsgs, RefreshActorTransferMsgs, RefreshMinedMsgsMaps, RefreshTransfersForLargeAmount)
 	})
+
 }
 
 //func PeriodicRefreshDataBaseState(ctx context.Context, dbsm *DataBaseStateManager) {
@@ -472,8 +477,17 @@ func GetTotalCountForTransfersForLargeAmount(ctx context.Context, dbsm *DataBase
 	return countUtils, nil
 }
 
-func GetAllBlockMsgsByMethodNameMap(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) (map[string]int64, error) {
-	blockMsgsByMethodNameMap := make(map[string]int64)
+func GetAllBlockMsgsByMethodName(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) (map[string]int64, error) {
+	curTime := time.Now()
+	alk.RLock()
+	if curTime.Sub(lastUpdateTime) < 24*time.Hour {
+		defer alk.RUnlock()
+		return AllMethods, nil
+	}
+
+	alk.RUnlock()
+
+	blockMsgsByMethodNames := make([]string, 0)
 
 	colds := dbsm.GetColdsCfg()
 	formal := dbsm.GetFormalCfg()
@@ -513,14 +527,14 @@ func GetAllBlockMsgsByMethodNameMap(ctx context.Context, dbsm *DataBaseStateMana
 				return nil, fmt.Errorf("GetAllBlockMethodNames for db %v failed: %v", tmp.Url(), err)
 			}
 
-			for _, allBlockMethodName := range allBlockMethodNames {
-				blockMsgsByMethodNameMap[allBlockMethodName.MethodName] += allBlockMethodName.Count
+			if len(allBlockMethodNames) != 0 {
+				blockMsgsByMethodNames = append(blockMsgsByMethodNames, allBlockMethodNames[0].MethodNames...)
 			}
 
 			tmpStartEpoch = dbState.EndEpoch
 		} else {
-			for methodName, count := range dbState.BlockMsgsByMethodNameMap {
-				blockMsgsByMethodNameMap[methodName] += count
+			for methodName, _ := range dbState.BlockMsgsByMethodNameMap {
+				blockMsgsByMethodNames = append(blockMsgsByMethodNames, methodName)
 			}
 		}
 	}
@@ -539,20 +553,68 @@ func GetAllBlockMsgsByMethodNameMap(ctx context.Context, dbsm *DataBaseStateMana
 			return nil, fmt.Errorf("GetAllBlockMethodNames for db %v failed: %v", tmp.Url(), err)
 		}
 
-		for _, allBlockMethodName := range allBlockMethodNames {
-			blockMsgsByMethodNameMap[allBlockMethodName.MethodName] += allBlockMethodName.Count
+		if len(allBlockMethodNames) != 0 {
+			blockMsgsByMethodNames = append(blockMsgsByMethodNames, allBlockMethodNames[0].MethodNames...)
 		}
 	}
 
-	return blockMsgsByMethodNameMap, nil
+	MethodNamesMap := make(map[string]int64, 0)
+	for _, methodName := range blockMsgsByMethodNames {
+		if _, ok := MethodNamesMap[methodName]; !ok {
+			MethodNamesMap[methodName] = 1
+		}
+	}
+
+	alk.Lock()
+	AllMethods = MethodNamesMap
+	lastUpdateTime = time.Now()
+	alk.Unlock()
+
+	return MethodNamesMap, nil
 }
 
-func GetAllBlockMethodNames(ctx context.Context, startEpoch, endEpoch abi.ChainEpoch, cols Collections) ([]model.AllMethodsForActorRes, error) {
+func GetAllBlockMethodNamesMap(ctx context.Context, startEpoch, endEpoch abi.ChainEpoch, cols Collections) ([]model.AllMethodsForActorRes, error) {
 	if endEpoch <= startEpoch {
 		return nil, nil
 	}
 
 	var allBlockMethodNamesRes []model.AllMethodsForActorRes
+
+	js := "// ExecTrace\n[\n    {\n        $match: {\n            \"IsBlock\": true,\n            \"Epoch\": {$gte: ctx.StartEpoch, $lt: ctx.EndEpoch},\n        }\n    },\n    {\n        $group: {\n            _id: \"$Msg.MethodName\",\n            Count:{$sum:1}\n        }\n    }\n]"
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch)}, js)
+	if err != nil {
+		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+		return nil, err
+	}
+
+	tableName := "ExecTrace"
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == tableName {
+			cur, err := col.Aggregate(ctx, pipe) //, options.Aggregate().SetAllowDiskUse(true)
+			if err != nil {
+				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return nil, err
+			}
+
+			err = cur.All(ctx, &allBlockMethodNamesRes)
+			if err != nil {
+				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return nil, err
+			}
+
+			return allBlockMethodNamesRes, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no ExecTrace collection")
+}
+
+func GetAllBlockMethodNames(ctx context.Context, startEpoch, endEpoch abi.ChainEpoch, cols Collections) ([]model.AllBlockMethodNamesRes, error) {
+	if endEpoch <= startEpoch {
+		return nil, nil
+	}
+
+	var allBlockMethodNamesRes []model.AllBlockMethodNamesRes
 	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch)}, string(monitor.GetAllBlockMethodNamesAggregator()))
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
