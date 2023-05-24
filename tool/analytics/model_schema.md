@@ -484,6 +484,15 @@
 }
 ```
 
+### StateFinalHeight
+
+```
+{
+	"Cids": "[]cid.Cid",
+	"_id": "abi.ChainEpoch"
+}
+```
+
 ### Tipset
 
 ```

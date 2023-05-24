@@ -118,6 +118,10 @@ func init() {
 			Name: "actor-message",
 			D:    &model.ActorMessage{},
 		},
+		schema.Model{
+			Name: "state-final-height",
+			D:    &model.StateFinalHeight{},
+		},
 	)
 }
 
