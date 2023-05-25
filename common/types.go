@@ -56,6 +56,8 @@ type StateManager interface {
 	SearchForMessage(ctx context.Context, head *types.TipSet, mcid cid.Cid, lookbackLimit abi.ChainEpoch, allowReplaced bool) (*types.TipSet, *types.MessageReceipt, cid.Cid, error)
 	TipSetState(ctx context.Context, ts *types.TipSet) (st cid.Cid, rec cid.Cid, err error)
 	LookupID(ctx context.Context, addr address.Address, ts *types.TipSet) (address.Address, error)
+	//EthGetTransactionHashByCid(ctx context.Context, cid cid.Cid) (*ethtypes.EthHash, error)
+
 }
 
 // ChainDict is a dict for enums

@@ -1,6 +1,7 @@
 package tipset
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -8,6 +9,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/chain/types/ethtypes"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
@@ -300,7 +306,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return nil
 	}
 
-	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage {
+	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash {
 		return nil
 	}
 
@@ -394,6 +400,29 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		allsmsgs = append(allsmsgs, smsgs...)
 	}
 
+	var msgcnt, tracecnt, actorMsgCnt, ethCnt int
+
+	if ctx.Opts.EnabelExtract.EnableExtractEthHash {
+		for _, smsg := range allsmsgs {
+			if smsg.Signature.Type != crypto.SigTypeDelegated {
+				continue
+			}
+
+			hash, err := newEthTxFromSignedMessage(ctx.C, smsg, ts.TipSet, ctx.D)
+			if err != nil {
+				return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, smsg.Cid())
+			}
+
+			eht, err := model.NewEthHash(hash, smsg.Cid(), ts.Height())
+			if err != nil {
+				elog.Errorw("convert to model.EthHash", "mcid", smsg.Cid(), "err", err.Error())
+			} else {
+				ethCnt++
+				res.Docs = append(res.Docs, eht)
+			}
+		}
+	}
+
 	allsmsgsMap := make(map[string]*types.SignedMessage)
 	for _, smsg := range allsmsgs {
 		// 只取第一条被执行的SignedMessage
@@ -405,8 +434,6 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	}
 
 	dupmsgs := map[cid.Cid]struct{}{}
-
-	var msgcnt, tracecnt, actorMsgCnt int
 
 	for i := range etraces {
 		p := etraces[i]
@@ -769,4 +796,85 @@ func extractBlockMessage(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	}
 
 	return nil
+}
+
+func newEthTxFromSignedMessage(ctx context.Context, smsg *types.SignedMessage, ts *types.TipSet, sm common.StateManager) (ethtypes.EthHash, error) {
+	var tx ethtypes.EthTx
+	var err error
+
+	if smsg.Signature.Type == crypto.SigTypeDelegated {
+		tx, err = ethtypes.EthTxFromSignedEthMessage(smsg)
+		if err != nil {
+			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to convert from signed message: %w", err)
+		}
+
+		tx.Hash, err = tx.TxHash()
+		if err != nil {
+			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to calculate hash for ethTx: %w", err)
+		}
+
+		fromAddr, err := lookupEthAddress(ctx, smsg.Message.From, ts, sm)
+		if err != nil {
+			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to resolve Ethereum address: %w", err)
+		}
+
+		tx.From = fromAddr
+	} else if smsg.Signature.Type == crypto.SigTypeSecp256k1 { // Secp Filecoin Message
+		tx = ethTxFromNativeMessage(ctx, smsg.VMMessage(), ts, sm)
+		tx.Hash, err = ethtypes.EthHashFromCid(smsg.Cid())
+		if err != nil {
+			return ethtypes.EmptyEthHash, err
+		}
+	} else { // BLS Filecoin message
+		tx = ethTxFromNativeMessage(ctx, smsg.VMMessage(), ts, sm)
+		tx.Hash, err = ethtypes.EthHashFromCid(smsg.Message.Cid())
+		if err != nil {
+			return ethtypes.EmptyEthHash, err
+		}
+	}
+
+	return tx.Hash, nil
+}
+
+func lookupEthAddress(ctx context.Context, addr address.Address, ts *types.TipSet, sm common.StateManager) (ethtypes.EthAddress, error) {
+	ethAddr, err := ethtypes.EthAddressFromFilecoinAddress(addr)
+	if err == nil && !ethAddr.IsMaskedID() {
+		return ethAddr, nil
+	}
+
+	if actor, err := sm.LoadActor(ctx, addr, ts); err != nil {
+		return ethtypes.EthAddress{}, err
+	} else if actor.Address != nil {
+		if ethAddr, err := ethtypes.EthAddressFromFilecoinAddress(*actor.Address); err == nil && !ethAddr.IsMaskedID() {
+			return ethAddr, nil
+		}
+	}
+
+	if err == nil && ethAddr.IsMaskedID() {
+		return ethAddr, nil
+	}
+
+	idAddr, err := sm.LookupID(ctx, addr, ts)
+	if err != nil {
+		return ethtypes.EthAddress{}, err
+	}
+	return ethtypes.EthAddressFromFilecoinAddress(idAddr)
+}
+
+func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, ts *types.TipSet, sm common.StateManager) ethtypes.EthTx {
+	// We don't care if we error here, conversion is best effort for non-eth transactions
+	from, _ := lookupEthAddress(ctx, msg.From, ts, sm)
+	to, _ := lookupEthAddress(ctx, msg.To, ts, sm)
+	return ethtypes.EthTx{
+		To:                   &to,
+		From:                 from,
+		Nonce:                ethtypes.EthUint64(msg.Nonce),
+		ChainID:              ethtypes.EthUint64(build.Eip155ChainId),
+		Value:                ethtypes.EthBigInt(msg.Value),
+		Type:                 ethtypes.Eip1559TxType,
+		Gas:                  ethtypes.EthUint64(msg.GasLimit),
+		MaxFeePerGas:         ethtypes.EthBigInt(msg.GasFeeCap),
+		MaxPriorityFeePerGas: ethtypes.EthBigInt(msg.GasPremium),
+		AccessList:           []ethtypes.EthHash{},
+	}
 }
