@@ -40,6 +40,7 @@ type ChainStore interface {
 	ChainBlockstore() bstore.Blockstore
 	MessagesForBlock(ctx context.Context, b *types.BlockHeader) ([]*types.Message, []*types.SignedMessage, error)
 	ComputeBaseFee(ctx context.Context, ts *types.TipSet) (abi.TokenAmount, error)
+	//ChainGetEvents(ctx context.Context, root cid.Cid) ([]types.Event, error)
 }
 
 // StateManager manages the state on chain
