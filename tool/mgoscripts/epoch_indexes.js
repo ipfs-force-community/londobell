@@ -49,6 +49,8 @@ db.DealProposalDetail.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.DealProposalSummary.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
+db.EvmInitCode.createIndex({"Epoch":1,"InitCode":1}, {"sparse": true});
+
 db.ExecGas.createIndex({"Epoch":1}, {"sparse": true});
 
 db.ExecTrace.createIndex({"Epoch":1,"Msg.To":1,"Msg.Method":1,"MsgRct.ExitCode":1}, {"sparse": true});

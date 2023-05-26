@@ -121,6 +121,7 @@ type EnableExtractOptions struct {
 	EnableExtractActorMessage bool
 	EnableExtractEthHash      bool
 	EnableExtractEventsRoot   bool
+	EnableExtractEvmByteCode  bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
