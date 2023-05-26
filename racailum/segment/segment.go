@@ -9,6 +9,13 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/network"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/trace"
+
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil/mdict"
@@ -17,12 +24,6 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/aggregate"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-	"github.com/ipfs/go-cid"
-	logging "github.com/ipfs/go-log/v2"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.opencensus.io/stats"
-	"go.opencensus.io/trace"
 )
 
 var log = logging.Logger("segment")
@@ -275,8 +276,16 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		return err
 	}
 
-	if err := s.SaveFinalHeight(ctx, tipsets[len(tipsets)-1]); err != nil {
-		return err
+	if s.opts.Extract.OnlyExtractState {
+		if s.opts.Extract.ExtractOptions.EnabelExtract.EnableExtractState {
+			if err := s.SaveStateFinalHeight(ctx, tipsets[len(tipsets)-1]); err != nil {
+				return err
+			}
+		}
+	} else {
+		if err := s.SaveFinalHeight(ctx, tipsets[len(tipsets)-1]); err != nil {
+			return err
+		}
 	}
 
 	if err := s.updateBoundary(ctx, tipsets[len(tipsets)-1], nil); err != nil {
@@ -462,6 +471,53 @@ func (s *Segment) GetFinalHeight(ctx context.Context) (abi.ChainEpoch, error) {
 	}
 
 	var results []FinalHeightRes
+	if err = cursor.All(context.TODO(), &results); err != nil {
+		return 0, err
+	}
+
+	if len(results) != 1 {
+		return 0, fmt.Errorf("unexpected length of results: %v", len(results))
+	}
+
+	return results[0].Epoch, nil
+}
+
+func (s *Segment) SaveStateFinalHeight(ctx context.Context, hi *common.LinkedTipSet) error {
+	elog := log.With("stateFinalHeight", hi.Height())
+	elog.Info("save state final height")
+	res := extract.NewRes(0, 0)
+	docs := make([][]common.Document, 1)
+
+	doc, err := model.NewStateFinalHeight(hi)
+	if err != nil {
+		return err
+	}
+
+	res.Docs = append(res.Docs, doc)
+	docs[0] = res.Docs
+	if err := s.insertMany(ctx, elog, docs, false); err != nil {
+		return fmt.Errorf("SaveFinalHeight err: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Segment) GetStateFinalHeight(ctx context.Context) (abi.ChainEpoch, error) {
+	log.Info("get final height")
+
+	findOpts := make([]*options.FindOptions, 0)
+	findOpts = append(findOpts, options.Find().SetSort(bson.D{{Key: "_id", Value: -1}}), options.Find().SetLimit(-1))
+	cursor, err := s.rdb.Find(ctx, "StateFinalHeight", bson.D{}, findOpts...)
+	if err != nil {
+		return 0, err
+	}
+
+	type StateFinalHeightRes struct {
+		Epoch abi.ChainEpoch `bson:"_id"`
+		Cids  []string
+	}
+
+	var results []StateFinalHeightRes
 	if err = cursor.All(context.TODO(), &results); err != nil {
 		return 0, err
 	}

@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	logging "github.com/ipfs/go-log/v2"
+	"go.opencensus.io/stats"
+
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/metrics"
 	"github.com/ipfs-force-community/londobell/racailum/grafana"
@@ -13,8 +16,6 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/aggregate"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/tracing"
-	logging "github.com/ipfs/go-log/v2"
-	"go.opencensus.io/stats"
 
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -235,11 +236,27 @@ func (r *RaCailum) AlertOutdatedFinalHeight(ctx context.Context, outdatedGap int
 	for {
 		select {
 		case <-tick.C:
-			finalHeight, err := r.activeSeg.GetFinalHeight(ctx)
-			if err != nil {
-				log.Errorf("get final height failed: %v", err)
-				stats.Record(ctx, metrics.OutdatedFinalHeight.M(1))
-				continue
+			var (
+				finalHeight abi.ChainEpoch
+				err         error
+			)
+
+			if r.cfg.Segment.Extract.OnlyExtractState {
+				if r.cfg.Segment.Extract.ExtractOptions.EnabelExtract.EnableExtractState {
+					finalHeight, err = r.activeSeg.GetStateFinalHeight(ctx)
+					if err != nil {
+						log.Errorf("get state final height failed: %v", err)
+						stats.Record(ctx, metrics.OutdatedFinalHeight.M(1))
+						continue
+					}
+				}
+			} else {
+				finalHeight, err = r.activeSeg.GetFinalHeight(ctx)
+				if err != nil {
+					log.Errorf("get final height failed: %v", err)
+					stats.Record(ctx, metrics.OutdatedFinalHeight.M(1))
+					continue
+				}
 			}
 
 			curEpoch := common.GetCurEpoch()

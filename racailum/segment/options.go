@@ -18,6 +18,8 @@ type extractOptions struct {
 	TipSetPartSizeLimit int
 
 	ExtractOptions extract.Options
+
+	OnlyExtractState bool
 }
 
 type persistOptions struct {
@@ -50,7 +52,8 @@ func DefaultOptions() Options {
 
 			TipSetPartSizeLimit: 16,
 
-			ExtractOptions: extract.DefaultOptions(),
+			ExtractOptions:   extract.DefaultOptions(),
+			OnlyExtractState: false,
 		},
 
 		Persist: persistOptions{
