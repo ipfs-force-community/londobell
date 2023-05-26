@@ -48,7 +48,7 @@ func GetMessagesForBlock(c *gin.Context) {
 		return
 	}
 
-	var messagesForBlockRes []model.TraceForMessageRes
+	var messagesForBlockRes []model.TraceForMessageSimplifyRes
 
 	// multi dbs query
 	{
