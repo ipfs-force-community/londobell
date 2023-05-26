@@ -1,6 +1,9 @@
 package model
 
-import "github.com/filecoin-project/go-state-types/abi"
+import (
+	"github.com/filecoin-project/go-state-types/abi"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type TraceForMessageRes struct {
 	Cid          string
@@ -20,4 +23,10 @@ type TraceForMessageRes struct {
 	GasFeeCap    string
 	GasPremium   string
 	GasCost      GasCost
+	MethodNum    uint64
+	Seq          []uint64
+	EventsRoot   string
+	ParamsBson   primitive.Binary
+	ReturnsBson  primitive.Binary
+	Actor        string
 }

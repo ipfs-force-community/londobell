@@ -301,9 +301,12 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		blockMessageCol := database.Collection("BlockMessage")
 		blockHeaderCol := database.Collection("BlockHeader")
 		actorMessageCol := database.Collection("ActorMessage")
+		ethHashCol := database.Collection("EthHash")
+		eventsRootCol := database.Collection("EventsRoot")
+		evmInitCodeCol := database.Collection("EvmInitCode")
 
 		cols := make([]*mongo.Collection, 0)
-		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol)
+		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, evmInitCodeCol)
 		dbsm.UpdateDBCollectionsMap(db.Url(), Collections{DB: database, Cols: cols})
 	}
 
@@ -326,9 +329,12 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 	blockMessageCol := database.Collection("BlockMessage")
 	blockHeaderCol := database.Collection("BlockHeader")
 	actorMessageCol := database.Collection("ActorMessage")
+	ethHashCol := database.Collection("EthHash")
+	eventsRootCol := database.Collection("EventsRoot")
+	evmInitCodeCol := database.Collection("EvmInitCode")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol)
+	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, evmInitCodeCol)
 	dbsm.UpdateDBCollectionsMap(tmp.Url(), Collections{DB: database, Cols: cols})
 
 	return nil
@@ -403,9 +409,12 @@ func GetCollectionsForDB(ctx context.Context, db DB) (Collections, error) {
 	blockMessageCol := database.Collection("BlockMessage")
 	blockHeaderCol := database.Collection("BlockHeader")
 	actorMessageCol := database.Collection("ActorMessage")
+	ethHashCol := database.Collection("EthHash")
+	eventsRootCol := database.Collection("EventsRoot")
+	evmInitCodeCol := database.Collection("EvmInitCode")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol)
+	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, evmInitCodeCol)
 
 	return Collections{DB: database, Cols: cols}, nil
 }
