@@ -2,6 +2,7 @@ package model
 
 import (
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/exitcode"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -29,4 +30,14 @@ type TraceForMessageRes struct {
 	ParamsBson   primitive.Binary
 	ReturnsBson  primitive.Binary
 	Actor        string
+}
+
+type TraceForMessageSimplifyRes struct {
+	Cid      string
+	Epoch    abi.ChainEpoch
+	From     string
+	To       string
+	Value    string
+	ExitCode exitcode.ExitCode
+	Method   string
 }
