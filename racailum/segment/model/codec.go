@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/filecoin-project/lotus/chain/types/ethtypes"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/big"
@@ -72,11 +74,28 @@ func init() {
 
 	tskCodecs := append([]interface{}{tipsetKeyBSONEncode, tipsetKeyBSONDecode}, tskExams...)
 
+	hashExams := []interface{}{}
+	for _, s := range []string{
+		"0x9db82eec8a529c12361cedfaa3ae43ccc66234efac00a4bae8e0cc6dcb269be1",
+		"0xc3535fefdd76f2de7a843fa4defcecb26cbc2d5b7279f7939662ca75815117eb",
+		"0x9941603956a8fd47753cbbdb3be2ae35f3afd8af164ab76222b72904f9ba84b8",
+	} {
+		hashExam, err := ethtypes.ParseEthHash(s)
+		if err != nil {
+			panic(fmt.Errorf("invalid hash string %s: %w", s, err))
+		}
+
+		hashExams = append(hashExams, hashExam)
+	}
+
+	hashCodecs := append([]interface{}{ethHashBSONEncode, ethHashBSONDecode}, hashExams...)
+
 	// encoder, decoder, examples
 	codecs := [][]interface{}{
 		addrCodecs,
 		cidCodecs,
 		tskCodecs,
+		hashCodecs,
 		{bigIntBSONEncode, bigIntBSONDecode, big.NewInt(1 << 10), big.NewInt(1 << 30), reward.BaselineExponent},
 		{uintptrBSONEncode, uintptrBSONDecode, uintptr(1 << 10), uintptr(1 << 30)},
 		{bitfieldBSONEncode, bitfieldBSONDecode, bitfield.New(), bitfield.NewFromSet([]uint64{1 << 10, 1 << 20, 1 << 30, 1 << 40})},
@@ -188,4 +207,13 @@ func tipsetKeyBSONDecode(s string) (types.TipSetKey, error) {
 
 	tsk := types.NewTipSetKey(tsCids...)
 	return tsk, nil
+}
+
+// ethtypes.EthHash
+func ethHashBSONEncode(hash ethtypes.EthHash) (string, bool, error) {
+	return hash.String(), false, nil
+}
+
+func ethHashBSONDecode(s string) (ethtypes.EthHash, error) {
+	return ethtypes.ParseEthHash(s)
 }
