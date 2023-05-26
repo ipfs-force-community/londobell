@@ -116,12 +116,12 @@ type EnableExtractOptions struct {
 	EnableExtractActorBalance bool
 	EnableExtractBlockHeader  bool
 	//EnableExtractMessageBlock bool
-	EnableExtractBlockMessage bool
-
+	EnableExtractBlockMessage    bool
 	EnableExtractActorMessage    bool
 	EnableExtractEthHash         bool
 	EnableExtractEventsRoot      bool
 	EnableExtractExplicitMessage bool
+	EnableExtractEvmByteCode     bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -139,7 +139,8 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractActorMessage:    true,
 		EnableExtractEthHash:         true,
 		EnableExtractEventsRoot:      true,
-		EnableExtractExplicitMessage: true,
+		EnableExtractExplicitMessage: false,
+		EnableExtractEvmByteCode:     true,
 	}
 }
 
