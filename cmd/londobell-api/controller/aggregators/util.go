@@ -818,9 +818,7 @@ func GetEventsByRoot(ctx context.Context, root string) ([]types.Event, error) {
 		return nil, err
 	}
 
-	js := "// EventRoots\n[\n    {\n        $match: {\n            _id: ctx.Cid\n        }\n    },\n   ]"
-
-	pipe, err := util.Parse(model.Ctx{Cid: root}, string(js)) //monitor.GetEventsRootAggregator()
+	pipe, err := util.Parse(model.Ctx{Cid: root}, monitor.GetEventsRootAggregator())
 	if err != nil {
 		return nil, err
 	}
