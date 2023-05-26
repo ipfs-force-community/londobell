@@ -1,9 +1,11 @@
 package tipset
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,6 +15,7 @@ import (
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
+	cbg "github.com/whyrusleeping/cbor-gen"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
@@ -34,6 +37,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 
+	amt4 "github.com/filecoin-project/go-amt-ipld/v4"
 	"github.com/filecoin-project/lotus/api"
 	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
 	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
@@ -310,7 +314,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return nil
 	}
 
-	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash {
+	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
 		return nil
 	}
 
@@ -404,7 +408,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		allsmsgs = append(allsmsgs, smsgs...)
 	}
 
-	var msgcnt, tracecnt, actorMsgCnt, ethCnt int
+	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt int
 
 	if ctx.Opts.EnabelExtract.EnableExtractEthHash {
 		for _, smsg := range allsmsgs {
@@ -496,6 +500,26 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
+		if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
+			if p.exec != nil && p.exec.MsgRct.Version() == types.MessageReceiptV1 {
+				eventsRoot := p.exec.MsgRct.EventsRoot
+				if eventsRoot != nil {
+					events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
+					if err != nil {
+						return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
+					}
+
+					etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
+					if err != nil {
+						elog.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+					} else {
+						res.Docs = append(res.Docs, etm)
+						etcnt++
+					}
+				}
+			}
+		}
+
 		if ctx.Opts.EnabelExtract.EnableExtractActorMessage {
 			isBlock := IsBlock(p.seq, msg.From)
 			storeMap := make(map[address.Address]string)
@@ -554,6 +578,30 @@ func LookupID(ctx *extract.Ctx, addr address.Address, ts *types.TipSet) (address
 	}
 
 	return actorID, nil
+}
+
+func GetEvents(ctx context.Context, root cid.Cid, cs common.ChainStore) ([]types.Event, error) {
+	store := cs.ActorStore(ctx)
+	evtArr, err := amt4.LoadAMT(ctx, store, root, amt4.UseTreeBitWidth(types.EventAMTBitwidth))
+	if err != nil {
+		return nil, xerrors.Errorf("load events amt: %w", err)
+	}
+
+	ret := make([]types.Event, 0, evtArr.Len())
+	var evt types.Event
+	err = evtArr.ForEach(ctx, func(u uint64, deferred *cbg.Deferred) error {
+		if u > math.MaxInt {
+			return xerrors.Errorf("too many events")
+		}
+		if err := evt.UnmarshalCBOR(bytes.NewReader(deferred.Raw)); err != nil {
+			return err
+		}
+
+		ret = append(ret, evt)
+		return nil
+	})
+
+	return ret, err
 }
 
 func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
