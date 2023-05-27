@@ -49,6 +49,10 @@ db.DealProposalDetail.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.DealProposalSummary.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
+db.EthHash.createIndex({"Cid":1,"Epoch":1}, {"sparse": true});
+
+// no indexes for EventsRoot
+
 db.EvmInitCode.createIndex({"Epoch":1,"InitCode":1}, {"sparse": true});
 
 db.ExecGas.createIndex({"Epoch":1}, {"sparse": true});

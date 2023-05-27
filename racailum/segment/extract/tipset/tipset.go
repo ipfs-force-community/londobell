@@ -137,6 +137,14 @@ func init() {
 		},
 
 		schema.Model{
+			Name: "eth-hash",
+			D:    &model.EthHash{},
+		},
+		schema.Model{
+			Name: "events-root",
+			D:    &model.EventsRoot{},
+		},
+		schema.Model{
 			Name: "evm-initcode",
 			D:    &model.EvmInitCode{},
 		},
@@ -435,6 +443,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			} else {
 				ethCnt++
 				res.Docs = append(res.Docs, eht)
+				elog.Infow("add to ethhash", "mcid", smsg.Cid(), "hash", hash.String())
 			}
 		}
 	}
@@ -591,7 +600,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 	}
 
-	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "evm-initcode", initCodeCnt)
+	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "eth-hash", ethCnt, "events-root", etcnt, "evm-initcode", initCodeCnt)
 
 	return nil
 }
