@@ -1,6 +1,8 @@
 package model
 
 import (
+	"encoding/json"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
@@ -17,7 +19,7 @@ var (
 
 type EventsRoot struct {
 	Root   cid.Cid `mir:"-" bson:"_id"`
-	Events []types.Event
+	Events []byte
 	Epoch  abi.ChainEpoch
 }
 
@@ -26,9 +28,14 @@ func (f *EventsRoot) Indexes() [][]string {
 }
 
 func NewEventsRoot(root cid.Cid, events []types.Event, epoch abi.ChainEpoch) (*EventsRoot, error) {
+	eventsJSON, err := json.Marshal(events)
+	if err != nil {
+		return nil, err
+	}
+
 	return &EventsRoot{
 		Root:   root,
-		Events: events,
+		Events: eventsJSON,
 		Epoch:  epoch,
 	}, nil
 }
