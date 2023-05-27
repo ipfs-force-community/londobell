@@ -68,10 +68,11 @@ func GetActorInfo(c *gin.Context) {
 	}
 
 	var (
-		actorID   address.Address
-		actorAddr address.Address
-		actorType string
-		state     interface{}
+		actorID       address.Address
+		actorAddr     address.Address
+		delegatedAddr address.Address
+		actorType     string
+		state         interface{}
 	)
 
 	// todo: mask protocol details
@@ -85,7 +86,11 @@ func GetActorInfo(c *gin.Context) {
 			return
 		}
 
-		actorAddr = addr
+		if addr.Protocol() == address.Delegated {
+			delegatedAddr = addr
+		} else {
+			actorAddr = addr
+		}
 	}
 
 	stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(api))
@@ -213,7 +218,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "evm"
 		// todo: f2
 		if addr.Protocol() == address.ID {
-			actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
+			delegatedAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
 			if err != nil {
 				alog.Error(err)
 				util.ReturnOnErr(c, err)
@@ -234,7 +239,7 @@ func GetActorInfo(c *gin.Context) {
 		actorType = "ethaccount"
 		// todo: f2
 		if addr.Protocol() == address.ID {
-			actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
+			delegatedAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
 			if err != nil {
 				alog.Error(err)
 				util.ReturnOnErr(c, err)
@@ -245,7 +250,7 @@ func GetActorInfo(c *gin.Context) {
 		// todo: f2
 		actorType = "placeholder"
 		if addr.Protocol() == address.ID {
-			actorAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
+			delegatedAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
 			if err != nil {
 				alog.Error(err)
 				util.ReturnOnErr(c, err)
@@ -260,16 +265,17 @@ func GetActorInfo(c *gin.Context) {
 	}
 
 	resData := model.ActorRes{
-		ActorID:   actorID,
-		ActorAddr: actorAddr.String(),
-		Epoch:     ts.Height(),
-		BlockTime: common.CalcTimeByEpoch(uint64(ts.Height())),
-		ActorType: actorType,
-		Balance:   act.Balance,
-		Code:      act.Code,
-		Head:      act.Head,
-		Nonce:     act.Nonce,
-		State:     state,
+		ActorID:       actorID,
+		ActorAddr:     actorAddr.String(),
+		Epoch:         ts.Height(),
+		BlockTime:     common.CalcTimeByEpoch(uint64(ts.Height())),
+		ActorType:     actorType,
+		Balance:       act.Balance,
+		Code:          act.Code,
+		Head:          act.Head,
+		Nonce:         act.Nonce,
+		State:         state,
+		DelegatedAddr: delegatedAddr.String(),
 	}
 
 	res.Data = resData
