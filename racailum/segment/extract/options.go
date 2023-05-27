@@ -139,6 +139,7 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractActorMessage: true,
 		EnableExtractEthHash:      true,
 		EnableExtractEventsRoot:   true,
+		EnableExtractEvmByteCode:  true,
 	}
 }
 
