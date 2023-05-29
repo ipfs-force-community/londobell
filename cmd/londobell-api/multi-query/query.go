@@ -50,6 +50,37 @@ func GetFinalHeight(ctx context.Context, cols Collections) (abi.ChainEpoch, erro
 	return 0, fmt.Errorf("no FinalHeight collection")
 }
 
+func GetStateFinalHeight(ctx context.Context, cols Collections) (abi.ChainEpoch, error) {
+	var finalHeightRes []model.FinalHeightRes
+
+	pipe, err := util.Parse(model.Ctx{}, string(monitor.GetFinalHeightAggregator()))
+	if err != nil {
+		return 0, err
+	}
+
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == "StateFinalHeight" {
+			cur, err := col.Aggregate(ctx, pipe)
+			if err != nil {
+				return 0, err
+			}
+
+			err = cur.All(ctx, &finalHeightRes)
+			if err != nil {
+				return 0, err
+			}
+
+			if len(finalHeightRes) == 0 {
+				return 0, nil
+			}
+
+			return finalHeightRes[0].Epoch, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no StateFinalHeight collection")
+}
+
 // MultiPagingQuery 对多库进行分页查询  todo: 磁盘state更改会影响dbStates（map）吗？
 func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils []CountUtil, aggregator []byte, req model.CommonReq, tableName string) ([]bson.M, error) {
 	qlog := log.With("multi-query", "MultiPagingQuery")
