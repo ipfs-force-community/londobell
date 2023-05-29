@@ -234,6 +234,7 @@ func RegisterAdapterApi(router *gin.Engine) {
 		group.POST("/sectornumber_by_dealID", adapter.GetSectorNumberByDealID)
 		group.POST("/changed_actors", adapter.GetStateChaingedActors)
 		group.POST("/version", adapter.GetVersion)
+		group.POST("/initcode_for_evm", adapter.GetInitCodeForEvm)
 	}
 }
 
