@@ -521,7 +521,7 @@ func GetMessageByTrace(trace model.TraceForMessageRes) (*types.Message, error) {
 
 	methodInfo, err := util.LookupMethodInfo(trace.Epoch, abi.MethodNum(trace.MethodNum), trace.From, trace.To, trace.Actor)
 	if err != nil {
-		return nil, err
+		log.Warn(err)
 	}
 
 	if !trace.ParamsBson.IsZero() {

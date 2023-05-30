@@ -48,20 +48,6 @@ func GetInitCodeForEvm(c *gin.Context) {
 		return
 	}
 
-	//actorIDStr, err := aggregators.GetIDByAddr(ctx, addr.String()[1:])
-	//if err != nil {
-	//	alog.Error(err)
-	//	util.ReturnOnErr(c, err)
-	//	return
-	//}
-	//
-	//actorID, err := address.NewFromString(actorIDStr)
-	//if err != nil {
-	//	alog.Error(err)
-	//	util.ReturnOnErr(c, err)
-	//	return
-	//}
-
 	stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(api))
 
 	act, err := api.StateGetActor(ctx, addr, ts.Key())
