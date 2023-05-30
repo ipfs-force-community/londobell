@@ -40,7 +40,6 @@ type Message struct {
 	Cid            cid.Cid `bson:"_id"`
 	*types.Message `bson:",inline"`
 	Detail         MessageDetail
-	SignedCid      cid.Cid `bson:"SignedCid,omitempty"`
 }
 
 // Indexes impl common.Indexed
@@ -51,7 +50,6 @@ func (m *Message) Indexes() [][]string {
 		[]string{"Detail.Method", "Detail.Actor"},
 		[]string{"Detail.PackedHeight"},
 		[]string{"Detail.PackedHeight", "Detail.Method"},
-		[]string{"SignedCid"},
 	}
 }
 
@@ -71,11 +69,10 @@ func (m *Message) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) 
 }
 
 // NewMessage converts from *types.Message to *Message with required infomations
-func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, params cbor.Er, epoch abi.ChainEpoch) (*Message, error) {
+func NewMessage(mcid cid.Cid, raw *types.Message, act, meth string, params cbor.Er, epoch abi.ChainEpoch) (*Message, error) {
 	msg := &Message{
-		Cid:       mcid,
-		Message:   raw,
-		SignedCid: signedCid,
+		Cid:     mcid,
+		Message: raw,
 	}
 
 	msg.Detail.Actor = act

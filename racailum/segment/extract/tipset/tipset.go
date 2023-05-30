@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/go-state-types/exitcode"
+
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
@@ -131,6 +133,10 @@ func init() {
 		schema.Model{
 			Name: "state-final-height",
 			D:    &model.StateFinalHeight{},
+		},
+		schema.Model{
+			Name: "explicit-message",
+			D:    &model.ExplicitMessage{},
 		},
 	)
 }
@@ -314,7 +320,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return nil
 	}
 
-	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
+	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot && !ctx.Opts.EnabelExtract.EnableExtractExplicitMessage {
 		return nil
 	}
 
@@ -398,20 +404,29 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return fmt.Errorf("add gas trace names: %w", err)
 	}
 
-	// 得到SignedMessage
-	allsmsgs := make([]*types.SignedMessage, 0)
-	for _, b := range ts.TipSet.Blocks() {
-		_, smsgs, err := ctx.D.MessagesForBlock(ctx.C, b)
-		if err != nil {
-			return fmt.Errorf("get message for block err: %w", err)
-		}
-		allsmsgs = append(allsmsgs, smsgs...)
+	allmsgs, err := ctx.D.MessagesForTipset(ctx.C, ts.TipSet)
+	if err != nil {
+		return fmt.Errorf("get messages for tipset err: %w", err)
 	}
 
-	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt int
+	allmsgsMap := make(map[string]types.ChainMsg)
+	for _, msg := range allmsgs {
+		key := msg.VMMessage().From.String() + "-" + strconv.FormatUint(msg.VMMessage().Nonce, 10)
+		if _, ok := allmsgsMap[key]; ok {
+			continue
+		}
+		allmsgsMap[key] = msg
+	}
+
+	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt int
 
 	if ctx.Opts.EnabelExtract.EnableExtractEthHash {
-		for _, smsg := range allsmsgs {
+		for _, cmsg := range allmsgs {
+			smsg, ok := cmsg.(*types.SignedMessage)
+			if !ok {
+				continue
+			}
+
 			if smsg.Signature.Type != crypto.SigTypeDelegated {
 				continue
 			}
@@ -429,16 +444,6 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				res.Docs = append(res.Docs, eht)
 			}
 		}
-	}
-
-	allsmsgsMap := make(map[string]*types.SignedMessage)
-	for _, smsg := range allsmsgs {
-		// 只取第一条被执行的SignedMessage
-		key := smsg.Message.From.String() + "-" + strconv.FormatUint(smsg.Message.Nonce, 10)
-		if _, ok := allsmsgsMap[key]; ok {
-			continue
-		}
-		allsmsgsMap[key] = smsg
 	}
 
 	dupmsgs := map[cid.Cid]struct{}{}
@@ -461,36 +466,37 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			elog.Errorf("%s", err)
 		}
 
-		mcid := msg.Cid()
-		var signedCid cid.Cid
+		trueCid := msg.Cid()
 
 		key := msg.From.String() + "-" + strconv.FormatUint(msg.Nonce, 10)
-		if smsg, ok := allsmsgsMap[key]; ok {
-			signedCid = mcid
-			if mcid != smsg.Cid() {
-				signedCid = smsg.Cid()
-				elog.Infow("new messagecid", "newMcid", signedCid, "oldMcid", mcid)
+		if cmsg, ok := allmsgsMap[key]; ok {
+			smsg, ok := cmsg.(*types.SignedMessage)
+			if ok {
+				if trueCid != smsg.Cid() {
+					trueCid = smsg.Cid()
+					elog.Infow("new messagecid", "newMcid", trueCid, "oldMcid", msg.Cid())
+				}
 			}
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractMessage {
-			if _, has := dupmsgs[mcid]; !has {
-				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
+			if _, has := dupmsgs[trueCid]; !has {
+				mmsg, err := model.NewMessage(trueCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 				if err != nil {
-					elog.Errorw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+					elog.Errorw("convert to model.Message", "trueCid", trueCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 				} else {
 					res.Docs = append(res.Docs, mmsg)
 					msgcnt++
-					dupmsgs[mcid] = struct{}{}
+					dupmsgs[trueCid] = struct{}{}
 				}
 			}
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractExecTrace {
 			isBlock := IsBlock(p.seq, msg.From)
-			met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock)
+			met, _, err := model.NewExecTrace(ctx.C, ctx.D, trueCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock)
 			if err != nil {
-				elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+				elog.Errorw("convert to model.MessageExec", "trueCid", trueCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
 				tracecnt++
 				res.Docs = append(res.Docs, met)
@@ -506,12 +512,12 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				if eventsRoot != nil {
 					events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
 					if err != nil {
-						return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
+						return fmt.Errorf("get events failed: %v, eventsRoot: %v, trueCid: %v", err, eventsRoot, trueCid)
 					}
 
 					etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
 					if err != nil {
-						elog.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+						elog.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "trueCid", trueCid, "err", err.Error())
 					} else {
 						res.Docs = append(res.Docs, etm)
 						etcnt++
@@ -545,13 +551,26 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 
 			for ID, mtype := range storeMap {
-				amsg, err := model.NewActorMessage(ID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock, p.seq)
+				amsg, err := model.NewActorMessage(ID, ts.Height(), trueCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock, p.seq)
 				if err != nil {
-					elog.Errorw("convert to model.ActorMessage", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
+					elog.Errorw("convert to model.ActorMessage", "actorID", ID, "signedCid", trueCid)
 				} else {
 					actorMsgCnt++
 					res.Docs = append(res.Docs, amsg)
 				}
+			}
+		}
+
+		if ctx.Opts.EnabelExtract.EnableExtractExplicitMessage {
+			if cmsg, ok := allmsgsMap[key]; ok {
+				var exitCode exitcode.ExitCode
+				if p.exec != nil {
+					exitCode = p.exec.MsgRct.ExitCode
+				}
+
+				emt := model.NewExplicitMessage(cmsg.Cid(), ts.Height(), msg.Value, mi.Method.Name, exitCode, msg.From, msg.To)
+				emtCnt++
+				res.Docs = append(res.Docs, emt)
 			}
 		}
 	}

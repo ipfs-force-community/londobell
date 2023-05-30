@@ -24,7 +24,6 @@ type ActorMessage struct {
 	ActorID    address.Address
 	Epoch      abi.ChainEpoch `mir:"-"`
 	Cid        cid.Cid
-	SignedCid  cid.Cid
 	Value      abi.TokenAmount // int64
 	MethodName string
 	ExitCode   exitcode.ExitCode
@@ -34,12 +33,11 @@ type ActorMessage struct {
 	IsBlock    bool // 是否是块消息
 }
 
-func NewActorMessage(actorID address.Address, epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, mtype string, from, to address.Address, isBlock bool, seq []int) (*ActorMessage, error) {
+func NewActorMessage(actorID address.Address, epoch abi.ChainEpoch, cid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, mtype string, from, to address.Address, isBlock bool, seq []int) (*ActorMessage, error) {
 	am := &ActorMessage{
 		ActorID:    actorID,
 		Epoch:      epoch,
 		Cid:        cid,
-		SignedCid:  signedCid,
 		Value:      value,
 		MethodName: methodName,
 		ExitCode:   exitcode,
