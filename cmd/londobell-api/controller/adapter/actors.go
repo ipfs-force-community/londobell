@@ -231,13 +231,11 @@ func GetActorsInfo(c *gin.Context) {
 		case builtin.IsEvmActor(act.Code):
 			actorType = "evm"
 			// todo: f2
-			if addr.Protocol() == address.ID {
-				delegatedAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
-				if err != nil {
-					alog.Error(err)
-					util.ReturnOnErr(c, err)
-					return
-				}
+			delegatedAddr, err = api.StateAccountKey(ctx, actorID, ts.Key())
+			if err != nil {
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
+				return
 			}
 
 			st, err := evm.Load(stor, act)
@@ -252,25 +250,23 @@ func GetActorsInfo(c *gin.Context) {
 		case builtin.IsEthAccountActor(act.Code):
 			actorType = "ethaccount"
 			// todo: f2
-			if addr.Protocol() == address.ID {
-				delegatedAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
-				if err != nil {
-					alog.Error(err)
-					util.ReturnOnErr(c, err)
-					return
-				}
+			delegatedAddr, err = api.StateAccountKey(ctx, actorID, ts.Key())
+			if err != nil {
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
+				return
 			}
+
 		case builtin.IsPlaceholderActor(act.Code):
 			// todo: f2
 			actorType = "placeholder"
-			if addr.Protocol() == address.ID {
-				delegatedAddr, err = api.StateAccountKey(ctx, addr, ts.Key())
-				if err != nil {
-					alog.Error(err)
-					util.ReturnOnErr(c, err)
-					return
-				}
+			delegatedAddr, err = api.StateAccountKey(ctx, actorID, ts.Key())
+			if err != nil {
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
+				return
 			}
+
 		default:
 			err = fmt.Errorf("unknow actor type: %v", addr)
 			alog.Error(err)
