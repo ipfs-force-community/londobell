@@ -300,6 +300,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/get_transaction_receipt_by_cid", aggregators.GetTransactionReceiptByCid)
 		//group.POST("/get_evm_initcode_by_actorID", aggregators.GetEvmInitCodeByActorID)
 		group.POST("/messagecid_by_hash", aggregators.GetMessageCidByHash)
+		group.POST("/hash_by_messagecid", aggregators.GetHashByMessageCid)
 		group.POST("/state_final_height", aggregators.GetStateFinalHeight)
 
 	}

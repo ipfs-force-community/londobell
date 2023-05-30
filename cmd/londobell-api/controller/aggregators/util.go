@@ -3,6 +3,7 @@ package aggregators
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -910,5 +911,70 @@ func GetCidFromEthHash(ctx context.Context, hash string) (string, error) {
 	}
 
 	return getCidByHashRes[0].Cid, nil
+}
+
+func GetEthHashByCid(ctx context.Context, mcidStr string) (string, error) {
+	// f4 & other
+
+	countUtils, err := multiquery.GetColsOnly(&multiquery.DBStateManager)
+	if err != nil {
+		return "", err
+	}
+
+	pipe, err := util.Parse(model.Ctx{Cid: mcidStr}, string(monitor.GetHashByMessageCidAggregator()))
+	if err != nil {
+		return "", err
+	}
+
+	var hashByMessageCidRes []model.HashByMessageCidRes
+
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "EthHash")
+		if err != nil {
+			return "", err
+		}
+
+		if len(multiResult) == 0 {
+			mcid, err := cid.Decode(mcidStr)
+			if err != nil {
+				return "", err
+			}
+
+			hash, err := ethtypes.EthHashFromCid(mcid)
+			if err != nil {
+				return "", err
+			}
+
+			return hex.EncodeToString(hash[:]), nil
+		}
+
+		raw := multiResult
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			return "", err
+		}
+
+		err = json.Unmarshal(rawByte, &hashByMessageCidRes)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if len(hashByMessageCidRes) == 0 {
+		mcid, err := cid.Decode(mcidStr)
+		if err != nil {
+			return "", err
+		}
+
+		hash, err := ethtypes.EthHashFromCid(mcid)
+		if err != nil {
+			return "", err
+		}
+
+		return hex.EncodeToString(hash[:]), nil
+	}
+
+	return hashByMessageCidRes[0].Hash, nil
 
 }
