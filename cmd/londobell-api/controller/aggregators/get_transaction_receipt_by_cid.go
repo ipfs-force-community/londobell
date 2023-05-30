@@ -77,6 +77,12 @@ func GetTransactionReceiptByCid(c *gin.Context) {
 
 	events, err := GetEventsByRoot(ctx, trace.EventsRoot)
 	if err != nil {
+		if err == ErrNotFound {
+			alog.Warn(err)
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
