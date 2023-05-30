@@ -466,39 +466,37 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			elog.Errorf("%s", err)
 		}
 
-		mcid := msg.Cid()
-		var signedCid cid.Cid
+		trueCid := msg.Cid()
 
 		key := msg.From.String() + "-" + strconv.FormatUint(msg.Nonce, 10)
 		if cmsg, ok := allmsgsMap[key]; ok {
 			smsg, ok := cmsg.(*types.SignedMessage)
 			if ok {
-				signedCid = mcid
-				if mcid != smsg.Cid() {
-					signedCid = smsg.Cid()
-					elog.Infow("new messagecid", "newMcid", signedCid, "oldMcid", mcid)
+				if trueCid != smsg.Cid() {
+					trueCid = smsg.Cid()
+					elog.Infow("new messagecid", "newMcid", trueCid, "oldMcid", msg.Cid())
 				}
 			}
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractMessage {
-			if _, has := dupmsgs[mcid]; !has {
-				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
+			if _, has := dupmsgs[trueCid]; !has {
+				mmsg, err := model.NewMessage(trueCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 				if err != nil {
-					elog.Errorw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+					elog.Errorw("convert to model.Message", "trueCid", trueCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 				} else {
 					res.Docs = append(res.Docs, mmsg)
 					msgcnt++
-					dupmsgs[mcid] = struct{}{}
+					dupmsgs[trueCid] = struct{}{}
 				}
 			}
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractExecTrace {
 			isBlock := IsBlock(p.seq, msg.From)
-			met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock)
+			met, _, err := model.NewExecTrace(ctx.C, ctx.D, trueCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock)
 			if err != nil {
-				elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+				elog.Errorw("convert to model.MessageExec", "trueCid", trueCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
 				tracecnt++
 				res.Docs = append(res.Docs, met)
@@ -514,12 +512,12 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				if eventsRoot != nil {
 					events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
 					if err != nil {
-						return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
+						return fmt.Errorf("get events failed: %v, eventsRoot: %v, trueCid: %v", err, eventsRoot, trueCid)
 					}
 
 					etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
 					if err != nil {
-						elog.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+						elog.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "trueCid", trueCid, "err", err.Error())
 					} else {
 						res.Docs = append(res.Docs, etm)
 						etcnt++
@@ -553,9 +551,9 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 
 			for ID, mtype := range storeMap {
-				amsg, err := model.NewActorMessage(ID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock, p.seq)
+				amsg, err := model.NewActorMessage(ID, ts.Height(), trueCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock, p.seq)
 				if err != nil {
-					elog.Errorw("convert to model.ActorMessage", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
+					elog.Errorw("convert to model.ActorMessage", "actorID", ID, "signedCid", trueCid)
 				} else {
 					actorMsgCnt++
 					res.Docs = append(res.Docs, amsg)
