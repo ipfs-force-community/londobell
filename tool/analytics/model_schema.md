@@ -305,6 +305,20 @@
 }
 ```
 
+### ExplicitMessage
+
+```
+{
+	"Epoch": "abi.ChainEpoch",
+	"ExitCode": "exitcode.ExitCode",
+	"From": "address.Address",
+	"MethodName": "string",
+	"To": "address.Address",
+	"Value": "big.Int",
+	"_id": "cid.Cid"
+}
+```
+
 ### FilSupply
 
 ```
