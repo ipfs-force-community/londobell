@@ -3,7 +3,6 @@ package aggregators
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -946,7 +945,7 @@ func GetEthHashByCid(ctx context.Context, mcidStr string) (string, error) {
 				return "", err
 			}
 
-			return hex.EncodeToString(hash[:]), nil
+			return hash.String(), nil
 		}
 
 		raw := multiResult
@@ -972,7 +971,7 @@ func GetEthHashByCid(ctx context.Context, mcidStr string) (string, error) {
 			return "", err
 		}
 
-		return hex.EncodeToString(hash[:]), nil
+		return hash.String(), nil
 	}
 
 	return hashByMessageCidRes[0].Hash, nil
