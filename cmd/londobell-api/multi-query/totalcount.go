@@ -1207,13 +1207,13 @@ func RefreshBlockMsgs(ctx context.Context, ds *DataBaseState, cols Collections, 
 		return 0, nil
 	}
 
-	blockFilter := bson.D{{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: ds.StartEpoch}}}, {Key: "Epoch", Value: bson.D{{Key: "$lt", Value: ds.EndEpoch}}}, {Key: "IsBlock", Value: true}}
+	blockFilter := bson.D{{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: ds.StartEpoch}}}, {Key: "Epoch", Value: bson.D{{Key: "$lt", Value: ds.EndEpoch}}}}
 
 	var (
 		count int64
 		err   error
 	)
-	tableName := "ExecTrace"
+	tableName := "ExplicitMessage"
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == tableName {
 			count, err = col.CountDocuments(ctx, blockFilter)
@@ -1226,7 +1226,7 @@ func RefreshBlockMsgs(ctx context.Context, ds *DataBaseState, cols Collections, 
 		}
 	}
 
-	return 0, fmt.Errorf("no ExecTrace collection")
+	return 0, fmt.Errorf("no ExplicitMessage collection")
 }
 
 func RefreshBlockMsgsByMethodName(ctx context.Context, ds *DataBaseState, cols Collections, actorID, methodName string) (int64, error) {
@@ -1249,7 +1249,7 @@ func RefreshBlockMsgsByMethodName(ctx context.Context, ds *DataBaseState, cols C
 		return 0, err
 	}
 
-	tableName := "ExecTrace"
+	tableName := "ExplicitMessage"
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == tableName {
 			cur, err := col.Aggregate(ctx, pipe)
@@ -1274,7 +1274,7 @@ func RefreshBlockMsgsByMethodName(ctx context.Context, ds *DataBaseState, cols C
 
 	// log.Warnf
 
-	return 0, fmt.Errorf("no ExecTrace collection")
+	return 0, fmt.Errorf("no ExplicitMessage collection")
 }
 
 func RefreshActorMsgsByMethodName(ctx context.Context, ds *DataBaseState, cols Collections, actorID, methodName string) (int64, error) {

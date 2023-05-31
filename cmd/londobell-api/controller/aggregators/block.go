@@ -6,12 +6,14 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
 )
 
+// todo: 和天佑确认
 func GetBlock(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -45,7 +47,7 @@ func GetBlock(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, blockAggregator, req, "ExecTrace")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, blockAggregator, req, "ExplicitMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
