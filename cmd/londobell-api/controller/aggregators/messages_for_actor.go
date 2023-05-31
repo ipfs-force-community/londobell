@@ -2,6 +2,7 @@ package aggregators
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -58,6 +59,10 @@ func GetMessagesForActor(c *gin.Context) {
 	}
 
 	req.Addr = actorID
+
+	if req.Index == 0 && req.Limit == 0 {
+		req.Limit = math.MaxInt64
+	}
 
 	var messagesForActor []model.MessageForActor
 

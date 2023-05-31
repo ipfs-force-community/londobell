@@ -30,7 +30,6 @@ import (
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/account"
-	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 	"github.com/filecoin-project/lotus/chain/store"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -196,41 +195,41 @@ func GetRobustByID(ctx context.Context, api v0api.FullNode, IDAddr address.Addre
 		return robust.String()[1:], nil
 	}
 
-	// other
-	iact, err := api.StateGetActor(ctx, _init.Address, types.EmptyTSK)
-	if err != nil {
-		return "", err
-	}
+	//// other: 等待数据库入库，暂时不显示
+	//iact, err := api.StateGetActor(ctx, _init.Address, types.EmptyTSK)
+	//if err != nil {
+	//	return "", err
+	//}
+	//
+	//ist, err := _init.Load(store.ActorStore(ctx, blockstore.NewAPIBlockstore(api)), iact)
+	//if err != nil {
+	//	return "", err
+	//}
+	//
+	//var robustStr string
+	//err = ist.ForEachActor(func(id abi.ActorID, robust address.Address) error {
+	//	idAddr, err := address.NewIDAddress(uint64(id))
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	if idAddr.String()[1:] == actorID {
+	//		RLock.Lock()
+	//		RobustMap[actorID] = robust.String()[1:]
+	//		RLock.Unlock()
+	//
+	//		robustStr = robust.String()[1:]
+	//		return nil
+	//	}
+	//
+	//	return nil
+	//})
+	//
+	//if err != nil {
+	//	return "", fmt.Errorf("walk through actors: %v", err)
+	//}
 
-	ist, err := _init.Load(store.ActorStore(ctx, blockstore.NewAPIBlockstore(api)), iact)
-	if err != nil {
-		return "", err
-	}
-
-	var robustStr string
-	err = ist.ForEachActor(func(id abi.ActorID, robust address.Address) error {
-		idAddr, err := address.NewIDAddress(uint64(id))
-		if err != nil {
-			return err
-		}
-
-		if idAddr.String()[1:] == actorID {
-			RLock.Lock()
-			RobustMap[actorID] = robust.String()[1:]
-			RLock.Unlock()
-
-			robustStr = robust.String()[1:]
-			return nil
-		}
-
-		return fmt.Errorf("id %v not found", actorID)
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	return robustStr, nil
+	return "", nil
 }
 
 // GetAllAddrs get [ID, robust, delegated]
