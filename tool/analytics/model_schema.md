@@ -231,6 +231,26 @@
 }
 ```
 
+### EthHash
+
+```
+{
+	"Cid": "cid.Cid",
+	"Epoch": "abi.ChainEpoch",
+	"_id": "ethtypes.EthHash"
+}
+```
+
+### EventsRoot
+
+```
+{
+	"Epoch": "abi.ChainEpoch",
+	"Events": "[]uint8",
+	"_id": "cid.Cid"
+}
+```
+
 ### ExecGas
 
 ```
