@@ -62,6 +62,10 @@ db.ExecTrace.createIndex({"SignedCid":1}, {"sparse": true});
 db.ExecTrace.createIndex({"Depth":1,"Epoch":1}, {"sparse": true});
 db.ExecTrace.createIndex({"Depth":1,"Msg.MethodName":1,"Epoch":1}, {"sparse": true});
 
+db.ExplicitMessage.createIndex({"Epoch":1}, {"sparse": true});
+db.ExplicitMessage.createIndex({"MethodName":1,"Epoch":1}, {"sparse": true});
+db.ExplicitMessage.createIndex({"ExitCode":1,"Epoch":1,"Value":1}, {"sparse": true});
+
 // no indexes for FilSupply
 
 db.FinalHeight.createIndex({"Cids":1}, {"sparse": true});
