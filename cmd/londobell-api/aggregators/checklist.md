@@ -127,3 +127,68 @@ blockmessages_by_methodname:3s
 transfer_message_for_largeAmount: 很慢 13m
 
 TransferMessage 结构变了
+
+
+
+
+#### 线上使用
+db.ExecTrace.createIndex({"Msg.To":1, "Msg.Method":1, "Detail.Return.RobustAddress":1}, {"sparse": true});
+db.ExecTrace.createIndex({"Cid":1},{"sparse": true});
+db.ExecTrace.createIndex({"SignedCid":1},{"sparse": true});
+db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":-1, "Msg.From":1, "Msg.To":1},{"sparse": true});
+db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":-1, "Msg.Value":1},{"sparse": true});
+db.ExecTrace.createIndex({"Epoch":1},{"sparse": true});
+db.ExecTrace.createIndex({"IsBlock":1, "Epoch":1},{"sparse": true});
+db.ExecTrace.createIndex({"IsBlock":1, "Epoch":1, "Msg.MethodName":1},{"sparse": true});
+
+
+db.Message.createIndex({"Detail.PackedHeight":1}, {"sparse": true});
+db.Message.createIndex({"Detail.Method":1}, {"sparse": true});
+
+
+db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"Epoch":1}, {"sparse": true});
+db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"MethodName":1,"Epoch":1}, {"sparse": true});
+db.ActorMessage.createIndex({"ActorID":1,"ExitCode":1,"Value":1,"Epoch":1}, {"sparse": true});
+db.ActorMessage.createIndex({"ActorID":1,"ExitCode":1,"Type":1,"Epoch":1,"Value":1}, {"sparse": true});
+db.ActorMessage.createIndex({"Epoch":1}, {"sparse": true});
+db.ActorMessage.createIndex({"IsBlock":1,"Epoch":1,"ActorID":1,"MethodName":1}, {"sparse": true});
+db.ActorMessage.createIndex({"Cid":1}, {"sparse": true});
+db.ActorMessage.createIndex({"SignedCid":1}, {"sparse": true});
+db.ActorMessage.createIndex({"IsBlock":1}, {"sparse": true});
+
+
+db.ExplicitMessage.createIndex({"Epoch":1}, {"sparse": true});
+db.ExplicitMessage.createIndex({"MethodName":1,"Epoch":1}, {"sparse": true});
+db.ExplicitMessage.createIndex({"ExitCode":1,"Epoch":1,"Value":1}, {"sparse": true});
+
+
+db.ActorBalance.createIndex({"Addresses":1}, {"sparse": true});
+db.ActorBalance.createIndex({"Epoch":1, "Addr":1}, {"sparse": true});
+db.ActorBalance.createIndex({"Epoch":1, "Code":1}, {"sparse": true});
+db.ActorBalance.createIndex({"Epoch":1, "Code":1, "Balance":-1}, {"sparse": true});
+
+
+db.ActorState.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
+
+
+db.BlockHeader.createIndex({"Epoch":-1,"Miner":1}, {"sparse": true});
+
+
+db.BlockMessage.createIndex({"Epoch":1,"Messages":1}, {"sparse": true});
+db.BlockMessage.createIndex({"Messages":1}, {"sparse": true});
+
+
+db.DealProposal.createIndex({"Epoch":-1,"_id":-1, "Client":1, "Provider":1}, {"sparse": true});
+
+db.EthHash.createIndex({"Cid":1,"Epoch":1}, {"sparse": true});
+
+db.FinalHeight.createIndex({"Cids":1}, {"sparse": true});
+
+
+db.MinerFunds.createIndex({"Info.Owner":1, "Epoch":1}, {"sparse": true});
+db.MinerFunds.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
+
+
+
+db.StateFinalHeight.createIndex({"Cids":1}, {"sparse": true});
+
