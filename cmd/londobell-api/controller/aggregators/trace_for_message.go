@@ -106,6 +106,9 @@ func GetTraceForMessage(c *gin.Context) {
 
 	trace := traceForMessageRes[0]
 	err = actorSet.ParseParamsAndReturnsReadable(ctx, &trace)
+	if err != nil {
+		log.Warnf("ParseParamsAndReturnsReadable failed: %v", err)
+	}
 
 	res.Data = []model.TraceForMessageRes{trace}
 	c.JSON(http.StatusOK, res)
@@ -161,11 +164,8 @@ func (s *ActorSet) ParseParamsAndReturnsReadable(ctx context.Context, trace *mod
 		code = act.Code
 	}
 
-	actorName := lbuiltin.ActorNameByCode(code)
-
-	if ccode, cname, ok := actor.DefaultActorConvertor(trace.Epoch, actorName); ok {
+	if ccode, _, ok := actor.DefaultActorConvertor(trace.Epoch, lbuiltin.ActorNameByCode(code)); ok {
 		code = ccode
-		actorName = cname
 	}
 
 	//vma := filcns.NewActorRegistry()
