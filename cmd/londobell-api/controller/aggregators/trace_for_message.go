@@ -231,7 +231,12 @@ func (s *ActorSet) ParseParamsAndReturnsReadable(ctx context.Context, trace *mod
 		}
 
 		trace.ParamsDetail = "0x" + hex.EncodeToString(paramsByte)
+
+		return nil
 	}
+
+	// ExtendSectorExpiration
+	//ExtendSectorExpiration2
 
 	return nil
 }
