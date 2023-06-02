@@ -8,8 +8,9 @@ import (
 
 	cid2 "github.com/ipfs/go-cid"
 
+	"context"
+
 	"github.com/gin-gonic/gin"
-	"golang.org/x/net/context"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
