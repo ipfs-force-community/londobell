@@ -2,41 +2,30 @@ package aggregators
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
 
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/builtin/v10/eam"
+	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/chain/types/ethtypes"
+	"github.com/gin-gonic/gin"
+	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 
 	"github.com/ipfs-force-community/londobell/buildnet"
-
-	"github.com/filecoin-project/lotus/chain/types/ethtypes"
-
-	"github.com/filecoin-project/go-state-types/builtin/v10/eam"
-
-	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
-
-	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
-
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin"
-
-	"github.com/filecoin-project/go-address"
-
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
-
-	"github.com/filecoin-project/lotus/chain/types"
-
-	"github.com/ipfs/go-cid"
-
-	"github.com/gin-gonic/gin"
-	"golang.org/x/net/context"
-
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
 )
 
 func GetTraceForMessage(c *gin.Context) {
@@ -242,7 +231,12 @@ func (s *ActorSet) ParseParamsAndReturnsReadable(ctx context.Context, trace *mod
 		}
 
 		trace.ParamsDetail = "0x" + hex.EncodeToString(paramsByte)
+
+		return nil
 	}
+
+	// ExtendSectorExpiration
+	//ExtendSectorExpiration2
 
 	return nil
 }
