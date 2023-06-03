@@ -3,6 +3,7 @@ package aggregators
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -852,13 +853,43 @@ func GetEventsByRoot(ctx context.Context, root string) ([]types.Event, error) {
 	}
 
 	var events []types.Event
-	err = json.Unmarshal(eventsRootRes[0].Events.Data, &events)
-	//events, err := types.DecodeEvents(eventsRootRes[0].Events.Data)
-	if err != nil {
-		return nil, err
+	event, ok := eventsRootRes[0].Events.(map[string]interface{})
+	if !ok {
+		return nil, nil
 	}
 
-	return events, nil
+	binaryEvent, ok := event["$binary"].(map[string]interface{})
+	if ok {
+		binaryEventStr, ok := binaryEvent["base64"].(string)
+		if ok {
+			binaryEventByte, err := base64.StdEncoding.DecodeString(binaryEventStr)
+			if err != nil {
+				return nil, err
+			}
+			err = json.Unmarshal(binaryEventByte, &events)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return events, nil
+	}
+
+	dataEventStr, ok := event["Data"].(string)
+	if ok {
+		dataEventByte, err := base64.StdEncoding.DecodeString(dataEventStr)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(dataEventByte, &events)
+		if err != nil {
+			return nil, err
+		}
+
+		return events, nil
+	}
+
+	return nil, nil
 }
 
 func GetCidFromEthHash(ctx context.Context, hash string) (string, error) {
