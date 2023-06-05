@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
 
@@ -83,7 +82,7 @@ func GetStateFinalHeight(ctx context.Context, cols Collections) (abi.ChainEpoch,
 
 // MultiPagingQuery 对多库进行分页查询  todo: 磁盘state更改会影响dbStates（map）吗？
 func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils []CountUtil, aggregator []byte, req model.CommonReq, tableName string) ([]bson.M, error) {
-	qlog := log.With("multi-query", "MultiPagingQuery")
+	//qlog := log.With("multi-query", "MultiPagingQuery")
 
 	// skip、limit
 	skipTag := func(skip, count int64) bool {
@@ -105,18 +104,18 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 	}
 
 	aggLists := make([]*aggUtil, 0)
-	for i, countlist := range countUtils {
+	for _, countlist := range countUtils {
 		skipflag := skipTag(skip, countlist.Count)
 		limitflag := limitTag(requestTotalCount, countlist.Count)
 		if skipflag && limitflag {
 			// 最后一次
-			qlog.Infof("skipflag && limitflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v, start: %v, end: %v", i, skip, limit, requestTotalCount, countlist.Start, countlist.End)
+			//qlog.Infof("skipflag && limitflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v, start: %v, end: %v", i, skip, limit, requestTotalCount, countlist.Start, countlist.End)
 
 			aggLists = append(aggLists, &aggUtil{startEpoch: countlist.Start, endEpoch: countlist.End, skip: skip, limit: limit, cols: countlist.Cols})
 			break
 		}
 		if skipflag && !limitflag {
-			qlog.Infof("skipflag && !limitflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v", i, skip, limit, requestTotalCount)
+			//qlog.Infof("skipflag && !limitflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v", i, skip, limit, requestTotalCount)
 
 			aggLists = append(aggLists, &aggUtil{startEpoch: countlist.Start, endEpoch: countlist.End, skip: skip, limit: limit, cols: countlist.Cols})
 			skip = 0
@@ -125,7 +124,7 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 			continue
 		}
 		if !skipflag {
-			qlog.Infof("!skipflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v", i, skip, limit, requestTotalCount)
+			//qlog.Infof("!skipflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v", i, skip, limit, requestTotalCount)
 
 			skip = skip - countlist.Count
 			requestTotalCount = skip + limit
@@ -133,7 +132,7 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 		}
 	}
 
-	qlog.Infof("get aggLists done!!")
+	//qlog.Infof("get aggLists done!!")
 
 	// concurrent agg
 	var (
@@ -146,7 +145,7 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 		i := i
 		aggList := aggLists[i]
 		ewg.Go(func() error {
-			start := time.Now()
+			//start := time.Now()
 			var aggRes []bson.M
 
 			//// todo: req.Addr 和 /*req.Cid*/ 要请求多个等价
@@ -175,7 +174,7 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 				}
 			}
 
-			qlog.Infof("agg successfully, agglist: %+v spent: %v", aggList, time.Now().Sub(start))
+			//qlog.Infof("agg successfully, agglist: %+v spent: %v", aggList, time.Now().Sub(start))
 			return nil
 		})
 	}
@@ -193,7 +192,7 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 
 // MultiRangeQuery 根据epoch范围定位到某些库查询
 func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils []CountUtil, aggregator []byte, req model.CommonReq, tableName string) ([]bson.M, error) {
-	qlog := log.With("multi-query", "MultiRangeQuery")
+	//qlog := log.With("multi-query", "MultiRangeQuery")
 
 	start := startEpoch
 	end := endEpoch
@@ -227,7 +226,7 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 		i := i
 		aggList := aggLists[i]
 		ewg.Go(func() error {
-			start := time.Now()
+			//start := time.Now()
 			var aggRes []bson.M
 
 			// 防止有分页需求的脚本
@@ -256,7 +255,7 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 				}
 			}
 
-			qlog.Infof("agg successfully for block, aggulist %+v spent %v", aggList, time.Now().Sub(start))
+			//qlog.Infof("agg successfully for block, aggulist %+v spent %v", aggList, time.Now().Sub(start))
 			return nil
 		})
 	}
