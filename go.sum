@@ -858,6 +858,8 @@ github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230602065813-7077
 github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230602065813-707742a4ded8/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
 github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230602070127-83fdd8f5f887 h1:5qHxO19cox8+XZMPgybso8M5qKs9movPeJZBHx8QWko=
 github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230602070127-83fdd8f5f887/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
+github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230605074850-bfcab71a1e80 h1:UTDJjj10o71sn6eQ3CFoyBjWFtswdmdhTdFi/tcPW1g=
+github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230605074850-bfcab71a1e80/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
 github.com/ipfs/bbloom v0.0.1/go.mod h1:oqo8CVWsJFMOZqTglBG4wydCE4IQA/G2/SEofB0rjUI=
 github.com/ipfs/bbloom v0.0.4 h1:Gi+8EGJ2y5qiD5FbsbpX/TMNcJw8gSqr7eyjHa4Fhvs=
 github.com/ipfs/bbloom v0.0.4/go.mod h1:cS9YprKXpoZ9lT0n/Mw/a6/aFV6DTjTLYHeA+gyqMG0=

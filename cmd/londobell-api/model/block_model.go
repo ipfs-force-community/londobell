@@ -26,7 +26,18 @@ type BlockMessage struct {
 	GasCost    interface{}
 }
 
+type BlockExplicitMessage struct {
+	From      string
+	To        string
+	Method    string
+	Value     string
+	SignedCid string
+	BlockTime primitive.DateTime
+	Epoch     abi.ChainEpoch
+	ExitCode  exitcode.ExitCode
+}
+
 type BlockMessagesRes struct {
-	TotalCount    int64          `json:"totalCount"`
-	BlockMessages []BlockMessage `json:"blockMessages"`
+	TotalCount    int64                  `json:"totalCount"`
+	BlockMessages []BlockExplicitMessage `json:"blockMessages"`
 }
