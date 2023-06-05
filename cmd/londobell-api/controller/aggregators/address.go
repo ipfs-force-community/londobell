@@ -2,7 +2,6 @@ package aggregators
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,8 +9,6 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
-
-var ErrNotFound = fmt.Errorf("get wrong result, length of result shoule be one")
 
 // formal db 每高度都更新，从formal获取即可, todo: 但会有延迟
 func GetAddress(c *gin.Context) {
@@ -31,12 +28,8 @@ func GetAddress(c *gin.Context) {
 
 	addressRes, err := GetAddrs(ctx, req.Addr)
 	if err != nil {
-		alog.Error(err)
-		if err == ErrNotFound {
-			res.Code = model.NotFound
-			res.Msg = err.Error()
-			c.JSON(http.StatusOK, res)
-			return
+		if err != util.ErrNotFound {
+			alog.Error(err)
 		}
 
 		util.ReturnOnErr(c, err)

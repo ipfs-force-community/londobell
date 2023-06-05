@@ -77,7 +77,7 @@ func GetTransactionReceiptByCid(c *gin.Context) {
 	}
 
 	events, err := GetEventsByRoot(ctx, trace.EventsRoot)
-	if err != nil && err != ErrNotFound {
+	if err != nil && err != util.ErrNotFound {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
