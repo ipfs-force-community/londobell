@@ -52,7 +52,7 @@ func GetChildCallsForMessage(c *gin.Context) {
 		}
 
 		if len(multiResult) == 0 {
-			c.JSON(http.StatusOK, res)
+			util.ReturnOnErr(c, util.ErrNotFound)
 			return
 		}
 

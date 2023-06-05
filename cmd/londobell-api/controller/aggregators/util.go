@@ -128,7 +128,7 @@ func GetAddrs(ctx context.Context, addr string) (model.AddressRes, error) {
 			}
 
 			if len(addressRes) != 1 {
-				return model.AddressRes{}, ErrNotFound
+				return model.AddressRes{}, util.ErrNotFound
 			}
 
 			return addressRes[0], nil
@@ -155,7 +155,7 @@ func GetRobustByID(ctx context.Context, api v0api.FullNode, IDAddr address.Addre
 	}
 
 	res, err := GetAddrs(ctx, actorID)
-	if err != nil && err != ErrNotFound {
+	if err != nil && err != util.ErrNotFound {
 		return "", err
 	}
 
@@ -833,7 +833,7 @@ func GetEventsByRoot(ctx context.Context, root string) ([]types.Event, error) {
 		}
 
 		if len(multiResult) == 0 {
-			return nil, ErrNotFound
+			return nil, util.ErrNotFound
 		}
 
 		raw := multiResult
@@ -849,7 +849,7 @@ func GetEventsByRoot(ctx context.Context, root string) ([]types.Event, error) {
 	}
 
 	if len(eventsRootRes) == 0 {
-		return nil, ErrNotFound
+		return nil, util.ErrNotFound
 	}
 
 	var events []types.Event
