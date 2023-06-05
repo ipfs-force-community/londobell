@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+
 	"go.uber.org/fx"
 
 	"github.com/filecoin-project/lotus/node/config"
@@ -795,6 +797,26 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 		}
 
 		return nil
+	}
+
+	if formal {
+		var ewg multierror.Group
+		for i := range addupes {
+			i := i
+			addup := addupes[i]
+			ewg.Go(func() error {
+				if err := addup(ctx, dbState, cols); err != nil {
+					return err
+				}
+
+				return nil
+			})
+		}
+
+		if err := ewg.Wait(); err != nil {
+			log.Errorf("RefreshFormalDataBaseState failed: %v", err)
+			return err
+		}
 	}
 
 	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {

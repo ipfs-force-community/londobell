@@ -75,7 +75,7 @@ type DataBaseState struct {
 	TransfersLargeAmountCount int64
 
 	//// todo: delete
-	//NextEpochForBlockMsgsCount        abi.ChainEpoch // 对于tmp，总是等于StartEpoch
+	NextEpochForBlockMsgsCount abi.ChainEpoch
 	//NextEpochForBlockMsgsByMethodName abi.ChainEpoch
 	//NextEpochForActorMsgsByMethodName abi.ChainEpoch
 	//NextEpochForActorMsgsCount        abi.ChainEpoch
@@ -91,17 +91,18 @@ type DBCollections struct {
 
 func DefaultDataBaseState(formal, tmp bool, start, end abi.ChainEpoch) *DataBaseState {
 	return &DataBaseState{
-		Formal:                    formal,
-		Tmp:                       tmp,
-		StartEpoch:                start,
-		EndEpoch:                  end,
-		BlockMsgsCount:            0,
-		BlockMsgsByMethodNameMap:  make(map[string]int64),
-		ActorMsgsByMethodNameMap:  make(map[string]map[string]int64),
-		ActorMsgsCountMap:         make(map[string]int64),
-		ActorTransfersCountMap:    make(map[string]int64),
-		MinedMsgsMap:              make(map[string]int64),
-		TransfersLargeAmountCount: 0,
+		Formal:                     formal,
+		Tmp:                        tmp,
+		StartEpoch:                 start,
+		EndEpoch:                   end,
+		BlockMsgsCount:             0,
+		BlockMsgsByMethodNameMap:   make(map[string]int64),
+		ActorMsgsByMethodNameMap:   make(map[string]map[string]int64),
+		ActorMsgsCountMap:          make(map[string]int64),
+		ActorTransfersCountMap:     make(map[string]int64),
+		MinedMsgsMap:               make(map[string]int64),
+		TransfersLargeAmountCount:  0,
+		NextEpochForBlockMsgsCount: start,
 	}
 }
 
