@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -32,8 +34,11 @@ var (
 )
 
 var (
-	refreshOnce sync.Once
-	refreshes   = make([]func(ctx context.Context, ds *DataBaseState, cols Collections, actorID, methodName string) (int64, error), 0)
+	//refreshOnce sync.Once
+	//refreshes   = make([]func(ctx context.Context, ds *DataBaseState, cols Collections, actorID, methodName string) (int64, error), 0)
+
+	addupOnce sync.Once
+	addupes   = make([]func(ctx context.Context, ds *DataBaseState, cols Collections) error, 0)
 
 	AllMethods     = make(map[string]int64, 0)
 	alk            sync.RWMutex
@@ -41,42 +46,50 @@ var (
 )
 
 func init() {
-	refreshOnce.Do(func() {
-		refreshes = append(refreshes, RefreshBlockMsgs, RefreshBlockMsgsByMethodName, RefreshActorMsgsByMethodName, RefreshActorMsgs, RefreshActorTransferMsgs, RefreshMinedMsgsMaps, RefreshTransfersForLargeAmount)
+	//refreshOnce.Do(func() {
+	//	refreshes = append(refreshes, RefreshBlockMsgs, RefreshBlockMsgsByMethodName, RefreshActorMsgsByMethodName, RefreshActorMsgs, RefreshActorTransferMsgs, RefreshMinedMsgsMaps, RefreshTransfersForLargeAmount)
+	//})
+
+	addupOnce.Do(func() {
+		addupes = append(addupes, AddUpBlockMsgsCount)
 	})
 
 }
 
-//func PeriodicRefreshDataBaseState(ctx context.Context, dbsm *DataBaseStateManager) {
-//	tick := time.NewTicker(30 * time.Minute)
-//	defer tick.Stop()
-//
-//	for {
-//		select {
-//		case <-tick.C:
-//			res, err := GetFinalHeightForFormalDB(ctx, dbsm)
-//			if err != nil {
-//				log.Error(err)
-//				continue
-//			}
-//
-//			if len(res) == 0 { // todo
-//				log.Warnf("no data in FinalHeight")
-//				continue
-//			}
-//
-//			start := time.Now()
-//			log.Infow("begin PeriodicRefreshDataBaseState for formal, finalHeight: %v", res[0].Epoch)
-//			if err := RefreshFormalDataBaseState(ctx, dbsm, res[0].Epoch); err != nil {
-//				log.Error(err)
-//				continue
-//			}
-//
-//			log.Infof("finish PeriodicRefreshDataBaseState for formal, elapsed: %v", time.Now().Sub(start).String())
-//		}
-//	}
-//}
-//
+func PeriodicRefreshDataBaseState(ctx context.Context, dbsm *DataBaseStateManager) {
+	tick := time.NewTicker(15 * time.Minute)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-tick.C:
+			finalHeight, err := GetFinalHeightForFormalDB(ctx, dbsm)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+
+			start := time.Now()
+			log.Infow("begin PeriodicRefreshDataBaseState for formal, finalHeight: %v", finalHeight)
+			if err := RefreshFormalDataBaseState(ctx, dbsm, finalHeight); err != nil {
+				log.Error(err)
+				continue
+			}
+
+			log.Infof("finish PeriodicRefreshDataBaseState for formal, elapsed: %v", time.Now().Sub(start).String())
+		}
+	}
+}
+
+func GetFinalHeightForFormalDB(ctx context.Context, dbsm *DataBaseStateManager) (abi.ChainEpoch, error) {
+	cols, ok := dbsm.GetDBCollections(dbsm.GetFormalCfg().Url())
+	if !ok {
+		return 0, fmt.Errorf("url %v not found in DBCollectionsMap", dbsm.GetFormalCfg().Url())
+	}
+
+	return GetFinalHeight(ctx, cols)
+}
+
 //func TestPeriodicRefreshDataBaseState(ctx context.Context, dbsm *DataBaseStateManager) {
 //	tick := time.NewTicker(10 * time.Minute) //todo:test
 //	defer tick.Stop()
@@ -104,95 +117,95 @@ func init() {
 //		}
 //	}
 //}
-//
-//// 只有formal需要定期刷
-//// todo:会发生多个进程同时操作dbsm.Stm的操作，导致dbState紊乱有错吗？
-//func RefreshFormalDataBaseState(ctx context.Context, dbsm *DataBaseStateManager, finalHeight abi.ChainEpoch) error {
-//	formal := dbsm.GetFormalCfg()
-//
-//	if formal.IsInvalidDB() {
-//		log.Warnf("db %v is invalid", formal)
-//		return nil
-//	}
-//
-//	dbState, found, err := dbsm.Stm.LoadDataBaseState(formal.Url())
-//	if err != nil {
-//		return err
-//	}
-//
-//	if !found {
-//		////todo
-//		//dbState, err := InitDataBaseState(ctx, db, true)
-//		//if err != nil {
-//		//	return 0, nil, err
-//		//}
-//		//
-//		//fmt.Println("InitDataBaseState", dbState)
-//		//if err := m.SetDataBaseState(db.Url, *dbState); err != nil {
-//		//	return 0, nil, err
-//		//}
-//		return fmt.Errorf("db %v not found", formal)
-//	}
-//
-//	cols, ok := dbsm.GetDBCollections(formal.Url())
-//	if !ok {
-//		return fmt.Errorf("url %v not found in DBCollectionsMap", formal.Url())
-//	}
-//
-//	dbState.EndEpoch = finalHeight + 1
-//
-//	var ewg multierror.Group
-//	for i := range refreshes {
-//		i := i
-//		refresh := refreshes[i]
-//		ewg.Go(func() error {
-//			if err := refresh(ctx, &dbState, cols); err != nil {
-//				return err
-//			}
-//
-//			return nil
-//		})
-//	}
-//
-//	if err := ewg.Wait(); err != nil {
-//		log.Errorf("RefreshFormalDataBaseState failed: %v", err)
-//		return err
-//	}
-//
-//	//if err := RefreshBlockMsgs(ctx, &dbState, cols); err != nil {
-//	//	return err
-//	//}
-//	//if err := RefreshBlockMsgsByMethodName(ctx, &dbState, cols); err != nil {
-//	//	return err
-//	//}
-//	//if err := RefreshActorMsgsByMethodName(ctx, &dbState, cols); err != nil {
-//	//	return err
-//	//}
-//	//if err := RefreshActorMsgs(ctx, &dbState, cols); err != nil {
-//	//	return err
-//	//}
-//	//if err := RefreshActorTransferMsgs(ctx, &dbState, cols); err != nil {
-//	//	return err
-//	//}
-//	//if err := RefreshMinedMsgsMaps(ctx, &dbState, cols); err != nil {
-//	//	return err
-//	//}
-//	////if err := RefreshTransfersForLargeAmount(ctx, &dbState, cols); err != nil { // todo
-//	////	return err
-//	////}
-//	//
-//
-//	if err := dbsm.Stm.SetDataBaseState(formal.Url(), dbState); err != nil {
-//		return err
-//	}
-//
-//	dbsm.DBStateCache.SetDataBase(formal.Url(), &dbState)
-//
-//	log.Infof("RefreshFormalDataBaseState successfully, dbState.EndEpoch: %v", finalHeight+1)
-//
-//	return nil
-//}
-//
+
+// 只有formal需要定期刷
+// todo:会发生多个进程同时操作dbsm.Stm的操作，导致dbState紊乱有错吗？
+func RefreshFormalDataBaseState(ctx context.Context, dbsm *DataBaseStateManager, finalHeight abi.ChainEpoch) error {
+	formal := dbsm.GetFormalCfg()
+
+	if formal.IsInvalidDB() {
+		log.Warnf("db %v is invalid", formal)
+		return nil
+	}
+
+	dbState, found, err := dbsm.Stm.LoadDataBaseState(formal.Url())
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		////todo
+		//dbState, err := InitDataBaseState(ctx, db, true)
+		//if err != nil {
+		//	return 0, nil, err
+		//}
+		//
+		//fmt.Println("InitDataBaseState", dbState)
+		//if err := m.SetDataBaseState(db.Url, *dbState); err != nil {
+		//	return 0, nil, err
+		//}
+		return fmt.Errorf("db %v not found", formal)
+	}
+
+	cols, ok := dbsm.GetDBCollections(formal.Url())
+	if !ok {
+		return fmt.Errorf("url %v not found in DBCollectionsMap", formal.Url())
+	}
+
+	dbState.EndEpoch = finalHeight + 1
+
+	var ewg multierror.Group
+	for i := range addupes {
+		i := i
+		addup := addupes[i]
+		ewg.Go(func() error {
+			if err := addup(ctx, &dbState, cols); err != nil {
+				return err
+			}
+
+			return nil
+		})
+	}
+
+	if err := ewg.Wait(); err != nil {
+		log.Errorf("RefreshFormalDataBaseState failed: %v", err)
+		return err
+	}
+
+	//if err := RefreshBlockMsgs(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	//if err := RefreshBlockMsgsByMethodName(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	//if err := RefreshActorMsgsByMethodName(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	//if err := RefreshActorMsgs(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	//if err := RefreshActorTransferMsgs(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	//if err := RefreshMinedMsgsMaps(ctx, &dbState, cols); err != nil {
+	//	return err
+	//}
+	////if err := RefreshTransfersForLargeAmount(ctx, &dbState, cols); err != nil { // todo
+	////	return err
+	////}
+	//
+
+	if err := dbsm.Stm.SetDataBaseState(formal.Url(), dbState); err != nil {
+		return err
+	}
+
+	dbsm.DBStateCache.SetDataBase(formal.Url(), &dbState)
+
+	log.Infof("RefreshFormalDataBaseState successfully, dbState.EndEpoch: %v", finalHeight+1)
+
+	return nil
+}
+
 //func TestRefreshFormalDataBaseState(ctx context.Context, dbsm *DataBaseStateManager, finalHeight abi.ChainEpoch) error {
 //	start := time.Now() //todo:test
 //
@@ -919,6 +932,12 @@ func refreshEpochRange(ctx context.Context, dbState *DataBaseState, cols Collect
 
 func refreshTotalCountForBlockMsgs(ctx context.Context, dbState *DataBaseState, cols Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	if dbState.Formal {
+		if dbState.NextEpochForBlockMsgsCount > dbState.StartEpoch {
+			*countUtils = append(*countUtils, CountUtil{Start: int64(dbState.StartEpoch), End: int64(dbState.EndEpoch), Count: dbState.BlockMsgsCount, Cols: cols})
+			*tmpStartEpoch = dbState.NextEpochForBlockMsgsCount
+			return nil
+		}
+
 		finalHeight, err := GetFinalHeight(ctx, cols)
 		if err != nil {
 			return err
@@ -1618,4 +1637,44 @@ func GetColsOnly(dbsm *DataBaseStateManager) ([]CountUtil, error) {
 	// 不需要排序
 
 	return countUtils, nil
+}
+
+// 累加
+func AddUpBlockMsgsCount(ctx context.Context, ds *DataBaseState, cols Collections) error {
+	rlog := log.With("AddUp", "BlockMsgsCount")
+
+	start := time.Now()
+	startEpoch, endEpoch := ds.NextEpochForBlockMsgsCount, ds.EndEpoch-1
+
+	var (
+		count int64
+		err   error
+	)
+
+	defer func() {
+		rlog.Infof("addup BlockMsgsCount successfully between %v and %v, count: %v, elapsed: %v", startEpoch, endEpoch, ds.BlockMsgsCount, time.Now().Sub(start).String())
+	}()
+
+	if ds.EndEpoch <= ds.NextEpochForBlockMsgsCount {
+		return nil
+	}
+
+	blockFilter := bson.D{{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: ds.NextEpochForBlockMsgsCount}}}, {Key: "Epoch", Value: bson.D{{Key: "$lt", Value: ds.EndEpoch}}}, {Key: "IsBlock", Value: true}}
+
+	tableName := "ExecTrace"
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == tableName {
+			count, err = col.CountDocuments(ctx, blockFilter)
+			if err != nil {
+				return err
+			}
+
+			ds.BlockMsgsCount += count
+			ds.NextEpochForBlockMsgsCount = ds.EndEpoch
+
+			return nil
+		}
+	}
+
+	return fmt.Errorf("no ExecTrace collection")
 }
