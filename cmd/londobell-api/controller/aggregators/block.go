@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -41,7 +42,7 @@ func GetBlock(c *gin.Context) {
 		totalCount += countUtil.Count
 	}
 
-	var blockMessages []model.BlockMessage
+	var blockMessages []model.BlockExplicitMessage
 
 	// multi dbs query
 	{
