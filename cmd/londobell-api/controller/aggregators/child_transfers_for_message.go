@@ -99,6 +99,6 @@ func GetChildTransfersForMessage(c *gin.Context) {
 	trace.ParamsDetail = parentTrace.ParamsDetail
 	trace.ReturnDetail = parentTrace.ReturnDetail
 
-	res.Data = childTransfersForMessageRes
+	res.Data = []model.ChildTransfersForMessageRes{trace}
 	c.JSON(http.StatusOK, res)
 }
