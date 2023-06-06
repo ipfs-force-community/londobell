@@ -35,6 +35,11 @@ var (
 	ErrActorMethodNotFound = fmt.Errorf("actor method not found")
 )
 
+const (
+	FirstExportedMethodNumber abi.MethodNum = 1 << 24
+	EvmMaxReservedMethod      abi.MethodNum = 1023
+)
+
 // NewSet loads actor codes and construct a actor set with the given tipset
 func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet, tmp bool) (*Set, error) {
 	_, span := trace.StartSpan(ctx, "actor.NewSet")
@@ -190,11 +195,29 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 		}, nil
 	}
 
+	if strings.Contains(actorName, "ethaccount") && call.Method >= FirstExportedMethodNumber {
+		return MethodInfo{
+			Actor: actorName,
+			Method: vm.MethodMeta{
+				Name: "Send(ethaccount)",
+			},
+		}, nil
+	}
+
 	vma := filcns.NewActorRegistry()
 
 	//todo: realcode
 	mi, ok := vma.Methods[code][call.Method]
 	if !ok {
+		if strings.Contains(actorName, "evm") && call.Method > EvmMaxReservedMethod {
+			return MethodInfo{
+				Actor: actorName,
+				Method: vm.MethodMeta{
+					Name: "HandleFileCoinMethod",
+				},
+			}, nil
+		}
+
 		return MethodInfo{Actor: actorName}, fmt.Errorf("%w: lookup method for from=%s, to=%s, code=%s, meth=%d", ErrActorMethodNotFound, call.From, call.To, code, call.Method)
 	}
 
