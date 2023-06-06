@@ -3,11 +3,14 @@ package aggregators
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
+
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -186,9 +189,38 @@ func (s *ActorSet) ParseParamsAndReturnsReadable(ctx context.Context, trace *mod
 	//	}
 	//}
 
-	if toActor == builtin.EthereumAddressManagerActorAddr && abi.MethodNum(trace.MethodNum) == builtin.MethodsEAM.CreateExternal {
-		buffer := bytes.NewBuffer(trace.ParamsBson.Data)
-		paramsByte, err := cbg.ReadByteArray(buffer, uint64(len(trace.ParamsBson.Data)))
+	var ParamsByte []byte
+
+	if IsCreateExternal(toActor, abi.MethodNum(trace.MethodNum)) || IsInvokeContract(code, abi.MethodNum(trace.MethodNum)) {
+		// 兼容$binary
+		params, ok := trace.Params.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type of params")
+		}
+
+		binaryParams, ok := params["$binary"].(map[string]interface{})
+		if ok {
+			binaryParamsStr, ok := binaryParams["base64"].(string)
+			if ok {
+				ParamsByte, err = base64.StdEncoding.DecodeString(binaryParamsStr)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			dataParamsStr, ok := params["Data"].(string)
+			if ok {
+				ParamsByte, err = base64.StdEncoding.DecodeString(dataParamsStr)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	if IsCreateExternal(toActor, abi.MethodNum(trace.MethodNum)) {
+		buffer := bytes.NewBuffer(ParamsByte)
+		paramsByte, err := cbg.ReadByteArray(buffer, uint64(len(ParamsByte)))
 		if err != nil {
 			return err
 		}
@@ -223,14 +255,21 @@ func (s *ActorSet) ParseParamsAndReturnsReadable(ctx context.Context, trace *mod
 		return nil
 	}
 
-	if lbuiltin.IsEvmActor(code) && abi.MethodNum(trace.MethodNum) == builtin.MethodsEVM.InvokeContract {
-		buffer := bytes.NewBuffer(trace.ParamsBson.Data)
-		paramsByte, err := cbg.ReadByteArray(buffer, uint64(len(trace.ParamsBson.Data)))
+	if IsInvokeContract(code, abi.MethodNum(trace.MethodNum)) {
+		buffer := bytes.NewBuffer(ParamsByte)
+		paramsByte, err := cbg.ReadByteArray(buffer, uint64(len(ParamsByte)))
 		if err != nil {
 			return err
 		}
 
 		trace.ParamsDetail = "0x" + hex.EncodeToString(paramsByte)
+
+		result, err := cbg.ReadByteArray(bytes.NewBuffer(trace.ReturnsBson.Data), uint64(len(trace.ReturnsBson.Data)))
+		if err != nil {
+			return xerrors.Errorf("evm result not correctly encoded: %w", err)
+		}
+
+		trace.ReturnDetail = "0x" + hex.EncodeToString(result)
 
 		return nil
 	}
@@ -239,4 +278,12 @@ func (s *ActorSet) ParseParamsAndReturnsReadable(ctx context.Context, trace *mod
 	//ExtendSectorExpiration2
 
 	return nil
+}
+
+func IsCreateExternal(toActor address.Address, methodNum abi.MethodNum) bool {
+	return toActor == builtin.EthereumAddressManagerActorAddr && methodNum == builtin.MethodsEAM.CreateExternal
+}
+
+func IsInvokeContract(code cid.Cid, methodNum abi.MethodNum) bool {
+	return lbuiltin.IsEvmActor(code) && methodNum == builtin.MethodsEVM.InvokeContract
 }
