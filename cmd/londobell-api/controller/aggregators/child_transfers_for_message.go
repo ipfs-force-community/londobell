@@ -72,6 +72,33 @@ func GetChildTransfersForMessage(c *gin.Context) {
 		}
 	}
 
-	res.Data = childTransfersForMessageRes
+	if len(childTransfersForMessageRes) == 0 {
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	trace := childTransfersForMessageRes[0]
+	parentTrace := &model.TraceForMessageRes{
+		Epoch:        trace.Epoch,
+		To:           trace.To,
+		Params:       trace.Params,
+		Return:       trace.Return,
+		ParamsDetail: trace.ParamsDetail,
+		ReturnDetail: trace.ReturnDetail,
+		MethodNum:    trace.MethodNum,
+		ParamsBson:   trace.ParamsBson,
+		ReturnsBson:  trace.ReturnsBson,
+		Actor:        trace.Actor,
+	}
+
+	err = actorSet.ParseParamsAndReturnsReadable(ctx, parentTrace)
+	if err != nil {
+		log.Warnf("ParseParamsAndReturnsReadable failed: %v", err)
+	}
+
+	trace.ParamsDetail = parentTrace.ParamsDetail
+	trace.ReturnDetail = parentTrace.ReturnDetail
+
+	res.Data = []model.ChildTransfersForMessageRes{trace}
 	c.JSON(http.StatusOK, res)
 }

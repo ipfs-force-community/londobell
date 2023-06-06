@@ -1,6 +1,9 @@
 package model
 
-import "github.com/filecoin-project/go-state-types/abi"
+import (
+	"github.com/filecoin-project/go-state-types/abi"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type ChildTransfersForMessageRes struct {
 	Epoch        abi.ChainEpoch `json:"_id"`
@@ -21,6 +24,10 @@ type ChildTransfersForMessageRes struct {
 	GasLimit     int64
 	GasFeeCap    string
 	GasPremium   string
+	ParamsBson   primitive.Binary
+	ReturnsBson  primitive.Binary
+	MethodNum    uint64
+	Actor        string
 }
 
 type Message struct {
