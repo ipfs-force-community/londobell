@@ -3,6 +3,7 @@ package tipset
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -24,6 +25,7 @@ import (
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v10/eam"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
@@ -40,6 +42,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 
 	amt4 "github.com/filecoin-project/go-amt-ipld/v4"
+	builtintypes "github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/lotus/api"
 	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
 	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
@@ -146,6 +149,10 @@ func init() {
 		schema.Model{
 			Name: "explicit-message",
 			D:    &model.ExplicitMessage{},
+		},
+		schema.Model{
+			Name: "evm-initcode",
+			D:    &model.EvmInitCode{},
 		},
 	)
 }
@@ -329,7 +336,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return nil
 	}
 
-	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot && !ctx.Opts.EnabelExtract.EnableExtractExplicitMessage {
+	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot && !ctx.Opts.EnabelExtract.EnableExtractExplicitMessage && !ctx.Opts.EnabelExtract.EnableExtractEvmByteCode {
 		return nil
 	}
 
@@ -427,7 +434,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		allmsgsMap[key] = msg
 	}
 
-	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt int
+	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt int
 
 	if ctx.Opts.EnabelExtract.EnableExtractEthHash {
 		for _, cmsg := range allmsgs {
@@ -585,9 +592,36 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				res.Docs = append(res.Docs, emt)
 			}
 		}
+
+		if ctx.Opts.EnabelExtract.EnableExtractEvmByteCode {
+			if IsBlock(p.seq, msg.From) {
+				if p.exec != nil && msg.To == builtintypes.EthereumAddressManagerActorAddr && p.exec.Msg.Method == builtintypes.MethodsEAM.CreateExternal && p.exec.MsgRct.ExitCode.IsSuccess() {
+					var result eam.CreateExternalReturn
+					r := bytes.NewReader(p.exec.MsgRct.Return)
+					if err := result.UnmarshalCBOR(r); err != nil {
+						return fmt.Errorf("UnmarshalCBOR return value failed: %w, msg: %v", err, p.exec.Msg.Cid())
+					}
+
+					actorID, err := address.NewIDAddress(result.ActorID)
+					if err != nil {
+						return fmt.Errorf("new IDAddress for %v faile: %v", result.ActorID, err)
+					}
+
+					var initCode abi.CborBytes
+					err = initCode.UnmarshalCBOR(bytes.NewReader(p.exec.Msg.Params))
+					if err != nil {
+						return fmt.Errorf("UnmarshalCBOR for params falied: %v, mcid: %v, signedCid: %v", err, mcid, signedCid)
+					}
+
+					eit := model.NewEvmInitCode(actorID, hex.EncodeToString(initCode), ts.Height())
+					initCodeCnt++
+					res.Docs = append(res.Docs, eit)
+				}
+			}
+		}
 	}
 
-	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "eth-hash", ethCnt, "events-root", etcnt)
+	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "eth-hash", ethCnt, "events-root", etcnt, "explicit-message", emtCnt, "evm-initcode", initCodeCnt)
 
 	return nil
 }

@@ -251,6 +251,16 @@
 }
 ```
 
+### EvmInitCode
+
+```
+{
+	"Epoch": "abi.ChainEpoch",
+	"InitCode": "string",
+	"_id": "address.Address"
+}
+```
+
 ### ExecGas
 
 ```
