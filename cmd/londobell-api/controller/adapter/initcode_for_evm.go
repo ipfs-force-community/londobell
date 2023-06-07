@@ -79,6 +79,6 @@ func GetInitCodeForEvm(c *gin.Context) {
 	}
 
 	// 前65位是初始化代码，不存储
-	res.Data = model.InitCodeForEvmRes{ByteCode: hex.EncodeToString(byteCode)}
+	res.Data = model.InitCodeForEvmRes{InitCode: hex.EncodeToString(byteCode)}
 	c.JSON(http.StatusOK, res)
 }

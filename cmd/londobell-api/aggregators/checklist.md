@@ -140,6 +140,7 @@ db.ExecTrace.createIndex({"MsgRct.ExitCode":1, "Epoch":-1, "Msg.Value":1},{"spar
 db.ExecTrace.createIndex({"Epoch":1},{"sparse": true});
 db.ExecTrace.createIndex({"IsBlock":1, "Epoch":1},{"sparse": true});
 db.ExecTrace.createIndex({"IsBlock":1, "Epoch":1, "Msg.MethodName":1},{"sparse": true});
+db.ExecTrace.createIndex({"IsBlock":1, "Msg.MethodName":1, "Detail.Return.ActorID":1, "MsgRct.ExitCode": 1},{"sparse": true});
 
 
 db.Message.createIndex({"Detail.PackedHeight":1}, {"sparse": true});
