@@ -37,7 +37,7 @@ type EvmInitCode struct {
 // EvmByteCode impl common.Indexed
 func (ei *EvmInitCode) Indexes() [][]string {
 	return [][]string{
-		[]string{evmInitCodeEpochField, "InitCode"},
+		[]string{evmInitCodeEpochField},
 	}
 }
 
