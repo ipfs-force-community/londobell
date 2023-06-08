@@ -1,18 +1,8 @@
 package aggregators
 
 import (
-	"bytes"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
-
-	"github.com/ipfs-force-community/londobell/buildnet"
-
-	"github.com/filecoin-project/go-state-types/abi"
-
-	"github.com/filecoin-project/go-address"
 
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
@@ -47,93 +37,25 @@ func GetInitCodeForEvm(c *gin.Context) {
 		return
 	}
 
-	//req.Addr, err = GetIDByAddr(ctx, req.Addr)
-	//if err != nil {
-	//	alog.Error(err)
-	//	util.ReturnOnErr(c, err)
-	//	return
-	//}
-	//
-	//pipe, err := util.Parse(model.Ctx{Addr: req.Addr}, monitor.GetEvmInitCodeByActorIDAggregator())
-	//if err != nil {
-	//	alog.Error(err)
-	//	util.ReturnOnErr(c, err)
-	//	return
-	//}
-	//
-	//var evmInitCodeByActorIDRes []model.GetEvmInitCodeByActorIDRes
-	//
-	//// multi dbs query
-	//{
-	//	multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "EvmInitCode")
-	//	if err != nil {
-	//		alog.Error(err)
-	//		util.ReturnOnErr(c, err)
-	//		return
-	//	}
-	//
-	//	if len(multiResult) == 0 {
-	//		c.JSON(http.StatusOK, res)
-	//		return
-	//	}
-	//
-	//	raw := multiResult
-	//	rawByte, err := json.Marshal(raw)
-	//	if err != nil {
-	//		alog.Error(err)
-	//		util.ReturnOnErr(c, err)
-	//		return
-	//	}
-	//
-	//	err = json.Unmarshal(rawByte, &evmInitCodeByActorIDRes)
-	//	if err != nil {
-	//		alog.Error(err)
-	//		util.ReturnOnErr(c, err)
-	//		return
-	//	}
-	//}
-	//
-	//if len(evmInitCodeByActorIDRes) == 0 {
-	//	c.JSON(http.StatusOK, res)
-	//	return
-	//}
-	//
-	//res.Data = evmInitCodeByActorIDRes[0]
-
-	// 不处理0x地址
-	IDStr, err := GetIDByAddr(ctx, req.Addr)
+	req.Addr, err = GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	actorID, err := address.NewFromString(buildnet.NetPrefix + IDStr)
+	pipe, err := util.Parse(model.Ctx{Addr: req.Addr}, monitor.GetEvmInitCodeByActorIDAggregator())
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	ID, err := address.IDFromAddress(actorID)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	pipe, err := util.Parse(model.Ctx{ID: ID}, monitor.GetInitCodeForEvmAggregator())
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	var initCodeForEvm []model.InitCodeForEvm
+	var evmInitCodeByActorIDRes []model.InitCodeForEvmRes
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "ExecTrace")
+		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "EvmInitCode")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
@@ -153,7 +75,7 @@ func GetInitCodeForEvm(c *gin.Context) {
 			return
 		}
 
-		err = json.Unmarshal(rawByte, &initCodeForEvm)
+		err = json.Unmarshal(rawByte, &evmInitCodeByActorIDRes)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
@@ -161,52 +83,122 @@ func GetInitCodeForEvm(c *gin.Context) {
 		}
 	}
 
-	if len(initCodeForEvm) == 0 {
+	if len(evmInitCodeByActorIDRes) == 0 {
 		c.JSON(http.StatusOK, res)
 		return
 	}
 
-	// 兼容$binary
-	var ParamsByte []byte
-	params, ok := initCodeForEvm[0].InitCode.(map[string]interface{})
-	if !ok {
-		err = fmt.Errorf("unexpected type of params")
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	binaryParams, ok := params["$binary"].(map[string]interface{})
-	if ok {
-		binaryParamsStr, ok := binaryParams["base64"].(string)
-		if ok {
-			ParamsByte, err = base64.StdEncoding.DecodeString(binaryParamsStr)
-			if err != nil {
-				alog.Error(err)
-				util.ReturnOnErr(c, err)
-				return
-			}
-		}
-	} else {
-		dataParamsStr, ok := params["Data"].(string)
-		if ok {
-			ParamsByte, err = base64.StdEncoding.DecodeString(dataParamsStr)
-			if err != nil {
-				alog.Error(err)
-				util.ReturnOnErr(c, err)
-				return
-			}
-		}
-	}
-
-	var initCode abi.CborBytes
-	err = initCode.UnmarshalCBOR(bytes.NewReader(ParamsByte))
-	if err != nil {
-		c.JSON(http.StatusOK, res)
-		return
-	}
-
-	res.Data = model.InitCodeForEvmRes{InitCode: hex.EncodeToString(initCode)}
-
+	res.Data = evmInitCodeByActorIDRes[0]
 	c.JSON(http.StatusOK, res)
+
+	//// 方案二
+	//// 不处理0x地址
+	//IDStr, err := GetIDByAddr(ctx, req.Addr)
+	//if err != nil {
+	//	alog.Error(err)
+	//	util.ReturnOnErr(c, err)
+	//	return
+	//}
+	//
+	//actorID, err := address.NewFromString(buildnet.NetPrefix + IDStr)
+	//if err != nil {
+	//	alog.Error(err)
+	//	util.ReturnOnErr(c, err)
+	//	return
+	//}
+	//
+	//ID, err := address.IDFromAddress(actorID)
+	//if err != nil {
+	//	alog.Error(err)
+	//	util.ReturnOnErr(c, err)
+	//	return
+	//}
+	//
+	//pipe, err := util.Parse(model.Ctx{ID: ID}, monitor.GetInitCodeForEvmAggregator())
+	//if err != nil {
+	//	alog.Error(err)
+	//	util.ReturnOnErr(c, err)
+	//	return
+	//}
+	//
+	//var initCodeForEvm []model.InitCodeForEvm
+	//
+	//// multi dbs query
+	//{
+	//	multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "ExecTrace")
+	//	if err != nil {
+	//		alog.Error(err)
+	//		util.ReturnOnErr(c, err)
+	//		return
+	//	}
+	//
+	//	if len(multiResult) == 0 {
+	//		c.JSON(http.StatusOK, res)
+	//		return
+	//	}
+	//
+	//	raw := multiResult
+	//	rawByte, err := json.Marshal(raw)
+	//	if err != nil {
+	//		alog.Error(err)
+	//		util.ReturnOnErr(c, err)
+	//		return
+	//	}
+	//
+	//	err = json.Unmarshal(rawByte, &initCodeForEvm)
+	//	if err != nil {
+	//		alog.Error(err)
+	//		util.ReturnOnErr(c, err)
+	//		return
+	//	}
+	//}
+	//
+	//if len(initCodeForEvm) == 0 {
+	//	c.JSON(http.StatusOK, res)
+	//	return
+	//}
+	//
+	//// 兼容$binary
+	//var ParamsByte []byte
+	//params, ok := initCodeForEvm[0].InitCode.(map[string]interface{})
+	//if !ok {
+	//	err = fmt.Errorf("unexpected type of params")
+	//	alog.Error(err)
+	//	util.ReturnOnErr(c, err)
+	//	return
+	//}
+	//
+	//binaryParams, ok := params["$binary"].(map[string]interface{})
+	//if ok {
+	//	binaryParamsStr, ok := binaryParams["base64"].(string)
+	//	if ok {
+	//		ParamsByte, err = base64.StdEncoding.DecodeString(binaryParamsStr)
+	//		if err != nil {
+	//			alog.Error(err)
+	//			util.ReturnOnErr(c, err)
+	//			return
+	//		}
+	//	}
+	//} else {
+	//	dataParamsStr, ok := params["Data"].(string)
+	//	if ok {
+	//		ParamsByte, err = base64.StdEncoding.DecodeString(dataParamsStr)
+	//		if err != nil {
+	//			alog.Error(err)
+	//			util.ReturnOnErr(c, err)
+	//			return
+	//		}
+	//	}
+	//}
+	//
+	//var initCode abi.CborBytes
+	//err = initCode.UnmarshalCBOR(bytes.NewReader(ParamsByte))
+	//if err != nil {
+	//	c.JSON(http.StatusOK, res)
+	//	return
+	//}
+	//
+	//res.Data = model.InitCodeForEvmRes{InitCode: hex.EncodeToString(initCode)}
+	//
+	//c.JSON(http.StatusOK, res)
 }
