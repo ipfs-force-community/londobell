@@ -340,101 +340,12 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return nil
 	}
 
-	start := time.Now()
-	st, rawinvocs, err := ctx.D.ExecutionTrace(ctx.C, ts.TipSet)
-	if err != nil {
-		return fmt.Errorf("tipset.Height: %v, tipset.Cids: %v, pstate: %v, tipset execution failed: %w", ts.TipSet.Height().String(), ts.TipSet.Cids(), ts.TipSet.Blocks()[0].ParentStateRoot, err)
-	}
-
-	if tmp {
-		elog.Infof("tipset execution successfully, tipset.Height: %v, tipset.Cids: %v, state: %v, pstate: %v", ts.TipSet.Height().String(), ts.TipSet.Cids(), st.String(), ts.TipSet.Blocks()[0].ParentStateRoot)
-	}
-
-	elapsed := time.Now().Sub(start)
-
-	if ts.Child != nil {
-		if expect := ts.State(); st != expect {
-			return fmt.Errorf("exec state of tipset %v mismatched, expect: %v, got: %v", ts.TipSet.Height(), expect, st)
-		}
-	}
-
-	var invocs []common.InvocResultCompact
-	if err := mir.Mirror(&invocs, rawinvocs); err != nil {
-		return fmt.Errorf("mirroring exec invoc results: %w", err)
-	}
-
-	elog.Infow("get exec invocs", "st", st, "count", len(invocs), "elapsed", elapsed.String())
-
-	if tmp {
-		// todo: call TipSetState to get Receipts?
-		tstart := time.Now()
-		err = extractTipSetForTmp(ctx, res, ts, st)
-		if err != nil {
-			return fmt.Errorf("extract tipset failed: %v", err)
-		}
-		elog.Infow("tipset extractor done", "name", "tipset", "elapsed", time.Now().Sub(tstart).String())
-	}
-
-	etraces := make([]persistExecTrace, 0, len(invocs)*4)
-	gasTraceNames := map[string]struct{}{}
-
-	for i := range invocs {
-		exec := &invocs[i].ExecutionTrace
-		etraces = append(etraces, persistExecTrace{
-			seq:    []int{i},
-			parent: nil,
-			exec:   exec,
-			gas:    &invocs[i].GasCost,
-		})
-
-		for ni := range exec.GasCharges {
-			name := exec.GasCharges[ni].Name
-			if _, has := gasTraceNames[name]; !has {
-				gasTraceNames[name] = struct{}{}
-			}
-		}
-
-		walkExecTrace([]int{i}, exec, func(subseq []int, subparent, subexec *common.ExecutionTraceCompact) {
-			etraces = append(etraces, persistExecTrace{
-				seq:    copyIndexes(subseq),
-				parent: subparent,
-				exec:   subexec,
-			})
-
-			for ni := range subexec.GasCharges {
-				name := subexec.GasCharges[ni].Name
-				if _, has := gasTraceNames[name]; !has {
-					gasTraceNames[name] = struct{}{}
-				}
-			}
-		})
-	}
-
-	gtnames := make([]string, 0, len(gasTraceNames))
-	for gn := range gasTraceNames {
-		gtnames = append(gtnames, gn)
-	}
-	sort.Strings(gtnames)
-
-	if err := ctx.D.AddEnum(ctx.C, model.NSGasTraceNames, gtnames...); err != nil {
-		return fmt.Errorf("add gas trace names: %w", err)
-	}
-
+	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt int
+	
 	allmsgs, err := ctx.D.MessagesForTipset(ctx.C, ts.TipSet)
 	if err != nil {
 		return fmt.Errorf("get messages for tipset err: %w", err)
 	}
-
-	allmsgsMap := make(map[string]types.ChainMsg)
-	for _, msg := range allmsgs {
-		key := msg.VMMessage().From.String() + "-" + strconv.FormatUint(msg.VMMessage().Nonce, 10)
-		if _, ok := allmsgsMap[key]; ok {
-			continue
-		}
-		allmsgsMap[key] = msg
-	}
-
-	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt int
 
 	if ctx.Opts.EnabelExtract.EnableExtractEthHash {
 		for _, cmsg := range allmsgs {
@@ -463,159 +374,250 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 	}
 
-	dupmsgs := map[cid.Cid]struct{}{}
-
-	for i := range etraces {
-		p := etraces[i]
-		msg := &p.exec.Msg
-
-		var parentMsg *types.Message
-		if p.parent != nil {
-			parentMsg = &p.parent.Msg
-		}
-
-		mi, err := ctx.Actors.Set.LookupMethodInfo(ctx.C, ts.TipSet, ctx.D, parentMsg, msg)
+	if ctx.Opts.EnabelExtract.EnableExtractExecTrace || ctx.Opts.EnabelExtract.EnableExtractMessage || ctx.Opts.EnabelExtract.EnableExtractActorMessage || ctx.Opts.EnabelExtract.EnableExtractEventsRoot || ctx.Opts.EnabelExtract.EnableExtractExplicitMessage || ctx.Opts.EnabelExtract.EnableExtractEvmByteCode {
+		start := time.Now()
+		st, rawinvocs, err := ctx.D.ExecutionTrace(ctx.C, ts.TipSet)
 		if err != nil {
-			if !errors.Is(err, actor.ErrActorMethodNotFound) {
-				return fmt.Errorf("lookup method info for %s/%d: %w", msg.To, msg.Method, err)
-			}
-
-			elog.Errorf("%s", err)
+			return fmt.Errorf("tipset.Height: %v, tipset.Cids: %v, pstate: %v, tipset execution failed: %w", ts.TipSet.Height().String(), ts.TipSet.Cids(), ts.TipSet.Blocks()[0].ParentStateRoot, err)
 		}
 
-		mcid := msg.Cid()
-		var signedCid cid.Cid
+		if tmp {
+			elog.Infof("tipset execution successfully, tipset.Height: %v, tipset.Cids: %v, state: %v, pstate: %v", ts.TipSet.Height().String(), ts.TipSet.Cids(), st.String(), ts.TipSet.Blocks()[0].ParentStateRoot)
+		}
 
-		key := msg.From.String() + "-" + strconv.FormatUint(msg.Nonce, 10)
-		if cmsg, ok := allmsgsMap[key]; ok {
-			smsg, ok := cmsg.(*types.SignedMessage)
-			if ok {
-				signedCid = mcid
-				if mcid != smsg.Cid() {
-					signedCid = smsg.Cid()
-					elog.Infow("new messagecid", "newMcid", signedCid, "oldMcid", mcid)
-				}
+		elapsed := time.Now().Sub(start)
+
+		if ts.Child != nil {
+			if expect := ts.State(); st != expect {
+				return fmt.Errorf("exec state of tipset %v mismatched, expect: %v, got: %v", ts.TipSet.Height(), expect, st)
 			}
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractMessage {
-			if _, has := dupmsgs[mcid]; !has {
-				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
-				if err != nil {
-					elog.Errorw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
-				} else {
-					res.Docs = append(res.Docs, mmsg)
-					msgcnt++
-					dupmsgs[mcid] = struct{}{}
-				}
-			}
+		var invocs []common.InvocResultCompact
+		if err := mir.Mirror(&invocs, rawinvocs); err != nil {
+			return fmt.Errorf("mirroring exec invoc results: %w", err)
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractExecTrace {
-			isBlock := IsBlock(p.seq, msg.From)
-			met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock)
+		elog.Infow("get exec invocs", "st", st, "count", len(invocs), "elapsed", elapsed.String())
+
+		if tmp {
+			// todo: call TipSetState to get Receipts?
+			tstart := time.Now()
+			err = extractTipSetForTmp(ctx, res, ts, st)
 			if err != nil {
-				elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
-			} else {
-				tracecnt++
-				res.Docs = append(res.Docs, met)
-				//if meg != nil && len(meg.Charges) > 0 {
-				//	res.Docs = append(res.Docs, meg)
-				//}
+				return fmt.Errorf("extract tipset failed: %v", err)
 			}
+			elog.Infow("tipset extractor done", "name", "tipset", "elapsed", time.Now().Sub(tstart).String())
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
-			if p.exec != nil && p.exec.MsgRct.Version() == types.MessageReceiptV1 {
-				eventsRoot := p.exec.MsgRct.EventsRoot
-				if eventsRoot != nil {
-					events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
-					if err != nil {
-						return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
-					}
+		etraces := make([]persistExecTrace, 0, len(invocs)*4)
+		gasTraceNames := map[string]struct{}{}
 
-					etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
-					if err != nil {
-						elog.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
-					} else {
-						res.Docs = append(res.Docs, etm)
-						etcnt++
+		for i := range invocs {
+			exec := &invocs[i].ExecutionTrace
+			etraces = append(etraces, persistExecTrace{
+				seq:    []int{i},
+				parent: nil,
+				exec:   exec,
+				gas:    &invocs[i].GasCost,
+			})
+
+			for ni := range exec.GasCharges {
+				name := exec.GasCharges[ni].Name
+				if _, has := gasTraceNames[name]; !has {
+					gasTraceNames[name] = struct{}{}
+				}
+			}
+
+			walkExecTrace([]int{i}, exec, func(subseq []int, subparent, subexec *common.ExecutionTraceCompact) {
+				etraces = append(etraces, persistExecTrace{
+					seq:    copyIndexes(subseq),
+					parent: subparent,
+					exec:   subexec,
+				})
+
+				for ni := range subexec.GasCharges {
+					name := subexec.GasCharges[ni].Name
+					if _, has := gasTraceNames[name]; !has {
+						gasTraceNames[name] = struct{}{}
 					}
 				}
-			}
+			})
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractActorMessage {
-			isBlock := IsBlock(p.seq, msg.From)
-			storeMap := make(map[address.Address]string)
+		gtnames := make([]string, 0, len(gasTraceNames))
+		for gn := range gasTraceNames {
+			gtnames = append(gtnames, gn)
+		}
+		sort.Strings(gtnames)
 
-			fromActorID, err := LookupID(ctx, msg.From, ts.TipSet)
+		if err := ctx.D.AddEnum(ctx.C, model.NSGasTraceNames, gtnames...); err != nil {
+			return fmt.Errorf("add gas trace names: %w", err)
+		}
+
+		allmsgsMap := make(map[string]types.ChainMsg)
+		for _, msg := range allmsgs {
+			key := msg.VMMessage().From.String() + "-" + strconv.FormatUint(msg.VMMessage().Nonce, 10)
+			if _, ok := allmsgsMap[key]; ok {
+				continue
+			}
+			allmsgsMap[key] = msg
+		}
+
+		dupmsgs := map[cid.Cid]struct{}{}
+
+		for i := range etraces {
+			p := etraces[i]
+			msg := &p.exec.Msg
+
+			var parentMsg *types.Message
+			if p.parent != nil {
+				parentMsg = &p.parent.Msg
+			}
+
+			mi, err := ctx.Actors.Set.LookupMethodInfo(ctx.C, ts.TipSet, ctx.D, parentMsg, msg)
 			if err != nil {
-				elog.Warnf("lookup ID for %v at %v failed: %v", msg.From, ts.Height(), err)
-				fromActorID = msg.From
-			}
-
-			if _, ok := storeMap[fromActorID]; !ok {
-				storeMap[fromActorID] = "from"
-			}
-
-			toActorID, err := LookupID(ctx, msg.To, ts.TipSet)
-			if err != nil {
-				elog.Warnf("lookup ID for %v at %v failed: %v", msg.To, ts.Height(), err)
-				toActorID = msg.To
-			}
-
-			if _, ok := storeMap[toActorID]; !ok {
-				storeMap[toActorID] = "to"
-			}
-
-			for ID, mtype := range storeMap {
-				amsg, err := model.NewActorMessage(ID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock, p.seq)
-				if err != nil {
-					elog.Errorw("convert to model.ActorMessage", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
-				} else {
-					actorMsgCnt++
-					res.Docs = append(res.Docs, amsg)
+				if !errors.Is(err, actor.ErrActorMethodNotFound) {
+					return fmt.Errorf("lookup method info for %s/%d: %w", msg.To, msg.Method, err)
 				}
-			}
-		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractExplicitMessage {
+				elog.Errorf("%s", err)
+			}
+
+			mcid := msg.Cid()
+			var signedCid cid.Cid
+
+			key := msg.From.String() + "-" + strconv.FormatUint(msg.Nonce, 10)
 			if cmsg, ok := allmsgsMap[key]; ok {
-				var exitCode exitcode.ExitCode
-				if p.exec != nil {
-					exitCode = p.exec.MsgRct.ExitCode
+				smsg, ok := cmsg.(*types.SignedMessage)
+				if ok {
+					signedCid = mcid
+					if mcid != smsg.Cid() {
+						signedCid = smsg.Cid()
+						elog.Infow("new messagecid", "newMcid", signedCid, "oldMcid", mcid)
+					}
+				}
+			}
+
+			if ctx.Opts.EnabelExtract.EnableExtractMessage {
+				if _, has := dupmsgs[mcid]; !has {
+					mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
+					if err != nil {
+						elog.Errorw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+					} else {
+						res.Docs = append(res.Docs, mmsg)
+						msgcnt++
+						dupmsgs[mcid] = struct{}{}
+					}
+				}
+			}
+
+			if ctx.Opts.EnabelExtract.EnableExtractExecTrace {
+				isBlock := IsBlock(p.seq, msg.From)
+				met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock)
+				if err != nil {
+					elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+				} else {
+					tracecnt++
+					res.Docs = append(res.Docs, met)
+					//if meg != nil && len(meg.Charges) > 0 {
+					//	res.Docs = append(res.Docs, meg)
+					//}
+				}
+			}
+
+			if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
+				if p.exec != nil && p.exec.MsgRct.Version() == types.MessageReceiptV1 {
+					eventsRoot := p.exec.MsgRct.EventsRoot
+					if eventsRoot != nil {
+						events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
+						if err != nil {
+							return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
+						}
+
+						etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
+						if err != nil {
+							elog.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+						} else {
+							res.Docs = append(res.Docs, etm)
+							etcnt++
+						}
+					}
+				}
+			}
+
+			if ctx.Opts.EnabelExtract.EnableExtractActorMessage {
+				isBlock := IsBlock(p.seq, msg.From)
+				storeMap := make(map[address.Address]string)
+
+				fromActorID, err := LookupID(ctx, msg.From, ts.TipSet)
+				if err != nil {
+					elog.Warnf("lookup ID for %v at %v failed: %v", msg.From, ts.Height(), err)
+					fromActorID = msg.From
 				}
 
-				emt := model.NewExplicitMessage(cmsg.Cid(), ts.Height(), msg.Value, mi.Method.Name, exitCode, msg.From, msg.To)
-				emtCnt++
-				res.Docs = append(res.Docs, emt)
+				if _, ok := storeMap[fromActorID]; !ok {
+					storeMap[fromActorID] = "from"
+				}
+
+				toActorID, err := LookupID(ctx, msg.To, ts.TipSet)
+				if err != nil {
+					elog.Warnf("lookup ID for %v at %v failed: %v", msg.To, ts.Height(), err)
+					toActorID = msg.To
+				}
+
+				if _, ok := storeMap[toActorID]; !ok {
+					storeMap[toActorID] = "to"
+				}
+
+				for ID, mtype := range storeMap {
+					amsg, err := model.NewActorMessage(ID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock, p.seq)
+					if err != nil {
+						elog.Errorw("convert to model.ActorMessage", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
+					} else {
+						actorMsgCnt++
+						res.Docs = append(res.Docs, amsg)
+					}
+				}
 			}
-		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractEvmByteCode {
-			if IsBlock(p.seq, msg.From) {
-				if p.exec != nil && msg.To == builtintypes.EthereumAddressManagerActorAddr && p.exec.Msg.Method == builtintypes.MethodsEAM.CreateExternal && p.exec.MsgRct.ExitCode.IsSuccess() {
-					var result eam.CreateExternalReturn
-					r := bytes.NewReader(p.exec.MsgRct.Return)
-					if err := result.UnmarshalCBOR(r); err != nil {
-						return fmt.Errorf("UnmarshalCBOR return value failed: %w, msg: %v", err, p.exec.Msg.Cid())
+			if ctx.Opts.EnabelExtract.EnableExtractExplicitMessage {
+				if cmsg, ok := allmsgsMap[key]; ok {
+					var exitCode exitcode.ExitCode
+					if p.exec != nil {
+						exitCode = p.exec.MsgRct.ExitCode
 					}
 
-					actorID, err := address.NewIDAddress(result.ActorID)
-					if err != nil {
-						return fmt.Errorf("new IDAddress for %v faile: %v", result.ActorID, err)
-					}
+					emt := model.NewExplicitMessage(cmsg.Cid(), ts.Height(), msg.Value, mi.Method.Name, exitCode, msg.From, msg.To)
+					emtCnt++
+					res.Docs = append(res.Docs, emt)
+				}
+			}
 
-					var initCode abi.CborBytes
-					err = initCode.UnmarshalCBOR(bytes.NewReader(p.exec.Msg.Params))
-					if err != nil {
-						return fmt.Errorf("UnmarshalCBOR for params falied: %v, mcid: %v, signedCid: %v", err, mcid, signedCid)
-					}
+			if ctx.Opts.EnabelExtract.EnableExtractEvmByteCode {
+				if IsBlock(p.seq, msg.From) {
+					if p.exec != nil && msg.To == builtintypes.EthereumAddressManagerActorAddr && p.exec.Msg.Method == builtintypes.MethodsEAM.CreateExternal && p.exec.MsgRct.ExitCode.IsSuccess() {
+						var result eam.CreateExternalReturn
+						r := bytes.NewReader(p.exec.MsgRct.Return)
+						if err := result.UnmarshalCBOR(r); err != nil {
+							return fmt.Errorf("UnmarshalCBOR return value failed: %w, msg: %v", err, p.exec.Msg.Cid())
+						}
 
-					eit := model.NewEvmInitCode(actorID, hex.EncodeToString(initCode), ts.Height())
-					initCodeCnt++
-					res.Docs = append(res.Docs, eit)
+						actorID, err := address.NewIDAddress(result.ActorID)
+						if err != nil {
+							return fmt.Errorf("new IDAddress for %v faile: %v", result.ActorID, err)
+						}
+
+						var initCode abi.CborBytes
+						err = initCode.UnmarshalCBOR(bytes.NewReader(p.exec.Msg.Params))
+						if err != nil {
+							return fmt.Errorf("UnmarshalCBOR for params falied: %v, mcid: %v, signedCid: %v", err, mcid, signedCid)
+						}
+
+						eit := model.NewEvmInitCode(actorID, hex.EncodeToString(initCode), ts.Height())
+						initCodeCnt++
+						res.Docs = append(res.Docs, eit)
+					}
 				}
 			}
 		}
