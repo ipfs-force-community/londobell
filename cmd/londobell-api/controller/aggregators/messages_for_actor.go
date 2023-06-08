@@ -125,11 +125,13 @@ func getCreateMessage(ctx context.Context, addrReq string, api v0api.FullNode, c
 	}
 
 	var (
-		to     string
-		method uint64
-		robust string
+		//to         string
+		//method     uint64
+		robust     string
+		methodName string
 	)
 
+	// notice: 升级时方法名变化需注意
 	switch {
 	case addr == sbuiltin.SystemActorAddr, addr == sbuiltin.InitActorAddr, addr == sbuiltin.RewardActorAddr, addr == sbuiltin.CronActorAddr, addr == sbuiltin.StoragePowerActorAddr,
 		addr == sbuiltin.VerifiedRegistryActorAddr, addr == sbuiltin.BurntFundsActorAddr, addr == sbuiltin.DatacapActorAddr, addr == sbuiltin.EthereumAddressManagerActorAddr,
@@ -137,16 +139,19 @@ func getCreateMessage(ctx context.Context, addrReq string, api v0api.FullNode, c
 		return nil, nil
 	case builtin.IsStorageMinerActor(actor.Code):
 		// CreateMiner
-		to = sbuiltin.StoragePowerActorAddr.String()[1:]
-		method = 2
+		methodName = "CreateMiner"
+		//to = sbuiltin.StoragePowerActorAddr.String()[1:]
+		//method = 2
 	case builtin.IsEvmActor(actor.Code):
 		// CreateExternal
-		to = sbuiltin.EthereumAddressManagerActorAddr.String()[1:]
-		method = 4
+		methodName = "CreateExternal"
+		//to = sbuiltin.EthereumAddressManagerActorAddr.String()[1:]
+		//method = 4
 	default:
 		// Exec
-		to = sbuiltin.InitActorAddr.String()[1:]
-		method = 2
+		methodName = "Exec"
+		//to = sbuiltin.InitActorAddr.String()[1:]
+		//method = 2
 	}
 
 	ID, err := api.StateLookupID(ctx, addr, types.EmptyTSK)
@@ -154,14 +159,31 @@ func getCreateMessage(ctx context.Context, addrReq string, api v0api.FullNode, c
 		return nil, err
 	}
 
-	robust, err = GetRobustByID(ctx, api, ID, actor)
-	if err != nil {
-		return nil, err
-	}
+	// 支持实时性，避免robust还未入库的情况
+	idStr := ID.String()[1:]
 
-	pipe, err := util.Parse(model.Ctx{Addr: robust, To: to, Method: method}, string(createMessageAggregator))
-	if err != nil {
-		return nil, err
+	var pipe interface{}
+	// evm actor可能没存f2，只存了f4
+	if builtin.IsEvmActor(actor.Code) {
+		id, err := address.IDFromAddress(ID)
+		if err != nil {
+			return nil, err
+		}
+
+		pipe, err = util.Parse(model.Ctx{ID: id, IDStr: idStr, MethodName: methodName /*To: to, Method: method*/}, string(createMessageAggregator))
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		robust, err = GetRobustByID(ctx, api, ID, actor)
+		if err != nil {
+			return nil, err
+		}
+
+		pipe, err = util.Parse(model.Ctx{Addr: robust, IDStr: idStr, MethodName: methodName /*To: to, Method: method*/}, string(createMessageAggregator))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var createMessage model.MessageForActor

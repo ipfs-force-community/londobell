@@ -40,6 +40,7 @@ type Ctx struct {
 	Cid        string
 	Cids       []string
 	ID         uint64
+	IDStr      string
 	Sort       int
 	To         string
 	Skip       int64

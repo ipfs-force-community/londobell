@@ -134,16 +134,19 @@ func GetCreateTime(c *gin.Context) {
 		}
 	case builtin.IsStorageMinerActor(actor.Code):
 		// CreateMiner
-		req.To = sbuiltin.StoragePowerActorAddr.String()[1:]
-		req.Method = 2
+		req.MethodName = "CreateMiner"
+		//req.To = sbuiltin.StoragePowerActorAddr.String()[1:]
+		//req.Method = 2
 	case builtin.IsEvmActor(actor.Code):
 		// CreateExternal
-		req.To = sbuiltin.EthereumAddressManagerActorAddr.String()[1:]
-		req.Method = 4
+		req.MethodName = "CreateExternal"
+		//req.To = sbuiltin.EthereumAddressManagerActorAddr.String()[1:]
+		//req.Method = 4
 	default:
 		// Exec
-		req.To = sbuiltin.InitActorAddr.String()[1:]
-		req.Method = 2
+		req.MethodName = "Exec"
+		//req.To = sbuiltin.InitActorAddr.String()[1:]
+		//req.Method = 2
 	}
 
 	ID, err := api.StateLookupID(ctx, addr, types.EmptyTSK)
@@ -153,23 +156,41 @@ func GetCreateTime(c *gin.Context) {
 		return
 	}
 
-	robust, err := GetRobustByID(ctx, api, ID, actor)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
+	idStr := ID.String()[1:]
 
-	req.Addr = robust
+	var pipe interface{}
+	if builtin.IsEvmActor(actor.Code) {
+		id, err := address.IDFromAddress(ID)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		pipe, err = util.Parse(model.Ctx{ID: id, IDStr: idStr, MethodName: req.MethodName}, string(createMessageAggregator))
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+	} else {
+		robust, err := GetRobustByID(ctx, api, ID, actor)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		req.Addr = robust
+		pipe, err = util.Parse(model.Ctx{Addr: req.Addr, IDStr: idStr, MethodName: req.MethodName}, string(createTimeAggregator))
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+	}
 
 	countUtils, err := multiquery.GetColsOnly(&multiquery.DBStateManager)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	pipe, err := util.Parse(model.Ctx{Addr: req.Addr, To: req.To, Method: req.Method}, string(createTimeAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

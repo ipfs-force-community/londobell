@@ -74,7 +74,7 @@ func GetTraces(c *gin.Context) {
 	for _, trace := range tracesRes {
 		methodInfo, err := util.LookupMethodInfo(trace.Epoch, abi.MethodNum(trace.Method), trace.From, trace.To, trace.Actor)
 		if err != nil {
-			alog.Warn(err)
+			//alog.Warn(err)
 		}
 
 		if !trace.ParamsBson.IsZero() {
