@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/go-state-types/builtin/v10/evm"
+
 	"github.com/filecoin-project/go-state-types/exitcode"
 
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -25,7 +27,6 @@ import (
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v10/eam"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
@@ -594,29 +595,16 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractEvmByteCode {
-			if IsBlock(p.seq, msg.From) {
-				if p.exec != nil && msg.To == builtintypes.EthereumAddressManagerActorAddr && p.exec.Msg.Method == builtintypes.MethodsEAM.CreateExternal && p.exec.MsgRct.ExitCode.IsSuccess() {
-					var result eam.CreateExternalReturn
-					r := bytes.NewReader(p.exec.MsgRct.Return)
-					if err := result.UnmarshalCBOR(r); err != nil {
-						return fmt.Errorf("UnmarshalCBOR return value failed: %w, msg: %v", err, p.exec.Msg.Cid())
-					}
-
-					actorID, err := address.NewIDAddress(result.ActorID)
-					if err != nil {
-						return fmt.Errorf("new IDAddress for %v faile: %v", result.ActorID, err)
-					}
-
-					var initCode abi.CborBytes
-					err = initCode.UnmarshalCBOR(bytes.NewReader(p.exec.Msg.Params))
-					if err != nil {
-						return fmt.Errorf("UnmarshalCBOR for params falied: %v, mcid: %v, signedCid: %v", err, mcid, signedCid)
-					}
-
-					eit := model.NewEvmInitCode(actorID, hex.EncodeToString(initCode), ts.Height())
-					initCodeCnt++
-					res.Docs = append(res.Docs, eit)
+			if p.exec != nil && p.exec.Msg.Method == builtintypes.MethodsEVM.Constructor && strings.Contains(mi.Actor, "evm") && p.exec.MsgRct.ExitCode.IsSuccess() {
+				var params evm.ConstructorParams
+				param := bytes.NewReader(p.exec.Msg.Params)
+				if err := params.UnmarshalCBOR(param); err != nil {
+					return fmt.Errorf("UnmarshalCBOR return value failed: %w, msg: %v", err, p.exec.Msg.Cid())
 				}
+
+				eit := model.NewEvmInitCode(p.exec.Msg.To, hex.EncodeToString(params.Initcode), ts.Height())
+				initCodeCnt++
+				res.Docs = append(res.Docs, eit)
 			}
 		}
 	}
