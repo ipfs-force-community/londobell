@@ -13,15 +13,16 @@ import (
 	"github.com/filecoin-project/lotus/node"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/gin-gonic/gin"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/urfave/cli/v2"
+
 	"github.com/ipfs-force-community/londobell/api"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/urfave/cli/v2"
 )
 
 var (
@@ -51,36 +52,36 @@ func Run(cctx *cli.Context, adapter bool) error {
 	}
 
 	if adapter {
-		_, err = fullnode.API.InjectNewFullNode(cctx)
-		if err != nil {
-			return err
-		}
-
-		tick := time.NewTicker(15 * time.Second)
-		defer tick.Stop()
-		go func() {
-			for {
-				select {
-				case <-tick.C:
-					err = fullnode.API.Choose(ctx)
-					if err != nil {
-						log.Warn(err)
-						continue
-					}
-
-					injectNew, err := fullnode.API.InjectNewFullNode(cctx)
-					if injectNew {
-						if err != nil {
-							log.Errorf("inject new fullnode failed: %v", err)
-						} else {
-							log.Info("inject new fullnode successfully")
-						}
-					} else {
-						log.Info("no new fullnode injected")
-					}
-				}
-			}
-		}()
+		//_, err = fullnode.API.InjectNewFullNode(cctx)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//tick := time.NewTicker(15 * time.Second)
+		//defer tick.Stop()
+		//go func() {
+		//	for {
+		//		select {
+		//		case <-tick.C:
+		//			err = fullnode.API.Choose(ctx)
+		//			if err != nil {
+		//				log.Warn(err)
+		//				continue
+		//			}
+		//
+		//			injectNew, err := fullnode.API.InjectNewFullNode(cctx)
+		//			if injectNew {
+		//				if err != nil {
+		//					log.Errorf("inject new fullnode failed: %v", err)
+		//				} else {
+		//					log.Info("inject new fullnode successfully")
+		//				}
+		//			} else {
+		//				log.Info("no new fullnode injected")
+		//			}
+		//		}
+		//	}
+		//}()
 
 		RegisterAdapterApi(router)
 
