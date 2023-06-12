@@ -8,10 +8,11 @@ import (
 // DefaultOptions returns defaults
 func DefaultOptions() Options {
 	return Options{
-		TipSet:          defaultTipSetOptions(),
-		StateRegular:    defaultActorStateRegularOptions(),
-		EnabelExtract:   defaultEnableExtractOptions(),
-		ZeroHourExtract: defaultZeroHourExtractOptions(),
+		TipSet:             defaultTipSetOptions(),
+		StateRegular:       defaultActorStateRegularOptions(),
+		EnabelExtract:      defaultEnableExtractOptions(),
+		ZeroHourExtract:    defaultZeroHourExtractOptions(),
+		SkipExpensiveEpoch: true,
 	}
 }
 
@@ -24,10 +25,11 @@ func DryOptions() Options {
 
 // Options for differect extracting jobs
 type Options struct {
-	TipSet          TipSetOptions
-	StateRegular    ActorStateRegularOptions
-	EnabelExtract   EnableExtractOptions
-	ZeroHourExtract ZeroHourExtractOptions
+	TipSet             TipSetOptions
+	StateRegular       ActorStateRegularOptions
+	EnabelExtract      EnableExtractOptions
+	ZeroHourExtract    ZeroHourExtractOptions
+	SkipExpensiveEpoch bool
 }
 
 func defaultTipSetOptions() TipSetOptions {
