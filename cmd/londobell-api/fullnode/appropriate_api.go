@@ -6,11 +6,12 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/filecoin-project/lotus/api/v1api"
+
 	"github.com/filecoin-project/lotus/api/client"
 
 	"github.com/dtynn/dix"
 	"github.com/filecoin-project/go-jsonrpc"
-	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/urfave/cli/v2"
 
@@ -28,7 +29,7 @@ type AppropriateAPI struct {
 
 type Node struct {
 	url    string
-	api    v0api.FullNode
+	api    v1api.FullNode
 	closer jsonrpc.ClientCloser
 }
 
@@ -36,7 +37,7 @@ func NewAppropriateAPI(nodes []util.Node) *AppropriateAPI {
 	return &AppropriateAPI{nodes: nodes, node: Node{}, lastNode: Node{}}
 }
 
-func (a *AppropriateAPI) GetAppropriateAPI() v0api.FullNode {
+func (a *AppropriateAPI) GetAppropriateAPI() v1api.FullNode {
 	a.apiMx.RLock()
 	defer a.apiMx.RUnlock()
 	return a.node.api
@@ -60,7 +61,7 @@ func (a *AppropriateAPI) GetLastAppropriateNode() Node {
 	return a.lastNode
 }
 
-func (a *AppropriateAPI) SetAppropriateAPI(api v0api.FullNode, url string, closer jsonrpc.ClientCloser) {
+func (a *AppropriateAPI) SetAppropriateAPI(api v1api.FullNode, url string, closer jsonrpc.ClientCloser) {
 	a.apiMx.Lock()
 	defer a.apiMx.Unlock()
 	a.node.api = api
@@ -68,7 +69,7 @@ func (a *AppropriateAPI) SetAppropriateAPI(api v0api.FullNode, url string, close
 	a.node.closer = closer
 }
 
-func (a *AppropriateAPI) SetLastAppropriateAPI(api v0api.FullNode, url string, closer jsonrpc.ClientCloser) {
+func (a *AppropriateAPI) SetLastAppropriateAPI(api v1api.FullNode, url string, closer jsonrpc.ClientCloser) {
 	a.apiMx.Lock()
 	defer a.apiMx.Unlock()
 	a.lastNode.api = api
@@ -92,7 +93,7 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 			requestHeader = http.Header{"Authorization": []string{"Bearer " + token}}
 		}
 
-		api, closer, err := client.NewFullNodeRPCV0(ctx, url, requestHeader)
+		api, closer, err := client.NewFullNodeRPCV1(ctx, url, requestHeader)
 		if err != nil {
 			log.Warnf("api:%v is not accessiable", url)
 			continue
