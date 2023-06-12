@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/ipfs/go-cid"
+
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 
@@ -33,6 +37,14 @@ func (b *Boundary) SetHi(ts *common.LinkedTipSet) {
 		Epoch: ts.Height(),
 		TSK:   ts.Key(),
 		State: ts.State(),
+	}
+}
+
+func (b *Boundary) SetHi2(epoch abi.ChainEpoch, tsk types.TipSetKey, state cid.Cid) {
+	b.Hi = Anchor{
+		Epoch: epoch,
+		TSK:   tsk,
+		State: state,
 	}
 }
 

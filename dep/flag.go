@@ -3,8 +3,11 @@ package dep
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/filecoin-project/lotus/api/client"
 
 	"github.com/dtynn/dix"
 	"github.com/mitchellh/go-homedir"
@@ -12,7 +15,6 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/filecoin-project/lotus/api/v0api"
-	cliutil "github.com/filecoin-project/lotus/cli/util"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
@@ -22,6 +24,10 @@ import (
 var (
 	FullNodeAPIFlag = &cli.StringFlag{
 		Name: "api-url",
+	}
+
+	TokenFlag = &cli.StringFlag{
+		Name: "token",
 	}
 
 	RepoFlag = &cli.StringFlag{
@@ -39,7 +45,13 @@ var (
 
 func InjectFullNode(cctx *cli.Context) dix.Option {
 	return dix.Override(new(v0api.FullNode), func(lc fx.Lifecycle) (v0api.FullNode, error) {
-		full, closer, err := cliutil.GetFullNodeAPI(cctx)
+		var requestHeader http.Header
+		token := cctx.String("token")
+		if token != "" {
+			requestHeader = http.Header{"Authorization": []string{"Bearer " + token}}
+		}
+
+		full, closer, err := client.NewFullNodeRPCV0(cctx.Context, cctx.String("api-url"), requestHeader)
 		if err != nil {
 			return nil, err
 		}

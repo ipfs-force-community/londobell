@@ -16,6 +16,7 @@ var log = logging.Logger("lotus-api-adapter")
 func main() {
 	lotuslog.SetupLogLevels()
 	logging.SetLogLevel("rpc", "FATAL")
+
 	app := &cli.App{
 		Name:  "lotus-api-adapter",
 		Usage: "chain data",
