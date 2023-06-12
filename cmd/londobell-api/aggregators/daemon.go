@@ -13,9 +13,14 @@ var daemonCmd = &cli.Command{
 			Name:  "port",
 			Usage: "2345",
 		},
-		&cli.StringSliceFlag{
-			Name:  "apis",
-			Usage: "ws://112.124.1.253:1234/rpc/v0",
+		//&cli.StringSliceFlag{
+		//	Name:  "apis",
+		//	Usage: "ws://112.124.1.253:1234/rpc/v0",
+		//},
+		&cli.StringFlag{
+			Name:     "nodeconfig",
+			Usage:    "The location of the node configuration, eg: ./config.json(api: token)",
+			Required: true,
 		},
 		&cli.StringFlag{
 			Name:  "RPCListen",

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"os"
 	"path/filepath"
 	"time"
@@ -86,10 +87,16 @@ var cfgUpdateCmd = &cli.Command{
 			Required: true,
 			Usage:    "three types: tmp, formal, cold",
 		},
-		&cli.StringSliceFlag{
-			Name:  "apis",
-			Usage: "ws://112.124.1.253:1234/rpc/v0",
+		//&cli.StringSliceFlag{
+		//	Name:  "apis",
+		//	Usage: "ws://112.124.1.253:1234/rpc/v0",
+		//},
+		&cli.StringFlag{
+			Name:     "nodeconfig",
+			Usage:    "The location of the node configuration, eg: ./config.json(api: token)",
+			Required: true,
 		},
+
 		//&cli.BoolFlag{
 		//	Name:  "reverse",
 		//	Value: false,
@@ -104,7 +111,11 @@ var cfgUpdateCmd = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		start := time.Now()
 
-		fullnode.API = fullnode.NewAppropriateAPI(cctx.StringSlice("apis"))
+		if err := util.ParseNodes(cctx.String("nodeconfig")); err != nil {
+			return err
+		}
+
+		fullnode.API = fullnode.NewAppropriateAPI(util.Nodes)
 		err := fullnode.API.Choose(context.TODO())
 		if err != nil {
 			return err

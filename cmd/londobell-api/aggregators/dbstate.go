@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 
@@ -237,13 +238,22 @@ var updateCmd = &cli.Command{
 			Usage:    "type: BlockMsgsCount, BlockMsgsByMethodNameMap, ActorMsgsByMethodNameMap, ActorMsgsCountMap, ActorTransfersCountMap, MinedMsgsMap, TransfersLargeAmountCount or all",
 			Required: true,
 		},
-		&cli.StringSliceFlag{
-			Name:  "apis",
-			Usage: "ws://112.124.1.253:1234/rpc/v0",
+		//&cli.StringSliceFlag{
+		//	Name:  "apis",
+		//	Usage: "ws://112.124.1.253:1234/rpc/v0",
+		//},
+		&cli.StringFlag{
+			Name:     "nodeconfig",
+			Usage:    "The location of the node configuration, eg: ./config.json(api: token)",
+			Required: true,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		fullnode.API = fullnode.NewAppropriateAPI(cctx.StringSlice("apis"))
+		if err := util.ParseNodes(cctx.String("nodeconfig")); err != nil {
+			return err
+		}
+
+		fullnode.API = fullnode.NewAppropriateAPI(util.Nodes)
 		err := fullnode.API.Choose(context.TODO())
 		if err != nil {
 			return err
