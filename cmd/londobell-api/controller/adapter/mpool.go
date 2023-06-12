@@ -8,18 +8,19 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/api/v0api"
+	"github.com/filecoin-project/lotus/api/v1api"
 	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/go-multierror"
+	"github.com/ipfs/go-cid"
+	"go.uber.org/zap"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
-	"github.com/ipfs/go-cid"
-	"go.uber.org/zap"
 )
 
 var ActorReg = filcns.NewActorRegistry()
@@ -156,7 +157,7 @@ func GetPendingMessages(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-func getMethodName(ctx context.Context, log *zap.SugaredLogger, api v0api.FullNode, msg *types.SignedMessage, ts *types.TipSet) (string, error) {
+func getMethodName(ctx context.Context, log *zap.SugaredLogger, api v1api.FullNode, msg *types.SignedMessage, ts *types.TipSet) (string, error) {
 	if msg.Message.Method == abi.MethodNum(0) {
 		return "Send", nil
 	}

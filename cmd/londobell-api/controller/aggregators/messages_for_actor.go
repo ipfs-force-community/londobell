@@ -5,7 +5,7 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/filecoin-project/lotus/api/v0api"
+	"github.com/filecoin-project/lotus/api/v1api"
 
 	"context"
 
@@ -112,7 +112,7 @@ func GetMessagesForActor(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-func getCreateMessage(ctx context.Context, addrReq string, api v0api.FullNode, countUtils []multiquery.CountUtil) (*model.MessageForActor, error) {
+func getCreateMessage(ctx context.Context, addrReq string, api v1api.FullNode, countUtils []multiquery.CountUtil) (*model.MessageForActor, error) {
 	// create message
 	addr, err := address.NewFromString(buildnet.NetPrefix + addrReq)
 	if err != nil {

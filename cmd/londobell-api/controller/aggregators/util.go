@@ -27,7 +27,7 @@ import (
 
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
 
-	"github.com/filecoin-project/lotus/api/v0api"
+	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/account"
@@ -138,7 +138,7 @@ func GetAddrs(ctx context.Context, addr string) (model.AddressRes, error) {
 	return model.AddressRes{}, fmt.Errorf("no table ActorBalance")
 }
 
-func GetRobustByID(ctx context.Context, api v0api.FullNode, IDAddr address.Address, actor *types.Actor) (string, error) {
+func GetRobustByID(ctx context.Context, api v1api.FullNode, IDAddr address.Address, actor *types.Actor) (string, error) {
 	if IDAddr.Protocol() != address.ID {
 		// warn
 		return "", nil
@@ -234,7 +234,7 @@ func GetRobustByID(ctx context.Context, api v0api.FullNode, IDAddr address.Addre
 }
 
 // GetAllAddrs get [ID, robust, delegated]
-func GetAllAddrs(ctx context.Context, addrStr string, api v0api.FullNode) ([]string, error) {
+func GetAllAddrs(ctx context.Context, addrStr string, api v1api.FullNode) ([]string, error) {
 	addrs := make([]string, 0)
 
 	addr, err := address.NewFromString(buildnet.NetPrefix + addrStr)
@@ -358,7 +358,7 @@ func IsSigTypeDelegatedMessage(from address.Address) bool {
 	return from.Protocol() == address.Delegated
 }
 
-func newEthTxFromSignedMessage(ctx context.Context, msg *types.Message, signedCid cid.Cid, api v0api.FullNode) (ethtypes.EthTx, error) {
+func newEthTxFromSignedMessage(ctx context.Context, msg *types.Message, signedCid cid.Cid, api v1api.FullNode) (ethtypes.EthTx, error) {
 	var tx ethtypes.EthTx
 	var err error
 
@@ -398,7 +398,7 @@ func newEthTxFromSignedMessage(ctx context.Context, msg *types.Message, signedCi
 	return tx, nil
 }
 
-func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, api v0api.FullNode) ethtypes.EthTx {
+func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, api v1api.FullNode) ethtypes.EthTx {
 	// We don't care if we error here, conversion is best effort for non-eth transactions
 	from, _ := lookupEthAddress(ctx, msg.From, api)
 	to, _ := lookupEthAddress(ctx, msg.To, api)
@@ -416,7 +416,7 @@ func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, api v0api.F
 	}
 }
 
-func lookupEthAddress(ctx context.Context, addr address.Address, api v0api.FullNode) (ethtypes.EthAddress, error) {
+func lookupEthAddress(ctx context.Context, addr address.Address, api v1api.FullNode) (ethtypes.EthAddress, error) {
 	// BLOCK A: We are trying to get an actual Ethereum address from an f410 address.
 	// Attempt to convert directly, if it's an f4 address.
 	ethAddr, err := ethtypes.EthAddressFromFilecoinAddress(addr)
@@ -618,7 +618,7 @@ func ParseTipSetKey(cidStrs []string) (types.TipSetKey, error) {
 	return types.NewTipSetKey(cids...), nil
 }
 
-func newEthTxFromMessageLookup(ctx context.Context, epoch abi.ChainEpoch, msg *types.Message, signedCid cid.Cid, txIdx uint64, api v0api.FullNode) (ethtypes.EthTx, error) {
+func newEthTxFromMessageLookup(ctx context.Context, epoch abi.ChainEpoch, msg *types.Message, signedCid cid.Cid, txIdx uint64, api v1api.FullNode) (ethtypes.EthTx, error) {
 	parentTsRes, err := GetParentTipSetByEpoch(ctx, epoch)
 	if err != nil {
 		return ethtypes.EthTx{}, err
@@ -656,7 +656,7 @@ func newEthTxFromMessageLookup(ctx context.Context, epoch abi.ChainEpoch, msg *t
 	return tx, nil
 }
 
-func newEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, trace model.TraceForMessageRes, events []types.Event, sa v0api.FullNode) (api.EthTxReceipt, error) {
+func newEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, trace model.TraceForMessageRes, events []types.Event, sa v1api.FullNode) (api.EthTxReceipt, error) {
 	var (
 		transactionIndex ethtypes.EthUint64
 		blockHash        ethtypes.EthHash
