@@ -57,31 +57,31 @@ func Run(cctx *cli.Context, adapter bool) error {
 		//	return err
 		//}
 		//
-		//tick := time.NewTicker(15 * time.Second)
-		//defer tick.Stop()
-		//go func() {
-		//	for {
-		//		select {
-		//		case <-tick.C:
-		//			err = fullnode.API.Choose(ctx)
-		//			if err != nil {
-		//				log.Warn(err)
-		//				continue
-		//			}
-		//
-		//			injectNew, err := fullnode.API.InjectNewFullNode(cctx)
-		//			if injectNew {
-		//				if err != nil {
-		//					log.Errorf("inject new fullnode failed: %v", err)
-		//				} else {
-		//					log.Info("inject new fullnode successfully")
-		//				}
-		//			} else {
-		//				log.Info("no new fullnode injected")
-		//			}
-		//		}
-		//	}
-		//}()
+		tick := time.NewTicker(15 * time.Second)
+		defer tick.Stop()
+		go func() {
+			for {
+				select {
+				case <-tick.C:
+					err = fullnode.API.Choose(ctx)
+					if err != nil {
+						log.Warn(err)
+						continue
+					}
+
+					//injectNew, err := fullnode.API.InjectNewFullNode(cctx)
+					//if injectNew {
+					//	if err != nil {
+					//		log.Errorf("inject new fullnode failed: %v", err)
+					//	} else {
+					//		log.Info("inject new fullnode successfully")
+					//	}
+					//} else {
+					//	log.Info("no new fullnode injected")
+					//}
+				}
+			}
+		}()
 
 		RegisterAdapterApi(router)
 
