@@ -88,7 +88,7 @@ var completeEthHashCmd = &cli.Command{
 		traceCol := db.Collection("ExecTrace")
 		ethhashCol := db.Collection("EthHash")
 
-		js, err := ioutil.ReadFile("./cmd/bell/complete_ethhash.js")
+		js, err := ioutil.ReadFile("./cmd/bell/merge_ethhash.js")
 		if err != nil {
 			return err
 		}
