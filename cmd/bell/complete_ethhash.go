@@ -124,99 +124,100 @@ var completeEthHashCmd = &cli.Command{
 		log.Infof("begin complete ethhash")
 		starttime := time.Now()
 
-		for {
-			for i := range part {
-				i := i
-				r := part[i]
-				ewg.Go(func() error {
-					if !lim.Acquire(context.TODO()) {
-						return nil
-					}
-
-					defer func() {
-						lim.Release(context.TODO())
-					}()
-
-					pipe, err := aggregators.Parse(model.Ctx{StartEpoch: r.Start, EndEpoch: r.End}, string(js))
-					if err != nil {
-						return err
-					}
-
-					cur, err := traceCol.Aggregate(context.TODO(), pipe)
-					if err != nil {
-						return err
-					}
-
-					var res []EthHashRes
-					err = cur.All(context.TODO(), &res)
-					if err != nil {
-						return err
-					}
-
-					var ethHashs = make([]EthHash, 0)
-					for _, r := range res {
-						scid, err := cid.Decode(r.Cid)
-						if err != nil {
-							return err
-						}
-
-						smsg, err := components.CS.GetSignedMessage(ctx, scid)
-						if err != nil {
-							return err
-						}
-
-						if smsg.Signature.Type != crypto.SigTypeDelegated {
-							return fmt.Errorf("not crypto.SigTypeDelegated: %v", smsg.Signature.Type)
-						}
-
-						ts, err := components.CS.LoadTipSet(ctx, types.EmptyTSK)
-						if err != nil {
-							return err
-						}
-
-						ethhash, err := newEthTxFromSignedMessage(ctx, smsg, ts, components.SM)
-						if err != nil {
-							return err
-						}
-
-						ethHashs = append(ethHashs, EthHash{Hash: ethhash, Cid: scid, Epoch: abi.ChainEpoch(r.Epoch)})
-						log.Infof("ethhash, hash: %v, cid: %v, epoch: %v", ethhash.String(), scid.String(), r.Epoch)
-					}
-
-					// insert into EvmInitCode
-					var docs []interface{}
-
-					for _, e := range ethHashs {
-						docs = append(docs, e)
-					}
-
-					total := len(docs)
-					if total > 0 {
-						ires, err := ethhashCol.InsertMany(context.TODO(), docs, options.InsertMany().SetOrdered(false))
-						if err != nil {
-							if actualErr := extractActualMgoErrors(err); actualErr != nil {
-								return actualErr
-							}
-						}
-
-						log.Infof("part [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), total, time.Now().Sub(starttime).String())
-						return nil
-					}
-
-					log.Infof("part [%v, %v] total 0, elapsed: %v\n", r.Start, r.End, time.Now().Sub(starttime).String())
+		//for {
+		for i := range part {
+			i := i
+			r := part[i]
+			ewg.Go(func() error {
+				if !lim.Acquire(context.TODO()) {
 					return nil
-				})
+				}
 
-			}
+				defer func() {
+					lim.Release(context.TODO())
+				}()
 
-			if err := ewg.Wait(); err != nil {
-				log.Errorf("falied: %v", err)
-				continue
-			}
+				pipe, err := aggregators.Parse(model.Ctx{StartEpoch: r.Start, EndEpoch: r.End}, string(js))
+				if err != nil {
+					return err
+				}
 
-			log.Infof("all finished, elapsed: %v\n", time.Now().Sub(starttime).String())
-			break
+				cur, err := traceCol.Aggregate(context.TODO(), pipe)
+				if err != nil {
+					return err
+				}
+
+				var res []EthHashRes
+				err = cur.All(context.TODO(), &res)
+				if err != nil {
+					return err
+				}
+
+				var ethHashs = make([]EthHash, 0)
+				for _, r := range res {
+					scid, err := cid.Decode(r.Cid)
+					if err != nil {
+						return err
+					}
+
+					smsg, err := components.CS.GetSignedMessage(ctx, scid)
+					if err != nil {
+						return err
+					}
+
+					if smsg.Signature.Type != crypto.SigTypeDelegated {
+						return fmt.Errorf("not crypto.SigTypeDelegated: %v", smsg.Signature.Type)
+					}
+
+					ts, err := components.CS.LoadTipSet(ctx, types.EmptyTSK)
+					if err != nil {
+						return err
+					}
+
+					ethhash, err := newEthTxFromSignedMessage(ctx, smsg, ts, components.SM)
+					if err != nil {
+						return err
+					}
+
+					ethHashs = append(ethHashs, EthHash{Hash: ethhash, Cid: scid, Epoch: abi.ChainEpoch(r.Epoch)})
+					log.Infof("ethhash, hash: %v, cid: %v, epoch: %v", ethhash.String(), scid.String(), r.Epoch)
+				}
+
+				// insert into EvmInitCode
+				var docs []interface{}
+
+				for _, e := range ethHashs {
+					docs = append(docs, e)
+				}
+
+				total := len(docs)
+				if total > 0 {
+					ires, err := ethhashCol.InsertMany(context.TODO(), docs, options.InsertMany().SetOrdered(false))
+					if err != nil {
+						if actualErr := extractActualMgoErrors(err); actualErr != nil {
+							return actualErr
+						}
+					}
+
+					log.Infof("part [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), total, time.Now().Sub(starttime).String())
+					return nil
+				}
+
+				log.Infof("part [%v, %v] total 0, elapsed: %v\n", r.Start, r.End, time.Now().Sub(starttime).String())
+				return nil
+			})
+
 		}
+
+		if err := ewg.Wait(); err != nil {
+			log.Errorf("falied: %v", err)
+			//continue
+			return err
+		}
+
+		log.Infof("all finished, elapsed: %v\n", time.Now().Sub(starttime).String())
+		//break
+		//}
 
 		return nil
 	},

@@ -128,99 +128,100 @@ var completeEventsRootCmd = &cli.Command{
 		log.Infof("begin complet eventsroot")
 		starttime := time.Now()
 
-		for {
-			for i := range part {
-				i := i
-				r := part[i]
-				ewg.Go(func() error {
-					if !lim.Acquire(context.TODO()) {
-						return nil
-					}
-
-					defer func() {
-						lim.Release(context.TODO())
-					}()
-
-					pipe, err := aggregators.Parse(model.Ctx{StartEpoch: r.Start, EndEpoch: r.End}, string(js))
-					if err != nil {
-						return err
-					}
-
-					cur, err := traceCol.Aggregate(context.TODO(), pipe)
-					if err != nil {
-						return err
-					}
-
-					var res []EventsRootRes
-					err = cur.All(context.TODO(), &res)
-					if err != nil {
-						return err
-					}
-
-					var eventsRoot = make([]EventsRoot, 0)
-					for _, r := range res {
-						if r.EventsRoot != "" { // null返回啥
-							root, err := cid.Decode(r.EventsRoot)
-							if err != nil {
-								return err
-							}
-
-							// 只同步1月后的
-							events, err := GetEvents(context.TODO(), root, components.CS)
-							if err != nil {
-								return err
-							}
-
-							eventsJSON, err := json.Marshal(events)
-							if err != nil {
-								return err
-							}
-
-							eventsRoot = append(eventsRoot, EventsRoot{Cid: r.Cid, Events: eventsJSON, Epoch: r.Epoch})
-						} else {
-							continue
-						}
-					}
-
-					// insert into EvmInitCode
-					var docs []interface{}
-					for _, e := range eventsRoot {
-						d := bson.D{
-							{Key: "_id", Value: e.Cid},
-							{Key: "Events", Value: e.Events},
-							{Key: "Epoch", Value: e.Epoch},
-						}
-
-						docs = append(docs, d)
-					}
-
-					total := len(docs)
-					if total > 0 {
-						ires, err := EventsRootCol.InsertMany(context.TODO(), docs, options.InsertMany().SetOrdered(false))
-						if err != nil {
-							if actualErr := extractActualMgoErrors(err); actualErr != nil {
-								return actualErr
-							}
-						}
-
-						log.Infof("part [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), total, time.Now().Sub(starttime).String())
-						return nil
-					}
-
-					log.Infof("part [%v, %v] total 0, elapsed: %v\n", r.Start, r.End, time.Now().Sub(starttime).String())
+		//for {
+		for i := range part {
+			i := i
+			r := part[i]
+			ewg.Go(func() error {
+				if !lim.Acquire(context.TODO()) {
 					return nil
-				})
+				}
 
-			}
+				defer func() {
+					lim.Release(context.TODO())
+				}()
 
-			if err := ewg.Wait(); err != nil {
-				log.Errorf("falied: %v", err)
-				continue
-			}
+				pipe, err := aggregators.Parse(model.Ctx{StartEpoch: r.Start, EndEpoch: r.End}, string(js))
+				if err != nil {
+					return err
+				}
 
-			log.Infof("all finished, elapsed: %v\n", time.Now().Sub(starttime).String())
-			break
+				cur, err := traceCol.Aggregate(context.TODO(), pipe)
+				if err != nil {
+					return err
+				}
+
+				var res []EventsRootRes
+				err = cur.All(context.TODO(), &res)
+				if err != nil {
+					return err
+				}
+
+				var eventsRoot = make([]EventsRoot, 0)
+				for _, r := range res {
+					if r.EventsRoot != "" { // null返回啥
+						root, err := cid.Decode(r.EventsRoot)
+						if err != nil {
+							return err
+						}
+
+						// 只同步1月后的
+						events, err := GetEvents(context.TODO(), root, components.CS)
+						if err != nil {
+							return err
+						}
+
+						eventsJSON, err := json.Marshal(events)
+						if err != nil {
+							return err
+						}
+
+						eventsRoot = append(eventsRoot, EventsRoot{Cid: r.Cid, Events: eventsJSON, Epoch: r.Epoch})
+					} else {
+						continue
+					}
+				}
+
+				// insert into EvmInitCode
+				var docs []interface{}
+				for _, e := range eventsRoot {
+					d := bson.D{
+						{Key: "_id", Value: e.Cid},
+						{Key: "Events", Value: e.Events},
+						{Key: "Epoch", Value: e.Epoch},
+					}
+
+					docs = append(docs, d)
+				}
+
+				total := len(docs)
+				if total > 0 {
+					ires, err := EventsRootCol.InsertMany(context.TODO(), docs, options.InsertMany().SetOrdered(false))
+					if err != nil {
+						if actualErr := extractActualMgoErrors(err); actualErr != nil {
+							return actualErr
+						}
+					}
+
+					log.Infof("part [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), total, time.Now().Sub(starttime).String())
+					return nil
+				}
+
+				log.Infof("part [%v, %v] total 0, elapsed: %v\n", r.Start, r.End, time.Now().Sub(starttime).String())
+				return nil
+			})
+
 		}
+
+		if err := ewg.Wait(); err != nil {
+			log.Errorf("falied: %v", err)
+			//continue
+			return err
+		}
+
+		log.Infof("all finished, elapsed: %v\n", time.Now().Sub(starttime).String())
+		//break
+		//}
 
 		return nil
 	},
