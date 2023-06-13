@@ -6,6 +6,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+
 	"github.com/filecoin-project/go-state-types/big"
 
 	"github.com/ipfs/go-cid"
@@ -50,15 +52,20 @@ var completeActorMessageCmd = &cli.Command{
 			Name:     "name",
 			Required: true,
 		},
-		&cli.StringSliceFlag{
-			Name:     "apis",
+		&cli.StringFlag{
+			Name:     "nodeconfig",
+			Usage:    "The location of the node configuration, eg: ./config.json(api: token)",
 			Required: true,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := context.Background()
 
-		adapter.API = adapter.NewAppropriateAPI(cctx.StringSlice("apis"))
+		if err := util.ParseNodes(cctx.String("nodeconfig")); err != nil {
+			return err
+		}
+
+		adapter.API = adapter.NewAppropriateAPI(util.Nodes)
 		err := adapter.API.Choose(ctx)
 		if err != nil {
 			return err
