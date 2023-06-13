@@ -87,8 +87,14 @@ var completeEthHashCmd = &cli.Command{
 		db := client.Database(cctx.String("name"))
 		traceCol := db.Collection("ExecTrace")
 		ethhashCol := db.Collection("EthHash")
+		tipsetCol := db.Collection("Tipset")
 
 		js, err := ioutil.ReadFile("./cmd/bell/merge_ethhash.js")
+		if err != nil {
+			return err
+		}
+
+		tsjs, err := ioutil.ReadFile("./cmd/bell/tipset_for_epoch.js")
 		if err != nil {
 			return err
 		}
@@ -169,8 +175,35 @@ var completeEthHashCmd = &cli.Command{
 						return fmt.Errorf("not crypto.SigTypeDelegated: %v", smsg.Signature.Type)
 					}
 
-					ts, err := components.CS.LoadTipSet(ctx, types.EmptyTSK)
+					pipe, err := aggregators.Parse(model.Ctx{StartEpoch: r.Epoch}, string(tsjs))
 					if err != nil {
+						return err
+					}
+
+					cur, err := tipsetCol.Aggregate(context.TODO(), pipe)
+					if err != nil {
+						return err
+					}
+
+					var tsRes []TipsetRes
+					err = cur.All(context.TODO(), &tsRes)
+					if err != nil {
+						return err
+					}
+
+					cids := make([]cid.Cid, 0)
+					for _, v := range tsRes[0].Cids {
+						c, err := cid.Decode(v)
+						if err != nil {
+							return err
+						}
+
+						cids = append(cids, c)
+					}
+
+					ts, err := components.CS.LoadTipSet(ctx, types.NewTipSetKey(cids...))
+					if err != nil {
+						log.Errorf("load tipset failed: %v", err)
 						return err
 					}
 
@@ -232,6 +265,10 @@ type EthHash struct {
 	Hash  ethtypes.EthHash `bson:"_id"`
 	Cid   cid.Cid
 	Epoch abi.ChainEpoch
+}
+
+type TipsetRes struct {
+	Cids []string
 }
 
 func newEthTxFromSignedMessage(ctx context.Context, smsg *types.SignedMessage, ts *types.TipSet, sm common.StateManager) (ethtypes.EthHash, error) {
