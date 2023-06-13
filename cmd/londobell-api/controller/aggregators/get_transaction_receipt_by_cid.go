@@ -1,7 +1,6 @@
 package aggregators
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
@@ -38,9 +37,8 @@ func GetTransactionReceiptByCid(c *gin.Context) {
 	}
 
 	if len(traceForMessageRes) != 1 {
-		err = fmt.Errorf("invalid length of traceForMessageRes: %v", len(traceForMessageRes))
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
+		alog.Warnf("invalid length of traceForMessageRes: %v", len(traceForMessageRes))
+		c.JSON(http.StatusOK, res)
 		return
 	}
 

@@ -2,7 +2,6 @@ package aggregators
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -33,9 +32,8 @@ func GetTransactionByCid(c *gin.Context) {
 	}
 
 	if len(traceForMessageRes) != 1 {
-		err = fmt.Errorf("invalid length of traceForMessageRes: %v", len(traceForMessageRes))
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
+		alog.Warnf("invalid length of traceForMessageRes: %v", len(traceForMessageRes))
+		c.JSON(http.StatusOK, res)
 		return
 	}
 
