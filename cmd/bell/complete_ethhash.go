@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"sort"
 	"time"
+
+	"github.com/ipfs-force-community/londobell/dep"
 
 	"github.com/filecoin-project/go-state-types/abi"
 
@@ -67,7 +70,7 @@ var completeEthHashCmd = &cli.Command{
 
 		stopper, err := dix.New(ctx,
 			Bell2(cctx, fxlog, cctx.Bool("local"), &components),
-			//dep.InjectFullNode(cctx),
+			dep.InjectFullNode(cctx),
 			//dep.InjectRepoPath(cctx),
 		)
 
@@ -160,6 +163,10 @@ var completeEthHashCmd = &cli.Command{
 						smsg, err := components.CS.GetSignedMessage(ctx, scid)
 						if err != nil {
 							return err
+						}
+
+						if smsg.Signature.Type != crypto.SigTypeDelegated {
+							return fmt.Errorf("not crypto.SigTypeDelegated: %v", smsg.Signature.Type)
 						}
 
 						ts, err := components.CS.LoadTipSet(ctx, types.EmptyTSK)

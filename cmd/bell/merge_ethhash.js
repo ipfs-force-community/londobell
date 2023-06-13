@@ -3,7 +3,7 @@
     {
         $match: {
             IsBlock: true,
-            "Msg.From": /^1/,
+            "Msg.From": /^4/,
             Epoch: {$gte: ctx.StartEpoch, $lt: ctx.EndEpoch}
         }
     },
