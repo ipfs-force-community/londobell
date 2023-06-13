@@ -14,12 +14,13 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/go-multierror"
+	"github.com/ipfs/go-cid"
+	"go.uber.org/zap"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
-	"github.com/ipfs/go-cid"
-	"go.uber.org/zap"
 )
 
 var ActorReg = filcns.NewActorRegistry()
@@ -65,7 +66,7 @@ func GetPendingMessages(c *gin.Context) {
 		for _, msg := range msgs {
 			if msg.Cid().Equals(mcid) || msg.Message.Cid().Equals(mcid) {
 				methodName, err := getMethodName(ctx, alog, api, msg, ts)
-				if err != nil {
+				if err != nil && err != util.ErrNotFound {
 					alog.Error(err)
 					util.ReturnOnErr(c, err)
 					return
@@ -94,7 +95,7 @@ func GetPendingMessages(c *gin.Context) {
 		msg := msgs[i]
 		g.Go(func() error {
 			methodName, err := getMethodName(ctx, alog, api, msg, ts)
-			if err != nil {
+			if err != nil && err != util.ErrNotFound {
 				return err
 			}
 
@@ -168,7 +169,7 @@ func getMethodName(ctx context.Context, log *zap.SugaredLogger, api v0api.FullNo
 			return "", nil
 		}
 
-		return "", err
+		return "", util.ErrNotFound
 	}
 
 	code := act.Code

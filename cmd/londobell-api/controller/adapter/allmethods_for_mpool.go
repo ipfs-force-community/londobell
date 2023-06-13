@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/go-multierror"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -52,7 +53,7 @@ func GetAllMethodsForPendingMessages(c *gin.Context) {
 		msg := msgs[i]
 		g.Go(func() error {
 			methodName, err := getMethodName(ctx, alog, api, msg, ts)
-			if err != nil {
+			if err != nil && err != util.ErrNotFound {
 				return err
 			}
 
