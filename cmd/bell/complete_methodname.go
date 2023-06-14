@@ -36,6 +36,10 @@ var completeMethodNameCmd = &cli.Command{
 			Name:     "name",
 			Required: true,
 		},
+		&cli.BoolFlag{
+			Name:     "isblock",
+			Required: true,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(cctx.String("url")))
@@ -45,9 +49,17 @@ var completeMethodNameCmd = &cli.Command{
 
 		db := client.Database(cctx.String("name"))
 		traceCol := db.Collection("ExecTrace")
-		js, err := ioutil.ReadFile("./cmd/bell/merge_methodname.js")
-		if err != nil {
-			return err
+		var js []byte
+		if cctx.Bool("isblock") {
+			js, err = ioutil.ReadFile("./cmd/bell/merge_methodname_block.js")
+			if err != nil {
+				return err
+			}
+		} else {
+			js, err = ioutil.ReadFile("./cmd/bell/merge_methodname_notblock.js")
+			if err != nil {
+				return err
+			}
 		}
 
 		startEpoch, endEpoch := cctx.Int64("start"), cctx.Int64("end")
@@ -80,7 +92,7 @@ var completeMethodNameCmd = &cli.Command{
 		lim := limiter.New(16)
 		var ewg multierror.Group
 
-		log.Infof("begin complet methoname")
+		log.Infof("begin complete methoname")
 		starttime := time.Now()
 
 		for {
