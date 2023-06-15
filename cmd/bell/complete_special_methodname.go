@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"sort"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/ipfs-force-community/londobell/lib/limiter"
 )
 
+//todo:2878193-2892593 fix hk
 var completeSpecialMethodNameCmd = &cli.Command{
 	Name: "complete-special-methodname",
 	Flags: []cli.Flag{
@@ -25,7 +27,7 @@ var completeSpecialMethodNameCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.Int64Flag{
-			Name:     "end", //2929447
+			Name:     "end", //2929445
 			Required: true,
 		},
 		&cli.StringFlag{
@@ -36,6 +38,11 @@ var completeSpecialMethodNameCmd = &cli.Command{
 			Name:     "name",
 			Required: true,
 		},
+		&cli.StringFlag{
+			Name:     "type",
+			Required: true,
+			Usage:    "complete or fix",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(cctx.String("url")))
@@ -45,9 +52,19 @@ var completeSpecialMethodNameCmd = &cli.Command{
 
 		db := client.Database(cctx.String("name"))
 		traceCol := db.Collection("ExecTrace")
-		js, err := ioutil.ReadFile("./cmd/bell/merge_special_methodname.js")
-		if err != nil {
-			return err
+		var js []byte
+		if cctx.String("type") == "complete" {
+			js, err = ioutil.ReadFile("./cmd/bell/merge_special_methodname.js")
+			if err != nil {
+				return err
+			}
+		} else if cctx.String("type") == "fix" {
+			js, err = ioutil.ReadFile("./cmd/bell/fix_special_methodname.js")
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("unknown type: %v", cctx.String("type"))
 		}
 
 		startEpoch, endEpoch := cctx.Int64("start"), cctx.Int64("end")
@@ -78,8 +95,10 @@ var completeSpecialMethodNameCmd = &cli.Command{
 		lim := limiter.New(16)
 		var ewg multierror.Group
 
-		log.Infof("begin complet methoname")
+		log.Infof("begin complete special methoname")
 		starttime := time.Now()
+
+		log.Infof("parts: %v", part)
 
 		for {
 			for i := range part {

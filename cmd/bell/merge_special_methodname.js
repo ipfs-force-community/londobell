@@ -23,7 +23,8 @@
                                                 ]},
                                             {$and: [
                                                     {$regexMatch: { input: "$Detail.Actor", regex: "evm"}},
-                                                    {$gt: ["$Method", 1023]}
+                                                    {$gt: ["$Method", 1023]},
+                                                    {$ne: ["$Method", 3844450837]}
                                                 ]},
                                             {$regexMatch: {input: "$message.Detail.Actor", regex: "placeholder"}}
                                         ]}
@@ -58,7 +59,8 @@
                             if: {
                                 $and: [
                                     {$regexMatch: {input: "$message.Detail.Actor", regex: "evm"}},
-                                    {$gt: ["$message.Method", 1023]}
+                                    {$gt: ["$message.Method", 1023]},
+                                    {$ne: ["$message.Method", 3844450837]}
                                 ]
                             },
                             then: "HandleFileCoinMethod",
