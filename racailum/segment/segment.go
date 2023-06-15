@@ -573,7 +573,7 @@ func (s *Segment) GetLatestDealID(ctx context.Context) (int64, error) {
 	}
 
 	if len(results) == 0 {
-		return 0, nil
+		return -1, nil
 	}
 
 	log.Infof("get latest dealID: %v", results[0].ID)

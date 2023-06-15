@@ -310,7 +310,7 @@ func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet, allow
 		return nil, fmt.Errorf("new actor set: %w", err)
 	}
 
-	latestDealID := int64(0)
+	latestDealID := int64(-1)
 
 	dlog := log.With("dry", true)
 	ectx, err := extract.NewCtx(ctx, s.dal, dlog, aset, latestDealID, dryOptions)

@@ -34,7 +34,7 @@ func TestExtractMultisigBalanceV7(t *testing.T) {
 	mockDAL := &MockDAL{}
 	mockDAL.On("ActorStore", ctx).Return(store.ActorStore(ctx, localBs), nil)
 
-	latestDealID := int64(0)
+	latestDealID := int64(-1)
 	ectx, err := extract.NewCtx(context.Background(), mockDAL, &zap.SugaredLogger{}, &actor.Set{}, latestDealID, extract.DryOptions())
 	require.NoError(t, err)
 
