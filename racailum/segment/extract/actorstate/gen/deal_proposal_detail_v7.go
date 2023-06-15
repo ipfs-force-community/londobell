@@ -79,6 +79,10 @@ func extractDealProposalDetailedV7(ctx *extract.Ctx, res *extract.Res, head *com
 			details[out.Provider].Detail.UnVerifiedDealEndCount++
 		}
 
+		if int64(idx) <= ctx.LatestDealID {
+			return nil
+		}
+
 		dealProposals = append(dealProposals, model.DealProposal{
 			ID:           idx,
 			Epoch:        head.Epoch,

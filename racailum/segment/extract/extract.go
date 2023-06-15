@@ -10,7 +10,7 @@ import (
 )
 
 // NewCtx constructs a new extract context
-func NewCtx(ctx context.Context, d common.DAL, l *zap.SugaredLogger, aset *actor.Set, opts Options) (*Ctx, error) {
+func NewCtx(ctx context.Context, d common.DAL, l *zap.SugaredLogger, aset *actor.Set, latestDealID int64, opts Options) (*Ctx, error) {
 	ectx := &Ctx{
 		C:    ctx,
 		D:    d,
@@ -19,6 +19,8 @@ func NewCtx(ctx context.Context, d common.DAL, l *zap.SugaredLogger, aset *actor
 	}
 
 	ectx.Actors.Set = aset
+	ectx.LatestDealID = latestDealID
+
 	return ectx, nil
 }
 
@@ -32,6 +34,8 @@ type Ctx struct {
 	Actors struct {
 		Set *actor.Set
 	}
+
+	LatestDealID int64 // latest dealID of DealProposal
 }
 
 // NewRes constructs a new extract result

@@ -37,7 +37,8 @@ func TestExtractMarketFundsV7(t *testing.T) {
 	require.NoError(t, err)
 	mockDAL := &MockDAL{}
 	mockDAL.On("ActorStore", ctx).Return(store.ActorStore(ctx, localBs), nil)
-	ectx, err := extract.NewCtx(ctx, mockDAL, &zap.SugaredLogger{}, &actor.Set{}, extract.DryOptions())
+	latestDealID := int64(0)
+	ectx, err := extract.NewCtx(ctx, mockDAL, &zap.SugaredLogger{}, &actor.Set{}, latestDealID, extract.DryOptions())
 	require.NoError(t, err)
 	res := extract.NewRes(0, 0)
 	addr, _ := address.NewFromString("t05")
