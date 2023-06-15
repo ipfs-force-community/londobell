@@ -85,6 +85,10 @@ func extractDealProposalDetailedV8(ctx *extract.Ctx, res *extract.Res, head *com
 			details[out.Provider].Detail.UnVerifiedDealEndCount++
 		}
 
+		if int64(idx) <= ctx.LatestDealID {
+			return nil
+		}
+
 		labelBytes := new(bytes.Buffer)
 		err = out.Label.MarshalCBOR(labelBytes)
 		if err != nil {

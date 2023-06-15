@@ -34,7 +34,8 @@ func TestExtractVerifRegV7(t *testing.T) {
 	mockDAL := &MockDAL{}
 	mockDAL.On("ActorStore", ctx).Return(store.ActorStore(ctx, localBs), nil)
 
-	ectx, err := extract.NewCtx(context.Background(), mockDAL, &zap.SugaredLogger{}, &actor.Set{}, extract.DryOptions())
+	latestDealID := int64(0)
+	ectx, err := extract.NewCtx(context.Background(), mockDAL, &zap.SugaredLogger{}, &actor.Set{}, latestDealID, extract.DryOptions())
 	require.NoError(t, err)
 
 	res := extract.NewRes(0, 0)

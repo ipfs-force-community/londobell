@@ -552,3 +552,31 @@ func (s *Segment) GetStateFinalHeight(ctx context.Context) (abi.ChainEpoch, erro
 
 	return results[0].Epoch, nil
 }
+
+func (s *Segment) GetLatestDealID(ctx context.Context) (int64, error) {
+	log.Info("get latest dealID")
+
+	findOpts := make([]*options.FindOptions, 0)
+	findOpts = append(findOpts, options.Find().SetSort(bson.D{{Key: "_id", Value: -1}}), options.Find().SetLimit(-1))
+	cursor, err := s.rdb.Find(ctx, "DealProposal", bson.D{}, findOpts...)
+	if err != nil {
+		return 0, err
+	}
+
+	type dealProposalRes struct {
+		ID int64 `bson:"_id"`
+	}
+
+	var results []dealProposalRes
+	if err = cursor.All(context.TODO(), &results); err != nil {
+		return 0, err
+	}
+
+	if len(results) == 0 {
+		return 0, nil
+	}
+
+	log.Infof("get latest dealID: %v", results[0].ID)
+
+	return results[0].ID, nil
+}

@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ipfs-force-community/londobell/metrics"
 	"go.opencensus.io/stats"
+
+	"github.com/ipfs-force-community/londobell/metrics"
 
 	"go.opencensus.io/trace"
 
@@ -26,6 +27,7 @@ type persistCtx struct {
 	actorSet              *actor.Set
 	log                   *zap.SugaredLogger
 	asyncPersistWaitGroup multierror.Group
+	latestDealID          int64
 }
 
 func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet, tmp bool) error {
@@ -46,11 +48,17 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 
 	size := len(tss)
 	var (
-		aset *actor.Set
-		err  error
+		aset         *actor.Set
+		latestDealID int64
+		err          error
 	)
 	if !tmp {
 		aset, err = actor.NewSet(ctx, s.dal.StateManager, tss[size-1], tmp)
+		if err != nil {
+			return err
+		}
+
+		latestDealID, err = s.GetLatestDealID(ctx)
 		if err != nil {
 			return err
 		}
@@ -59,9 +67,10 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 	}
 
 	pctx := &persistCtx{
-		ctx:      ctx,
-		actorSet: aset,
-		log:      elog,
+		ctx:          ctx,
+		actorSet:     aset,
+		log:          elog,
+		latestDealID: latestDealID,
 	}
 
 	tsDone := 0
@@ -105,7 +114,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 	innerCtx, innerCancel := context.WithCancel(ctx.ctx)
 	defer innerCancel()
 
-	ectx, err := extract.NewCtx(innerCtx, s.dal, elog, ctx.actorSet, s.opts.Extract.ExtractOptions)
+	ectx, err := extract.NewCtx(innerCtx, s.dal, elog, ctx.actorSet, ctx.latestDealID, s.opts.Extract.ExtractOptions)
 	if err != nil {
 		return err
 	}
@@ -301,8 +310,10 @@ func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet, allow
 		return nil, fmt.Errorf("new actor set: %w", err)
 	}
 
+	latestDealID := int64(0)
+
 	dlog := log.With("dry", true)
-	ectx, err := extract.NewCtx(ctx, s.dal, dlog, aset, dryOptions)
+	ectx, err := extract.NewCtx(ctx, s.dal, dlog, aset, latestDealID, dryOptions)
 	if err != nil {
 		return nil, fmt.Errorf("new extract context: %w", err)
 	}
