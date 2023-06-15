@@ -39,7 +39,7 @@ func TestExtractMinerFundsV7(t *testing.T) {
 	require.NoError(t, err)
 	mockDAL := &MockDAL{}
 	mockDAL.On("ActorStore", ctx).Return(store.ActorStore(ctx, localBs), nil)
-	latestDealID := int64(0)
+	latestDealID := int64(-1)
 	ectx, _ := extract.NewCtx(ctx, mockDAL, &zap.SugaredLogger{}, &actor.Set{}, latestDealID, extract.DryOptions())
 	err = extractMinerFundsV7(ectx, res, &common.ActorHead{
 		Actor: &types.Actor{Head: headerCId, Balance: big.MustFromString("2631953892560049294647")},
