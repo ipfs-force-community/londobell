@@ -215,7 +215,34 @@ HEAD_LOOP:
 				continue HEAD_LOOP
 			}
 
-			log.Infow("incoming tipset", "tsk", tsk, "height", ts.Height())
+			var finalHeight abi.ChainEpoch
+			if r.cfg.Segment.Extract.OnlyExtractState {
+				if r.cfg.Segment.Extract.ExtractOptions.EnabelExtract.EnableExtractState {
+					finalHeight, err = r.activeSeg.GetStateFinalHeight(ctx)
+					if err != nil {
+						log.Errorf("get state final height failed: %v", err)
+						continue HEAD_LOOP
+					}
+				}
+			} else {
+				finalHeight, err = r.activeSeg.GetFinalHeight(ctx)
+				if err != nil {
+					log.Errorf("get final height failed: %v", err)
+					continue HEAD_LOOP
+				}
+			}
+
+			if ts.Height()-finalHeight > 120 {
+				newts, err := r.components.cs.GetTipsetByHeight(ctx, finalHeight+120, ts, true)
+				if err != nil {
+					log.Errorf("failed to load tipset by height %v: %s", finalHeight+120, err)
+					continue HEAD_LOOP
+				}
+
+				ts = newts
+			}
+
+			log.Infow("incoming tipset", "tsk", ts.Key(), "height", ts.Height(), "tsk-ch", tsk)
 			estart := time.Now()
 			if err := r.Extract(ctx, ts); err != nil {
 				log.Errorf("failed to persist tipset: %s", err)
@@ -225,7 +252,7 @@ HEAD_LOOP:
 				stats.Record(ctx, metrics.TipSetHeight.M(int64(ts.Height())))
 				stats.Record(ctx, metrics.ExtractDuration.M(metrics.SinceInMilliseconds(estart)))
 			}
-			log.Infow("done tipset extracting", "tsk", tsk, "height", ts.Height(), "elapsed", time.Now().Sub(estart).String())
+			log.Infow("done tipset extracting", "tsk", ts.Key(), "height", ts.Height(), "elapsed", time.Now().Sub(estart).String())
 		}
 	}
 }
