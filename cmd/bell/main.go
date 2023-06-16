@@ -32,6 +32,7 @@ func main() {
 			compareCmd,
 			checkCmd,
 			offlineCmd,
+			fixActorMessageCmd,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{
