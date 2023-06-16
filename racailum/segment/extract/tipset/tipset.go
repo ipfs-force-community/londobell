@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -470,19 +469,21 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		p := etraces[i]
 		msg := &p.exec.Msg
 
-		var parentMsg *types.Message
-		if p.parent != nil {
-			parentMsg = &p.parent.Msg
-		}
+		//var parentMsg *types.Message
+		//if p.parent != nil {
+		//	parentMsg = &p.parent.Msg
+		//}
+		//
+		//mi, err := ctx.Actors.Set.LookupMethodInfo(ctx.C, ts.TipSet, ctx.D, parentMsg, msg)
+		//if err != nil {
+		//	if !errors.Is(err, actor.ErrActorMethodNotFound) {
+		//		return fmt.Errorf("lookup method info for %s/%d: %w", msg.To, msg.Method, err)
+		//	}
+		//
+		//	elog.Errorf("%s", err)
+		//}
 
-		mi, err := ctx.Actors.Set.LookupMethodInfo(ctx.C, ts.TipSet, ctx.D, parentMsg, msg)
-		if err != nil {
-			if !errors.Is(err, actor.ErrActorMethodNotFound) {
-				return fmt.Errorf("lookup method info for %s/%d: %w", msg.To, msg.Method, err)
-			}
-
-			elog.Errorf("%s", err)
-		}
+		mi := actor.MethodInfo{}
 
 		mcid := msg.Cid()
 		var signedCid cid.Cid

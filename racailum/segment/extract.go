@@ -53,10 +53,11 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		err          error
 	)
 	if !tmp {
-		aset, err = actor.NewSet(ctx, s.dal.StateManager, tss[size-1], tmp)
-		if err != nil {
-			return err
-		}
+		aset = &actor.Set{}
+		//aset, err = actor.NewSet(ctx, s.dal.StateManager, tss[size-1], tmp)
+		//if err != nil {
+		//	return err
+		//}
 
 		latestDealID, err = s.GetLatestDealID(ctx)
 		if err != nil {
