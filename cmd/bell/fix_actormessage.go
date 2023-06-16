@@ -241,8 +241,6 @@ var fixActorMessageCmd = &cli.Command{
 				log.Infof("ctx done!!")
 			}
 		}
-
-		return nil
 	},
 }
 
