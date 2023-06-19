@@ -64,7 +64,7 @@ var fixActorMessageCmd = &cli.Command{
 
 		api := adapter.API.GetAppropriateAPI()
 
-		client, err := mongo.Connect(ctx, options.Client().ApplyURI(cctx.String("url")))
+		client, err := mongo.Connect(ctx, options.Client().ApplyURI(cctx.String("dsn")))
 		if err != nil {
 			return err
 		}
