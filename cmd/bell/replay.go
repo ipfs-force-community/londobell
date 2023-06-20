@@ -4,6 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/ipfs-force-community/londobell/lib/mgoutil"
+
+	"go.mongodb.org/mongo-driver/mongo"
+
+	"github.com/hashicorp/go-multierror"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/ipfs-force-community/londobell/lib/limiter"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 
 	"github.com/dtynn/dix"
 	amt4 "github.com/filecoin-project/go-amt-ipld/v4"
@@ -32,6 +43,14 @@ var replayCmd = &cli.Command{
 			Name:     "end-ts",
 			Required: true,
 		},
+		&cli.StringFlag{
+			Name:     "dsn",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "name",
+			Required: true,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := context.Background()
@@ -54,38 +73,14 @@ var replayCmd = &cli.Command{
 		components.CS.StoreEvents(true)
 
 		log.Infof("IsStoringEvents: %v", components.Stm.ChainStore().IsStoringEvents())
-		//r, err := repo.NewFS(cctx.String("repo"))
-		//if err != nil {
-		//	return fmt.Errorf("opening fs repo: %w", err)
-		//}
-		//
-		//err = r.Init(repo.FullNode)
-		//if err != nil && err != repo.ErrRepoExists {
-		//	return fmt.Errorf("repo error: %w", err)
-		//}
-		//
-		//lr, err := r.Lock(repo.FullNode)
-		//if err != nil {
-		//	return err
-		//}
-		//defer lr.Close() //nolint:errcheck
-		//
-		//bs, err := lr.Blockstore(cctx.Context, repo.UniversalBlockstore)
-		//if err != nil {
-		//	return fmt.Errorf("failed to open blockstore: %w", err)
-		//}
-		//
-		//mds, err := lr.Datastore(context.TODO(), "/metadata")
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//j, err := fsjournal.OpenFSJournal(lr, journal.EnvDisabledEvents())
-		//if err != nil {
-		//	return fmt.Errorf("failed to open journal: %w", err)
-		//}
-		//
-		//cst := store.NewChainStore(bs, bs, mds, filcns.Weight, j)
+
+		client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(cctx.String("dsn")))
+		if err != nil {
+			return err
+		}
+
+		db := client.Database(cctx.String("name"))
+		eventsRootCol := db.Collection("EventsRoot")
 
 		cids, err := lcli.ParseTipSetString(cctx.String("end-ts"))
 		if err != nil {
@@ -116,33 +111,76 @@ var replayCmd = &cli.Command{
 			tss[i], tss[j] = tss[j], tss[i]
 		}
 
-		//replay
+		lim := limiter.New(16)
+		var ewg multierror.Group
+
 		for _, ts := range tss {
-			_, ires, err := components.Stm.ExecutionTrace(ctx, ts)
-			if err != nil {
-				log.Error(err)
-				return err
-			}
+			ts := ts
+			starttime := time.Now()
 
-			log.Infof("execute tipset %v, len(ires): %v", ts.Height(), len(ires))
+			ewg.Go(func() error {
+				if !lim.Acquire(context.TODO()) {
+					return nil
+				}
 
-			//validate
-			for _, r := range ires {
-				if r.MsgRct != nil && r.MsgRct.Version() == types.MessageReceiptV1 {
-					eventsRoot := r.MsgRct.EventsRoot
-					if eventsRoot != nil {
-						events, err := LoadEvents(ctx, components.CS, *eventsRoot)
-						if err != nil {
-							log.Errorf("load events for root %v failed: %v", r.MsgRct.EventsRoot.String(), err)
-							return err
+				defer func() {
+					lim.Release(context.TODO())
+				}()
+
+				_, ires, err := components.Stm.ExecutionTrace(ctx, ts)
+				if err != nil {
+					log.Error(err)
+					return err
+				}
+
+				log.Infof("execute tipset %v, len(ires): %v", ts.Height(), len(ires))
+
+				var eventsRes []*model.EventsRoot
+				for _, r := range ires {
+					if r.MsgRct != nil && r.MsgRct.Version() == types.MessageReceiptV1 {
+						eventsRoot := r.MsgRct.EventsRoot
+						if eventsRoot != nil {
+							events, err := LoadEvents(ctx, components.CS, *eventsRoot)
+							if err != nil {
+								log.Errorf("load events for root %v failed: %v", r.MsgRct.EventsRoot.String(), err)
+								return err
+							}
+
+							etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
+							if err != nil {
+								log.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", r.Msg.Cid(), "err", err.Error())
+							} else {
+								eventsRes = append(eventsRes, etm)
+							}
 						}
+					}
+				}
 
-						log.Infof("load events for root %v at %v successfly, events: %v", r.MsgRct.EventsRoot.String(), ts.Height(), events)
+				// insert
+				var docs []interface{}
+				for _, e := range eventsRes {
+					docs = append(docs, e)
+				}
+
+				total := len(docs)
+				if total > 0 {
+					ires, err := eventsRootCol.InsertMany(context.TODO(), docs, options.InsertMany().SetOrdered(false))
+					if err != nil {
+						if actualErr := mgoutil.ExtractActualMgoErrors(err); actualErr != nil {
+							return actualErr
+						}
 					}
 
-					log.Infof("null eventsRoot")
+					log.Infof("ts %v inserted: %v/%v, elapsed: %v\n", ts.Height(), len(ires.InsertedIDs), total, time.Now().Sub(starttime).String())
+					return nil
 				}
-			}
+
+				return nil
+			})
+		}
+
+		if err := ewg.Wait(); err != nil {
+			return fmt.Errorf("extract part: %w", err)
 		}
 
 		return nil
@@ -158,26 +196,6 @@ func Inject(cctx *cli.Context, target ...interface{}) dix.Option {
 		//dep.InjectFullNode(cctx), dep.OnlineDataSource(),
 	)
 }
-
-//func InjectChainRepo(cctx *cli.Context) dix.Option {
-//	return dix.Override(new(repo.LockedRepo), func(lc fx.Lifecycle) repo.LockedRepo {
-//		r, err := repo.NewFS(cctx.String("repo"))
-//		if err != nil {
-//			panic(fmt.Errorf("opening fs repo: %w", err))
-//		}
-//		err = r.Init(repo.FullNode)
-//		if err != nil && err != repo.ErrRepoExists {
-//			panic(fmt.Errorf("dst repo error: %w", err))
-//		}
-//
-//		lr, err := r.Lock(repo.FullNode)
-//		if err != nil {
-//			panic(fmt.Errorf("lock repo failed: %w", err))
-//		}
-//
-//		return modules.LockedRepo(lr)(lc)
-//	})
-//}
 
 func LoadEvents(ctx context.Context, cs *store.ChainStore, eventsRoot cid.Cid) ([]types.Event, error) {
 	store := cs.ActorStore(ctx)

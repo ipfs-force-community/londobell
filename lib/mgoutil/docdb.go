@@ -52,7 +52,7 @@ func (m *MgoDocDB) Insert(ctx context.Context, colName string, docs []interface{
 	}
 
 	if err != nil {
-		if actualErr := extractActualMgoErrors(err); actualErr != nil {
+		if actualErr := ExtractActualMgoErrors(err); actualErr != nil {
 			return inserted, actualErr
 		}
 	}
@@ -125,7 +125,7 @@ func (m *MgoDocDB) getCol(name string) *mongo.Collection {
 	return col
 }
 
-func extractActualMgoErrors(err error) error {
+func ExtractActualMgoErrors(err error) error {
 	mbwr, ok := err.(mongo.BulkWriteException)
 	if !ok {
 		if mongo.IsDuplicateKeyError(err) {
