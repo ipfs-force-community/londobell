@@ -97,7 +97,7 @@ var completeActorMessageCmd = &cli.Command{
 		part := make([]Range, 0)
 		for tsDone < endEpoch {
 			start := tsDone
-			end := start + 2880*5
+			end := start + 2880*2
 			if end > endEpoch {
 				end = endEpoch
 			}
@@ -111,7 +111,7 @@ var completeActorMessageCmd = &cli.Command{
 			return part[i].Start > part[j].Start
 		})
 
-		lim := limiter.New(16)
+		lim := limiter.New(8)
 		var ewg multierror.Group
 
 		log.Infof("begin complete actormessage")
