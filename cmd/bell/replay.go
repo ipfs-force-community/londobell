@@ -51,6 +51,9 @@ var replayCmd = &cli.Command{
 			return err
 		}
 
+		components.CS.StoreEvents(true)
+
+		log.Infof("IsStoringEvents: %v", components.Stm.ChainStore().IsStoringEvents())
 		//r, err := repo.NewFS(cctx.String("repo"))
 		//if err != nil {
 		//	return fmt.Errorf("opening fs repo: %w", err)
@@ -112,8 +115,6 @@ var replayCmd = &cli.Command{
 			j := got - i - 1
 			tss[i], tss[j] = tss[j], tss[i]
 		}
-
-		log.Infof("components: %v", components)
 
 		//replay
 		for _, ts := range tss {
