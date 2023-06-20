@@ -192,6 +192,8 @@ var replayCmd = &cli.Command{
 						log.Infof("ts %v inserted: %v/%v, elapsed: %v\n", ts.Height(), len(ires.InsertedIDs), total, time.Now().Sub(starttime).String())
 						return nil
 					}
+				} else {
+					log.Infof("skip tipset %v for no events", ts.Height())
 				}
 
 				return nil
