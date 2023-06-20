@@ -7,18 +7,17 @@ import (
 	"time"
 
 	"github.com/ipfs-force-community/londobell/lib/mgoutil"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/hashicorp/go-multierror"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/ipfs-force-community/londobell/lib/limiter"
-	"github.com/ipfs-force-community/londobell/racailum/segment/model"
-
 	"github.com/dtynn/dix"
 	amt4 "github.com/filecoin-project/go-amt-ipld/v4"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -27,6 +26,8 @@ import (
 	"github.com/urfave/cli/v2"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.uber.org/fx"
+
+	"github.com/ipfs-force-community/londobell/lib/limiter"
 
 	"github.com/ipfs-force-community/londobell/dep"
 )
@@ -127,52 +128,70 @@ var replayCmd = &cli.Command{
 					lim.Release(context.TODO())
 				}()
 
-				_, ires, err := components.Stm.ExecutionTrace(ctx, ts)
+				cmsgs, err := components.CS.MessagesForTipset(ctx, ts)
 				if err != nil {
 					log.Error(err)
 					return err
 				}
 
-				log.Infof("execute tipset %v, len(ires): %v", ts.Height(), len(ires))
-
-				var eventsRes []*model.EventsRoot
-				for _, r := range ires {
-					if r.MsgRct != nil && r.MsgRct.Version() == types.MessageReceiptV1 {
-						eventsRoot := r.MsgRct.EventsRoot
-						if eventsRoot != nil {
-							events, err := LoadEvents(ctx, components.CS, *eventsRoot)
-							if err != nil {
-								log.Errorf("load events for root %v failed: %v", r.MsgRct.EventsRoot.String(), err)
-								return err
-							}
-
-							etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
-							if err != nil {
-								log.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", r.Msg.Cid(), "err", err.Error())
-							} else {
-								eventsRes = append(eventsRes, etm)
-							}
+				var exist = false
+				for _, cmsg := range cmsgs {
+					if smsg, ok := cmsg.(*types.SignedMessage); ok {
+						if smsg.Signature.Type == crypto.SigTypeDelegated {
+							exist = true
+							break
 						}
 					}
 				}
 
-				// insert
-				var docs []interface{}
-				for _, e := range eventsRes {
-					docs = append(docs, e)
-				}
-
-				total := len(docs)
-				if total > 0 {
-					ires, err := eventsRootCol.InsertMany(context.TODO(), docs, options.InsertMany().SetOrdered(false))
+				if exist {
+					_, ires, err := components.Stm.ExecutionTrace(ctx, ts)
 					if err != nil {
-						if actualErr := mgoutil.ExtractActualMgoErrors(err); actualErr != nil {
-							return actualErr
+						log.Error(err)
+						return err
+					}
+
+					log.Infof("execute tipset %v, len(ires): %v", ts.Height(), len(ires))
+
+					var eventsRes []*model.EventsRoot
+					for _, r := range ires {
+						if r.MsgRct != nil && r.MsgRct.Version() == types.MessageReceiptV1 {
+							eventsRoot := r.MsgRct.EventsRoot
+							if eventsRoot != nil {
+								events, err := LoadEvents(ctx, components.CS, *eventsRoot)
+								if err != nil {
+									log.Errorf("load events for root %v failed: %v", r.MsgRct.EventsRoot.String(), err)
+									return err
+								}
+
+								etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
+								if err != nil {
+									log.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", r.Msg.Cid(), "err", err.Error())
+								} else {
+									eventsRes = append(eventsRes, etm)
+								}
+							}
 						}
 					}
 
-					log.Infof("ts %v inserted: %v/%v, elapsed: %v\n", ts.Height(), len(ires.InsertedIDs), total, time.Now().Sub(starttime).String())
-					return nil
+					// insert
+					var docs []interface{}
+					for _, e := range eventsRes {
+						docs = append(docs, e)
+					}
+
+					total := len(docs)
+					if total > 0 {
+						ires, err := eventsRootCol.InsertMany(context.TODO(), docs, options.InsertMany().SetOrdered(false))
+						if err != nil {
+							if actualErr := mgoutil.ExtractActualMgoErrors(err); actualErr != nil {
+								return actualErr
+							}
+						}
+
+						log.Infof("ts %v inserted: %v/%v, elapsed: %v\n", ts.Height(), len(ires.InsertedIDs), total, time.Now().Sub(starttime).String())
+						return nil
+					}
 				}
 
 				return nil
