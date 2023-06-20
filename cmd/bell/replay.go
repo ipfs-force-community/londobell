@@ -24,10 +24,6 @@ var replayCmd = &cli.Command{
 	Name:  "replay",
 	Usage: "replay chain data to repo",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:     "repo",
-			Required: true,
-		},
 		&cli.IntFlag{
 			Name:     "start-height",
 			Required: true,
