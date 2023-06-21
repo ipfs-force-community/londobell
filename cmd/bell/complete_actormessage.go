@@ -111,7 +111,7 @@ var completeActorMessageCmd = &cli.Command{
 			return part[i].Start > part[j].Start
 		})
 
-		lim := limiter.New(2)
+		lim := limiter.New(1)
 		var ewg multierror.Group
 
 		log.Infof("begin complete actormessage")
@@ -129,6 +129,15 @@ var completeActorMessageCmd = &cli.Command{
 					lim.Release(context.TODO())
 				}()
 
+				err = adapter.API.Choose(ctx)
+				if err != nil {
+					return err
+				}
+
+				api = adapter.API.GetAppropriateAPI()
+
+				starttime := time.Now()
+
 				pipe, err := aggregators.Parse(model.Ctx{StartEpoch: r.Start, EndEpoch: r.End}, string(js))
 				if err != nil {
 					return err
@@ -145,6 +154,9 @@ var completeActorMessageCmd = &cli.Command{
 					return err
 				}
 
+				log.Infof("[%v, %v] aggregate successfully, elapsed: %v", r.Start, r.End, time.Now().Sub(starttime).String())
+
+				starttime2 := time.Now()
 				actorMessages := make([]ActorMessage, 0)
 				for _, r := range res {
 					storeMap := make(map[address.Address]string)
@@ -204,6 +216,9 @@ var completeActorMessageCmd = &cli.Command{
 					}
 				}
 
+				log.Infof("[%v, %v] get actorMessages successfully, elapsed: %v", r.Start, r.End, time.Now().Sub(starttime2).String())
+
+				starttime3 := time.Now()
 				var docs []interface{}
 				for _, am := range actorMessages {
 					docs = append(docs, am)
@@ -218,7 +233,7 @@ var completeActorMessageCmd = &cli.Command{
 						}
 					}
 
-					log.Infof("part [%v, %v], inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), total, time.Now().Sub(starttime).String())
+					log.Infof("part [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), total, time.Now().Sub(starttime3).String())
 					return nil
 				}
 
