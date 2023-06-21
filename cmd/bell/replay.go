@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ipfs-force-community/londobell/lib/mgoutil"
@@ -94,7 +95,6 @@ var replayCmd = &cli.Command{
 		}
 
 		start := cctx.Int("start-height")
-		log.Info("start, end height", start, ts.Height())
 
 		tss := []*types.TipSet{}
 
@@ -112,12 +112,17 @@ var replayCmd = &cli.Command{
 			tss[i], tss[j] = tss[j], tss[i]
 		}
 
+		log.Info("start, end height, len(tss)", start, ts.Height(), len(tss))
+
 		lim := limiter.New(16)
 		var ewg multierror.Group
 
+		var (
+			doneCount = 0
+			lk        sync.Mutex
+		)
 		for _, ts := range tss {
 			ts := ts
-			starttime := time.Now()
 
 			ewg.Go(func() error {
 				if !lim.Acquire(context.TODO()) {
@@ -128,6 +133,7 @@ var replayCmd = &cli.Command{
 					lim.Release(context.TODO())
 				}()
 
+				starttime := time.Now()
 				cmsgs, err := components.CS.MessagesForTipset(ctx, ts)
 				if err != nil {
 					log.Error(err)
@@ -151,8 +157,9 @@ var replayCmd = &cli.Command{
 						return err
 					}
 
-					log.Infof("execute tipset %v, len(ires): %v", ts.Height(), len(ires))
+					log.Infof("execute tipset %v, len(ires): %v, elapsed: %v", ts.Height(), len(ires), time.Now().Sub(starttime))
 
+					starttime2 := time.Now()
 					var eventsRes []*model.EventsRoot
 					for _, r := range ires {
 						if r.MsgRct != nil && r.MsgRct.Version() == types.MessageReceiptV1 {
@@ -189,13 +196,17 @@ var replayCmd = &cli.Command{
 							}
 						}
 
-						log.Infof("ts %v inserted: %v/%v, elapsed: %v\n", ts.Height(), len(ires.InsertedIDs), total, time.Now().Sub(starttime).String())
+						log.Infof("ts %v inserted: %v/%v, elapsed: %v\n", ts.Height(), len(ires.InsertedIDs), total, time.Now().Sub(starttime2).String())
 						return nil
 					}
 				} else {
 					log.Infof("skip tipset %v for no events", ts.Height())
 				}
 
+				lk.Lock()
+				doneCount++
+				log.Infof("handle tipset successfully, %v/%v", doneCount, len(tss))
+				lk.Unlock()
 				return nil
 			})
 		}
