@@ -244,7 +244,7 @@ var completeActorMessageCmd = &cli.Command{
 							}
 						}
 
-						log.Infof("part doc [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), total, time.Now().Sub(starttime3).String())
+						log.Infof("part doc [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), len(doc), time.Now().Sub(starttime3).String())
 						docDone += len(doc)
 						insertCount += len(ires.InsertedIDs)
 					}
