@@ -164,6 +164,9 @@ var replayCmd = &cli.Command{
 					return err
 				}
 
+				log.Infof("get messages for tipset %v, elapsed: %v", ts.Height(), time.Now().Sub(starttime).String())
+
+				starttime = time.Now()
 				var exist = false
 				for _, cmsg := range cmsgs {
 					if smsg, ok := cmsg.(*types.SignedMessage); ok {
