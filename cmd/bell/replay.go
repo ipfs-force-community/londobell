@@ -53,6 +53,9 @@ var replayCmd = &cli.Command{
 			Name:     "name",
 			Required: true,
 		},
+		&cli.Int64SliceFlag{
+			Name: "skip-heights",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := context.Background()
@@ -95,8 +98,10 @@ var replayCmd = &cli.Command{
 		}
 
 		start := cctx.Int("start-height")
-
 		tss := []*types.TipSet{}
+
+		skipHeights := cctx.Int64Slice("skip-heights")
+		log.Infof("skipHeights: %v", skipHeights)
 
 		for ts.Height() >= abi.ChainEpoch(start) {
 			tss = append(tss, ts)
@@ -112,7 +117,7 @@ var replayCmd = &cli.Command{
 			tss[i], tss[j] = tss[j], tss[i]
 		}
 
-		log.Info("start, end height, len(tss)", start, ts.Height(), len(tss))
+		log.Infof("start: %v, end: %v, len(tss): %v", start, ts.Height(), len(tss))
 
 		lim := limiter.New(16)
 		var ewg multierror.Group
@@ -132,6 +137,25 @@ var replayCmd = &cli.Command{
 				defer func() {
 					lim.Release(context.TODO())
 				}()
+
+				skip := false
+				for _, h := range skipHeights {
+					if h == int64(ts.Height()) {
+						skip = true
+						break
+					}
+				}
+
+				if skip {
+					log.Infof("skip tipset %v for existing int skipHeights", ts.Height())
+
+					lk.Lock()
+					doneCount++
+					log.Infof("handle tipset successfully, %v/%v", doneCount, len(tss))
+					lk.Unlock()
+
+					return nil
+				}
 
 				starttime := time.Now()
 				cmsgs, err := components.CS.MessagesForTipset(ctx, ts)
