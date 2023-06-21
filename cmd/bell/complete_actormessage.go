@@ -135,6 +135,7 @@ var completeActorMessageCmd = &cli.Command{
 
 				err = adapter.API.Choose(ctx)
 				if err != nil {
+					log.Error(err)
 					return err
 				}
 
@@ -144,17 +145,20 @@ var completeActorMessageCmd = &cli.Command{
 
 				pipe, err := aggregators.Parse(model.Ctx{StartEpoch: r.Start, EndEpoch: r.End}, string(js))
 				if err != nil {
+					log.Error(err)
 					return err
 				}
 
 				cur, err := traceCol.Aggregate(context.TODO(), pipe)
 				if err != nil {
+					log.Error(err)
 					return err
 				}
 
 				var res []ActorMessageRes
 				err = cur.All(context.TODO(), &res)
 				if err != nil {
+					log.Error(err)
 					return err
 				}
 
@@ -167,6 +171,7 @@ var completeActorMessageCmd = &cli.Command{
 
 					fromAddr, err := address.NewFromString(buildnet.NetPrefix + r.From)
 					if err != nil {
+						log.Error(err)
 						return err
 					}
 
@@ -195,6 +200,7 @@ var completeActorMessageCmd = &cli.Command{
 
 					toAddr, err := address.NewFromString(buildnet.NetPrefix + r.To)
 					if err != nil {
+						log.Error(err)
 						return err
 					}
 
@@ -220,6 +226,7 @@ var completeActorMessageCmd = &cli.Command{
 
 					c, err := cid.Decode(r.Cid)
 					if err != nil {
+						log.Error(err)
 						return err
 					}
 
@@ -228,6 +235,7 @@ var completeActorMessageCmd = &cli.Command{
 
 					v, err := big.FromString(r.Value)
 					if err != nil {
+						log.Error(err)
 						return err
 					}
 					for actorID, mtype := range storeMap {
