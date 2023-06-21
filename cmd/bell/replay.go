@@ -139,6 +139,8 @@ var replayCmd = &cli.Command{
 					lim.Release(context.TODO())
 				}()
 
+				log.Infof("begin tipset %v", ts.Height())
+				start := time.Now()
 				skip := false
 				for _, h := range skipHeights {
 					if h == int64(ts.Height()) {
@@ -152,7 +154,7 @@ var replayCmd = &cli.Command{
 
 					lk.Lock()
 					doneCount++
-					log.Infof("handle tipset successfully, %v/%v", doneCount, len(tss))
+					log.Infof("handle tipset %v successfully, %v/%v", ts.Height(), doneCount, len(tss))
 					lk.Unlock()
 
 					return nil
@@ -233,7 +235,7 @@ var replayCmd = &cli.Command{
 
 				lk.Lock()
 				doneCount++
-				log.Infof("handle tipset successfully, %v/%v", doneCount, len(tss))
+				log.Infof("handle tipset %v successfully, elapsed: %v, %v/%v", ts.Height(), time.Now().Sub(start).String(), doneCount, len(tss))
 				lk.Unlock()
 				return nil
 			})
