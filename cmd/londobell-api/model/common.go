@@ -24,5 +24,5 @@ type Ctx struct {
 	StartEpoch int64
 	EndEpoch   int64
 	Addr       string
-	ID         string
+	PrimaryID  string
 }

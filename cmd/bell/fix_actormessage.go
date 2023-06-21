@@ -208,7 +208,7 @@ var fixActorMessageCmd = &cli.Command{
 						}
 
 						for id, actorID := range toCompleteMap {
-							pipe, err := aggregators.Parse(model.Ctx{ID: id, Addr: actorID.String()[1:]}, mergeFixActorMessageJS)
+							pipe, err := aggregators.Parse(model.Ctx{PrimaryID: id, Addr: actorID.String()[1:]}, mergeFixActorMessageJS)
 							if err != nil {
 								return err
 							}
@@ -246,7 +246,7 @@ var fixActorMessageCmd = &cli.Command{
 
 var getToFixActorMessageJS = "[\n    {\n        $match: {\n            Type: \"to\",\n            Epoch: {$gte: ctx.StartEpoch, $lt: ctx.EndEpoch},\n            ActorID: {$not: /^0/}\n        }\n    }\n]"
 
-var mergeFixActorMessageJS = "[\n    {\n        $match: {\n            _id: ctx.ID,\n        }\n    },\n    {\n        $addFields: {\n            ActorID: ctx.Addr\n        }\n    },\n    {\n        $project: {\n            _id: 1,\n            ActorID: \"$ActorID\"\n        }\n    },\n    {\n        $merge: {\n            into: \"ActorMessage\",\n            on: \"_id\",\n            whenMatched:   \"merge\",\n            whenNotMatched: \"discard\"\n        }\n    }\n]"
+var mergeFixActorMessageJS = "[\n    {\n        $match: {\n            _id: ctx.PrimaryID,\n        }\n    },\n    {\n        $addFields: {\n            ActorID: ctx.Addr\n        }\n    },\n    {\n        $project: {\n            _id: 1,\n            ActorID: \"$ActorID\"\n        }\n    },\n    {\n        $merge: {\n            into: \"ActorMessage\",\n            on: \"_id\",\n            whenMatched:   \"merge\",\n            whenNotMatched: \"discard\"\n        }\n    }\n]"
 
 type ActorMessageRes struct {
 	ID      string `bson:"_id"`
