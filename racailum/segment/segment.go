@@ -416,30 +416,6 @@ func (s *Segment) SetBoundary(ctx context.Context, hi, lo *common.LinkedTipSet) 
 	return s.updateBoundary(ctx, hi, lo)
 }
 
-func (s *Segment) SetHiBoundaryForTmp(ctx context.Context, epoch abi.ChainEpoch, tsk types.TipSetKey) error {
-	s.bound.Lock()
-	defer s.bound.Unlock()
-
-	return s.updateHiBoundary(ctx, epoch, tsk)
-}
-
-func (s *Segment) updateHiBoundary(ctx context.Context, epoch abi.ChainEpoch, tsk types.TipSetKey) error {
-	_, span := trace.StartSpan(ctx, "segment.updateHiBoundary")
-	defer span.End()
-
-	prev := s.bound.Boundary
-
-	s.bound.SetHi2(epoch, tsk, cid.Undef)
-
-	err := s.mgr.SetBoundary(s.name, s.bound.Boundary)
-	if err == nil {
-		return nil
-	}
-
-	s.bound.Boundary = prev
-	return err
-}
-
 // ReadBoundary returns the boundary of the segment
 func (s *Segment) ReadBoundary() Boundary {
 	s.bound.RLock()
