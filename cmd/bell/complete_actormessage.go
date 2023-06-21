@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/ioutil"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -111,11 +112,14 @@ var completeActorMessageCmd = &cli.Command{
 			return part[i].Start > part[j].Start
 		})
 
-		lim := limiter.New(1)
+		lim := limiter.New(2)
 		var ewg multierror.Group
 
 		log.Infof("begin complete actormessage")
 		starttime := time.Now()
+
+		actorIDMap := make(map[address.Address]address.Address)
+		var alk sync.RWMutex
 
 		for i := range part {
 			i := i
@@ -166,9 +170,25 @@ var completeActorMessageCmd = &cli.Command{
 						return err
 					}
 
-					fromID, err := api.StateLookupID(ctx, fromAddr, types.EmptyTSK)
-					if err != nil {
-						fromID = fromAddr
+					var (
+						fromID address.Address
+						toID   address.Address
+					)
+
+					alk.RLock()
+					ID, ok := actorIDMap[fromAddr]
+					alk.RUnlock()
+					if ok {
+						fromID = ID
+					} else {
+						fromID, err = api.StateLookupID(ctx, fromAddr, types.EmptyTSK)
+						if err != nil {
+							fromID = fromAddr
+						}
+
+						alk.Lock()
+						actorIDMap[fromAddr] = fromID
+						alk.Unlock()
 					}
 
 					storeMap[fromID] = "from"
@@ -178,9 +198,20 @@ var completeActorMessageCmd = &cli.Command{
 						return err
 					}
 
-					toID, err := api.StateLookupID(ctx, toAddr, types.EmptyTSK)
-					if err != nil {
-						toID = toAddr
+					alk.RLock()
+					ID, ok = actorIDMap[toAddr]
+					alk.RUnlock()
+					if ok {
+						toID = ID
+					} else {
+						toID, err = api.StateLookupID(ctx, toAddr, types.EmptyTSK)
+						if err != nil {
+							toID = toAddr
+						}
+
+						alk.Lock()
+						actorIDMap[toAddr] = toID
+						alk.Unlock()
 					}
 
 					if _, ok := storeMap[toID]; !ok {
@@ -218,7 +249,6 @@ var completeActorMessageCmd = &cli.Command{
 
 				log.Infof("[%v, %v] get actorMessages successfully, len(actorMessages): %v, elapsed: %v", r.Start, r.End, len(actorMessages), time.Now().Sub(starttime2).String())
 
-				starttime3 := time.Now()
 				var docs []interface{}
 				for _, am := range actorMessages {
 					docs = append(docs, am)
@@ -236,6 +266,7 @@ var completeActorMessageCmd = &cli.Command{
 							end = size
 						}
 
+						starttime3 := time.Now()
 						doc := docs[start:end]
 						ires, err := actorMessageCol.InsertMany(ctx, doc, options.InsertMany().SetOrdered(false))
 						if err != nil {
@@ -249,11 +280,11 @@ var completeActorMessageCmd = &cli.Command{
 						insertCount += len(ires.InsertedIDs)
 					}
 
-					log.Infof("part docs [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, insertCount, total, time.Now().Sub(starttime3).String())
+					log.Infof("part [%v, %v] done: %v/%v, elapsed: %v\n", r.Start, r.End, insertCount, total, time.Now().Sub(starttime).String())
 					return nil
 				}
 
-				log.Infof("part [%v, %v] total 0, elapsed: %v\n", r.Start, r.End, time.Now().Sub(starttime).String())
+				log.Infof("part [%v, %v] done total 0, elapsed: %v\n", r.Start, r.End, time.Now().Sub(starttime).String())
 				return nil
 			})
 		}
