@@ -279,6 +279,7 @@ var completeActorMessageCmd = &cli.Command{
 						ires, err := actorMessageCol.InsertMany(ctx, doc, options.InsertMany().SetOrdered(false))
 						if err != nil {
 							if actualErr := extractActualMgoErrors(err); actualErr != nil {
+								log.Error(actualErr)
 								return actualErr
 							}
 						}
