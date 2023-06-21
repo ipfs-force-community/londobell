@@ -59,6 +59,10 @@ var replayCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := context.Background()
+
+		skipHeights := cctx.Int64Slice("skip-heights")
+		log.Infof("skipHeights: %v", skipHeights)
+
 		var components struct {
 			fx.In
 			CS  *store.ChainStore
@@ -99,9 +103,6 @@ var replayCmd = &cli.Command{
 
 		start := cctx.Int("start-height")
 		tss := []*types.TipSet{}
-
-		skipHeights := cctx.Int64Slice("skip-heights")
-		log.Infof("skipHeights: %v", skipHeights)
 
 		for ts.Height() >= abi.ChainEpoch(start) {
 			tss = append(tss, ts)
