@@ -216,7 +216,7 @@ var completeActorMessageCmd = &cli.Command{
 					}
 				}
 
-				log.Infof("[%v, %v] get actorMessages successfully, elapsed: %v", r.Start, r.End, time.Now().Sub(starttime2).String())
+				log.Infof("[%v, %v] get actorMessages successfully, len(actorMessages): %v, elapsed: %v", r.Start, r.End, len(actorMessages), time.Now().Sub(starttime2).String())
 
 				starttime3 := time.Now()
 				var docs []interface{}
@@ -226,14 +226,30 @@ var completeActorMessageCmd = &cli.Command{
 
 				total := len(docs)
 				if total > 0 {
-					ires, err := actorMessageCol.InsertMany(ctx, docs, options.InsertMany().SetOrdered(false))
-					if err != nil {
-						if actualErr := extractActualMgoErrors(err); actualErr != nil {
-							return actualErr
+					insertCount := 0
+					docDone := 0
+					size := len(docs)
+					for docDone < size {
+						start := docDone
+						end := start + 4096
+						if end > size {
+							end = size
 						}
+
+						doc := docs[start:end]
+						ires, err := actorMessageCol.InsertMany(ctx, doc, options.InsertMany().SetOrdered(false))
+						if err != nil {
+							if actualErr := extractActualMgoErrors(err); actualErr != nil {
+								return actualErr
+							}
+						}
+
+						log.Infof("part doc [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), total, time.Now().Sub(starttime3).String())
+						docDone += len(doc)
+						insertCount += len(ires.InsertedIDs)
 					}
 
-					log.Infof("part [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), total, time.Now().Sub(starttime3).String())
+					log.Infof("part docs [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, insertCount, total, time.Now().Sub(starttime3).String())
 					return nil
 				}
 
