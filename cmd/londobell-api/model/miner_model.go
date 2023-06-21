@@ -3,7 +3,9 @@ package model
 import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type MinerReq struct {
@@ -33,4 +35,9 @@ type MinerRes struct {
 	RecoverSectorCount       uint64            `json:"recover_sector_count"`
 	TerminateSectorCount     uint64            `json:"terminate_sector_count"`
 	PrecommitSectorCount     uint64            `json:"precommit_sector_count"`
+	Beneficiary              address.Address
+	BeneficiaryTerm          *miner.BeneficiaryTerm
+	PendingBeneficiaryTerm   *miner.PendingBeneficiaryChange
+	PeerID                   *peer.ID
+	Multiaddrs               []abi.Multiaddrs
 }

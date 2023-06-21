@@ -4,29 +4,31 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
-
+	"github.com/dtynn/dix"
+	"github.com/filecoin-project/lotus/node"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/gin-gonic/gin"
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/urfave/cli/v2"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-
+	"github.com/ipfs-force-community/londobell/api"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/mongoutil"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/urfave/cli/v2"
 )
 
 var (
 	log = logging.Logger("server")
 )
 
-func Run(cctx *cli.Context, useAPI bool) error {
+func Run(cctx *cli.Context, adapter bool) error {
 	router := gin.New()
 	router.Use(CrosHandler())
 	router.Use(gin.Logger())
@@ -38,18 +40,18 @@ func Run(cctx *cli.Context, useAPI bool) error {
 		ctx = context.Background()
 	)
 
-	if useAPI {
-		if err := util.ParseNodes(cctx.String("nodeconfig")); err != nil {
-			return err
-		}
+	if err := util.ParseNodes(cctx.String("nodeconfig")); err != nil {
+		return err
+	}
 
-		adapter.API = adapter.NewAppropriateAPI(util.Nodes)
-		err = adapter.API.Choose(ctx)
-		if err != nil {
-			return err
-		}
+	fullnode.API = fullnode.NewAppropriateAPI(util.Nodes)
+	err = fullnode.API.Choose(ctx)
+	if err != nil {
+		return err
+	}
 
-		_, err = adapter.API.InjectNewFullNode(cctx)
+	if adapter {
+		_, err = fullnode.API.InjectNewFullNode(cctx)
 		if err != nil {
 			return err
 		}
@@ -60,13 +62,13 @@ func Run(cctx *cli.Context, useAPI bool) error {
 			for {
 				select {
 				case <-tick.C:
-					err = adapter.API.Choose(ctx)
+					err = fullnode.API.Choose(ctx)
 					if err != nil {
 						log.Warn(err)
 						continue
 					}
 
-					injectNew, err := adapter.API.InjectNewFullNode(cctx)
+					injectNew, err := fullnode.API.InjectNewFullNode(cctx)
 					if injectNew {
 						if err != nil {
 							log.Errorf("inject new fullnode failed: %v", err)
@@ -81,35 +83,128 @@ func Run(cctx *cli.Context, useAPI bool) error {
 		}()
 
 		RegisterAdapterApi(router)
-	} else {
-		aggregators.InitAggregators()
-		mongoutil.InitDB()
-		mongoutil.Client, err = mongo.Connect(ctx, options.Client().ApplyURI(mongoutil.DbConfig.URL).SetRegistry(bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{})).Build()))
+
+		httpStoper, errCh := serveHTTP(fmt.Sprintf(":%s", cctx.String("port")), router)
+		select {
+		case err = <-errCh:
+
+		case <-time.After(time.Duration(5)):
+
+		}
 		if err != nil {
+			return fmt.Errorf("start http server: %w", err)
+		}
+
+		shutdownCh := make(chan struct{})
+		doneCh := node.MonitorShutdown(
+			shutdownCh,
+			node.ShutdownHandler{Component: "http server", StopFunc: httpStoper},
+		)
+
+		sigCh := make(chan os.Signal, 2)
+		signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+
+		select {
+		case sig := <-sigCh:
+			log.Warnw("received shutdown", "signal", sig)
+		case <-doneCh:
+			log.Warn("received shutdown")
+		}
+
+		os.Exit(1)
+	} else {
+		tick := time.NewTicker(15 * time.Second)
+		defer tick.Stop()
+		go func() {
+			for {
+				select {
+				case <-tick.C:
+					err = fullnode.API.Choose(ctx)
+					if err != nil {
+						log.Warn(err)
+						continue
+					}
+				}
+			}
+		}()
+
+		shutdownCh := make(chan struct{})
+
+		//var components struct {
+		//	fx.In
+		//	NodeAPI api.MultiNodeAPI
+		//	DBStMgr *multiquery.DataBaseStateManager
+		//}
+
+		var multiNode api.MultiNodeAPI
+		stopper, err := dix.New(
+			cctx.Context,
+			multiquery.MultiQuery(context.TODO(), &multiquery.DBStateManager, &multiNode),
+			multiquery.InjectRepoPath(cctx),
+			dix.Override(new(dtypes.ShutdownChan), shutdownCh),
+		)
+		if err != nil {
+			log.Error("stopper", err)
 			return err
 		}
-		defer mongoutil.Client.Disconnect(ctx) //nolint:errcheck
 
-		db := mongoutil.Client.Database(mongoutil.DbConfig.Name)
-		mongoutil.TraceCol = db.Collection("ExecTrace")
-		mongoutil.ActorBalanceCol = db.Collection("ActorBalance")
-		mongoutil.FinalHeightCol = db.Collection("FinalHeight")
-		mongoutil.MinerSectorHealthCol = db.Collection("MinerSectorHealth")
-		mongoutil.TipSetCol = db.Collection("Tipset")
+		defer stopper(cctx.Context) // nolint: errcheck
 
+		//multiquery.DBStateManager = *components.DBStMgr // todo
+
+		err = multiquery.FirstLoad(cctx.Context, &multiquery.DBStateManager)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+
+		go multiquery.Reload(cctx.Context, &multiquery.DBStateManager)
+
+		//start := time.Now()
+		//multiquery.TestPeriodicRefreshDataBaseState(cctx.Context, &multiquery.DBStateManager) //todo:test
+		//fmt.Printf("PeriodicRefreshDataBaseState done, elapsed: %v\n", time.Now().Sub(start))
+
+		go multiquery.PeriodicRefreshDataBaseState(cctx.Context, &multiquery.DBStateManager)
+
+		aggregators.InitAggregators()
 		RegisterAggregatorsApi(router)
+
+		httpStoper, errCh := serveHTTP(fmt.Sprintf(":%s", cctx.String("port")), router)
+		select {
+		case err = <-errCh:
+
+		case <-time.After(time.Duration(5)):
+
+		}
+		if err != nil {
+			return fmt.Errorf("start http server: %w", err)
+		}
+		doneCh := node.MonitorShutdown(
+			shutdownCh,
+			node.ShutdownHandler{Component: "http server", StopFunc: httpStoper},
+			node.ShutdownHandler{Component: "application", StopFunc: node.StopFunc(stopper)},
+		)
+
+		addr := cctx.String("RPCListen")
+		if addr == "" {
+			addr = multiquery.DefaultRPCListenAddr
+		}
+		endpoint, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			return fmt.Errorf("parse addr: %s, err: %v", addr, err)
+		}
+		return serveRPC(&multiNode, stopper, endpoint, doneCh, 0)
 	}
 
-	s := &http.Server{
-		Addr:         fmt.Sprintf(":%s", cctx.String("port")),
-		Handler:      router,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	}
-
-	if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
-	}
+	//s := &http.Server{
+	//	Addr:         fmt.Sprintf(":%s", cctx.String("port")),
+	//	Handler:      router,
+	//	ReadTimeout:  time.Minute,
+	//	WriteTimeout: time.Minute,
+	//}
+	//if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	//	log.Fatal(err)
+	//}
 
 	//err = router.Run(":" + cctx.String("port"))
 	//if err != nil {
@@ -120,40 +215,96 @@ func Run(cctx *cli.Context, useAPI bool) error {
 }
 
 func RegisterAdapterApi(router *gin.Engine) {
-	// todo: 更新文档
 	group := router.Group("/adapter").Use()
 	{
 		group.POST("/actor", adapter.GetActorInfo)
 		group.POST("/actors", adapter.GetActorsInfo)
 		group.POST("/actor_ids", adapter.GetActorIDs)
 		group.POST("/epoch", adapter.GetEpochInfo)
+		group.POST("/last_epoch", adapter.GetLastEpochInfo)
 		group.POST("/miner", adapter.GetMinerInfo)
 		group.POST("/sector", adapter.GetSectorInfo)
 		group.POST("/batchminers", adapter.GetBatchMinersInfo)
 		group.POST("/sectorpower", adapter.GetSectorPowerInfo)
 		group.POST("/precommit_deposit_toburn", adapter.GetPreCommitDepositToBurnInfo)
 		group.POST("/sector_for_miner", adapter.GetSectorForMinerInfo)
+		group.POST("/mpool", adapter.GetPendingMessages)
+		group.POST("/allmethods_for_mpool", adapter.GetAllMethodsForPendingMessages)
+		group.POST("/list_miners", adapter.GetListMiners)
+		group.POST("/current_sector_initial_pledge", adapter.CurrentSectorInitialPledge)
+		group.POST("/sectornumber_by_dealID", adapter.GetSectorNumberByDealID)
+		group.POST("/changed_actors", adapter.GetStateChaingedActors)
+		group.POST("/version", adapter.GetVersion)
+		group.POST("/initcode_for_evm", adapter.GetInitCodeForEvm)
 	}
 }
 
+// todo: 范围查询 和 分页查询MultiPagingQuery
 func RegisterAggregatorsApi(router *gin.Engine) {
 	group := router.Group("/aggregators").Use()
 	{
+		// todo: 1. 原来范围请求变成分页请求的接口 2. 原来只请求formal，现在为了实时性也请求tmp 和天佑沟通
 		group.POST("/address", aggregators.GetAddress)
-		group.POST("/agg_pre_netfee", aggregators.GetAggPreNetfee)
-		group.POST("/agg_pro_netfee", aggregators.GetAggProNetfee)
+		group.POST("/actor_state_epoch", aggregators.GetActorStateForEpoch) // todo: account只存一次，head主键不变
+		group.POST("/balance", aggregators.GetBalance)
+		group.POST("/richlist", aggregators.GetRichList)
+		group.POST("/agg_pre_netfee", aggregators.GetAggPreNetFee)
+		group.POST("/agg_pro_netfee", aggregators.GetAggProNetFee)
 		group.POST("/block", aggregators.GetBlock)
+		group.POST("/count_of_blockmessages", aggregators.GetCountOfBlockMessages)
+		group.POST("/traces", aggregators.GetTraces) // only tianyou
+		group.POST("/trace_for_message", aggregators.GetTraceForMessage)
+		group.POST("/batch_trace_for_message", aggregators.GetBatchTraceForMessage)
+		group.POST("/child_transfers_for_message", aggregators.GetChildTransfersForMessage)
+		group.POST("/multisig_message", aggregators.GetMultisigMessage) // only tianyou
 		group.POST("/miner_blockreward", aggregators.GetMinerBlockReward)
-		group.POST("/miners_mined", aggregators.GetMinersMined)
-		group.POST("/final_height", aggregators.GetFinalHeight)
-		group.POST("/miners_info", aggregators.GetMinersInfo)
-		group.POST("/multisig_message", aggregators.GetMultisigMessage)
-		group.POST("/punishment", aggregators.GetPunishment)
-		group.POST("/wincount", aggregators.GetWinCount)
-		group.POST("/traces", aggregators.GetTraces)
-		group.POST("/child_epoch", aggregators.GetChildEpoch)
 		group.POST("/miners_blockreward", aggregators.GetMinersBlockReward)
+		group.POST("/miners_mined", aggregators.GetMinersMined)
+		group.POST("/wincount", aggregators.GetWinCount) // todo: 全网至今总wincount
+		group.POST("/wincount_for_miner", aggregators.GetWinCountForMiner)
+		group.POST("/total_block_count", aggregators.GetTotalBlockCount) // todo: 全网至今总爆块数
+		group.POST("/miners_for_owner", aggregators.GetMinersForOwner)   // only query from formal
+		group.POST("/all_owners", aggregators.GetAllOwners)              // only query from formal
+		group.POST("/miner_info", aggregators.GetMinerInfo)
+		group.POST("/miners_info", aggregators.GetMinersInfo)
+		group.POST("/gascost_for_sector", aggregators.GetGasCostForSector)
 		group.POST("/burn_monitor", aggregators.GetBurnMonitor)
+		group.POST("/punishment", aggregators.GetPunishment)
+		group.POST("/final_height", aggregators.GetFinalHeight)
+		group.POST("/latest_tipset", aggregators.GetLatestTipSet)
+		group.POST("/child_epoch", aggregators.GetChildEpoch)
+		group.POST("/tipset", aggregators.GetTipSet)
+		group.POST("/parent_tipset", aggregators.GetParentTipSet)
+		group.POST("/latest_time_of_trace", aggregators.GetLatestTimeOfTrace)
+		group.POST("/create_time", aggregators.GetCreateTime)
+		group.POST("/deals", aggregators.GetDeals)         // todo: 阅读nv18后的deal特性
+		group.POST("/deal_by_id", aggregators.GetDealByID) // todo: 阅读nv18后的deal特性
+		group.POST("/detail_for_deal", aggregators.GetDetailForDeal)
+		group.POST("/deals_by_addr", aggregators.GetDealsByAddr)
+		group.POST("/blockmessages_by_methodname", aggregators.GetBlockMessagesByMethodName)
+		group.POST("/actormessages_by_methodname", aggregators.GetActorMessagesByMethodName)
+		group.POST("/messages_for_actor", aggregators.GetMessagesForActor)
+		group.POST("/transfer_messages", aggregators.GetTransferMessages)
+		group.POST("/transfer_message_for_largeAmount", aggregators.GetTransferMessageForLargeAmount)
+		group.POST("/blockheader", aggregators.GetBlockHeader)
+		group.POST("/blockheader_by_cid", aggregators.GetBlockHeaderByCid)
+		group.POST("/blockheaders_by_miner", aggregators.GetBlockHeadersByMiner) // 出块列表，出块奖励额外获取
+		//group.POST("/mined_by_miner_range", aggregators.GetMinedByMinerForRange)
+		group.POST("/blocks_for_message", aggregators.GetBlocksForMessage) // todo: epoch可不要，遍历查询即可
+		group.POST("/count_and_methods_of_messages_for_blockheader", aggregators.GetCountAndMethodsOfMessagesForBlockHeader)
+		group.POST("/messages_for_block", aggregators.GetMessagesForBlock)
+		group.POST("/blockheader_messages_by_methodname", aggregators.GetBlockHeaderMessagesByMethodName)
+		group.POST("/all_methods", aggregators.GetAllMethods)
+		group.POST("/all_methods_for_actor", aggregators.GetAllActorMethods)
+		group.POST("/version", aggregators.GetVersion)
+		group.POST("/get_transaction_by_cid", aggregators.GetTransactionByCid)
+		group.POST("/get_transaction_receipt_by_cid", aggregators.GetTransactionReceiptByCid)
+		group.POST("/initcode_for_evm", aggregators.GetInitCodeForEvm)
+		group.POST("/messagecid_by_hash", aggregators.GetMessageCidByHash)
+		group.POST("/hash_by_messagecid", aggregators.GetHashByMessageCid)
+		group.POST("/state_final_height", aggregators.GetStateFinalHeight)
+		group.POST("/child_calls_for_message", aggregators.GetChildCallsForMessage)
+
 	}
 }
 

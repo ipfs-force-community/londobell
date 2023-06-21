@@ -5,7 +5,7 @@ import (
 )
 
 type MinersBlockRewardRes struct {
-	ID               interface{}          `bson:"_id" json:"_id"`
-	TotalBlockReward primitive.Decimal128 `bson:"totalBlockReward" json:"TotalBlockReward"`
-	BlockCount       int                  `bson:"blockcount" json:"BlockCount"`
+	ID               interface{} `bson:"_id" json:"_id"`
+	TotalBlockReward primitive.Decimal128
+	BlockCount       int
 }

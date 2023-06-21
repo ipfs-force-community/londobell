@@ -16,14 +16,15 @@ type ActorReq struct {
 }
 
 type ActorRes struct {
-	ActorID   address.Address `json:"actor_id"`
-	ActorAddr string          `json:"actor_addr"`
-	Epoch     abi.ChainEpoch  `json:"epoch"`
-	BlockTime time.Time       `json:"block_time"`
-	ActorType string          `json:"actor_type"`
-	Balance   types.BigInt    `json:"balance"`
-	Code      cid.Cid         `json:"code"`
-	Head      cid.Cid         `json:"head"`
-	Nonce     uint64          `json:"nonce"`
-	State     interface{}     `json:"state"`
+	ActorID       address.Address `json:"actor_id"`
+	ActorAddr     string          `json:"actor_addr"`
+	Epoch         abi.ChainEpoch  `json:"epoch"`
+	BlockTime     time.Time       `json:"block_time"`
+	ActorType     string          `json:"actor_type"`
+	Balance       types.BigInt    `json:"balance"`
+	Code          cid.Cid         `json:"code"`
+	Head          cid.Cid         `json:"head"`
+	Nonce         uint64          `json:"nonce"`
+	State         interface{}     `json:"state"`
+	DelegatedAddr string          `json:"delegated_addr"`
 }
