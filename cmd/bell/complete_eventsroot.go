@@ -176,7 +176,7 @@ var completeEventsRootCmd = &cli.Command{
 							return err
 						}
 
-						eventsRoot = append(eventsRoot, EventsRoot{Cid: r.Cid, Events: eventsJSON, Epoch: r.Epoch})
+						eventsRoot = append(eventsRoot, EventsRoot{Root: root, Events: eventsJSON, Epoch: r.Epoch})
 					} else {
 						continue
 					}
@@ -186,7 +186,7 @@ var completeEventsRootCmd = &cli.Command{
 				var docs []interface{}
 				for _, e := range eventsRoot {
 					d := bson.D{
-						{Key: "_id", Value: e.Cid},
+						{Key: "_id", Value: e.Root},
 						{Key: "Events", Value: e.Events},
 						{Key: "Epoch", Value: e.Epoch},
 					}
@@ -228,13 +228,12 @@ var completeEventsRootCmd = &cli.Command{
 }
 
 type EventsRootRes struct {
-	Cid        string
 	EventsRoot string
 	Epoch      int64
 }
 
 type EventsRoot struct {
-	Cid    string
+	Root   cid.Cid
 	Events []byte
 	Epoch  int64
 }
