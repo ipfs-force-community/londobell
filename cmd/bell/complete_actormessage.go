@@ -113,7 +113,7 @@ var completeActorMessageCmd = &cli.Command{
 			return part[i].Start > part[j].Start
 		})
 
-		lim := limiter.New(2)
+		lim := limiter.New(5)
 		var ewg multierror.Group
 
 		log.Infof("begin complete actormessage")
