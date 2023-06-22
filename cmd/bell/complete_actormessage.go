@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"sort"
 	"sync"
@@ -133,9 +134,10 @@ var completeActorMessageCmd = &cli.Command{
 					lim.Release(context.TODO())
 				}()
 
+				alog := log.With("range", fmt.Sprintf("[%d, %d]", r.Start, r.End))
 				err = adapter.API.Choose(ctx)
 				if err != nil {
-					log.Error(err)
+					alog.Error(err)
 					return err
 				}
 
@@ -145,24 +147,24 @@ var completeActorMessageCmd = &cli.Command{
 
 				pipe, err := aggregators.Parse(model.Ctx{StartEpoch: r.Start, EndEpoch: r.End}, string(js))
 				if err != nil {
-					log.Error(err)
+					alog.Error(err)
 					return err
 				}
 
 				cur, err := traceCol.Aggregate(context.TODO(), pipe)
 				if err != nil {
-					log.Error(err)
+					alog.Error(err)
 					return err
 				}
 
 				var res []ActorMessageRes
 				err = cur.All(context.TODO(), &res)
 				if err != nil {
-					log.Error(err)
+					alog.Error(err)
 					return err
 				}
 
-				log.Infof("[%v, %v] aggregate successfully, elapsed: %v", r.Start, r.End, time.Now().Sub(starttime).String())
+				alog.Infof("[%v, %v] aggregate successfully, elapsed: %v", r.Start, r.End, time.Now().Sub(starttime).String())
 
 				starttime2 := time.Now()
 				actorMessages := make([]ActorMessage, 0)
@@ -171,7 +173,7 @@ var completeActorMessageCmd = &cli.Command{
 
 					fromAddr, err := address.NewFromString(buildnet.NetPrefix + r.From)
 					if err != nil {
-						log.Error(err)
+						alog.Error(err)
 						return err
 					}
 
@@ -200,7 +202,7 @@ var completeActorMessageCmd = &cli.Command{
 
 					toAddr, err := address.NewFromString(buildnet.NetPrefix + r.To)
 					if err != nil {
-						log.Error(err)
+						alog.Error(err)
 						return err
 					}
 
@@ -226,18 +228,25 @@ var completeActorMessageCmd = &cli.Command{
 
 					c, err := cid.Decode(r.Cid)
 					if err != nil {
-						log.Error(err)
+						alog.Error(err)
 						return err
 					}
 
 					var sc cid.Cid
 					sc, _ = cid.Decode(r.SignedCid)
 
-					v, err := big.FromString(r.Value)
-					if err != nil {
-						log.Error(err)
-						return err
+					var v big.Int
+					if r.Value == "" {
+						alog.Warnf("value is null for %v", r.Cid)
+						v = big.NewInt(0)
+					} else {
+						v, err = big.FromString(r.Value)
+						if err != nil {
+							alog.Errorf("falied to get value for %v, err: %v", r.Cid, err)
+							return err
+						}
 					}
+
 					for actorID, mtype := range storeMap {
 						// todo: insert进去类型是否一致
 						actorMessages = append(actorMessages, ActorMessage{ID: r.ID + "-" + mtype,
@@ -255,7 +264,7 @@ var completeActorMessageCmd = &cli.Command{
 					}
 				}
 
-				log.Infof("[%v, %v] get actorMessages successfully, len(actorMessages): %v, elapsed: %v", r.Start, r.End, len(actorMessages), time.Now().Sub(starttime2).String())
+				alog.Infof("[%v, %v] get actorMessages successfully, len(actorMessages): %v, elapsed: %v", r.Start, r.End, len(actorMessages), time.Now().Sub(starttime2).String())
 
 				var docs []interface{}
 				for _, am := range actorMessages {
@@ -279,21 +288,21 @@ var completeActorMessageCmd = &cli.Command{
 						ires, err := actorMessageCol.InsertMany(ctx, doc, options.InsertMany().SetOrdered(false))
 						if err != nil {
 							if actualErr := extractActualMgoErrors(err); actualErr != nil {
-								log.Error(actualErr)
+								alog.Error(actualErr)
 								return actualErr
 							}
 						}
 
-						log.Infof("part doc [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), len(doc), time.Now().Sub(starttime3).String())
+						alog.Infof("part doc [%v, %v] inserted: %v/%v, elapsed: %v\n", r.Start, r.End, len(ires.InsertedIDs), len(doc), time.Now().Sub(starttime3).String())
 						docDone += len(doc)
 						insertCount += len(ires.InsertedIDs)
 					}
 
-					log.Infof("part [%v, %v] done: %v/%v, elapsed: %v\n", r.Start, r.End, insertCount, total, time.Now().Sub(starttime).String())
+					alog.Infof("part [%v, %v] done: %v/%v, elapsed: %v\n", r.Start, r.End, insertCount, total, time.Now().Sub(starttime).String())
 					return nil
 				}
 
-				log.Infof("part [%v, %v] done total 0, elapsed: %v\n", r.Start, r.End, time.Now().Sub(starttime).String())
+				alog.Infof("part [%v, %v] done total 0, elapsed: %v\n", r.Start, r.End, time.Now().Sub(starttime).String())
 				return nil
 			})
 		}
