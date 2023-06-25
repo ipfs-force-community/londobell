@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math"
 	"sort"
@@ -168,7 +169,7 @@ var completeEventsRootCmd = &cli.Command{
 						// 只同步1月后的
 						events, err := GetEvents(context.TODO(), root, components.CS)
 						if err != nil {
-							return err
+							return fmt.Errorf("get events %v failed for epoch %v: %v", root, r.Epoch, err)
 						}
 
 						eventsJSON, err := json.Marshal(events)
