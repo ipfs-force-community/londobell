@@ -4,6 +4,10 @@ import (
 	"context"
 	"net/http"
 
+	cid2 "github.com/ipfs/go-cid"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -46,7 +50,23 @@ func GetTransactionByCid(c *gin.Context) {
 		return
 	}
 
-	tx, err := EthTxFromSignedEthMessage(msg)
+	cid, err := cid2.Decode(trace.Cid)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
+	txIndex, err := GetTransactionIndexBySeq(trace.Seq)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
+	api := fullnode.API.GetAppropriateAPI()
+
+	tx, err := newEthTxFromMessageLookup(ctx, trace.Epoch, msg, cid, txIndex, api)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
