@@ -7,6 +7,14 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/dep"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
+	smodel "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment/model"
+
 	"github.com/dtynn/dix"
 	"github.com/urfave/cli/v2"
 
@@ -15,6 +23,7 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
 
+// londobell dsn存在config里
 var multiQueryCfgCmd = &cli.Command{
 	Name: "multiquery-cfg",
 	Subcommands: []*cli.Command{
@@ -28,12 +37,12 @@ var cfgInitCmd = &cli.Command{
 	Name:  "init",
 	Flags: []cli.Flag{},
 	Action: func(cctx *cli.Context) error {
-		rpath, err := multiquery.GetRepoPath(cctx)
+		rpath, err := dep.GetRepoPath(cctx)
 		if err != nil {
 			return err
 		}
 
-		cfgPath := multiquery.ConfigFilePath(rpath)
+		cfgPath := dep.ConfigFilePath(rpath)
 
 		_, err = os.Stat(cfgPath)
 		if err == nil {
@@ -52,8 +61,8 @@ var cfgInitCmd = &cli.Command{
 			return fmt.Errorf("MkdirAll for %s: %w", cfgPath, err)
 		}
 
-		cfg := multiquery.DefaultConfig()
-		err = multiquery.WriteToConfig(cfgPath, cfg)
+		cfg := common.DefaultConfig()
+		err = common.WriteToConfig(cfgPath, cfg)
 		if err != nil {
 			return err
 		}
@@ -68,7 +77,7 @@ var cfgInitCmd = &cli.Command{
 // 修改tmp可以直接改配置文件
 // 第一次colds使用cfgUpdateCmd落盘，后面由老formal过渡到cold用archiveCmd
 
-// formal 只更新最近finalheight
+// todo: 第一次添加或更新cold、formal
 var cfgUpdateCmd = &cli.Command{
 	Name: "update",
 	Flags: []cli.Flag{
@@ -80,15 +89,11 @@ var cfgUpdateCmd = &cli.Command{
 			Name:     "new-name",
 			Required: true,
 		},
-		&cli.StringFlag{
+		&cli.IntFlag{
 			Name:     "db-type",
 			Required: true,
-			Usage:    "three types: tmp, formal, cold",
+			Usage:    "three types: 0(tmp), 1(formal), 2(cold)",
 		},
-		//&cli.StringSliceFlag{
-		//	Name:  "apis",
-		//	Usage: "ws://112.124.1.253:1234/rpc/v0",
-		//},
 		&cli.StringFlag{
 			Name:     "nodeconfig",
 			Usage:    "The location of the node configuration, eg: ./config.json(api: token)",
@@ -105,8 +110,13 @@ var cfgUpdateCmd = &cli.Command{
 			Value: false,
 			Usage: "reload even if dbState exists if force is true, otherwise return. true in default",
 		},
+		&cli.Int64Flag{
+			Name:  "interval",
+			Usage: "interval of segment",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
+		ctx := context.TODO()
 		start := time.Now()
 
 		if err := util.ParseNodes(cctx.String("nodeconfig")); err != nil {
@@ -125,8 +135,8 @@ var cfgUpdateCmd = &cli.Command{
 
 		stopper, err := dix.New(
 			cctx.Context,
-			multiquery.MultiQuery(context.TODO(), &components.DBStMgr),
-			multiquery.InjectRepoPath(cctx),
+			dep.MultiQuery(context.TODO(), &components.DBStMgr),
+			dep.InjectRepoPath(cctx),
 		)
 		if err != nil {
 			fmt.Println("stopper", err)
@@ -138,23 +148,26 @@ var cfgUpdateCmd = &cli.Command{
 		newURL := cctx.String("new-url")
 		newName := cctx.String("new-name")
 		force := cctx.Bool("force")
+		var interval int64
+		if cctx.IsSet("interval") {
+			interval = cctx.Int64("interval")
+		} else {
+			interval = smodel.DefaultInterval
+		}
 
-		newDB := multiquery.NewDB(newURL, newName)
+		newDB := common.NewDB(newURL, newName)
 		cfg := components.DBStMgr.GetCfg()
 
-		formal, tmp := false, false
-		dbType := cctx.String("db-type")
+		dbType := smodel.DType(cctx.Int("db-type"))
 		switch dbType {
-		case "tmp":
+		case smodel.Tmp:
 			cfg.Tmp = newDB
-			tmp = true
-		case "formal":
+		case smodel.Formal:
 			cfg.Formal = newDB
-			formal = true
-		case "cold":
+		case smodel.Cold:
 			colds := cfg.Colds
 
-			validColds := make([]multiquery.DB, 0)
+			validColds := make([]common.DB, 0)
 			for _, cold := range colds {
 				if cold.IsInvalidDB() {
 					log.Warnw("invalid cold", "url", cold.Url(), "name", cold.Name())
@@ -186,24 +199,32 @@ var cfgUpdateCmd = &cli.Command{
 			return nil
 		}
 
-		if !tmp {
+		if dbType == smodel.Formal || dbType == smodel.Cold {
 			// todo: 如果load存在？
-			_, ok, err := components.DBStMgr.Stm.LoadDataBaseState(newDB.Url())
+			_, ok, err := components.DBStMgr.GetState(ctx, newDB.Url())
 			if err != nil {
-				log.Errorf("load dbState for newDB %v failed: %v", newDB, err)
-			} else if ok && !force {
+				return fmt.Errorf("load dbState for newDB %v failed: %v", newDB, err)
+			}
+			if ok && !force {
 				log.Warnf("dbState of newDB %v exists, don't reload because of force be %v", newDB, force)
-			} else if ok && force || !ok {
+				return nil
+			}
+
+			if ok && force || !ok {
 				log.Infof("set dbState for newDB %v, ok: %v, force: %v", newDB, ok, force)
 
-				err = components.DBStMgr.FirstSetDataBaseState(cctx.Context, newDB, dbType, formal, tmp)
+				err = components.DBStMgr.FirstSetDataBaseState(ctx, newDB, dbType, abi.ChainEpoch(interval))
 				if err != nil {
 					return err
 				}
 			}
 		}
+		repoPath, err := dep.GetRepoPath(cctx)
+		if err != nil {
+			return err
+		}
 
-		err = multiquery.WriteToConfig(multiquery.ConfigFilePath(components.DBStMgr.GetRepoPath()), cfg)
+		err = common.WriteToConfig(dep.ConfigFilePath(repoPath), cfg)
 		if err != nil {
 			return err
 		}

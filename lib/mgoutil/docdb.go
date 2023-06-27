@@ -17,11 +17,12 @@ var log = logging.Logger("mgoutil")
 // NewMgoDocDB returns an instance of MgoDocDB
 func NewMgoDocDB(ctx context.Context, cli *mongo.Client, db *mongo.Database) (*MgoDocDB, error) {
 	mdb := &MgoDocDB{
-		cli:       cli,
-		db:        db,
-		insertOpt: options.InsertMany().SetOrdered(false),
-		updateOpt: options.Update().SetUpsert(true),
-		aggOpt:    options.Aggregate(),
+		cli:           cli,
+		db:            db,
+		insertOpt:     options.InsertMany().SetOrdered(false),
+		updateOpt:     options.Update().SetUpsert(true),
+		aggOpt:        options.Aggregate(),
+		findUpdateOpt: options.FindOneAndUpdate().SetReturnDocument(options.After).SetUpsert(true),
 	}
 
 	mdb.cols.m = make(map[string]*mongo.Collection)
@@ -33,9 +34,10 @@ type MgoDocDB struct {
 	cli *mongo.Client
 	db  *mongo.Database
 
-	insertOpt *options.InsertManyOptions
-	updateOpt *options.UpdateOptions
-	aggOpt    *options.AggregateOptions
+	insertOpt     *options.InsertManyOptions
+	updateOpt     *options.UpdateOptions
+	aggOpt        *options.AggregateOptions
+	findUpdateOpt *options.FindOneAndUpdateOptions
 
 	cols struct {
 		sync.RWMutex
@@ -106,6 +108,20 @@ func (m *MgoDocDB) Aggregate(ctx context.Context, colName string, pipeline inter
 	}
 
 	return nil
+}
+
+func (m *MgoDocDB) FindOneAndUpdate(ctx context.Context, col string, filter interface{},
+	update interface{}) error {
+	err := m.getCol(col).FindOneAndUpdate(ctx, filter, update, m.findUpdateOpt).Err()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *MgoDocDB) CountDocuments(ctx context.Context, col string, filter interface{}) (int64, error) {
+	return m.getCol(col).CountDocuments(ctx, filter)
 }
 
 func (m *MgoDocDB) getCol(name string) *mongo.Collection {
@@ -244,4 +260,24 @@ func (m *MultiDB) SetDbs(db *MgoDocDB) error {
 
 	m.dbs = append(m.dbs, db)
 	return nil
+}
+
+func (m *MultiDB) FindOneAndUpdate(ctx context.Context, col string, filter interface{},
+	update interface{}) error {
+	for _, db := range m.dbs {
+		err := db.FindOneAndUpdate(ctx, col, filter, update)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *MultiDB) CountDocuments(ctx context.Context, col string, filter interface{}) (int64, error) {
+	for _, db := range m.dbs {
+		return db.CountDocuments(ctx, col, filter)
+	}
+
+	return 0, nil
 }

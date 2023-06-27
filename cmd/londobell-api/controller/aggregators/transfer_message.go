@@ -47,13 +47,13 @@ func GetTransferMessages(c *gin.Context) {
 
 	totalCount := int64(0)
 	for _, countUtil := range countUtils {
-		totalCount += countUtil.Count
+		totalCount += countUtil.ActorTransferStates
 	}
 
 	var transferMessages []model.TransferMessage
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, transferMsgsForActorAggregator, req, "ActorMessage")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorTransferStates, countUtils, transferMsgsForActorAggregator, req, "ActorMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
+	segment2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment"
 )
 
 type BellAPI interface {
@@ -14,5 +14,5 @@ type BellAPI interface {
 }
 
 type MultiAPI interface {
-	LoadDBState(url string) (multiquery.DataBaseState, error)
+	LoadDBInfo(name string) (segment2.Info, error)
 }

@@ -4,7 +4,14 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
 	"sync"
+
+	"github.com/ipfs-force-community/londobell/lib/limiter"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
+
+	smodel "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment/model"
 
 	"github.com/filecoin-project/go-state-types/abi"
 
@@ -18,7 +25,7 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 )
 
-func GetFinalHeight(ctx context.Context, cols Collections) (abi.ChainEpoch, error) {
+func GetFinalHeight(ctx context.Context, cols common.Collections) (abi.ChainEpoch, error) {
 	var finalHeightRes []model.FinalHeightRes
 
 	pipe, err := util.Parse(model.Ctx{}, string(monitor.GetFinalHeightAggregator()))
@@ -49,7 +56,7 @@ func GetFinalHeight(ctx context.Context, cols Collections) (abi.ChainEpoch, erro
 	return 0, fmt.Errorf("no FinalHeight collection")
 }
 
-func GetStateFinalHeight(ctx context.Context, cols Collections) (abi.ChainEpoch, error) {
+func GetStateFinalHeight(ctx context.Context, cols common.Collections) (abi.ChainEpoch, error) {
 	var finalHeightRes []model.FinalHeightRes
 
 	pipe, err := util.Parse(model.Ctx{}, string(monitor.GetFinalHeightAggregator()))
@@ -80,10 +87,55 @@ func GetStateFinalHeight(ctx context.Context, cols Collections) (abi.ChainEpoch,
 	return 0, fmt.Errorf("no StateFinalHeight collection")
 }
 
-// MultiPagingQuery 对多库进行分页查询  todo: 磁盘state更改会影响dbStates（map）吗？
-func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils []CountUtil, aggregator []byte, req model.CommonReq, tableName string) ([]bson.M, error) {
-	//qlog := log.With("multi-query", "MultiPagingQuery")
+//// todo: 递归
+//func determineSegments(skip, limit,requestTotalCount int64, ptype string, countUtils []CountUtil,skipTag func(int64,int64) bool,limitTag func(int64, int64) bool) (result []CountUtil) {
+//	for _, countlist := range countUtils {
+//		totalCount := int64(0)
+//		switch ptype {
+//		case "block":
+//			for _, bs := range countlist.BlockStates {
+//				totalCount += bs.Count
+//			}
+//		case
+//		default:
+//		}
+//
+//		agg := &aggUtil{startEpoch: countlist.Start, endEpoch: countlist.End,
+//			BlockStates: countlist.BlockStates,
+//			BlockMethodStates :countlist.BlockMethodStates,
+//			ActorStates :countlist.ActorStates,
+//			ActorMethodStates :countlist.ActorMethodStates,
+//			ActorTransferStates     :countlist.ActorTransferStates,
+//			MinedStates              :countlist.MinedStates,
+//			LargeAmountTransferStates:countlist.LargeAmountTransferStates}
+//
+//		skipflag := skipTag(skip, totalCount)
+//		limitflag := limitTag(requestTotalCount, totalCount)
+//		if skipflag && limitflag {
+//			agg.skip = skip
+//			agg.limit = limit
+//			aggLists = append(aggLists, agg)
+//			break
+//		}
+//		if skipflag && !limitflag {
+//			agg.skip = skip
+//			agg.limit = limit
+//			aggLists = append(aggLists, agg)
+//			skip = 0
+//			limit = requestTotalCount - totalCount
+//			requestTotalCount = requestTotalCount - totalCount // skip 1, limit 5  tmp 8
+//			continue
+//		}
+//		if !skipflag {
+//			skip = skip - totalCount
+//			requestTotalCount = skip + limit
+//			continue
+//		}
+//	}
+//}
 
+// MultiPagingQuery 对多库进行分页查询  todo: 磁盘state更改会影响dbStates（map）吗？
+func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype, countUtils []CountUtil, aggregator []byte, req model.CommonReq, tableName string) ([]bson.M, error) {
 	// skip、limit
 	skipTag := func(skip, count int64) bool {
 		return skip < count
@@ -103,36 +155,174 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 		requestTotalCount = skip + limit
 	}
 
-	aggLists := make([]*aggUtil, 0)
-	for _, countlist := range countUtils {
-		skipflag := skipTag(skip, countlist.Count)
-		limitflag := limitTag(requestTotalCount, countlist.Count)
-		if skipflag && limitflag {
-			// 最后一次
-			//qlog.Infof("skipflag && limitflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v, start: %v, end: %v", i, skip, limit, requestTotalCount, countlist.Start, countlist.End)
+	segmentLists := make([]*segmentUtil, 0)
 
-			aggLists = append(aggLists, &aggUtil{startEpoch: countlist.Start, endEpoch: countlist.End, skip: skip, limit: limit, cols: countlist.Cols})
+	// 锁定库
+	for _, countlist := range countUtils {
+		totalCount := int64(0)
+		switch ptype {
+		case BlockStates:
+			for _, bs := range countlist.BlockStates {
+				totalCount += bs.Count
+			}
+		case BlockMethodStates:
+			totalCount = countlist.BlockMethodStates
+		case ActorStates:
+			totalCount = countlist.ActorStates
+		case ActorMethodStates:
+			totalCount = countlist.ActorMethodStates
+		case ActorTransferStates:
+			totalCount = countlist.ActorTransferStates
+		case MinedStates:
+			totalCount = countlist.MinedStates
+		case LargeAmountTransferStates:
+			totalCount = countlist.LargeAmountTransferStates
+		default:
+			return nil, fmt.Errorf("invalid type for paging: %v", ptype)
+		}
+
+		segment := &segmentUtil{startEpoch: countlist.Start, endEpoch: countlist.End, Cols: countlist.Cols,
+			BlockStates:               countlist.BlockStates,
+			BlockMethodStates:         countlist.BlockMethodStates,
+			ActorStates:               countlist.ActorStates,
+			ActorMethodStates:         countlist.ActorMethodStates,
+			ActorTransferStates:       countlist.ActorTransferStates,
+			MinedStates:               countlist.MinedStates,
+			LargeAmountTransferStates: countlist.LargeAmountTransferStates}
+
+		skipflag := skipTag(skip, totalCount)
+		limitflag := limitTag(requestTotalCount, totalCount)
+		if skipflag && limitflag {
+			segment.skip = skip
+			segment.limit = limit
+			segmentLists = append(segmentLists, segment)
 			break
 		}
 		if skipflag && !limitflag {
-			//qlog.Infof("skipflag && !limitflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v", i, skip, limit, requestTotalCount)
-
-			aggLists = append(aggLists, &aggUtil{startEpoch: countlist.Start, endEpoch: countlist.End, skip: skip, limit: limit, cols: countlist.Cols})
+			segment.skip = skip
+			segment.limit = limit
+			segmentLists = append(segmentLists, segment)
 			skip = 0
-			limit = requestTotalCount - countlist.Count
-			requestTotalCount = requestTotalCount - countlist.Count // skip 1, limit 5  tmp 8
+			limit = requestTotalCount - totalCount
+			requestTotalCount = requestTotalCount - totalCount // skip 1, limit 5  tmp 8
 			continue
 		}
 		if !skipflag {
-			//qlog.Infof("!skipflag, index: %v, skip: %v, limit: %v, requestTotalCount: %v", i, skip, limit, requestTotalCount)
-
-			skip = skip - countlist.Count
+			skip = skip - totalCount
 			requestTotalCount = skip + limit
 			continue
 		}
 	}
 
-	//qlog.Infof("get aggLists done!!")
+	// 锁定段
+	aggLists := make([]*aggUtil, 0)
+	switch ptype {
+	case BlockStates:
+		for _, segmentList := range segmentLists {
+			skip, limit := segmentList.skip, segmentList.limit
+			requestTotalCount := skip + limit
+
+			sort.Slice(segmentList.BlockStates, func(i, j int) bool {
+				return segmentList.BlockStates[i].StartEpoch > segmentList.BlockStates[j].StartEpoch
+			})
+
+			for _, bs := range segmentList.BlockStates {
+				count := bs.Count
+
+				agg := &aggUtil{startEpoch: int64(bs.StartEpoch), endEpoch: int64(bs.EndEpoch), cols: segmentList.Cols}
+				skipflag := skipTag(skip, count)
+				limitflag := limitTag(requestTotalCount, count)
+				if skipflag && limitflag {
+					agg.skip = skip
+					agg.limit = limit
+					aggLists = append(aggLists, agg)
+					break
+				}
+				if skipflag && !limitflag {
+					agg.skip = skip
+					agg.limit = limit
+					aggLists = append(aggLists, agg)
+					skip = 0
+					limit = requestTotalCount - count
+					requestTotalCount = requestTotalCount - count // skip 1, limit 5  tmp 8
+					continue
+				}
+				if !skipflag {
+					skip = skip - count
+					requestTotalCount = skip + limit
+					continue
+				}
+			}
+		}
+	case BlockMethodStates:
+		for _, segmentList := range segmentLists {
+			aggLists = append(aggLists, &aggUtil{
+				startEpoch: segmentList.startEpoch,
+				endEpoch:   segmentList.endEpoch,
+				skip:       segmentList.skip,
+				limit:      segmentList.limit,
+				cols:       segmentList.Cols,
+				count:      segmentList.BlockMethodStates,
+			})
+		}
+	case ActorStates:
+		for _, segmentList := range segmentLists {
+			aggLists = append(aggLists, &aggUtil{
+				startEpoch: segmentList.startEpoch,
+				endEpoch:   segmentList.endEpoch,
+				skip:       segmentList.skip,
+				limit:      segmentList.limit,
+				cols:       segmentList.Cols,
+				count:      segmentList.ActorStates,
+			})
+		}
+	case ActorMethodStates:
+		for _, segmentList := range segmentLists {
+			aggLists = append(aggLists, &aggUtil{
+				startEpoch: segmentList.startEpoch,
+				endEpoch:   segmentList.endEpoch,
+				skip:       segmentList.skip,
+				limit:      segmentList.limit,
+				cols:       segmentList.Cols,
+				count:      segmentList.ActorMethodStates,
+			})
+		}
+	case ActorTransferStates:
+		for _, segmentList := range segmentLists {
+			aggLists = append(aggLists, &aggUtil{
+				startEpoch: segmentList.startEpoch,
+				endEpoch:   segmentList.endEpoch,
+				skip:       segmentList.skip,
+				limit:      segmentList.limit,
+				cols:       segmentList.Cols,
+				count:      segmentList.ActorTransferStates,
+			})
+		}
+	case MinedStates:
+		for _, segmentList := range segmentLists {
+			aggLists = append(aggLists, &aggUtil{
+				startEpoch: segmentList.startEpoch,
+				endEpoch:   segmentList.endEpoch,
+				skip:       segmentList.skip,
+				limit:      segmentList.limit,
+				cols:       segmentList.Cols,
+				count:      segmentList.MinedStates,
+			})
+		}
+	case LargeAmountTransferStates:
+		for _, segmentList := range segmentLists {
+			aggLists = append(aggLists, &aggUtil{
+				startEpoch: segmentList.startEpoch,
+				endEpoch:   segmentList.endEpoch,
+				skip:       segmentList.skip,
+				limit:      segmentList.limit,
+				cols:       segmentList.Cols,
+				count:      segmentList.LargeAmountTransferStates,
+			})
+		}
+	default:
+		return nil, fmt.Errorf("invalid type of paging: %v", ptype)
+	}
 
 	// concurrent agg
 	var (
@@ -141,17 +331,21 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 		ewg    multierror.Group
 	)
 
+	lim := limiter.New(16)
+
 	for i := range aggLists {
 		i := i
 		aggList := aggLists[i]
 		ewg.Go(func() error {
-			//start := time.Now()
-			var aggRes []bson.M
+			if !lim.Acquire(ctx) {
+				return nil
+			}
 
-			//// todo: req.Addr 和 /*req.Cid*/ 要请求多个等价
-			//if req.Addr != "" && aggregator ==  {
-			//	//pipe1...
-			//}
+			defer func() {
+				lim.Release(ctx)
+			}()
+
+			var aggRes []bson.M
 
 			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.startEpoch, EndEpoch: aggList.endEpoch, Skip: aggList.skip, Limit: aggList.limit, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, Sort: req.Sort, To: req.To, Addrs: req.Addrs, Addr: req.Addr}, string(aggregator)) // todo: methodName
 			if err != nil {
@@ -171,11 +365,12 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 					}
 
 					res[i] = aggRes
+
+					return nil
 				}
 			}
 
-			//qlog.Infof("agg successfully, agglist: %+v spent: %v", aggList, time.Now().Sub(start))
-			return nil
+			return fmt.Errorf("no collection: %v", tableName)
 		})
 	}
 
@@ -192,8 +387,6 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, countUtils 
 
 // MultiRangeQuery 根据epoch范围定位到某些库查询
 func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils []CountUtil, aggregator []byte, req model.CommonReq, tableName string) ([]bson.M, error) {
-	//qlog := log.With("multi-query", "MultiRangeQuery")
-
 	start := startEpoch
 	end := endEpoch
 	aggLists := make([]*aggUtil, 0)
@@ -226,7 +419,6 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 		i := i
 		aggList := aggLists[i]
 		ewg.Go(func() error {
-			//start := time.Now()
 			var aggRes []bson.M
 
 			// 防止有分页需求的脚本
@@ -255,7 +447,6 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 				}
 			}
 
-			//qlog.Infof("agg successfully for block, aggulist %+v spent %v", aggList, time.Now().Sub(start))
 			return nil
 		})
 	}
@@ -283,7 +474,7 @@ func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []Cou
 	priorityLists := make([]CountUtil, 0)
 	delayedLists := make([]CountUtil, 0)
 	for _, countList := range countLists {
-		if countList.Tmp || countList.Formal {
+		if countList.DType == smodel.Formal || countList.DType == smodel.Tmp {
 			priorityLists = append(priorityLists, countList)
 		} else {
 			delayedLists = append(delayedLists, countList)

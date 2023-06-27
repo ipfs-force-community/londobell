@@ -39,14 +39,16 @@ func GetBlock(c *gin.Context) {
 
 	totalCount := int64(0)
 	for _, countUtil := range countUtils {
-		totalCount += countUtil.Count
+		for _, bs := range countUtil.BlockStates {
+			totalCount += bs.Count
+		}
 	}
 
 	var blockMessages []model.BlockExplicitMessage
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, blockAggregator, req, "ExecTrace")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.BlockStates, countUtils, blockAggregator, req, "ExecTrace")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

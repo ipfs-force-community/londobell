@@ -48,7 +48,7 @@ func GetMessagesForActor(c *gin.Context) {
 
 	totalCount := int64(0)
 	for _, countUtil := range countUtils {
-		totalCount += countUtil.Count
+		totalCount += countUtil.ActorStates
 	}
 
 	api := fullnode.API.GetAppropriateAPI()
@@ -69,7 +69,7 @@ func GetMessagesForActor(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, messagesForActorAggregator, req, "ActorMessage")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorStates, countUtils, messagesForActorAggregator, req, "ActorMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

@@ -3,17 +3,64 @@ package multiquery
 import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"go.mongodb.org/mongo-driver/mongo"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
+
+	smodel "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment/model"
+)
+
+type Ptype int
+
+const (
+	BlockStates Ptype = iota
+	BlockMethodStates
+	ActorStates
+	ActorMethodStates
+	ActorTransferStates
+	MinedStates
+	LargeAmountTransferStates
 )
 
 type CountUtil struct {
 	Start int64
 	End   int64
-	Count int64
+	//Count int64
 
-	Cols Collections
+	Cols common.Collections
 
-	Tmp    bool
-	Formal bool
+	//Tmp    bool
+	//Formal bool
+
+	DType smodel.DType
+
+	BlockStates []smodel.SegmentState
+
+	// 暂时不对其他state分段
+	BlockMethodStates         int64
+	ActorStates               int64
+	ActorMethodStates         int64
+	ActorTransferStates       int64
+	MinedStates               int64
+	LargeAmountTransferStates int64
+}
+
+type segmentUtil struct {
+	startEpoch int64
+	endEpoch   int64
+	skip       int64
+	limit      int64
+
+	Cols common.Collections
+
+	BlockStates []smodel.SegmentState
+
+	// 暂时不对其他state分段
+	BlockMethodStates         int64
+	ActorStates               int64
+	ActorMethodStates         int64
+	ActorTransferStates       int64
+	MinedStates               int64
+	LargeAmountTransferStates int64
 }
 
 type aggUtil struct {
@@ -22,7 +69,9 @@ type aggUtil struct {
 	skip       int64
 	limit      int64
 
-	cols Collections
+	cols common.Collections
+
+	count int64
 }
 
 type ByMethodNameUtil struct {

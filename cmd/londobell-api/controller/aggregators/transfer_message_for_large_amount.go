@@ -41,14 +41,14 @@ func GetTransferMessageForLargeAmount(c *gin.Context) {
 
 	totalCount := int64(0)
 	for _, countUtil := range countUtils {
-		totalCount += countUtil.Count
+		totalCount += countUtil.LargeAmountTransferStates
 	}
 
 	var transferMessageForLargeAmount []model.TransferMessage
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, transferMessageForLargeAmountAggregator, req, "Message") //todo: ExecTrace
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.LargeAmountTransferStates, countUtils, transferMessageForLargeAmountAggregator, req, "Message") //todo: ExecTrace
 		if err != nil {
 			alog.Error(err)
 			alog.Error(err)

@@ -2,10 +2,7 @@ package aggregators
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
-
-	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
 	"github.com/gin-gonic/gin"
 
@@ -32,7 +29,7 @@ func GetCountOfBlockMessages(c *gin.Context) {
 
 	curEpoch := common.GetCurEpoch()
 
-	countUtils, err := multiquery.GetEpochRange(ctx, &multiquery.DBStateManager, curEpoch)
+	countUtils, err := multiquery.GetTotalCountForBlockMsgs(ctx, &multiquery.DBStateManager, curEpoch)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -41,45 +38,11 @@ func GetCountOfBlockMessages(c *gin.Context) {
 
 	totalCount := int64(0)
 	for _, countUtil := range countUtils {
-		totalCount += countUtil.Count
-	}
-
-	var blockCount []model.BlockCountRes
-
-	// multi dbs query
-	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, monitor.GetCountOfBlockMessagesAggregator(), req, "ExecTrace")
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		if len(multiResult) == 0 {
-			c.JSON(http.StatusOK, res)
-			return
-		}
-
-		raw := multiResult
-		rawByte, err := json.Marshal(raw)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		err = json.Unmarshal(rawByte, &blockCount)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
+		for _, bs := range countUtil.BlockStates {
+			totalCount += bs.Count
 		}
 	}
 
-	count := int64(0)
-	for _, bc := range blockCount {
-		count += bc.Count
-	}
-	res.Data = model.BlockCountRes{Count: count}
+	res.Data = model.BlockCountRes{Count: totalCount}
 	c.JSON(http.StatusOK, res)
 }

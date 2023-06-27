@@ -98,6 +98,9 @@ type DocumentDB interface {
 	Update(ctx context.Context, col string, filter, docs interface{}) (int, error)
 	Delete(ctx context.Context, col string, filter interface{}) (int, error)
 	Aggregate(ctx context.Context, col string, pipeline interface{}, res interface{}) error
+	FindOneAndUpdate(ctx context.Context, col string, filter interface{},
+		update interface{}) error
+	CountDocuments(ctx context.Context, col string, filter interface{}) (int64, error)
 }
 
 // DetailPrinter prints more detailed info
