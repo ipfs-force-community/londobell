@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/dep"
 
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
@@ -22,11 +22,12 @@ func main() {
 		Usage: "api for londobell-aggregators",
 		Commands: []*cli.Command{
 			multiQueryCfgCmd,
+			segmentCmd,
 			dbstateCmd,
 			daemonCmd,
 		},
 		Flags: []cli.Flag{
-			multiquery.RepoFlag,
+			dep.RepoFlag,
 		},
 		Version: build.UserVersion(),
 	}

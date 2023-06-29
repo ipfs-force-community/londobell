@@ -1,4 +1,4 @@
-package multiquery
+package common
 
 import (
 	"fmt"
@@ -24,10 +24,11 @@ func NewDBCollectionsConfigMgr(cfg Config) *DBCollectionsConfigMgr {
 
 // cold dbs每次新增就立即运行state存储；formal定时运行state存储；tmp每次都运行state存储
 type Config struct {
-	Colds          []DB
-	Formal         DB
-	Tmp            DB
-	LastModifyTime int64
+	Colds                   []DB
+	Formal                  DB
+	Tmp                     DB
+	LastModifyTime          int64
+	BatchSegmentInsertLimit int
 }
 
 type DB struct {
@@ -61,10 +62,11 @@ func (db DB) Equals(o DB) bool {
 func DefaultConfig() Config {
 	colds := make([]DB, 0)
 	return Config{
-		Colds:          colds,
-		Formal:         DB{},
-		Tmp:            DB{},
-		LastModifyTime: time.Now().Unix(),
+		Colds:                   colds,
+		Formal:                  DB{},
+		Tmp:                     DB{},
+		LastModifyTime:          time.Now().Unix(),
+		BatchSegmentInsertLimit: 16,
 	}
 }
 

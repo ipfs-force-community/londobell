@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
+
 	"context"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -117,7 +119,7 @@ func GetDealsByAddr(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-func GetTotalCountForDealsByAddr(ctx context.Context, cols multiquery.Collections, ID string, addrs []string, epoch abi.ChainEpoch) (int64, error) {
+func GetTotalCountForDealsByAddr(ctx context.Context, cols common2.Collections, ID string, addrs []string, epoch abi.ChainEpoch) (int64, error) {
 	DALock.RLock()
 	if _, exist := DealsByAddrCountMap[ID]; exist {
 		if count, ok := DealsByAddrCountMap[ID][epoch]; ok {

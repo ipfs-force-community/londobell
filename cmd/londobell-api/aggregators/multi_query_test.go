@@ -1,79 +1,63 @@
-package multiquery
+package main
 
-import (
-	"context"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
-
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
-
-	"github.com/filecoin-project/lotus/node/config"
-
-	"github.com/dtynn/dix"
-)
-
-func Init() {
-	//fmt.Println(DBStateManager)
-	fullnode.API = fullnode.NewAppropriateAPI([]util.Node{{URL: "ws://112.124.1.253:1234/rpc/v0"}})
-	err := fullnode.API.Choose(context.TODO())
-	if err != nil {
-		return
-	}
-
-	_, err = dix.New(
-		context.TODO(),
-		MultiQuery(context.TODO(), &DBStateManager),
-		MockRepoPath(),
-		//dep.InjectFullNode(cctx),
-	)
-	if err != nil {
-		fmt.Println("stopper", err)
-		return
-	}
-}
-
-func MockRepoPath() dix.Option {
-	return dix.Override(new(RepoPath), func() (RepoPath, error) {
-		return RepoPath("/Users/zhoulin/.multi"), nil
-	})
-}
-
-func MockConfig() error {
-	cfgPath := ConfigFilePath("/Users/zhoulin/.multi")
-
-	err := os.MkdirAll(filepath.Dir(cfgPath), 0755)
-	if err != nil {
-		return fmt.Errorf("MkdirAll for %s: %w", cfgPath, err)
-	}
-
-	cfg := MockDefaultConfig()
-	content, err := config.ConfigComment(cfg)
-	if err != nil {
-		return fmt.Errorf("marshal default config: %w", err)
-	}
-
-	err = ioutil.WriteFile(cfgPath, content, 0644)
-	if err != nil {
-		return fmt.Errorf("write config file: %w", err)
-	}
-
-	return nil
-}
-
-func MockDefaultConfig() Config {
-	colds := make([]DB, 0)
-	colds = append(colds, NewDB("mongodb://guest:read-only@106.15.125.51:27017/bell", "bell"))
-	return Config{
-		Colds:  colds,
-		Formal: NewDB("mongodb://guest:read-only@106.15.125.51:27017/bell", "bell"),
-		Tmp:    NewDB("mongodb://192.168.1.221:27017/tmpbell", "tmpbell"),
-	}
-}
-
+//func Init() {
+//	//fmt.Println(DBStateManager)
+//	fullnode.API = fullnode.NewAppropriateAPI([]util.Node{{URL: "ws://112.124.1.253:1234/rpc/v0"}})
+//	err := fullnode.API.Choose(context.TODO())
+//	if err != nil {
+//		return
+//	}
+//
+//	_, err = dix.New(
+//		context.TODO(),
+//		dep.MultiQuery(context.TODO(), &multiquery.DBStateManager),
+//		MockRepoPath(),
+//		//dep.InjectFullNode(cctx),
+//	)
+//	if err != nil {
+//		fmt.Println("stopper", err)
+//		return
+//	}
+//}
+//
+//func MockRepoPath() dix.Option {
+//	return dix.Override(new(dep.RepoPath), func() (dep.RepoPath, error) {
+//		return dep.RepoPath("/Users/zhoulin/.multi"), nil
+//	})
+//}
+//
+//func MockConfig() error {
+//	cfgPath := dep.ConfigFilePath("/Users/zhoulin/.multi")
+//
+//	err := os.MkdirAll(filepath.Dir(cfgPath), 0755)
+//	if err != nil {
+//		return fmt.Errorf("MkdirAll for %s: %w", cfgPath, err)
+//	}
+//
+//	cfg := MockDefaultConfig()
+//	content, err := config.ConfigComment(cfg)
+//	if err != nil {
+//		return fmt.Errorf("marshal default config: %w", err)
+//	}
+//
+//	err = ioutil.WriteFile(cfgPath, content, 0644)
+//	if err != nil {
+//		return fmt.Errorf("write config file: %w", err)
+//	}
+//
+//	return nil
+//}
+//
+//func MockDefaultConfig() config2.Config {
+//	colds := make([]config2.DB, 0)
+//	colds = append(colds, config2.NewDB("mongodb://guest:read-only@106.15.125.51:27017/bell", "bell"))
+//	return config2.Config{
+//		Colds:  colds,
+//		Formal: config2.NewDB("mongodb://guest:read-only@106.15.125.51:27017/bell", "bell"),
+//		Tmp:    config2.NewDB("mongodb://192.168.1.221:27017/tmpbell", "tmpbell"),
+//	}
+//}
+//
 //func TestRefresh(t *testing.T) {
 //	Init()
 //	DBStateManager.DBCfg.Cfg = MockDefaultConfig()

@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
+	segment2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment"
 
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
@@ -71,18 +71,18 @@ func (m *BellNodeAPI) GetSampleRate(ctx context.Context) (float64, error) {
 
 type MultiNodeAPI struct {
 	fx.In
-	DBSMgr *multiquery.StateManager
+	SegMgr *segment2.SegManager
 }
 
-func (m *MultiNodeAPI) LoadDBState(url string) (multiquery.DataBaseState, error) {
-	dbState, found, err := m.DBSMgr.LoadDataBaseState(url)
+func (m *MultiNodeAPI) LoadDBInfo(name string) (segment2.Info, error) {
+	info, found, err := m.SegMgr.LoadInfo(name)
 	if err != nil {
-		return multiquery.DataBaseState{}, err
+		return segment2.Info{}, err
 	}
 
 	if !found {
-		return multiquery.DataBaseState{}, nil
+		return segment2.Info{}, nil
 	}
 
-	return dbState, nil
+	return info, nil
 }

@@ -5,8 +5,9 @@ package api
 import (
 	"context"
 
-	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"golang.org/x/xerrors"
+
+	segment2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment"
 )
 
 var ErrNotSupported = xerrors.New("method not supported")
@@ -28,7 +29,7 @@ type BellAPIStub struct {
 
 type MultiAPIStruct struct {
 	Internal struct {
-		LoadDBState func(p0 string) (multiquery.DataBaseState, error) ``
+		LoadDBInfo func(p0 string) (segment2.Info, error) ``
 	}
 }
 
@@ -79,15 +80,15 @@ func (s *BellAPIStub) ShutDown(p0 context.Context) error {
 	return ErrNotSupported
 }
 
-func (s *MultiAPIStruct) LoadDBState(p0 string) (multiquery.DataBaseState, error) {
-	if s.Internal.LoadDBState == nil {
-		return *new(multiquery.DataBaseState), ErrNotSupported
+func (s *MultiAPIStruct) LoadDBInfo(p0 string) (segment2.Info, error) {
+	if s.Internal.LoadDBInfo == nil {
+		return *new(segment2.Info), ErrNotSupported
 	}
-	return s.Internal.LoadDBState(p0)
+	return s.Internal.LoadDBInfo(p0)
 }
 
-func (s *MultiAPIStub) LoadDBState(p0 string) (multiquery.DataBaseState, error) {
-	return *new(multiquery.DataBaseState), ErrNotSupported
+func (s *MultiAPIStub) LoadDBInfo(p0 string) (segment2.Info, error) {
+	return *new(segment2.Info), ErrNotSupported
 }
 
 var _ BellAPI = new(BellAPIStruct)

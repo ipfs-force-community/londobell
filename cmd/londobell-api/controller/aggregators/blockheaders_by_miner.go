@@ -47,7 +47,7 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 
 	totalCount := int64(0)
 	for _, countUtil := range countUtils {
-		totalCount += countUtil.Count
+		totalCount += countUtil.MinedStates
 	}
 
 	api := fullnode.API.GetAppropriateAPI()
@@ -63,7 +63,7 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 	var blockHeadersByMiner []model.BlockHeader
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, countUtils, blockHeadersByMinerAggregator, req, "BlockHeader")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.MinedStates, countUtils, blockHeadersByMinerAggregator, req, "BlockHeader")
 		if err != nil {
 			alog.Error(err)
 			alog.Error(err)

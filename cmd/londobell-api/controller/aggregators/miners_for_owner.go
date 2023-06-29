@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
+
 	"context"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -81,7 +83,7 @@ func GetMinersForOwner(c *gin.Context) {
 }
 
 // todo: 目前只适用Epoch字段名的
-func GetLatestEpoch(ctx context.Context, cols multiquery.Collections, tableName string) (abi.ChainEpoch, error) {
+func GetLatestEpoch(ctx context.Context, cols common.Collections, tableName string) (abi.ChainEpoch, error) {
 	matchStage := bson.D{
 		{
 			Key: "$match", Value: bson.D{

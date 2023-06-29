@@ -9,19 +9,22 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/dep"
+
 	"github.com/dtynn/dix"
 	"github.com/filecoin-project/lotus/node"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/gin-gonic/gin"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/urfave/cli/v2"
+
 	"github.com/ipfs-force-community/londobell/api"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/urfave/cli/v2"
 )
 
 var (
@@ -130,17 +133,11 @@ func Run(cctx *cli.Context, adapter bool) error {
 
 		shutdownCh := make(chan struct{})
 
-		//var components struct {
-		//	fx.In
-		//	NodeAPI api.MultiNodeAPI
-		//	DBStMgr *multiquery.DataBaseStateManager
-		//}
-
 		var multiNode api.MultiNodeAPI
 		stopper, err := dix.New(
 			cctx.Context,
-			multiquery.MultiQuery(context.TODO(), &multiquery.DBStateManager, &multiNode),
-			multiquery.InjectRepoPath(cctx),
+			dep.MultiQuery(context.TODO(), &multiquery.DBStateManager, &multiNode),
+			dep.InjectRepoPath(cctx),
 			dix.Override(new(dtypes.ShutdownChan), shutdownCh),
 		)
 		if err != nil {
@@ -150,7 +147,11 @@ func Run(cctx *cli.Context, adapter bool) error {
 
 		defer stopper(cctx.Context) // nolint: errcheck
 
-		//multiquery.DBStateManager = *components.DBStMgr // todo
+		repoPath, err := dep.GetRepoPath(cctx)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
 
 		err = multiquery.FirstLoad(cctx.Context, &multiquery.DBStateManager)
 		if err != nil {
@@ -158,13 +159,14 @@ func Run(cctx *cli.Context, adapter bool) error {
 			return err
 		}
 
-		go multiquery.Reload(cctx.Context, &multiquery.DBStateManager)
+		go multiquery.Reload(cctx.Context, &multiquery.DBStateManager, dep.ConfigFilePath(repoPath))
 
 		//start := time.Now()
 		//multiquery.TestPeriodicRefreshDataBaseState(cctx.Context, &multiquery.DBStateManager) //todo:test
 		//fmt.Printf("PeriodicRefreshDataBaseState done, elapsed: %v\n", time.Now().Sub(start))
 
-		go multiquery.PeriodicRefreshDataBaseState(cctx.Context, &multiquery.DBStateManager)
+		mlog := log.With("server", "multi-query")
+		go multiquery.PeriodicRefreshDataBaseState(cctx.Context, mlog, &multiquery.DBStateManager)
 
 		aggregators.InitAggregators()
 		RegisterAggregatorsApi(router)

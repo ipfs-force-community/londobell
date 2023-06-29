@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
+
 	"github.com/filecoin-project/go-jsonrpc"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
 
@@ -10,7 +12,7 @@ import (
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 )
 
-func ColdsIsExists(db multiquery.DB, colds []multiquery.DB) bool {
+func ColdsIsExists(db common.DB, colds []common.DB) bool {
 	var exist bool
 
 	for _, cold := range colds {

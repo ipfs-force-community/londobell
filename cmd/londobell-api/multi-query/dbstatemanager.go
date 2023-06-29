@@ -10,22 +10,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-
-	"go.uber.org/fx"
-
-	"github.com/filecoin-project/lotus/node/config"
-
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/node/config"
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
-
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
-
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.uber.org/fx"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
+	config2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment"
+	smodel "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment/model"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
 
 const DefaultRPCListenAddr = "/ip4/127.0.0.1/tcp/12346"
@@ -36,69 +34,282 @@ var (
 	ALock          sync.RWMutex              // todo: for ActorIDMap
 
 	ErrNotFoundInDBCollectionsMap = fmt.Errorf("not found in DBCollectionsMap")
+	ErrNotFound                   = fmt.Errorf("not found")
 )
 
 type DataBaseStateManager struct {
 	fx.In
-	Stm          *StateManager
+	Segment      *segment.Segment
 	DBStateCache *DataBaseStateCache
-	DBCfg        *DBCollectionsConfigMgr
-
-	RPath RepoPath
+	DBCfg        *config2.DBCollectionsConfigMgr
 }
 
-type DataBaseStateCache struct {
-	cache map[string]*DataBaseState
-	clk   sync.RWMutex
-}
-
-func NewDataBaseStateCache() *DataBaseStateCache {
-	return &DataBaseStateCache{
-		cache: make(map[string]*DataBaseState),
-	}
-}
-
-func (dbsc *DataBaseStateCache) GetDataBase(url string) (*DataBaseState, bool) {
-	dbsc.clk.RLock()
-	defer dbsc.clk.RUnlock()
-
-	if dbState, ok := dbsc.cache[url]; ok {
-		return dbState, true
-	}
-
-	return nil, false
-}
-
-func (dbsc *DataBaseStateCache) SetDataBase(url string, dbState *DataBaseState) {
-	dbsc.clk.Lock()
-	defer dbsc.clk.Unlock()
-
-	dbsc.cache[url] = dbState
-}
-
-func (dbsm *DataBaseStateManager) GetRepoPath() RepoPath {
-	return dbsm.RPath
-}
-
-func (dbsm *DataBaseStateManager) GetDataBase(url string) (*DataBaseState, error) {
-	var dbState *DataBaseState
-	if dsc, ok := dbsm.DBStateCache.GetDataBase(url); !ok {
-		ds, found, err := dbsm.Stm.LoadDataBaseState(url)
+// todo: only for formal & colds
+func (dbsm *DataBaseStateManager) GetState(ctx context.Context, dsn string) (*segment.State, bool, error) {
+	state, ok := dbsm.DBStateCache.GetState(dsn)
+	if !ok {
+		state, found, err := dbsm.Segment.GetState(ctx, dsn)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if !found {
 			// todo
-			return nil, fmt.Errorf("db %v not found", url)
+			return nil, false, nil
 		}
 
-		dbsm.DBStateCache.SetDataBase(url, &ds)
-		dbState = &ds
-	} else {
-		dbState = dsc
+		dbsm.DBStateCache.SetState(dsn, state)
+
+		return state, true, nil
 	}
 
-	return dbState, nil
+	return state, true, nil
+}
+
+func (dbsm *DataBaseStateManager) GetDBState(ctx context.Context, dsn string) (*smodel.DBState, bool, error) {
+	dbState, ok := dbsm.DBStateCache.GetDBState(dsn)
+	if !ok {
+		dbState, found, err := dbsm.Segment.GetDBState(ctx, dsn)
+		if err != nil {
+			return nil, false, err
+		}
+		if !found {
+			// todo
+			return nil, false, nil
+		}
+
+		dbsm.DBStateCache.FindAndUpdateDBState(dsn, dbState)
+
+		return dbState, true, nil
+	}
+
+	return dbState, true, nil
+}
+
+func (dbsm *DataBaseStateManager) GetBlockStates(ctx context.Context, dsn string) ([]smodel.SegmentState, error) {
+	blockStates, ok := dbsm.DBStateCache.GetBlockStates(dsn)
+	if !ok {
+		blockStates, err := dbsm.Segment.GetBlockStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		// todo: nil
+		if err := dbsm.DBStateCache.SetBlockStates(dsn, blockStates); err != nil {
+			return nil, err
+		}
+
+		return blockStates, nil
+	}
+
+	return blockStates, nil
+}
+
+func (dbsm *DataBaseStateManager) GetBlockMethodStates(ctx context.Context, dsn string, methodName string) ([]smodel.SegmentState, error) {
+	blockMethodStates, ok := dbsm.DBStateCache.GetBlockMethodStates(dsn, methodName)
+	if !ok {
+		allBlockMethodStates, err := dbsm.Segment.GetAllBlockMethodStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := dbsm.DBStateCache.SetBlockMethodStates(dsn, allBlockMethodStates); err != nil {
+			return nil, err
+		}
+
+		blockMethodStates, _ := dbsm.DBStateCache.GetBlockMethodStates(dsn, methodName)
+		return blockMethodStates, nil
+	}
+
+	return blockMethodStates, nil
+}
+
+func (dbsm *DataBaseStateManager) GetAllBlockMethodStates(ctx context.Context, dsn string) ([]smodel.SegmentState, error) {
+	blockMethodStates, ok := dbsm.DBStateCache.GetAllBlockMethodStates(dsn)
+	if !ok {
+		blockMethodStates, err := dbsm.Segment.GetAllBlockMethodStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := dbsm.DBStateCache.SetBlockMethodStates(dsn, blockMethodStates); err != nil {
+			return nil, err
+		}
+
+		blockMethodStates, _ = dbsm.DBStateCache.GetAllBlockMethodStates(dsn)
+		return blockMethodStates, nil
+	}
+
+	return blockMethodStates, nil
+}
+
+func (dbsm *DataBaseStateManager) GetActorStates(ctx context.Context, dsn string, actorID string) ([]smodel.SegmentState, error) {
+	actorStates, ok := dbsm.DBStateCache.GetActorStates(dsn, actorID)
+	if !ok {
+		allActorStates, err := dbsm.Segment.GetAllActorStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := dbsm.DBStateCache.SetActorStates(dsn, allActorStates); err != nil {
+			return nil, err
+		}
+
+		actorStates, _ := dbsm.DBStateCache.GetActorStates(dsn, actorID)
+		return actorStates, nil
+	}
+
+	return actorStates, nil
+}
+
+func (dbsm *DataBaseStateManager) GetAllActorStates(ctx context.Context, dsn string) ([]smodel.SegmentState, error) {
+	actorStates, ok := dbsm.DBStateCache.GetAllActorStates(dsn)
+	if !ok {
+		actorStates, err := dbsm.Segment.GetAllActorStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := dbsm.DBStateCache.SetActorStates(dsn, actorStates); err != nil {
+			return nil, err
+		}
+
+		return actorStates, nil
+	}
+
+	return actorStates, nil
+}
+
+func (dbsm *DataBaseStateManager) GetActorMethodStates(ctx context.Context, dsn, actorID, methodName string) ([]smodel.SegmentState, error) {
+	actorMethodStates, ok := dbsm.DBStateCache.GetActorMethodStates(dsn, actorID, methodName)
+	if !ok {
+		allActorMethodStates, err := dbsm.Segment.GetAllActorMethodStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		//if !found {
+		//	return smodel.SegmentState{}, ErrNotFound
+		//}
+
+		if err := dbsm.DBStateCache.SetActorMethodStates(dsn, allActorMethodStates); err != nil {
+			return nil, err
+		}
+
+		actorMethodStates, _ := dbsm.DBStateCache.GetActorMethodStates(dsn, actorID, methodName)
+		return actorMethodStates, nil
+	}
+
+	return actorMethodStates, nil
+}
+
+func (dbsm *DataBaseStateManager) GetAllActorMethodStates(ctx context.Context, dsn string) ([]smodel.SegmentState, error) {
+	actorMethodStates, ok := dbsm.DBStateCache.GetAllActorMethodStates(dsn)
+	if !ok {
+		actorMethodStates, err := dbsm.Segment.GetAllActorMethodStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := dbsm.DBStateCache.SetActorMethodStates(dsn, actorMethodStates); err != nil {
+			return nil, err
+		}
+
+		return actorMethodStates, nil
+	}
+
+	return actorMethodStates, nil
+}
+
+func (dbsm *DataBaseStateManager) GetActorTransferStates(ctx context.Context, dsn string, actorID string) ([]smodel.SegmentState, error) {
+	actorTransferStates, ok := dbsm.DBStateCache.GetActorTransferStates(dsn, actorID)
+	if !ok {
+		allActorTransferStates, err := dbsm.Segment.GetAllActorTransferStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := dbsm.DBStateCache.SetActorTransferStates(dsn, allActorTransferStates); err != nil {
+			return nil, err
+		}
+
+		actorTransferStates, _ := dbsm.DBStateCache.GetActorTransferStates(dsn, actorID)
+		return actorTransferStates, nil
+	}
+
+	return actorTransferStates, nil
+}
+
+func (dbsm *DataBaseStateManager) GetAllActorTransferStates(ctx context.Context, dsn string) ([]smodel.SegmentState, error) {
+	actorTransferStates, ok := dbsm.DBStateCache.GetAllActorTransferStates(dsn)
+	if !ok {
+		actorTransferStates, err := dbsm.Segment.GetAllActorTransferStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := dbsm.DBStateCache.SetActorTransferStates(dsn, actorTransferStates); err != nil {
+			return nil, err
+		}
+
+		return actorTransferStates, nil
+	}
+
+	return actorTransferStates, nil
+}
+
+func (dbsm *DataBaseStateManager) GetMinedStates(ctx context.Context, dsn string, actorID string) ([]smodel.SegmentState, error) {
+	minedStates, ok := dbsm.DBStateCache.GetMinedStates(dsn, actorID)
+	if !ok {
+		allMinedStates, err := dbsm.Segment.GetAllMinedStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := dbsm.DBStateCache.SetMinedStates(dsn, allMinedStates); err != nil {
+			return nil, err
+		}
+
+		minedStates, _ := dbsm.DBStateCache.GetMinedStates(dsn, actorID)
+		return minedStates, nil
+	}
+
+	return minedStates, nil
+}
+
+func (dbsm *DataBaseStateManager) GetAllMinedStates(ctx context.Context, dsn string) ([]smodel.SegmentState, error) {
+	minedStates, ok := dbsm.DBStateCache.GetAllMinedStates(dsn)
+	if !ok {
+		minedStates, err := dbsm.Segment.GetAllMinedStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := dbsm.DBStateCache.SetMinedStates(dsn, minedStates); err != nil {
+			return nil, err
+		}
+
+		return minedStates, nil
+	}
+
+	return minedStates, nil
+}
+
+func (dbsm *DataBaseStateManager) GetLargeAmountTransferStates(ctx context.Context, dsn string) ([]smodel.SegmentState, error) {
+	largeAmountTransferStates, ok := dbsm.DBStateCache.GetLargeAmountTransferStates(dsn)
+	if !ok {
+		largeAmountTransferStates, err := dbsm.Segment.GetLargeAmountTransferStates(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := dbsm.DBStateCache.SetLargeAmountTransferStates(dsn, largeAmountTransferStates); err != nil {
+			return nil, err
+		}
+
+		return largeAmountTransferStates, nil
+	}
+
+	return largeAmountTransferStates, nil
 }
 
 func (dbsm *DataBaseStateManager) GetCfgLastModifyTime() int64 {
@@ -108,35 +319,35 @@ func (dbsm *DataBaseStateManager) GetCfgLastModifyTime() int64 {
 	return dbsm.DBCfg.Cfg.LastModifyTime
 }
 
-func (dbsm *DataBaseStateManager) GetCfg() Config {
+func (dbsm *DataBaseStateManager) GetCfg() config2.Config {
 	dbsm.DBCfg.DBCollectionsConfigLk.Lock()
 	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
 
 	return dbsm.DBCfg.Cfg
 }
 
-func (dbsm *DataBaseStateManager) GetTmpCfg() DB {
+func (dbsm *DataBaseStateManager) GetTmpCfg() config2.DB {
 	dbsm.DBCfg.DBCollectionsConfigLk.Lock()
 	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
 
 	return dbsm.DBCfg.Cfg.Tmp
 }
 
-func (dbsm *DataBaseStateManager) GetFormalCfg() DB {
+func (dbsm *DataBaseStateManager) GetFormalCfg() config2.DB {
 	dbsm.DBCfg.DBCollectionsConfigLk.Lock()
 	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
 
 	return dbsm.DBCfg.Cfg.Formal
 }
 
-func (dbsm *DataBaseStateManager) GetColdsCfg() []DB {
+func (dbsm *DataBaseStateManager) GetColdsCfg() []config2.DB {
 	dbsm.DBCfg.DBCollectionsConfigLk.Lock()
 	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
 
 	return dbsm.DBCfg.Cfg.Colds
 }
 
-func (dbsm *DataBaseStateManager) UpdateColdsCfg(db DB) bool {
+func (dbsm *DataBaseStateManager) UpdateColdsCfg(db config2.DB) bool {
 	var exist bool
 	colds := dbsm.GetColdsCfg()
 
@@ -157,7 +368,7 @@ func (dbsm *DataBaseStateManager) UpdateColdsCfg(db DB) bool {
 	return exist
 }
 
-func (dbsm *DataBaseStateManager) ReplaceColdsCfg(dbs []DB) {
+func (dbsm *DataBaseStateManager) ReplaceColdsCfg(dbs []config2.DB) {
 	dbsm.DBCfg.DBCollectionsConfigLk.Lock()
 	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
 
@@ -166,7 +377,7 @@ func (dbsm *DataBaseStateManager) ReplaceColdsCfg(dbs []DB) {
 	return
 }
 
-func (dbsm *DataBaseStateManager) GetDBCollections(url string) (Collections, bool) {
+func (dbsm *DataBaseStateManager) GetDBCollections(url string) (config2.Collections, bool) {
 	dbsm.DBCfg.DBCollectionsConfigLk.Lock()
 	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
 
@@ -175,17 +386,17 @@ func (dbsm *DataBaseStateManager) GetDBCollections(url string) (Collections, boo
 		return cols, true
 	}
 
-	return Collections{}, false
+	return config2.Collections{}, false
 }
 
-func (dbsm *DataBaseStateManager) SetConfig(cfg Config) {
+func (dbsm *DataBaseStateManager) SetConfig(cfg config2.Config) {
 	dbsm.DBCfg.DBCollectionsConfigLk.Lock()
 	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
 
 	dbsm.DBCfg.Cfg = cfg
 }
 
-func (dbsm *DataBaseStateManager) UpdateDBCollectionsMap(url string, collections Collections) {
+func (dbsm *DataBaseStateManager) UpdateDBCollectionsMap(url string, collections config2.Collections) {
 	dbsm.DBCfg.DBCollectionsConfigLk.Lock()
 	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
 
@@ -202,21 +413,21 @@ func FirstLoad(ctx context.Context, dbsm *DataBaseStateManager) error {
 		return err
 	}
 
-	if err := dbsm.LoadDBStateCache(); err != nil {
+	if err := dbsm.LoadDBStateCache(ctx); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func Reload(ctx context.Context, dbsm *DataBaseStateManager) {
+func Reload(ctx context.Context, dbsm *DataBaseStateManager, cfgPath string) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			if err := dbsm.MonitorConfig(ctx, ConfigFilePath(dbsm.GetRepoPath())); err != nil {
+			if err := dbsm.MonitorConfig(ctx, cfgPath); err != nil {
 				log.Error(err)
 				continue
 			}
@@ -245,14 +456,14 @@ func (dbsm *DataBaseStateManager) MonitorConfig(ctx context.Context, cfgPath str
 	if curModifyTime > lastModifyTime {
 		log.Infof("curModifyTime %v > lastModifyTime %v", curModifyTime, lastModifyTime)
 		// reload config
-		cfg := Config{}
+		cfg := config2.Config{}
 		_, err = config.FromReader(file, &cfg)
 		if err != nil {
 			return err
 		}
 
 		cfg.LastModifyTime = time.Now().Unix()
-		err = WriteToConfig(cfgPath, cfg)
+		err = config2.WriteToConfig(cfgPath, cfg)
 		if err != nil {
 			return err
 		}
@@ -263,7 +474,7 @@ func (dbsm *DataBaseStateManager) MonitorConfig(ctx context.Context, cfgPath str
 			return err
 		}
 
-		if err := dbsm.LoadDBStateCache(); err != nil {
+		if err := dbsm.LoadDBStateCache(ctx); err != nil {
 			return err
 		}
 	}
@@ -310,7 +521,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 
 		cols := make([]*mongo.Collection, 0)
 		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol)
-		dbsm.UpdateDBCollectionsMap(db.Url(), Collections{DB: database, Cols: cols})
+		dbsm.UpdateDBCollectionsMap(db.Url(), config2.Collections{DB: database, Cols: cols})
 	}
 
 	if tmp.IsInvalidDB() {
@@ -339,12 +550,12 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 
 	cols := make([]*mongo.Collection, 0)
 	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol)
-	dbsm.UpdateDBCollectionsMap(tmp.Url(), Collections{DB: database, Cols: cols})
+	dbsm.UpdateDBCollectionsMap(tmp.Url(), config2.Collections{DB: database, Cols: cols})
 
 	return nil
 }
 
-func (dbsm *DataBaseStateManager) LoadDBStateCache() error {
+func (dbsm *DataBaseStateManager) LoadDBStateCache(ctx context.Context) error {
 	colds := dbsm.GetColdsCfg()
 	formal := dbsm.GetFormalCfg()
 
@@ -357,43 +568,36 @@ func (dbsm *DataBaseStateManager) LoadDBStateCache() error {
 			continue
 		}
 
-		if _, ok := dbsm.DBStateCache.GetDataBase(cold.Url()); !ok {
-			dbState, found, err := dbsm.Stm.LoadDataBaseState(cold.Url())
-			if err != nil {
-				return err
-			}
+		_, found, err := dbsm.GetState(ctx, cold.Url())
+		if err != nil {
+			return err
+		}
 
-			if !found {
-				return fmt.Errorf("db %v not found in DataBaseState, please run cfgUpdateCmd firstly", cold.Url())
-			}
-
-			dbsm.DBStateCache.SetDataBase(cold.Url(), &dbState)
+		if !found {
+			return fmt.Errorf("state of dsn %v not found, please run cfgUpdateCmd firstly", cold.Url())
 		}
 	}
 
 	if formal.IsInvalidDB() {
 		log.Warnf("db %v is invalid", formal)
 	} else {
-		if _, ok := dbsm.DBStateCache.GetDataBase(formal.Url()); !ok {
-			_, found, err := dbsm.Stm.LoadDataBaseState(formal.Url())
-			if err != nil {
-				return err
-			}
+		_, found, err := dbsm.GetState(ctx, formal.Url())
+		if err != nil {
+			return err
+		}
 
-			// todo: 逐步递增加载formal
-			if !found {
-				return fmt.Errorf("db %v not found in DataBaseState, please run cfgUpdateCmd firstly", formal.Url())
-			}
+		if !found {
+			return fmt.Errorf("state of dsn %v not found, please run cfgUpdateCmd firstly", formal.Url())
 		}
 	}
 
 	return nil
 }
 
-func GetCollectionsForDB(ctx context.Context, db DB) (Collections, error) {
+func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collections, error) {
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(db.Url()).SetRegistry(bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{})).Build()))
 	if err != nil {
-		return Collections{}, err
+		return config2.Collections{}, err
 	}
 	//defer client.Disconnect(ctx) //nolint:errcheck
 	database := client.Database(db.Name())
@@ -421,10 +625,10 @@ func GetCollectionsForDB(ctx context.Context, db DB) (Collections, error) {
 	cols := make([]*mongo.Collection, 0)
 	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol)
 
-	return Collections{DB: database, Cols: cols}, nil
+	return config2.Collections{DB: database, Cols: cols}, nil
 }
 
-func GetTipSetStartEpoch(ctx context.Context, cols Collections) (abi.ChainEpoch, error) {
+func GetTipSetStartEpoch(ctx context.Context, cols config2.Collections) (abi.ChainEpoch, error) {
 	var boundaryRes []Boundrary
 	pipe, err := util.Parse(model.Ctx{}, string(monitor.GetBoundaryOfDBAggregator()))
 	if err != nil {
@@ -458,7 +662,7 @@ func GetTipSetStartEpoch(ctx context.Context, cols Collections) (abi.ChainEpoch,
 
 }
 
-func GetEndEpoch(ctx context.Context, cols Collections) (abi.ChainEpoch, error) {
+func GetEndEpoch(ctx context.Context, cols config2.Collections) (abi.ChainEpoch, error) {
 	var finalHeightRes []model.FinalHeightRes
 	pipe, err := util.Parse(model.Ctx{}, string(monitor.GetFinalHeightAggregator()))
 	if err != nil {
@@ -491,7 +695,7 @@ func GetEndEpoch(ctx context.Context, cols Collections) (abi.ChainEpoch, error) 
 }
 
 // tmp不管
-func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols Collections, dbType string) (Boundrary, error) {
+func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols config2.Collections, dbType smodel.DType) (Boundrary, error) {
 	cfg := dbsm.GetCfg()
 	countUtils := make([]CountUtil, 0)
 	for _, cold := range cfg.Colds {
@@ -499,12 +703,16 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols Col
 			continue
 		}
 
-		dbState, ok, err := dbsm.Stm.LoadDataBaseState(cold.Url())
-		if err != nil || !ok {
+		state, found, err := dbsm.GetState(ctx, cold.Url())
+		if err != nil {
 			return Boundrary{}, fmt.Errorf("load dbState for cold %v failed", cold.Url())
 		}
 
-		countUtils = append(countUtils, CountUtil{Start: int64(dbState.StartEpoch), End: int64(dbState.EndEpoch)})
+		if !found {
+			return Boundrary{}, fmt.Errorf("state of dsn %v not found, please run cfgUpdateCmd firstly", cold.Url())
+		}
+
+		countUtils = append(countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch())})
 	}
 
 	// 逆序排序
@@ -524,7 +732,7 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols Col
 	}
 
 	switch dbType {
-	case "formal":
+	case smodel.Formal:
 		// end: finalheight+1
 
 		// start
@@ -544,7 +752,7 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols Col
 
 		// [start, end) [1,6) [3,6) [3,4) [1,4)  [2,4)（大，小】 [11,2)
 		// [2,3)  [5,8)  [10,11)  [13, ...)   [2,5) [8,10) [11,13)
-	case "cold":
+	case smodel.Cold:
 		// 添加上下边界
 		minStartEpoch := int64(0)
 		if len(countUtils) > 0 {
@@ -552,12 +760,16 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols Col
 		}
 
 		if !cfg.Formal.IsInvalidDB() {
-			formalState, found, err := dbsm.Stm.LoadDataBaseState(cfg.Formal.Url())
-			if err != nil || !found {
+			formalState, found, err := dbsm.GetState(ctx, cfg.Formal.Url())
+			if err != nil {
 				return Boundrary{}, fmt.Errorf("load dbState for formal %v failed", cfg.Formal.Url())
 			}
 
-			countUtils = append(countUtils, CountUtil{Start: int64(formalState.StartEpoch), End: math.MaxInt64})
+			if !found {
+				return Boundrary{}, fmt.Errorf("state of dsn %v not found", cfg.Formal.Url())
+			}
+
+			countUtils = append(countUtils, CountUtil{Start: int64(formalState.GetStartEpoch()), End: math.MaxInt64})
 			// 逆序排序
 			sort.Slice(countUtils, func(i, j int) bool {
 				return countUtils[i].End > countUtils[j].End
@@ -667,7 +879,7 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols Col
 	}
 }
 
-func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, newDB DB, dbType string, formal, tmp bool) error {
+func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, newDB config2.DB, dbType smodel.DType, interval abi.ChainEpoch) error {
 	cols, err := GetCollectionsForDB(ctx, newDB)
 	if err != nil {
 		log.Errorf("get collections for DB %v failed: %v", newDB, cols)
@@ -682,149 +894,138 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 
 	log.Infow("get boundary for db", "db", newDB, "boundary", boundary)
 
-	dbState := DefaultDataBaseState(formal, tmp, boundary.Start, boundary.End)
+	dbState := segment.DefaultState(newDB.Url(), dbType, interval, boundary.Start, boundary.End)
 	if err != nil {
 		return err
 	}
 
-	if !tmp && !formal {
-		log.Infow("begin RefreshDataBaseState...")
-		//if err := RefreshDataBaseState(ctx, dbState, cols); err != nil {
-		//	log.Errorf("refresh DataBaseState failed: %v", err)
+	if dbType == smodel.Cold {
+		log.Infof("暂不处理cold")
+		return nil
+
+		//log.Infow("begin RefreshDataBaseState...")
+		////if err := RefreshDataBaseState(ctx, dbState, cols); err != nil {
+		////	log.Errorf("refresh DataBaseState failed: %v", err)
+		////	return err
+		////}
+		//
+		//log.Infow("begin SetBlockState...")
+		//
+		//slog := log.With("segment")
+		//// todo: 暂时不对cold分段
+		//blockStates, err := GetBlockStates(ctx, dbState, cols, "", "")
+		//if err != nil {
 		//	return err
 		//}
-
-		log.Infow("begin RefreshBlockMsgs...")
-		count, err := RefreshBlockMsgs(ctx, dbState, cols, "", "")
-		if err != nil {
-			return err
-		}
-
-		dbState.BlockMsgsCount = count
-		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-			log.Errorf("set DataBaseState failed: %v", err)
-			return err
-		}
-
-		log.Infow("begin RefreshBlockMsgsByMethodName...")
-		allBlockMethodNames, err := GetAllBlockMethodNamesMap(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-		if err != nil {
-			return err
-		}
-
-		for _, allBlockMethodName := range allBlockMethodNames {
-			dbState.BlockMsgsByMethodNameMap[allBlockMethodName.MethodName] += allBlockMethodName.Count
-		}
-
-		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-			log.Errorf("set DataBaseState failed: %v", err)
-			return err
-		}
-
-		log.Infow("begin RefreshActorMsgsByMethodName...")
-		allActorsMethods, err := GetAllActorsMethods(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-		if err != nil {
-			return err
-		}
-
-		for _, allActorMethods := range allActorsMethods {
-			if _, ok := dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName]; !ok {
-				dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName] = make(map[string]int64)
-				dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] = allActorMethods.Count
-			} else {
-				dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] += allActorMethods.Count
-			}
-		}
-
-		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-			log.Errorf("set DataBaseState failed: %v", err)
-			return err
-		}
-
-		log.Infow("begin RefreshActorMsgs...")
-		allActorsMsgsCount, err := GetAllActorsMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-		if err != nil {
-			return err
-		}
-
-		for _, allActorMsgsCount := range allActorsMsgsCount {
-			dbState.ActorMsgsCountMap[allActorMsgsCount.ActorID] += allActorMsgsCount.Count
-		}
-
-		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-			log.Errorf("set DataBaseState failed: %v", err)
-			return err
-		}
-
-		log.Infow("begin RefreshActorTransferMsgs...")
-		allActorsTransferMsgsCount, err := GetAllActorsTransferMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-		if err != nil {
-			return err
-		}
-
-		for _, allActorTransferMsgsCount := range allActorsTransferMsgsCount {
-			dbState.ActorTransfersCountMap[allActorTransferMsgsCount.ActorID] += allActorTransferMsgsCount.Count
-		}
-
-		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-			log.Errorf("set DataBaseState failed: %v", err)
-			return err
-		}
-
-		log.Infow("begin RefreshMinedMsgsMaps...")
-		allMinersMinedCount, err := GetAllMinersMinedCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-		if err != nil {
-			return err
-		}
-
-		for _, allMinerMinedCount := range allMinersMinedCount {
-			dbState.MinedMsgsMap[allMinerMinedCount.ActorID] += allMinerMinedCount.Count
-		}
-
-		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-			log.Errorf("set DataBaseState failed: %v", err)
-			return err
-		}
-
-		log.Infow("begin RefreshTransfersForLargeAmount...")
-		transfersLargeAmountCount, err := RefreshTransfersForLargeAmount(ctx, dbState, cols, "", "")
-		if err != nil {
-			return err
-		}
-
-		dbState.TransfersLargeAmountCount = transfersLargeAmountCount
-
-		if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-			log.Errorf("set DataBaseState failed: %v", err)
-			return err
-		}
-
-		return nil
+		//
+		//err = dbsm.Segment.SetBlockState(ctx, slog, blockStates)
+		//if err != nil {
+		//	log.Errorf("set DataBaseState failed: %v", err)
+		//	return err
+		//}
+		//
+		//log.Infow("begin RefreshBlockMsgsByMethodName...")
+		//allBlockMethodNames, err := GetAllBlockMethodNamesMap(ctx, dbState.GetStartEpoch(), dbState.GetEndEpoch(), cols)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//for _, allBlockMethodName := range allBlockMethodNames {
+		//	dbState.BlockMsgsByMethodNameMap[allBlockMethodName.MethodName] += allBlockMethodName.Count
+		//}
+		//
+		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		//	log.Errorf("set DataBaseState failed: %v", err)
+		//	return err
+		//}
+		//
+		//log.Infow("begin RefreshActorMsgsByMethodName...")
+		//allActorsMethods, err := GetAllActorsMethods(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//for _, allActorMethods := range allActorsMethods {
+		//	if _, ok := dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName]; !ok {
+		//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName] = make(map[string]int64)
+		//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] = allActorMethods.Count
+		//	} else {
+		//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] += allActorMethods.Count
+		//	}
+		//}
+		//
+		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		//	log.Errorf("set DataBaseState failed: %v", err)
+		//	return err
+		//}
+		//
+		//log.Infow("begin RefreshActorMsgs...")
+		//allActorsMsgsCount, err := GetAllActorsMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//for _, allActorMsgsCount := range allActorsMsgsCount {
+		//	dbState.ActorMsgsCountMap[allActorMsgsCount.ActorID] += allActorMsgsCount.Count
+		//}
+		//
+		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		//	log.Errorf("set DataBaseState failed: %v", err)
+		//	return err
+		//}
+		//
+		//log.Infow("begin RefreshActorTransferMsgs...")
+		//allActorsTransferMsgsCount, err := GetAllActorsTransferMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//for _, allActorTransferMsgsCount := range allActorsTransferMsgsCount {
+		//	dbState.ActorTransfersCountMap[allActorTransferMsgsCount.ActorID] += allActorTransferMsgsCount.Count
+		//}
+		//
+		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		//	log.Errorf("set DataBaseState failed: %v", err)
+		//	return err
+		//}
+		//
+		//log.Infow("begin RefreshMinedMsgsMaps...")
+		//allMinersMinedCount, err := GetAllMinersMinedCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//for _, allMinerMinedCount := range allMinersMinedCount {
+		//	dbState.MinedMsgsMap[allMinerMinedCount.ActorID] += allMinerMinedCount.Count
+		//}
+		//
+		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		//	log.Errorf("set DataBaseState failed: %v", err)
+		//	return err
+		//}
+		//
+		//log.Infow("begin RefreshTransfersForLargeAmount...")
+		//transfersLargeAmountCount, err := RefreshTransfersForLargeAmount(ctx, dbState, cols, "", "")
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//dbState.TransfersLargeAmountCount = transfersLargeAmountCount
+		//
+		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+		//	log.Errorf("set DataBaseState failed: %v", err)
+		//	return err
+		//}
+		//
+		//return nil
 	}
 
-	if formal {
-		var ewg multierror.Group
-		for i := range addupes {
-			i := i
-			addup := addupes[i]
-			ewg.Go(func() error {
-				if err := addup(ctx, dbState, cols); err != nil {
-					return err
-				}
-
-				return nil
-			})
+	if dbType == smodel.Formal {
+		slog := log.With("segment", "AddUpBlockState")
+		err := dbsm.Segment.AddUpBlockState(ctx, slog, boundary.End, dbState, cols)
+		if err != nil {
+			return fmt.Errorf("addup blockstate for %v failed: %w", newDB.Url(), err)
 		}
-
-		if err := ewg.Wait(); err != nil {
-			log.Errorf("RefreshFormalDataBaseState failed: %v", err)
-			return err
-		}
-	}
-
-	if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		log.Errorf("set DataBaseState failed: %v", err)
-		return err
 	}
 
 	return nil
