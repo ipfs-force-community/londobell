@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 
 	"context"
 
@@ -40,13 +41,6 @@ func GetDealsByAddr(c *gin.Context) {
 		return
 	}
 
-	latestEpoch, err := GetLatestEpoch(ctx, cols, "DealProposal")
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
 	api := fullnode.API.GetAppropriateAPI()
 	addrs, err := GetAllAddrs(ctx, req.Addr, api)
 	if err != nil {
@@ -65,13 +59,6 @@ func GetDealsByAddr(c *gin.Context) {
 		}
 	}
 
-	totalCount, err := GetTotalCountForDealsByAddr(ctx, cols, ID, addrs, latestEpoch)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
 	curEpoch := common.GetCurEpoch()
 
 	countUtils, err := multiquery.GetEpochRange(ctx, &multiquery.DBStateManager, curEpoch)
@@ -81,11 +68,47 @@ func GetDealsByAddr(c *gin.Context) {
 		return
 	}
 
+	for _, countUtil := range countUtils {
+		totalCount := int64(0)
+		for start := countUtil.Start; start < countUtil.End; start++ {
+			// 只有零点会存
+			if common.IsZeroHour(true, abi.ChainEpoch(start)) {
+				count, err := GetTotalCountForDealsByAddr(ctx, cols, ID, addrs, abi.ChainEpoch(start))
+				if err != nil {
+					alog.Error(err)
+					util.ReturnOnErr(c, err)
+					return
+				}
+
+				totalCount += count
+			}
+		}
+
+		countUtil.Count = totalCount
+	}
+
+	var totalCount = int64(0)
+	for _, countUtil := range countUtils {
+		totalCount += countUtil.Count
+	}
+
+	sort.Slice(countUtils, func(i, j int) bool {
+		return countUtils[i].Start > countUtils[j].End
+	})
+
+	length := len(countUtils)
+	if length == 0 {
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	startEpoch, endEpoch := countUtils[length-1].Start, countUtils[0].End
+
 	var deals []model.Deal
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, int64(latestEpoch), int64(latestEpoch)+1, countUtils, dealsByAddrAggregator, req, "DealProposal")
+		multiResult, err := multiquery.MultiRangeQuery(ctx, startEpoch, endEpoch, countUtils, dealsByAddrAggregator, req, "DealProposal")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
