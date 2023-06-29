@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -41,13 +42,21 @@ func GetBlockHeaderMessagesByMethodName(c *gin.Context) {
 	}
 
 	var (
-		blockHeaderMessagesByMethodNameRes model.BlockHeaderMessagesByMethodNameRes
-		messagesForBlockByMethodNameRes    []model.TraceForMessageRes
+		countOfBlockHeaderMessagesByMethodNameRes model.CountOfBlockHeaderMessagesByMethodNameRes
+		blockHeaderMessagesByMethodNameRes        model.BlockHeaderMessagesByMethodNameRes
+		messagesForBlockByMethodNameRes           []model.BlockHeaderMessage
 	)
+
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid, MethodName: req.MethodName}, string(countOfMessagesForBlockHeaderByMethodNameAggregator))
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
 
 	// multi dbs query
 	{
-		totalCountResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, countOfMessagesForBlockHeaderByMethodNameAggregator, req, "BlockMessage")
+		totalCountResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "BlockMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
@@ -67,14 +76,25 @@ func GetBlockHeaderMessagesByMethodName(c *gin.Context) {
 			return
 		}
 
-		err = json.Unmarshal(countRawByte, &blockHeaderMessagesByMethodNameRes)
+		err = json.Unmarshal(countRawByte, &countOfBlockHeaderMessagesByMethodNameRes)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
 		}
 
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, blockHeaderMessagesByMethodNameAggregator, req, "MessageBlock")
+		epoch := countOfBlockHeaderMessagesByMethodNameRes.Epoch
+		count := countOfBlockHeaderMessagesByMethodNameRes.TotalCount
+
+		blockHeaderMessagesByMethodNameRes.TotalCount = count
+
+		for i := range countUtils {
+			if epoch >= countUtils[i].Start && epoch < countUtils[i].End {
+				countUtils[i].BlockMethodStates = count // todo: state再议
+			}
+		}
+
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.BlockMethodStates, countUtils, blockHeaderMessagesByMethodNameAggregator, req, "BlockMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
