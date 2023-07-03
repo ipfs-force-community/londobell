@@ -571,7 +571,14 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 
 			for ID, mtype := range storeMap {
-				amsg, err := model.NewActorMessage(ID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock, p.seq)
+				var eventsRoot cid.Cid
+				if p.exec != nil && p.exec.MsgRct.Version() == types.MessageReceiptV1 {
+					if p.exec.MsgRct.EventsRoot != nil {
+						eventsRoot = *p.exec.MsgRct.EventsRoot
+					}
+				}
+
+				amsg, err := model.NewActorMessage(ID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock, p.seq, eventsRoot)
 				if err != nil {
 					elog.Errorw("convert to model.ActorMessage", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
 				} else {

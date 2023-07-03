@@ -32,9 +32,10 @@ type ActorMessage struct {
 	From       address.Address
 	To         address.Address
 	IsBlock    bool // 是否是块消息
+	EventsRoot cid.Cid
 }
 
-func NewActorMessage(actorID address.Address, epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, mtype string, from, to address.Address, isBlock bool, seq []int) (*ActorMessage, error) {
+func NewActorMessage(actorID address.Address, epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, mtype string, from, to address.Address, isBlock bool, seq []int, eventsRoot cid.Cid) (*ActorMessage, error) {
 	am := &ActorMessage{
 		ActorID:    actorID,
 		Epoch:      epoch,
@@ -47,6 +48,7 @@ func NewActorMessage(actorID address.Address, epoch abi.ChainEpoch, cid, signedC
 		From:       from,
 		To:         to,
 		IsBlock:    isBlock,
+		EventsRoot: eventsRoot,
 	}
 
 	am.genID(epoch, mtype, seq)
@@ -60,6 +62,7 @@ func (am *ActorMessage) Indexes() [][]string {
 		[]string{"ActorID", "IsBlock", actorMessageEpochField},
 		[]string{"ActorID", "IsBlock", "MethodName", actorMessageEpochField},
 		[]string{"ActorID", "ExitCode", "Type", actorMessageEpochField, "Value"},
+		[]string{"ActorID", "IsBlock", "EventsRoot", actorMessageEpochField},
 	}
 }
 
