@@ -17,6 +17,7 @@ const (
 	ActorStates
 	ActorMethodStates
 	ActorTransferStates
+	ActorEventStates
 	MinedStates
 	LargeAmountTransferStates
 )
@@ -40,6 +41,7 @@ type CountUtil struct {
 	ActorStates               int64
 	ActorMethodStates         int64
 	ActorTransferStates       int64
+	ActorEventStates          int64
 	MinedStates               int64
 	LargeAmountTransferStates int64
 }
@@ -59,6 +61,7 @@ type segmentUtil struct {
 	ActorStates               int64
 	ActorMethodStates         int64
 	ActorTransferStates       int64
+	ActorEventStates          int64
 	MinedStates               int64
 	LargeAmountTransferStates int64
 }

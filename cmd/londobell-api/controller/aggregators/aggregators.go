@@ -63,6 +63,9 @@ var (
 	countOfLargeAmountTransfersAggregator []byte
 	transferMsgsForActorAggregator        []byte
 	childCallsForMessageAggregator        []byte
+	eventsByActorAggregator               []byte
+	eventsForMessageAggregator            []byte
+	eventsForEpochRangeAggregator         []byte
 )
 
 type Methodlist struct {
@@ -143,4 +146,7 @@ func InitAggregators() {
 	countOfLargeAmountTransfersAggregator = monitor.GetCountOfLargeAmountTransfersAggregator()
 	transferMsgsForActorAggregator = monitor.GetTransferMsgsForActorAggregator()
 	childCallsForMessageAggregator = monitor.GetChildCallsForMessageAggregator()
+	eventsByActorAggregator = monitor.GetEventsByActorAggregator()
+	eventsForMessageAggregator = monitor.GetEventsForMessageAggregator()
+	eventsForEpochRangeAggregator = monitor.GetEventsForEpochRangeAggregator()
 }
