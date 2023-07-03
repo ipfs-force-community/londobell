@@ -461,6 +461,37 @@ func GetTotalCountForActorTransferMsgs(ctx context.Context, actorID string, dbsm
 	return countUtils, nil
 }
 
+func GetTotalCountForActorEvents(ctx context.Context, actor string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
+	api := fullnode.API.GetAppropriateAPI()
+
+	addr, err := address.NewFromString(buildnet.NetPrefix + actor)
+	if err != nil {
+		return nil, err
+	}
+
+	actorID := actor
+	switch addr.Protocol() {
+	case address.ID:
+		actorID = addr.String()[1:]
+	case address.SECP256K1, address.Actor, address.BLS, address.Delegated:
+		ID, err := api.StateLookupID(ctx, addr, types.EmptyTSK)
+		if err != nil {
+			return nil, err
+		}
+
+		actorID = ID.String()[1:]
+	default:
+		return nil, fmt.Errorf("unknow address type for actor %v", actor)
+	}
+
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	return countUtils, nil
+}
+
 //出块列表 BlockHeader查，现在就是这样
 func GetTotalCountForMinedMsgsMap(ctx context.Context, minerID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForMinedMsgsMap")
@@ -1110,6 +1141,47 @@ func refreshTotalCountForActorTransferMsgs(ctx context.Context, state *segment.S
 	}
 }
 
+func refreshTotalCountForActorEvents(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+	switch state.GetDType() {
+	case smodel.Formal:
+		count, err := GetActorEventStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count})
+		*tmpStartEpoch = state.GetEndEpoch()
+		return nil
+	case smodel.Tmp:
+		state.SetStartEpoch(*tmpStartEpoch)
+		state.SetEndEpoch(curEpoch + 1)
+
+		count, err := GetActorEventStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count})
+		return nil
+	case smodel.Cold:
+		/// todo: 暂时不管冷库
+		//actorStates, err := DBStateManager.GetActorEventStates(ctx, state.GetDSN(), actorID)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//count := int64(0)
+		//for _, aes := range actorEventStates {
+		//	count += aes.Count
+		//}
+		//
+		//*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count})
+		return nil
+	default:
+		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
+	}
+}
+
 func refreshTotalCountForMinedMsgsMap(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
@@ -1501,6 +1573,49 @@ func GetActorTransferStates(ctx context.Context, state *segment.State, cols comm
 	}
 
 	return 0, fmt.Errorf("no ActorMessage collection")
+}
+
+func GetActorEventStates(ctx context.Context, state *segment.State, cols common.Collections, actorID string) (int64, error) {
+	rlog := log.With("query", "GetActorEventStates")
+
+	start := time.Now()
+	startEpoch, endEpoch := state.GetStartEpoch(), state.GetEndEpoch()
+	defer func() {
+		rlog.Infof("refresh ActorEventStates successfully for [%v, %v), elapsed: %v", startEpoch, endEpoch, time.Now().Sub(start).String())
+	}()
+
+	var countRes []model.CountRes
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetCountOfEventsForActorAggregator()))
+	if err != nil {
+		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+		return 0, err
+	}
+
+	tableName := "ActorEvent"
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == tableName {
+			cur, err := col.Aggregate(ctx, pipe)
+			if err != nil {
+				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			err = cur.All(ctx, &countRes)
+			if err != nil {
+				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			if len(countRes) == 0 {
+				rlog.Warnf("no actor between %v and %v", startEpoch, endEpoch)
+				return 0, nil
+			}
+
+			return countRes[0].Count, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no ActorEvent collection")
 }
 
 func GetMinedStates(ctx context.Context, state *segment.State, cols common.Collections, actorID string) (int64, error) {

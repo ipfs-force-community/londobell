@@ -173,6 +173,8 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 			totalCount = countlist.ActorMethodStates
 		case ActorTransferStates:
 			totalCount = countlist.ActorTransferStates
+		case ActorEventStates:
+			totalCount = countlist.ActorEventStates
 		case MinedStates:
 			totalCount = countlist.MinedStates
 		case LargeAmountTransferStates:
@@ -296,6 +298,17 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 				limit:      segmentList.limit,
 				cols:       segmentList.Cols,
 				count:      segmentList.ActorTransferStates,
+			})
+		}
+	case ActorEventStates:
+		for _, segmentList := range segmentLists {
+			aggLists = append(aggLists, &aggUtil{
+				startEpoch: segmentList.startEpoch,
+				endEpoch:   segmentList.endEpoch,
+				skip:       segmentList.skip,
+				limit:      segmentList.limit,
+				cols:       segmentList.Cols,
+				count:      segmentList.ActorEventStates,
 			})
 		}
 	case MinedStates:

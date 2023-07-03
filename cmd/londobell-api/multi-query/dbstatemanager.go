@@ -518,9 +518,10 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		eventsRootCol := database.Collection("EventsRoot")
 		stateFinalHeightCol := database.Collection("StateFinalHeight")
 		evmInitCodeCol := database.Collection("EvmInitCode")
+		actorEventCodeCol := database.Collection("ActorEvent")
 
 		cols := make([]*mongo.Collection, 0)
-		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol)
+		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol)
 		dbsm.UpdateDBCollectionsMap(db.Url(), config2.Collections{DB: database, Cols: cols})
 	}
 
@@ -547,9 +548,10 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 	eventsRootCol := database.Collection("EventsRoot")
 	stateFinalHeightCol := database.Collection("StateFinalHeight")
 	evmInitCodeCol := database.Collection("EvmInitCode")
+	actorEventCodeCol := database.Collection("ActorEvent")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol)
+	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol)
 	dbsm.UpdateDBCollectionsMap(tmp.Url(), config2.Collections{DB: database, Cols: cols})
 
 	return nil
@@ -621,9 +623,10 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 	eventsRootCol := database.Collection("EventsRoot")
 	stateFinalHeightCol := database.Collection("StateFinalHeight")
 	evmInitCodeCol := database.Collection("EvmInitCode")
+	actorEventCodeCol := database.Collection("ActorEvent")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol)
+	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol)
 
 	return config2.Collections{DB: database, Cols: cols}, nil
 }
