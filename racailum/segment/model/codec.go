@@ -90,12 +90,30 @@ func init() {
 
 	hashCodecs := append([]interface{}{ethHashBSONEncode, ethHashBSONDecode}, hashExams...)
 
+	ethBytesExams := []interface{}{}
+	for _, s := range []string{
+		strings.ToLower(`"0xd4c5fb16488Aa48081296299d54b0c648C9333dA"`),
+		strings.ToLower(`"0x2C2EC67e3e1FeA8e4A39601cB3A3Cd44f5fa830d"`),
+		strings.ToLower(`"0x01184F793982104363F9a8a5845743f452dE0586"`),
+	} {
+		var eb ethtypes.EthBytes
+		err := eb.UnmarshalJSON([]byte(s))
+		if err != nil {
+			panic(fmt.Errorf("unmarshal for %s to ethtypes.EthBytes failed: %w", s, err))
+		}
+
+		ethBytesExams = append(ethBytesExams, eb)
+	}
+
+	ethBytesCodecs := append([]interface{}{ethBytesBSONEncode, ethBytesBSONDecode}, ethBytesExams...)
+
 	// encoder, decoder, examples
 	codecs := [][]interface{}{
 		addrCodecs,
 		cidCodecs,
 		tskCodecs,
 		hashCodecs,
+		ethBytesCodecs,
 		{bigIntBSONEncode, bigIntBSONDecode, big.NewInt(1 << 10), big.NewInt(1 << 30), reward.BaselineExponent},
 		{uintptrBSONEncode, uintptrBSONDecode, uintptr(1 << 10), uintptr(1 << 30)},
 		{bitfieldBSONEncode, bitfieldBSONDecode, bitfield.New(), bitfield.NewFromSet([]uint64{1 << 10, 1 << 20, 1 << 30, 1 << 40})},
@@ -216,4 +234,15 @@ func ethHashBSONEncode(hash ethtypes.EthHash) (string, bool, error) {
 
 func ethHashBSONDecode(s string) (ethtypes.EthHash, error) {
 	return ethtypes.ParseEthHash(s)
+}
+
+// ethtypes.EthBytes
+func ethBytesBSONEncode(ethBytes ethtypes.EthBytes) (string, bool, error) {
+	return ethBytes.String(), false, nil
+}
+
+func ethBytesBSONDecode(s string) (ethtypes.EthBytes, error) {
+	var eb ethtypes.EthBytes
+	err := eb.UnmarshalJSON([]byte(s))
+	return eb, err
 }

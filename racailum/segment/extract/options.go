@@ -122,6 +122,7 @@ type EnableExtractOptions struct {
 	EnableExtractEventsRoot      bool
 	EnableExtractExplicitMessage bool
 	EnableExtractEvmByteCode     bool
+	EnableExtractActorEvent      bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -141,6 +142,7 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractEventsRoot:      true,
 		EnableExtractExplicitMessage: false,
 		EnableExtractEvmByteCode:     true,
+		EnableExtractActorEvent:      true,
 	}
 }
 

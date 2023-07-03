@@ -155,6 +155,10 @@ func init() {
 			Name: "evm-initcode",
 			D:    &model.EvmInitCode{},
 		},
+		schema.Model{
+			Name: "actor-event",
+			D:    &model.ActorEvent{},
+		},
 	)
 }
 
@@ -337,7 +341,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return nil
 	}
 
-	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot && !ctx.Opts.EnabelExtract.EnableExtractExplicitMessage && !ctx.Opts.EnabelExtract.EnableExtractEvmByteCode {
+	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot && !ctx.Opts.EnabelExtract.EnableExtractExplicitMessage && !ctx.Opts.EnabelExtract.EnableExtractEvmByteCode && !ctx.Opts.EnabelExtract.EnableExtractActorEvent {
 		return nil
 	}
 
@@ -435,7 +439,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		allmsgsMap[key] = msg
 	}
 
-	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt int
+	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt, aecnt int
 
 	if ctx.Opts.EnabelExtract.EnableExtractEthHash {
 		for _, cmsg := range allmsgs {
@@ -526,7 +530,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
+		if ctx.Opts.EnabelExtract.EnableExtractEventsRoot || ctx.Opts.EnabelExtract.EnableExtractActorEvent {
 			if p.exec != nil && p.exec.MsgRct.Version() == types.MessageReceiptV1 {
 				eventsRoot := p.exec.MsgRct.EventsRoot
 				if eventsRoot != nil {
@@ -535,12 +539,40 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 						return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
 					}
 
-					etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
-					if err != nil {
-						elog.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
-					} else {
-						res.Docs = append(res.Docs, etm)
-						etcnt++
+					if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
+						etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
+						if err != nil {
+							elog.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+						} else {
+							res.Docs = append(res.Docs, etm)
+							etcnt++
+						}
+					}
+
+					if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
+						for i, evt := range events {
+							actorID, err := address.NewIDAddress(uint64(evt.Emitter))
+							if err != nil {
+								return fmt.Errorf("failed to create ID address: %w", err)
+							}
+
+							data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
+							if !ok {
+								// not an eth event.
+								elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
+								//continue //todo
+							}
+
+							logIndex := uint64(i)
+							removed := false
+							aet, err := model.NewActorEvent(actorID, ts.Height(), mcid, signedCid, topics, data, logIndex, removed, p.seq)
+							if err != nil {
+								elog.Errorw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+							} else {
+								aecnt++
+								res.Docs = append(res.Docs, aet)
+							}
+						}
 					}
 				}
 			}
@@ -609,7 +641,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 	}
 
-	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "eth-hash", ethCnt, "events-root", etcnt, "explicit-message", emtCnt, "evm-initcode", initCodeCnt)
+	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "eth-hash", ethCnt, "events-root", etcnt, "explicit-message", emtCnt, "evm-initcode", initCodeCnt, "actor-event", aecnt)
 
 	return nil
 }
@@ -982,4 +1014,67 @@ func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, ts *types.T
 		MaxPriorityFeePerGas: ethtypes.EthBigInt(msg.GasPremium),
 		AccessList:           []ethtypes.EthHash{},
 	}
+}
+
+func ethLogFromEvent(ctx *extract.Ctx, ts *types.TipSet, entries []types.EventEntry) (data []byte, topics []ethtypes.EthHash, ok bool) {
+	elog := ctx.L.With("epoch", ts.Height())
+
+	var (
+		topicsFound      [4]bool
+		topicsFoundCount int
+		dataFound        bool
+	)
+	for _, entry := range entries {
+		// Drop events with non-raw topics to avoid mistakes.
+		if entry.Codec != cid.Raw {
+			elog.Warnw("did not expect an event entry with a non-raw codec", "codec", entry.Codec, "key", entry.Key)
+			return nil, nil, false
+		}
+		// Check if the key is t1..t4
+		if len(entry.Key) == 2 && "t1" <= entry.Key && entry.Key <= "t4" {
+			// '1' - '1' == 0, etc.
+			idx := int(entry.Key[1] - '1')
+
+			// Drop events with mis-sized topics.
+			if len(entry.Value) != 32 {
+				elog.Warnw("got an EVM event topic with an invalid size", "key", entry.Key, "size", len(entry.Value))
+				return nil, nil, false
+			}
+
+			// Drop events with duplicate topics.
+			if topicsFound[idx] {
+				elog.Warnw("got a duplicate EVM event topic", "key", entry.Key)
+				return nil, nil, false
+			}
+			topicsFound[idx] = true
+			topicsFoundCount++
+
+			// Extend the topics array
+			for len(topics) <= idx {
+				topics = append(topics, ethtypes.EthHash{})
+			}
+			copy(topics[idx][:], entry.Value)
+		} else if entry.Key == "d" {
+			// Drop events with duplicate data fields.
+			if dataFound {
+				elog.Warnw("got duplicate EVM event data")
+				return nil, nil, false
+			}
+
+			dataFound = true
+			data = entry.Value
+		} else {
+			// Skip entries we don't understand (makes it easier to extend things).
+			// But we warn for now because we don't expect them.
+			elog.Warnw("unexpected event entry", "key", entry.Key)
+		}
+
+	}
+
+	// Drop events with skipped topics.
+	if len(topics) != topicsFoundCount {
+		elog.Warnw("EVM event topic length mismatch", "expected", len(topics), "actual", topicsFoundCount)
+		return nil, nil, false
+	}
+	return data, topics, true
 }
