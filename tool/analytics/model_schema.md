@@ -13,6 +13,22 @@
 }
 ```
 
+### ActorEvent
+
+```
+{
+	"ActorID": "address.Address",
+	"Cid": "cid.Cid",
+	"Data": "ethtypes.EthBytes",
+	"Epoch": "abi.ChainEpoch",
+	"LogIndex": "uint64",
+	"Removed": "bool",
+	"SignedCid": "cid.Cid",
+	"Topics": "[]ethtypes.EthHash",
+	"_id": "string"
+}
+```
+
 ### ActorMessage
 
 ```
