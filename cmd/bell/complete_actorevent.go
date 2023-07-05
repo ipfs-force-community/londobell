@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -122,14 +124,29 @@ var completeActorEventCmd = &cli.Command{
 					return err
 				}
 
-				var res []ActorEventRes
+				var result []ActorEventRes
+				var res []bson.M
 				err = cur.All(context.TODO(), &res)
 				if err != nil {
 					return err
 				}
 
+				rawByte, err := json.Marshal(res)
+				if err != nil {
+					return err
+				}
+
+				err = json.Unmarshal(rawByte, &result)
+				if err != nil {
+					return err
+				}
+
 				var actorEvents = make([]*lmodel.ActorEvent, 0)
-				for _, r := range res {
+				for _, r := range result {
+					if r.Cid == "bafy2bzaced5geaa6xd35ffiah3favxxuzbaqk6g2xnggm4dnntgcdwzkzrfy6" {
+						fmt.Println("find")
+					}
+
 					var events []types.Event
 					event, ok := r.Events.(primitive.Binary)
 					if ok {
@@ -190,10 +207,8 @@ var completeActorEventCmd = &cli.Command{
 							return err
 						}
 
-						signedCid, err := cid.Decode(r.SignedCid)
-						if err != nil {
-							return err
-						}
+						var signedCid cid.Cid
+						signedCid, _ = cid.Decode(r.SignedCid)
 
 						data, topics, ok := ethLogFromEvent(abi.ChainEpoch(r.Epoch), evt.Entries)
 						if !ok {
@@ -255,7 +270,7 @@ var completeActorEventCmd = &cli.Command{
 }
 
 type ActorEventRes struct {
-	ID        string `bson:"_id"`
+	ID        string `bson:"_id" json:"_id"`
 	Cid       string
 	SignedCid string
 	Epoch     int64
