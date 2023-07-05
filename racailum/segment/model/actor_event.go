@@ -48,6 +48,22 @@ func NewActorEvent(actorID address.Address, epoch abi.ChainEpoch, cid, signedCid
 	return ae, nil
 }
 
+func NewActorEvent2(actorID address.Address, epoch abi.ChainEpoch, cid, signedCid cid.Cid, topics []ethtypes.EthHash, data ethtypes.EthBytes, logIndex uint64, removed bool, id string) (*ActorEvent, error) {
+	ae := &ActorEvent{
+		ID:        id,
+		ActorID:   actorID,
+		Epoch:     epoch,
+		Cid:       cid,
+		SignedCid: signedCid,
+		Topics:    topics,
+		Data:      data,
+		LogIndex:  logIndex,
+		Removed:   removed,
+	}
+
+	return ae, nil
+}
+
 // Indexes impl common.Indexed
 func (ae *ActorEvent) Indexes() [][]string {
 	return [][]string{
