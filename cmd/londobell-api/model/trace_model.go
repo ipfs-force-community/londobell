@@ -34,4 +34,5 @@ type TraceRes struct {
 	Params       interface{}
 	Detail       interface{}
 	Actor        string
+	IsBlock      bool
 }
