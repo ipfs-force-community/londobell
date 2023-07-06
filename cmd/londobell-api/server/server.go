@@ -306,6 +306,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/hash_by_messagecid", aggregators.GetHashByMessageCid)
 		group.POST("/state_final_height", aggregators.GetStateFinalHeight)
 		group.POST("/child_calls_for_message", aggregators.GetChildCallsForMessage)
+		group.POST("/test_contract_transfer", aggregators.GetTestContractTransfer)
 
 	}
 }

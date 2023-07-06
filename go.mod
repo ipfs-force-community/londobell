@@ -18,11 +18,10 @@ require (
 	github.com/filecoin-project/specs-actors/v5 v5.0.6
 	github.com/filecoin-project/specs-actors/v6 v6.0.2
 	github.com/filecoin-project/specs-actors/v7 v7.0.1
-	github.com/filecoin-project/venus v1.10.2
 	github.com/gin-gonic/gin v1.8.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230706020451-2d4da33d43ae
+	github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230706033754-6e16b27df1f5
 	github.com/ipfs/go-blockservice v0.4.0
 	github.com/ipfs/go-cid v0.3.2
 	github.com/ipfs/go-datastore v0.6.0
@@ -70,7 +69,6 @@ require (
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
-	github.com/bluele/gcache v0.0.0-20190518031135-bc40bd653833 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/buger/goterm v1.0.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
@@ -156,6 +154,7 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/hako/durafmt v0.0.0-20200710122514-c0fb7b4da026 // indirect
 	github.com/hannahhoward/cbor-gen-for v0.0.0-20200817222906-ea96cece81f1 // indirect
 	github.com/hannahhoward/go-pubsub v0.0.0-20200423002714-8d62886cc36e // indirect
@@ -276,7 +275,6 @@ require (
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
-	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.2 // indirect
 	github.com/petar/GoLLRB v0.0.0-20210522233825-ae3b015fd3e9 // indirect
@@ -315,6 +313,7 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/zondax/hid v0.9.1 // indirect
 	github.com/zondax/ledger-go v0.12.1 // indirect
+	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opentelemetry.io/otel v1.11.1 // indirect
 	go.opentelemetry.io/otel/bridge/opencensus v0.33.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.2.0 // indirect
