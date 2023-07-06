@@ -174,6 +174,39 @@ func (dbsc *DataBaseStateCache) GetLargeAmountTransferStates(dsn string) ([]mode
 	return nil, false
 }
 
+func (dbsc *DataBaseStateCache) GetDealState(dsn string) (model.DealState, bool) {
+	dbsc.clk.RLock()
+	defer dbsc.clk.RUnlock()
+
+	if state, ok := dbsc.states[dsn]; ok {
+		return state.GetDealState(), true
+	}
+
+	return model.DealState{}, false
+}
+
+//func (dbsc *DataBaseStateCache) GetAllDealActorStates(dsn string) (model.SegmentDealState, bool) {
+//	dbsc.clk.RLock()
+//	defer dbsc.clk.RUnlock()
+//
+//	if state, ok := dbsc.states[dsn]; ok {
+//		return state.GetAllDealActorStates(), true
+//	}
+//
+//	return nil, false
+//}
+
+//func (dbsc *DataBaseStateCache) GetDealActorStates(dsn string, actorID string) ([]model.SegmentDealState, bool) {
+//	dbsc.clk.RLock()
+//	defer dbsc.clk.RUnlock()
+//
+//	if state, ok := dbsc.states[dsn]; ok {
+//		return state.GetDealActorStates(actorID), true
+//	}
+//
+//	return nil, false
+//}
+
 func (dbsc *DataBaseStateCache) SetState(url string, state *segment.State) {
 	dbsc.clk.Lock()
 	defer dbsc.clk.Unlock()
@@ -193,6 +226,21 @@ func (dbsc *DataBaseStateCache) FindAndUpdateDBState(dsn string, dbState *smodel
 	// todo: blockStates is nil
 	state := &segment.State{}
 	state.SetDBState(dbState)
+	dbsc.SetState(dsn, state)
+	return
+}
+
+func (dbsc *DataBaseStateCache) FindAndUpdateDealState(dsn string, dealState model.DealState) {
+	dbsc.clk.Lock()
+	defer dbsc.clk.Unlock()
+
+	if state, ok := dbsc.states[dsn]; ok {
+		state.SetDealState(dealState)
+		return
+	}
+
+	state := &segment.State{}
+	state.SetDealState(dealState)
 	dbsc.SetState(dsn, state)
 	return
 }
@@ -301,3 +349,18 @@ func (dbsc *DataBaseStateCache) SetLargeAmountTransferStates(dsn string, largeAm
 
 	return fmt.Errorf("state of dsn %v not found", dsn)
 }
+
+//func (dbsc *DataBaseStateCache) SetDealActorStates(dsn string, dealActorStates []smodel.SegmentDealState) error {
+//	dbsc.clk.Lock()
+//	defer dbsc.clk.Unlock()
+//
+//	if state, ok := dbsc.states[dsn]; ok {
+//		if err := state.SetDealActorStates(dealActorStates); err != nil {
+//			return err
+//		}
+//
+//		return nil
+//	}
+//
+//	return fmt.Errorf("state of dsn %v not found", dsn)
+//}

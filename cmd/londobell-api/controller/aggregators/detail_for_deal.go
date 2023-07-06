@@ -41,7 +41,7 @@ func GetDetailForDeal(c *gin.Context) {
 		return
 	}
 
-	var detailForDealRes []model.DetailForDealRes
+	var detailForDealRes model.DetailForDealRes
 
 	// multi dbs query
 	{
@@ -58,7 +58,7 @@ func GetDetailForDeal(c *gin.Context) {
 			return
 		}
 
-		raw := multiResult
+		raw := multiResult[0]
 		rawByte, err := json.Marshal(raw)
 		if err != nil {
 			alog.Error(err)
@@ -74,6 +74,6 @@ func GetDetailForDeal(c *gin.Context) {
 		}
 	}
 
-	res.Data = detailForDealRes
+	res.Data = []model.DetailForDealRes{detailForDealRes}
 	c.JSON(http.StatusOK, res)
 }

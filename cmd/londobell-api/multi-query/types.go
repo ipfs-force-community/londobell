@@ -19,17 +19,15 @@ const (
 	ActorTransferStates
 	MinedStates
 	LargeAmountTransferStates
+	DealState
+	DealActorStates
 )
 
 type CountUtil struct {
 	Start int64
 	End   int64
-	//Count int64
 
 	Cols common.Collections
-
-	//Tmp    bool
-	//Formal bool
 
 	DType smodel.DType
 
@@ -42,13 +40,16 @@ type CountUtil struct {
 	ActorTransferStates       int64
 	MinedStates               int64
 	LargeAmountTransferStates int64
+
+	DealState       int64 // todo： 暂时不分段，测试下
+	DealActorStates int64
 }
 
 type segmentUtil struct {
-	startEpoch int64
-	endEpoch   int64
-	skip       int64
-	limit      int64
+	start int64
+	end   int64
+	skip  int64
+	limit int64
 
 	Cols common.Collections
 
@@ -61,13 +62,15 @@ type segmentUtil struct {
 	ActorTransferStates       int64
 	MinedStates               int64
 	LargeAmountTransferStates int64
+	DealState                 int64
+	DealActorStates           int64
 }
 
 type aggUtil struct {
-	startEpoch int64
-	endEpoch   int64
-	skip       int64
-	limit      int64
+	start int64
+	end   int64
+	skip  int64
+	limit int64
 
 	cols common.Collections
 

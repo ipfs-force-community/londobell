@@ -11,8 +11,6 @@ import (
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
 
-	"github.com/filecoin-project/go-state-types/abi"
-
 	smodel "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment/model"
 
 	"github.com/dtynn/dix"
@@ -213,7 +211,7 @@ var cfgUpdateCmd = &cli.Command{
 			if ok && force || !ok {
 				log.Infof("set dbState for newDB %v, ok: %v, force: %v", newDB, ok, force)
 
-				err = components.DBStMgr.FirstSetDataBaseState(ctx, newDB, dbType, abi.ChainEpoch(interval))
+				err = components.DBStMgr.FirstSetDataBaseState(ctx, newDB, dbType, interval)
 				if err != nil {
 					return err
 				}

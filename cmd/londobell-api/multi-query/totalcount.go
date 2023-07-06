@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment"
@@ -37,23 +39,19 @@ var (
 )
 
 var (
-	//addupOnce sync.Once
-	//addupes   = make([]func(ctx context.Context, log *zap.SugaredLogger, dbState *smodel.DBState, blockStates []*smodel.SegmentState) error, 0)
+	addupOnce sync.Once
+	addupes   = make([]func(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment) error, 0)
 
 	AllMethods     = make(map[string]int64, 0)
 	alk            sync.RWMutex
 	lastUpdateTime time.Time
 )
 
-//func init() {
-//	//refreshOnce.Do(func() {
-//	//	refreshes = append(refreshes, RefreshBlockMsgs, RefreshBlockMsgsByMethodName, RefreshActorMsgsByMethodName, RefreshActorMsgs, RefreshActorTransferMsgs, RefreshMinedMsgsMaps, RefreshTransfersForLargeAmount)
-//	//})
-//
-//	addupOnce.Do(func() {
-//		addupes = append(addupes, segment.AddUpBlockMsgsCount)
-//	})
-//}
+func init() {
+	addupOnce.Do(func() {
+		addupes = append(addupes, AddUpBlockState /* AddUpDealActorState */)
+	})
+}
 
 func PeriodicRefreshDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbsm *DataBaseStateManager) {
 	tick := time.NewTicker(15 * time.Minute)
@@ -62,15 +60,9 @@ func PeriodicRefreshDataBaseState(ctx context.Context, log *zap.SugaredLogger, d
 	for {
 		select {
 		case <-tick.C:
-			finalHeight, err := GetFinalHeightForFormalDB(ctx, dbsm)
-			if err != nil {
-				log.Error(err)
-				continue
-			}
-
 			start := time.Now()
-			log.Infof("begin PeriodicRefreshDataBaseState for formal, finalHeight: %v", finalHeight)
-			if err := RefreshFormalDataBaseState(ctx, log, dbsm, finalHeight); err != nil {
+			log.Info("begin PeriodicRefreshDataBaseState for formal")
+			if err := RefreshFormalDataBaseState(ctx, log, dbsm); err != nil {
 				log.Error(err)
 				continue
 			}
@@ -119,7 +111,7 @@ func GetFinalHeightForFormalDB(ctx context.Context, dbsm *DataBaseStateManager) 
 
 // 只有formal需要定期刷
 // todo:会发生多个进程同时操作dbsm.Stm的操作，导致dbState紊乱有错吗？
-func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbsm *DataBaseStateManager, finalHeight abi.ChainEpoch) error {
+func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbsm *DataBaseStateManager) error {
 	formal := dbsm.GetFormalCfg()
 
 	if formal.IsInvalidDB() {
@@ -142,62 +134,57 @@ func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbs
 		return fmt.Errorf("url %v not found in DBCollectionsMap", formal.Url())
 	}
 
-	nextEndEpoch := finalHeight + 1
-	newState := *state
+	newState := *state // todo: 指针get出来是否会导致原来错误
+	addUpState := segment.NewAddUpState(newState)
 
-	// todo: 多个state
-	err = dbsm.Segment.AddUpBlockState(ctx, log, nextEndEpoch, &newState, cols)
-	if err != nil {
-		return fmt.Errorf("addup blockstate for %v failed: %w", dsn, err)
+	var ewg multierror.Group
+	for i := range addupes {
+		i := i
+		addup := addupes[i]
+		ewg.Go(func() error {
+			if err := addup(ctx, log, addUpState, cols, dbsm.Segment); err != nil {
+				return err
+			}
+
+			return nil
+		})
 	}
 
+	if err := ewg.Wait(); err != nil {
+		log.Errorf("RefreshFormalDataBaseState failed: %v", err)
+		return err
+	}
+
+	newState = addUpState.GetState()
 	dbsm.DBStateCache.SetState(dsn, &newState)
 
-	//var ewg multierror.Group
-	//for i := range addupes {
-	//	i := i
-	//	addup := addupes[i]
-	//	ewg.Go(func() error {
-	//		if err := addup(ctx, &dbState, cols); err != nil {
-	//			return err
-	//		}
-	//
-	//		return nil
-	//	})
-	//}
-	//
-	//if err := ewg.Wait(); err != nil {
-	//	log.Errorf("RefreshFormalDataBaseState failed: %v", err)
-	//	return err
-	//}
-
-	//if err := RefreshBlockMsgs(ctx, &dbState, cols); err != nil {
-	//	return err
-	//}
-	//if err := RefreshBlockMsgsByMethodName(ctx, &dbState, cols); err != nil {
-	//	return err
-	//}
-	//if err := RefreshActorMsgsByMethodName(ctx, &dbState, cols); err != nil {
-	//	return err
-	//}
-	//if err := RefreshActorMsgs(ctx, &dbState, cols); err != nil {
-	//	return err
-	//}
-	//if err := RefreshActorTransferMsgs(ctx, &dbState, cols); err != nil {
-	//	return err
-	//}
-	//if err := RefreshMinedMsgsMaps(ctx, &dbState, cols); err != nil {
-	//	return err
-	//}
-	////if err := RefreshTransfersForLargeAmount(ctx, &dbState, cols); err != nil { // todo
-	////	return err
-	////}
-	//
-
-	log.Infof("RefreshFormalDataBaseState successfully, dbState.EndEpoch: %v", finalHeight+1)
+	log.Infof("RefreshFormalDataBaseState successfully, dbState.EndEpoch: %v", newState.GetEndEpoch())
 
 	return nil
 }
+
+func AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment) error {
+	finalHeight, err := GetFinalHeight(ctx, cols)
+	if err != nil {
+		return err
+	}
+
+	nextEndEpoch := int64(finalHeight + 1)
+
+	return seg.AddUpBlockState(ctx, log, nextEndEpoch, addUpState, cols)
+}
+
+//func AddUpDealActorState(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment) error {
+//	state := addUpState.GetState()
+//
+//	endDealID, err := GetEndDealID(ctx, cols, state.GetDealStartID())
+//	if err != nil {
+//		return err
+//	}
+//
+//	nextDealID := int64(endDealID + 1)
+//	return seg.AddUpDealActorState(ctx, log, nextDealID, addUpState, cols)
+//}
 
 //func TestRefreshFormalDataBaseState(ctx context.Context, dbsm *DataBaseStateManager, finalHeight abi.ChainEpoch) error {
 //	start := time.Now() //todo:test
@@ -317,7 +304,7 @@ func refresh(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.Chain
 
 	// tmp每次都重新刷
 	if !tmp.IsInvalidDB() {
-		tmpState := segment.DefaultState(tmp.Url(), smodel.Tmp, smodel.DefaultInterval, 0, 0)
+		tmpState := segment.DefaultState(tmp.Url(), smodel.Tmp, smodel.DefaultInterval, 0, 0, 0, 0)
 
 		tmpCols, ok := dbsm.GetDBCollections(tmp.Url())
 		if !ok {
@@ -339,6 +326,24 @@ func refresh(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.Chain
 
 func GetEpochRange(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", refreshEpochRange)
+	if err != nil {
+		return nil, err
+	}
+
+	return countUtils, nil
+}
+
+func GetDealRange(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
+	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", refreshDealRange)
+	if err != nil {
+		return nil, err
+	}
+
+	return countUtils, nil
+}
+
+func GetTotalCountForActorDeals(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorDeals)
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +561,7 @@ func GetAllBlockMsgsByMethodName(ctx context.Context, dbsm *DataBaseStateManager
 	// tmp每次都重新刷
 	if !tmp.IsInvalidDB() {
 		dsn := tmp.Url()
-		state := segment.DefaultState(dsn, smodel.Tmp, smodel.DefaultInterval, tmpStartEpoch, curEpoch+1)
+		state := segment.DefaultState(dsn, smodel.Tmp, smodel.DefaultInterval, tmpStartEpoch, curEpoch+1, 0, 0)
 
 		cols, ok := dbsm.GetDBCollections(dsn)
 		if !ok {
@@ -688,7 +693,7 @@ func GetAllActorMsgsByMethodNameMap(ctx context.Context, dbsm *DataBaseStateMana
 	// tmp每次都重新刷
 	if !tmp.IsInvalidDB() {
 		dsn := tmp.Url()
-		state := segment.DefaultState(dsn, smodel.Tmp, smodel.DefaultInterval, tmpStartEpoch, curEpoch+1)
+		state := segment.DefaultState(dsn, smodel.Tmp, smodel.DefaultInterval, tmpStartEpoch, curEpoch+1, 0, 0)
 
 		cols, ok := dbsm.GetDBCollections(dsn)
 		if !ok {
@@ -900,6 +905,47 @@ func refreshEpochRange(ctx context.Context, state *segment.State, cols common.Co
 	}
 }
 
+func refreshDealRange(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
+	switch state.GetDType() {
+	case smodel.Formal:
+		StartEpoch, err := GetStartEpochForDeal(ctx, cols)
+		if err != nil {
+			return err
+		}
+
+		startDealID, err := GetStartDealID(ctx, cols, StartEpoch)
+		if err != nil {
+			return err
+		}
+
+		endDealID, err := GetEndDealID(ctx, cols, StartEpoch)
+		if err != nil {
+			return err
+		}
+
+		count := endDealID - startDealID
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(startDealID), End: int64(endDealID), DealState: int64(count), Cols: cols})
+		return nil
+	case smodel.Tmp:
+		return nil
+	case smodel.Cold:
+		dealState, found, err := DBStateManager.GetDealState(ctx, state.GetDSN())
+		if err != nil {
+			return err
+		}
+
+		if !found {
+			return fmt.Errorf("dealState of dsn %v not found", state.GetDSN())
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetDealStartID()), End: int64(state.GetDealEndID()), DealState: dealState.Count, Cols: cols})
+		return nil
+	default:
+		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
+	}
+}
+
 func refreshTotalCountForBlockMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
@@ -944,6 +990,51 @@ func refreshTotalCountForBlockMsgs(ctx context.Context, state *segment.State, co
 		}
 
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), BlockStates: blockStates, Cols: cols})
+		return nil
+	default:
+		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
+	}
+}
+
+// actor筛选的，旧库不缓存？
+func refreshTotalCountForActorDeals(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+	switch state.GetDType() {
+	case smodel.Formal:
+		// todo: formal state 每次拿
+		StartEpoch, err := GetStartEpochForDeal(ctx, cols)
+		if err != nil {
+			return err
+		}
+
+		startDealID, err := GetStartDealID(ctx, cols, StartEpoch)
+		if err != nil {
+			return err
+		}
+
+		endDealID, err := GetEndDealID(ctx, cols, StartEpoch)
+		if err != nil {
+			return err
+		}
+
+		state.SetDealState(smodel.DealState{StartDealID: startDealID, EndDealID: endDealID})
+
+		count, err := GetDealActorStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(startDealID), End: int64(endDealID), DealActorStates: count, Cols: cols})
+
+		return nil
+	case smodel.Tmp:
+		return nil
+	case smodel.Cold:
+		count, err := GetDealActorStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetDealStartID()), End: int64(state.GetDealEndID()), DealActorStates: count, Cols: cols})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
@@ -1596,6 +1687,50 @@ func GetLargeAmountTransferStates(ctx context.Context, state *segment.State, col
 	}
 
 	return 0, fmt.Errorf("no ExecTrace collection")
+}
+
+func GetDealActorStates(ctx context.Context, state *segment.State, cols common.Collections, actorID string) (int64, error) {
+	rlog := log.With("query", "DealActorStates")
+
+	start := time.Now()
+	startDealID, endDealID := state.GetDealStartID(), state.GetDealEndID()
+	defer func() {
+		rlog.Infof("refresh DealActorStates successfully for [%v, %v), elapsed: %v", startDealID, endDealID, time.Now().Sub(start).String())
+	}()
+
+	var countRes []model.CountRes
+
+	pipe, err := util.Parse(model.Ctx{Start: int64(startDealID), End: int64(endDealID), Addr: actorID}, string(monitor.GetCountOfDealsByAddrAggregator()))
+	if err != nil {
+		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+		return 0, err
+	}
+
+	tableName := "DealProposal"
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == tableName {
+			cur, err := col.Aggregate(ctx, pipe)
+			if err != nil {
+				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			err = cur.All(ctx, &countRes)
+			if err != nil {
+				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			if len(countRes) == 0 {
+				rlog.Warnf("no deal for actor %v for [%v, %v)", actorID, startDealID, endDealID)
+				return 0, nil
+			}
+
+			return countRes[0].Count, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no DealProposal collection")
 }
 
 func GetIDForAddr(ctx context.Context, from, to string, log *zap.SugaredLogger, api v0api.FullNode) (fromID, toID string, fromErr, toErr bool) {
