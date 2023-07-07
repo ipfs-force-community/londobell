@@ -21,12 +21,16 @@ var (
 type DealProposal struct {
 	ID                  int64 `bson:"_id"`
 	Epoch               abi.ChainEpoch
+	ProviderID          addr.Address
+	ClientID            addr.Address
 	market.DealProposal `bson:",inline"`
 }
 
 type DealProposalV8 struct {
 	ID              int64 `bson:"_id"`
 	Epoch           abi.ChainEpoch
+	ProviderID      addr.Address
+	ClientID        addr.Address
 	MDealProposalV8 `bson:",inline"`
 }
 
@@ -66,6 +70,7 @@ func (d *DealProposal) Indexes() [][]string {
 		[]string{"VerifiedDeal"},
 		[]string{"Provider"},
 		[]string{"Client"},
+		[]string{"_id", "ProviderID", "ClientID"},
 	}
 }
 

@@ -89,6 +89,16 @@ func extractDealProposalDetailedV9(ctx *extract.Ctx, res *extract.Res, head *com
 			return nil
 		}
 
+		providerID, err := extract.LookupID(ctx, out.Provider, head.TipSet)
+		if err != nil {
+			return fmt.Errorf("lookup ID for client %v at %v failed: %v", out.Provider, head.Epoch, err)
+		}
+
+		clientID, err := extract.LookupID(ctx, out.Client, head.TipSet)
+		if err != nil {
+			return fmt.Errorf("lookup ID for client %v at %v failed: %v", out.Client, head.Epoch, err)
+		}
+
 		labelBytes := new(bytes.Buffer)
 		err = out.Label.MarshalCBOR(labelBytes)
 		if err != nil {
@@ -96,8 +106,10 @@ func extractDealProposalDetailedV9(ctx *extract.Ctx, res *extract.Res, head *com
 		}
 
 		dealProposals = append(dealProposals, model.DealProposalV8{
-			ID:    int64(idx),
-			Epoch: head.Epoch,
+			ID:         int64(idx),
+			Epoch:      head.Epoch,
+			ProviderID: providerID,
+			ClientID:   clientID,
 			MDealProposalV8: model.MDealProposalV8{
 				PieceCID:             out.PieceCID,
 				PieceSize:            out.PieceSize,

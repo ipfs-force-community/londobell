@@ -46,6 +46,7 @@ db.DealProposal.createIndex({"Epoch":1,"VerifiedDeal":1}, {"sparse": true});
 db.DealProposal.createIndex({"VerifiedDeal":1}, {"sparse": true});
 db.DealProposal.createIndex({"Provider":1}, {"sparse": true});
 db.DealProposal.createIndex({"Client":1}, {"sparse": true});
+db.DealProposal.createIndex({"_id":1,"ProviderID":1,"ClientID":1}, {"sparse": true});
 
 db.DealProposalDetail.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 

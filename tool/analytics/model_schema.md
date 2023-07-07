@@ -183,6 +183,7 @@
 {
 	"Client": "address.Address",
 	"ClientCollateral": "big.Int",
+	"ClientID": "address.Address",
 	"EndEpoch": "abi.ChainEpoch",
 	"Epoch": "abi.ChainEpoch",
 	"Label": "string",
@@ -190,6 +191,7 @@
 	"PieceSize": "abi.PaddedPieceSize",
 	"Provider": "address.Address",
 	"ProviderCollateral": "big.Int",
+	"ProviderID": "address.Address",
 	"StartEpoch": "abi.ChainEpoch",
 	"StoragePricePerEpoch": "big.Int",
 	"VerifiedDeal": "bool",

@@ -125,10 +125,22 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
             return nil
         }
 
+        providerID, err := extract.LookupID(ctx, out.Provider, head.TipSet)
+        if err != nil {
+            return fmt.Errorf("lookup ID for client %v at %v failed: %v", out.Provider, head.Epoch, err)
+        }
+
+        clientID, err := extract.LookupID(ctx, out.Client, head.TipSet)
+        if err != nil {
+            return fmt.Errorf("lookup ID for client %v at %v failed: %v", out.Client, head.Epoch, err)
+        }
+
         {{ if lt .Ver 8}}
 		dealProposals = append(dealProposals, model.DealProposal{
 			ID:           idx,
 			Epoch:        head.Epoch,
+			ProviderID: providerID,
+            ClientID:   clientID,
 			DealProposal: out,
 		})
 		{{ else }}
@@ -141,6 +153,8 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
 		dealProposals = append(dealProposals, model.DealProposalV8{
             ID:           int64(idx),
             Epoch:        head.Epoch,
+            ProviderID: providerID,
+            ClientID:   clientID,
             MDealProposalV8: model.MDealProposalV8{
                 PieceCID:             out.PieceCID,
                 PieceSize:            out.PieceSize,
