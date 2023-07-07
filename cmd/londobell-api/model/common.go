@@ -46,4 +46,6 @@ type Ctx struct {
 	To         string
 	Skip       int64
 	Limit      int64
+	ProviderID string
+	ClientID   string
 }
