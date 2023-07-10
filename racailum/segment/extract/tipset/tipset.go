@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/filecoin-project/go-state-types/builtin/v10/evm"
@@ -191,32 +190,6 @@ var extractors = []extractor{
 		name:   "block-message",
 		method: extractBlockMessage,
 	},
-}
-
-var ActorIDMapping = NewActorIDMap()
-
-type ActorIDMap struct {
-	m  map[address.Address]address.Address
-	lk sync.RWMutex
-}
-
-func NewActorIDMap() *ActorIDMap {
-	return &ActorIDMap{m: make(map[address.Address]address.Address)}
-}
-
-func (am *ActorIDMap) GetActorID(addr address.Address) (address.Address, bool) {
-	am.lk.RLock()
-	defer am.lk.RUnlock()
-
-	actorID, ok := am.m[addr]
-	return actorID, ok
-}
-
-func (am *ActorIDMap) SetActorID(addr, actorID address.Address) {
-	am.lk.Lock()
-	defer am.lk.Unlock()
-
-	am.m[addr] = actorID
 }
 
 type extractor struct {
@@ -582,7 +555,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			isBlock := IsBlock(p.seq, msg.From)
 			storeMap := make(map[address.Address]string)
 
-			fromActorID, err := LookupID(ctx, msg.From, ts.TipSet)
+			fromActorID, err := extract.LookupID(ctx, msg.From, ts.TipSet)
 			if err != nil {
 				elog.Warnf("lookup ID for %v at %v failed: %v", msg.From, ts.Height(), err)
 				fromActorID = msg.From
@@ -592,7 +565,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				storeMap[fromActorID] = "from"
 			}
 
-			toActorID, err := LookupID(ctx, msg.To, ts.TipSet)
+			toActorID, err := extract.LookupID(ctx, msg.To, ts.TipSet)
 			if err != nil {
 				elog.Warnf("lookup ID for %v at %v failed: %v", msg.To, ts.Height(), err)
 				toActorID = msg.To
@@ -648,21 +621,6 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 func IsBlock(seq []int, from address.Address) bool {
 	return len(seq) == 1 && (strings.HasPrefix(from.String()[1:], "1") || strings.HasPrefix(from.String()[1:], "3") || strings.HasPrefix(from.String()[1:], "4"))
-}
-
-func LookupID(ctx *extract.Ctx, addr address.Address, ts *types.TipSet) (address.Address, error) {
-	var err error
-	actorID, ok := ActorIDMapping.GetActorID(addr)
-	if !ok {
-		actorID, err = ctx.D.LookupID(ctx.C, addr, ts)
-		if err != nil {
-			return address.Undef, err
-		}
-
-		ActorIDMapping.SetActorID(addr, actorID)
-	}
-
-	return actorID, nil
 }
 
 func GetEvents(ctx context.Context, root cid.Cid, cs common.ChainStore) ([]types.Event, error) {
@@ -825,6 +783,7 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				CirculatingSupply: &supply,
 				Addr:              addr,
 				Epoch:             height,
+				TipSet:            ts.TipSet,
 			})
 
 			return nil

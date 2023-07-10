@@ -122,8 +122,9 @@ type ActorHead struct {
 		Power *types.Actor
 	}
 
-	Addr  address.Address
-	Epoch abi.ChainEpoch
+	Addr   address.Address
+	Epoch  abi.ChainEpoch
+	TipSet *types.TipSet
 }
 
 // InvocResultCompact is the compact representation of api.InvocResult

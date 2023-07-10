@@ -2,6 +2,10 @@ package extract
 
 import (
 	"context"
+	"sync"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/chain/types"
 
 	"go.uber.org/zap"
 
@@ -50,4 +54,45 @@ func NewRes(docCap, regularStatesCap int) *Res {
 type Res struct {
 	RegularStates []*common.ActorHead
 	Docs          []common.Document
+}
+
+var ActorIDMapping = NewActorIDMap()
+
+type ActorIDMap struct {
+	m  map[address.Address]address.Address
+	lk sync.RWMutex
+}
+
+func NewActorIDMap() *ActorIDMap {
+	return &ActorIDMap{m: make(map[address.Address]address.Address)}
+}
+
+func (am *ActorIDMap) GetActorID(addr address.Address) (address.Address, bool) {
+	am.lk.RLock()
+	defer am.lk.RUnlock()
+
+	actorID, ok := am.m[addr]
+	return actorID, ok
+}
+
+func (am *ActorIDMap) SetActorID(addr, actorID address.Address) {
+	am.lk.Lock()
+	defer am.lk.Unlock()
+
+	am.m[addr] = actorID
+}
+
+func LookupID(ctx *Ctx, addr address.Address, ts *types.TipSet) (address.Address, error) {
+	var err error
+	actorID, ok := ActorIDMapping.GetActorID(addr)
+	if !ok {
+		actorID, err = ctx.D.LookupID(ctx.C, addr, ts)
+		if err != nil {
+			return address.Undef, err
+		}
+
+		ActorIDMapping.SetActorID(addr, actorID)
+	}
+
+	return actorID, nil
 }
