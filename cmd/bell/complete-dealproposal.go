@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ipfs-force-community/londobell/buildnet"
+
 	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/filecoin-project/go-address"
@@ -154,12 +156,12 @@ var completeProposalCmd = &cli.Command{
 					)
 
 					alk.RLock()
-					provider, err := address.NewFromString(r.Provider)
+					provider, err := address.NewFromString(buildnet.NetPrefix + r.Provider)
 					if err != nil {
 						return err
 					}
 
-					client, err := address.NewFromString(r.Client)
+					client, err := address.NewFromString(buildnet.NetPrefix + r.Client)
 					if err != nil {
 						return err
 					}
@@ -179,6 +181,7 @@ var completeProposalCmd = &cli.Command{
 						alk.Unlock()
 					}
 
+					alk.RLock()
 					cID, ok := actorIDMap[client]
 					alk.RUnlock()
 					if ok {
@@ -194,7 +197,7 @@ var completeProposalCmd = &cli.Command{
 						alk.Unlock()
 					}
 
-					pipe2, err := util.Parse(model.Ctx{ProviderID: providerID.String()[1:], ClientID: clientID.String()[1:]}, string(js2))
+					pipe2, err := util.Parse(model.Ctx{ID: r.ID, ProviderID: providerID.String()[1:], ClientID: clientID.String()[1:]}, string(js2))
 					if err != nil {
 						return err
 					}
@@ -234,7 +237,7 @@ var completeProposalCmd = &cli.Command{
 }
 
 type DealProposalRes struct {
-	ID    string `bson:"_id" json:"_id"`
+	ID    uint64 `bson:"_id" json:"_id"`
 	Epoch int64
 	//PieceCID             string
 	//PieceSize            int64
