@@ -47,6 +47,10 @@ var fixActorMessageCmd = &cli.Command{
 			Usage:    "The location of the node configuration, eg: ./config.json(node: token)",
 			Required: true,
 		},
+		&cli.DurationFlag{
+			Name:  "tick",
+			Usage: "tick for fix ActorMessage",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -74,7 +78,14 @@ var fixActorMessageCmd = &cli.Command{
 		tipsetCol := db.Collection("Tipset")
 		finalHeightCol := db.Collection("FinalHeight")
 
-		tick := time.NewTicker(24 * time.Hour)
+		var duration time.Duration
+		if !cctx.IsSet("tick") {
+			duration = 24 * time.Hour
+		} else {
+			duration = cctx.Duration("tick")
+		}
+
+		tick := time.NewTicker(duration)
 		defer tick.Stop()
 		for {
 			select {
