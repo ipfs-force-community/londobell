@@ -114,7 +114,7 @@ var completeProposalCmd = &cli.Command{
 		lim := limiter.New(16)
 		var ewg multierror.Group
 
-		log.Infof("begin complet dealproposal")
+		log.Infof("begin complete dealproposal")
 		starttime := time.Now()
 
 		actorIDMap := make(map[address.Address]address.Address)
@@ -133,7 +133,7 @@ var completeProposalCmd = &cli.Command{
 					lim.Release(context.TODO())
 				}()
 
-				pipe, err := util.Parse(model.Ctx{StartEpoch: r.Start, EndEpoch: r.End}, string(js))
+				pipe, err := util.Parse(model.Ctx{StartID: r.Start, EndID: r.End}, string(js))
 				if err != nil {
 					return err
 				}

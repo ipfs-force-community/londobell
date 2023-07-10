@@ -1,7 +1,7 @@
 // DealProposal
 [
     {$match: {
-        Epoch: {$gte: ctx.StartEpoch, $lt: ctx.EndEpoch},
+        _id: {$gte: ctx.StartID, $lt: ctx.EndID},
         }},
     {
         $project: {

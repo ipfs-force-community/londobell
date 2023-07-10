@@ -48,4 +48,6 @@ type Ctx struct {
 	Limit      int64
 	ProviderID string
 	ClientID   string
+	StartID    int64
+	EndID      int64
 }
