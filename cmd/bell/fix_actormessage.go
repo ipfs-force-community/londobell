@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ipfs-force-community/londobell/common"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -50,6 +52,9 @@ var fixActorMessageCmd = &cli.Command{
 		&cli.DurationFlag{
 			Name:  "tick",
 			Usage: "tick for fix ActorMessage",
+		},
+		&cli.BoolFlag{
+			Name: "tmp",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -109,24 +114,29 @@ var fixActorMessageCmd = &cli.Command{
 
 				startEpoch := tipsetRes[0].Epoch
 
-				cursor, err = finalHeightCol.Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "_id", Value: -1}}), options.Find().SetLimit(-1))
-				if err != nil {
-					log.Errorf("FinalHeight find failed: %v", err)
-					continue
-				}
+				var endEpoch int64
+				if cctx.Bool("tmp") {
+					endEpoch = int64(common.GetCurEpoch())
+				} else {
+					cursor, err = finalHeightCol.Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "_id", Value: -1}}), options.Find().SetLimit(-1))
+					if err != nil {
+						log.Errorf("FinalHeight find failed: %v", err)
+						continue
+					}
 
-				var finalHeightRes []EpochRes
-				if err = cursor.All(context.TODO(), &finalHeightRes); err != nil {
-					log.Errorf("cur all failed: %v", err)
-					continue
-				}
+					var finalHeightRes []EpochRes
+					if err = cursor.All(context.TODO(), &finalHeightRes); err != nil {
+						log.Errorf("cur all failed: %v", err)
+						continue
+					}
 
-				if len(finalHeightRes) != 1 {
-					log.Warn("not found in FinalHeight")
-					continue
-				}
+					if len(finalHeightRes) != 1 {
+						log.Warn("not found in FinalHeight")
+						continue
+					}
 
-				endEpoch := finalHeightRes[0].Epoch
+					endEpoch = finalHeightRes[0].Epoch
+				}
 
 				tsDone := startEpoch
 
