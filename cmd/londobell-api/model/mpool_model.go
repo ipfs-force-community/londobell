@@ -16,6 +16,7 @@ type PendingMessage struct {
 	GasLimit   int64
 	GasPremium abi.TokenAmount
 	Method     string
+	Hash       string
 }
 
 type PendingMessagesRes struct {

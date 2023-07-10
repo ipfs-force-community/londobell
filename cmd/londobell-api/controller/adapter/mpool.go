@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -72,12 +73,60 @@ func GetPendingMessages(c *gin.Context) {
 					return
 				}
 
+				hash, err := newEthHashFromSignedMessage(ctx, msg, api)
+				if err != nil {
+					alog.Error(fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid()))
+					util.ReturnOnErr(c, err)
+					return
+				}
+
 				res.Data = model.PendingMessagesRes{TotalCount: 1, PendingMessages: []model.PendingMessage{{
-					Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: ts.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName,
+					Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: ts.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName, Hash: hash.String(),
 				}}}
 				c.JSON(http.StatusOK, res)
 				return
 			}
+		}
+
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	if req.Hash != "" {
+		var g multierror.Group
+
+		for i := range msgs {
+			i := i
+			msg := msgs[i]
+			g.Go(func() error {
+				hash, err := newEthHashFromSignedMessage(ctx, msg, api)
+				if err != nil {
+					alog.Error(fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid()))
+					return err
+				}
+
+				if req.Hash == hash.String() {
+					methodName, err := getMethodName(ctx, alog, api, msg, ts)
+					if err != nil && err != util.ErrNotFound {
+						alog.Error(err)
+						return err
+					}
+
+					res.Data = model.PendingMessagesRes{TotalCount: 1, PendingMessages: []model.PendingMessage{{
+						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: ts.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName, Hash: hash.String(),
+					}}}
+
+					return nil
+				}
+
+				return nil
+			})
+		}
+
+		if err := g.Wait(); err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
 		}
 
 		c.JSON(http.StatusOK, res)
@@ -102,19 +151,29 @@ func GetPendingMessages(c *gin.Context) {
 			// todo: InvokeEVM和其他未定义方法区分开??
 			// filter by methodName
 			if req.MethodName != "" && methodName == req.MethodName {
+				hash, err := newEthHashFromSignedMessage(ctx, msg, api)
+				if err != nil {
+					return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid())
+				}
+
 				mutex.Lock()
 				pendingMessages = append(pendingMessages, model.PendingMessage{
-					Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: ts.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName,
+					Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: ts.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName, Hash: hash.String(),
 				})
 				totalCount++
 				mutex.Unlock()
 			}
 
 			if req.MethodName == "" {
+				hash, err := newEthHashFromSignedMessage(ctx, msg, api)
+				if err != nil {
+					return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid())
+				}
+
 				// todo: methodName为空时加入mpool吗？
 				mutex.Lock()
 				pendingMessages = append(pendingMessages, model.PendingMessage{
-					Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: ts.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName,
+					Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: ts.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName, Hash: hash.String(),
 				})
 				totalCount++
 				mutex.Unlock()
