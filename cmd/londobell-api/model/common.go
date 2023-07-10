@@ -28,6 +28,7 @@ type CommonReq struct {
 	To         string   `json:"to"`
 	Index      int64    `json:"index"`
 	Limit      int64    `json:"limit"`
+	Hash       string   `json:"hash"`
 }
 
 type Ctx struct {
