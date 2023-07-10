@@ -70,7 +70,8 @@ func (d *DealProposal) Indexes() [][]string {
 		[]string{"VerifiedDeal"},
 		[]string{"Provider"},
 		[]string{"Client"},
-		[]string{"_id", "ProviderID", "ClientID"},
+		[]string{"ProviderID", "-_id"},
+		[]string{"ClientID", "-_id"},
 	}
 }
 
