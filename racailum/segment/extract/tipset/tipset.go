@@ -29,6 +29,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	lminer "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
+	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -202,6 +203,10 @@ var extractors = []extractor{
 	{
 		name:   "actor-address",
 		method: extractActorAddress,
+	},
+	{
+		name:   "changed-actor",
+		method: extractChangedActor,
 	},
 }
 
@@ -1289,6 +1294,70 @@ func extractActorAddress(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 
 	for i := range actorAddresses {
 		res.Docs = append(res.Docs, actorAddresses[i])
+	}
+
+	return nil
+}
+
+func extractChangedActor(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	_, span := trace.StartSpan(ctx.C, "extractor.extractChangedActor")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
+	height := ts.Height()
+	if !ctx.Opts.EnabelExtract.EnableExtractChangedActor {
+		return nil
+	}
+
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("changed actor extracted")
+
+	old := ts.ParentState()
+	new := ts.Parent.ParentState()
+
+	oldTree, err := ctx.D.StateTree(old)
+	if err != nil {
+		return fmt.Errorf("failed to load old state tree: %w", err)
+	}
+
+	newTree, err := ctx.D.StateTree(new)
+	if err != nil {
+		return fmt.Errorf("failed to load new state tree: %w", err)
+	}
+
+	changedActors, err := state.Diff(ctx.C, oldTree, newTree)
+	if err != nil {
+		return err
+	}
+
+	changedActor := []*model.ChangedActor{}
+	for addr, act := range changedActors {
+		actorID, err := address.NewFromString(addr)
+		if err != nil {
+			return fmt.Errorf("new address for addr: %v faile: %v", addr, err)
+		}
+		id, err := actorstate.GenRegularHeadID(act.Head, actorID, height)
+		if err != nil {
+			return fmt.Errorf("generate regular id: %w", err)
+		}
+		actType := builtin2.ActorNameByCode(act.Code)
+		actTypes := strings.Split(actType, "/")
+		if len(actTypes) > 1 {
+			actType = actTypes[len(actTypes)-1]
+		} else {
+			elog.Warnf("actor %s acttype out of design", actType)
+		}
+		changedActor = append(changedActor, &model.ChangedActor{
+			ID:      id,
+			Epoch:   height,
+			ActorID: actorID,
+			Balance: act.Balance,
+			Code:    actType,
+			Address: act.Address,
+		})
+	}
+
+	for i := range changedActor {
+		res.Docs = append(res.Docs, changedActor[i])
 	}
 
 	return nil

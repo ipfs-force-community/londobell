@@ -128,6 +128,7 @@ type EnableExtractOptions struct {
 	EnableExtractMinerSector     bool // 由于需要取未来sectorinfo，故临时库不抽； 变化延迟15分钟能接受吗？
 	EnableExtractSectorClaim     bool // 同上
 	EnableExtractActorAddress    bool
+	EnableExtractChangedActor    bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -151,6 +152,7 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractMinerSector:     true,
 		EnableExtractSectorClaim:     true,
 		EnableExtractActorAddress:    true,
+		EnableExtractChangedActor:    true,
 	}
 }
 
