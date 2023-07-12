@@ -411,12 +411,12 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 	case ActorEventStates:
 		for _, segmentList := range segmentLists {
 			aggLists = append(aggLists, &aggUtil{
-				startEpoch: segmentList.startEpoch,
-				endEpoch:   segmentList.endEpoch,
-				skip:       segmentList.skip,
-				limit:      segmentList.limit,
-				cols:       segmentList.Cols,
-				count:      segmentList.ActorEventStates,
+				start: segmentList.start,
+				end:   segmentList.end,
+				skip:  segmentList.skip,
+				limit: segmentList.limit,
+				cols:  segmentList.Cols,
+				count: segmentList.ActorEventStates,
 			})
 		}
 	case MinedStates:
