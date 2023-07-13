@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/node/config"
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
@@ -83,6 +85,26 @@ func (dbsm *DataBaseStateManager) GetDBState(ctx context.Context, dsn string) (*
 	}
 
 	return dbState, true, nil
+}
+
+func (dbsm *DataBaseStateManager) GetDealState(ctx context.Context, dsn string) (smodel.DealState, bool, error) {
+	dealState, ok := dbsm.DBStateCache.GetDealState(dsn)
+	if !ok {
+		dealState, found, err := dbsm.Segment.GetDealState(ctx, dsn)
+		if err != nil {
+			return smodel.DealState{}, false, err
+		}
+
+		if !found {
+			return smodel.DealState{}, false, err
+		}
+
+		dbsm.DBStateCache.FindAndUpdateDealState(dsn, dealState)
+
+		return dealState, true, nil
+	}
+
+	return dealState, true, nil
 }
 
 func (dbsm *DataBaseStateManager) GetBlockStates(ctx context.Context, dsn string) ([]smodel.SegmentState, error) {
@@ -312,6 +334,44 @@ func (dbsm *DataBaseStateManager) GetLargeAmountTransferStates(ctx context.Conte
 	return largeAmountTransferStates, nil
 }
 
+//func (dbsm *DataBaseStateManager) GetAllDealActorStates(ctx context.Context, dsn string) ([]smodel.SegmentDealState, error) {
+//	dealActorStates, ok := dbsm.DBStateCache.GetAllDealActorStates(dsn)
+//	if !ok {
+//		dealActorStates, err := dbsm.Segment.GetAllDealActorStates(ctx, dsn)
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		// todo: nil
+//		if err := dbsm.DBStateCache.SetDealActorStates(dsn, dealActorStates); err != nil {
+//			return nil, err
+//		}
+//
+//		return dealActorStates, nil
+//	}
+//
+//	return dealActorStates, nil
+//}
+
+//func (dbsm *DataBaseStateManager) GetDealActorStates(ctx context.Context, dsn string, actorID string) ([]smodel.SegmentDealState, error) {
+//	dealActorStates, ok := dbsm.DBStateCache.GetDealActorStates(dsn, actorID)
+//	if !ok {
+//		allDealActorStates, err := dbsm.Segment.GetAllDealActorStates(ctx, dsn)
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		if err := dbsm.DBStateCache.SetDealActorStates(dsn, allDealActorStates); err != nil {
+//			return nil, err
+//		}
+//
+//		dealActorStates, _ := dbsm.DBStateCache.GetDealActorStates(dsn, actorID)
+//		return dealActorStates, nil
+//	}
+//
+//	return dealActorStates, nil
+//}
+
 func (dbsm *DataBaseStateManager) GetCfgLastModifyTime() int64 {
 	dbsm.DBCfg.DBCollectionsConfigLk.Lock()
 	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
@@ -406,6 +466,11 @@ func (dbsm *DataBaseStateManager) UpdateDBCollectionsMap(url string, collections
 type Boundrary struct {
 	Start abi.ChainEpoch `bson:"start" json:"Start"`
 	End   abi.ChainEpoch `bson:"end" json:"End"`
+}
+
+type DealRange struct {
+	Start uint64
+	End   uint64
 }
 
 func FirstLoad(ctx context.Context, dbsm *DataBaseStateManager) error {
@@ -518,9 +583,10 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		eventsRootCol := database.Collection("EventsRoot")
 		stateFinalHeightCol := database.Collection("StateFinalHeight")
 		evmInitCodeCol := database.Collection("EvmInitCode")
+		actorEventCodeCol := database.Collection("ActorEvent")
 
 		cols := make([]*mongo.Collection, 0)
-		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol)
+		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol)
 		dbsm.UpdateDBCollectionsMap(db.Url(), config2.Collections{DB: database, Cols: cols})
 	}
 
@@ -547,9 +613,10 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 	eventsRootCol := database.Collection("EventsRoot")
 	stateFinalHeightCol := database.Collection("StateFinalHeight")
 	evmInitCodeCol := database.Collection("EvmInitCode")
+	actorEventCodeCol := database.Collection("ActorEvent")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol)
+	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol)
 	dbsm.UpdateDBCollectionsMap(tmp.Url(), config2.Collections{DB: database, Cols: cols})
 
 	return nil
@@ -621,9 +688,10 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 	eventsRootCol := database.Collection("EventsRoot")
 	stateFinalHeightCol := database.Collection("StateFinalHeight")
 	evmInitCodeCol := database.Collection("EvmInitCode")
+	actorEventCodeCol := database.Collection("ActorEvent")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol)
+	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol)
 
 	return config2.Collections{DB: database, Cols: cols}, nil
 }
@@ -879,7 +947,124 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols con
 	}
 }
 
-func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, newDB config2.DB, dbType smodel.DType, interval abi.ChainEpoch) error {
+func (dbsm *DataBaseStateManager) GetDealRangeForDB(ctx context.Context, cols config2.Collections, dbType smodel.DType) (DealRange, error) {
+	cfg := dbsm.GetCfg()
+	countUtils := make([]CountUtil, 0)
+	for _, cold := range cfg.Colds {
+		if cold.IsInvalidDB() {
+			continue
+		}
+
+		state, found, err := dbsm.GetState(ctx, cold.Url())
+		if err != nil {
+			return DealRange{}, fmt.Errorf("load dbState for cold %v failed", cold.Url())
+		}
+
+		if !found {
+			return DealRange{}, fmt.Errorf("state of dsn %v not found, please run cfgUpdateCmd firstly", cold.Url())
+		}
+
+		countUtils = append(countUtils, CountUtil{Start: int64(state.GetDealStartID()), End: int64(state.GetDealEndID())})
+	}
+
+	// 逆序排序
+	sort.Slice(countUtils, func(i, j int) bool {
+		return countUtils[i].End > countUtils[j].End
+	})
+
+	startEpoch, err := GetStartEpochForDeal(ctx, cols)
+	if err != nil {
+		return DealRange{}, err
+	}
+
+	startDealID, err := GetStartDealID(ctx, cols, startEpoch)
+	if err != nil {
+		return DealRange{}, err
+	}
+
+	endDealID, err := GetEndDealID(ctx, cols, startEpoch)
+	if err != nil {
+		return DealRange{}, err
+	}
+
+	switch dbType {
+	case smodel.Formal:
+		if len(countUtils) != 0 {
+			latestEndDealID := uint64(countUtils[0].End)
+			if startDealID <= latestEndDealID {
+				startDealID = latestEndDealID
+			}
+		}
+
+		return DealRange{
+			Start: startDealID,
+			End:   endDealID,
+		}, nil
+
+	case smodel.Cold:
+		// 添加上下边界
+		minStartDealID := int64(0)
+		if len(countUtils) > 0 {
+			minStartDealID = countUtils[len(countUtils)-1].Start
+		}
+
+		if !cfg.Formal.IsInvalidDB() {
+			formalState, found, err := dbsm.GetState(ctx, cfg.Formal.Url())
+			if err != nil {
+				return DealRange{}, fmt.Errorf("load dbState for formal %v failed", cfg.Formal.Url())
+			}
+
+			if !found {
+				return DealRange{}, fmt.Errorf("state of dsn %v not found", cfg.Formal.Url())
+			}
+
+			countUtils = append(countUtils, CountUtil{Start: int64(formalState.GetDealStartID()), End: math.MaxInt64})
+			// 逆序排序
+			sort.Slice(countUtils, func(i, j int) bool {
+				return countUtils[i].End > countUtils[j].End
+			})
+		}
+
+		countUtils = append(countUtils, CountUtil{Start: 0, End: minStartDealID}, CountUtil{Start: math.MaxInt64, End: math.MaxInt64})
+		sort.Slice(countUtils, func(i, j int) bool {
+			return countUtils[i].Start > countUtils[j].Start
+		})
+
+		// 找出不连续的段
+		discontinuousSegment := make([]CountUtil, 0)
+		for i := 1; i < len(countUtils); i++ {
+			if countUtils[i-1].Start != countUtils[i].End {
+				discontinuousSegment = append(discontinuousSegment, CountUtil{
+					Start: countUtils[i].End,
+					End:   countUtils[i-1].Start,
+				})
+			}
+		}
+
+		sort.Slice(discontinuousSegment, func(i, j int) bool {
+			return discontinuousSegment[i].End > discontinuousSegment[j].End
+		})
+
+		for _, seg := range discontinuousSegment {
+			start := uint64(math.Max(float64(startDealID), float64(seg.Start)))
+			end := uint64(math.Min(float64(endDealID), float64(seg.End)))
+			if start >= end {
+				continue
+			}
+
+			return DealRange{Start: start, End: end}, nil
+		}
+
+		return DealRange{}, fmt.Errorf("no needed DealRange")
+
+	default:
+		return DealRange{}, fmt.Errorf("invalid db type: %v", dbType)
+	}
+}
+
+func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, newDB config2.DB, dbType smodel.DType, interval int64) error {
+	flog := log.With("FirstSetDataBaseState", newDB)
+
 	cols, err := GetCollectionsForDB(ctx, newDB)
 	if err != nil {
 		log.Errorf("get collections for DB %v failed: %v", newDB, cols)
@@ -892,12 +1077,22 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 		return err
 	}
 
-	log.Infow("get boundary for db", "db", newDB, "boundary", boundary)
+	flog.Infow("get boundary for db", "db", newDB, "boundary", boundary)
 
-	dbState := segment.DefaultState(newDB.Url(), dbType, interval, boundary.Start, boundary.End)
+	// 保证有两轮dealProposal入库了
+	dealRange, err := dbsm.GetDealRangeForDB(ctx, cols, dbType)
+	if err != nil {
+		log.Errorf("get deal range for db %v failed: %v", newDB, err)
+	}
+
+	flog.Infow("get dealRange for db", "db", newDB, "dealRange", dealRange)
+
+	state := segment.DefaultState(newDB.Url(), dbType, interval, boundary.Start, boundary.End, dealRange.Start, dealRange.End)
 	if err != nil {
 		return err
 	}
+
+	addUpState := segment.NewAddUpState(*state)
 
 	if dbType == smodel.Cold {
 		log.Infof("暂不处理cold")
@@ -1021,10 +1216,25 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 	}
 
 	if dbType == smodel.Formal {
-		slog := log.With("segment", "AddUpBlockState")
-		err := dbsm.Segment.AddUpBlockState(ctx, slog, boundary.End, dbState, cols)
 		if err != nil {
-			return fmt.Errorf("addup blockstate for %v failed: %w", newDB.Url(), err)
+			return err
+		}
+		var ewg multierror.Group
+		for i := range addupes {
+			i := i
+			addup := addupes[i]
+			ewg.Go(func() error {
+				if err := addup(ctx, flog, addUpState, cols, dbsm.Segment); err != nil {
+					return err
+				}
+
+				return nil
+			})
+		}
+
+		if err := ewg.Wait(); err != nil {
+			log.Errorf("RefreshFormalDataBaseState failed: %v", err)
+			return err
 		}
 	}
 

@@ -18,13 +18,18 @@ type State struct {
 	actorTransferStates       []model.SegmentState
 	minedStates               []model.SegmentState
 	largeAmountTransferStates []model.SegmentState
+
+	dealState model.DealState
+	//dealActorStates []model.SegmentDealState
 }
 
-func DefaultState(dsn string, dtype model.DType, interval, startEpoch, endEpoch abi.ChainEpoch) *State {
+func DefaultState(dsn string, dtype model.DType, interval int64, startEpoch, endEpoch abi.ChainEpoch, startDealID, endDealID uint64) *State {
 	dbState := model.NewDBState(dsn, dtype, interval, startEpoch, endEpoch)
+	dealState := model.NewDealState(dsn, dtype, model.NoneInterval, startDealID, endDealID, 0)
 	blockStates := make([]model.SegmentState, 0)
 	return &State{
-		dbState:     dbState, // todo
+		dbState:     dbState,    // todo
+		dealState:   *dealState, // todo
 		blockStates: blockStates,
 	}
 }
@@ -47,6 +52,18 @@ func (s *State) GetStartEpoch() abi.ChainEpoch {
 
 func (s *State) GetEndEpoch() abi.ChainEpoch {
 	return s.dbState.EndEpoch
+}
+
+func (s *State) GetDealState() model.DealState {
+	return s.dealState
+}
+
+func (s *State) GetDealStartID() uint64 {
+	return s.dealState.StartDealID
+}
+
+func (s *State) GetDealEndID() uint64 {
+	return s.dealState.EndDealID
 }
 
 func (s *State) GetBlockStates() []model.SegmentState {
@@ -132,6 +149,21 @@ func (s *State) GetLargeAmountTransferStates() []model.SegmentState {
 	return s.largeAmountTransferStates
 }
 
+//func (s *State) GetDealActorStates(actorID string) []model.SegmentDealState {
+//	dealActorStates := make([]model.SegmentDealState, 0)
+//	for _, das := range s.dealActorStates {
+//		if das.ActorID == actorID {
+//			dealActorStates = append(dealActorStates, das)
+//		}
+//	}
+//
+//	return s.dealActorStates
+//}
+//
+//func (s *State) GetAllDealActorStates() []model.SegmentDealState {
+//	return s.dealActorStates
+//}
+
 func (s *State) SetEndEpoch(endEpoch abi.ChainEpoch) {
 	s.dbState.EndEpoch = endEpoch
 }
@@ -142,6 +174,10 @@ func (s *State) SetStartEpoch(startEpoch abi.ChainEpoch) {
 
 func (s *State) SetDBState(dbState *model.DBState) {
 	s.dbState = dbState
+}
+
+func (s *State) SetDealState(dealState model.DealState) {
+	s.dealState = dealState
 }
 
 func (s *State) SetBlockStates(blockStates []model.SegmentState) error {
@@ -182,3 +218,8 @@ func (s *State) SetLargeAmountTransferStates(largeAmountTransferStates []model.S
 	s.largeAmountTransferStates = largeAmountTransferStates
 	return nil
 }
+
+//func (s *State) SetDealActorStates(dealActorStates []model.SegmentDealState) error {
+//	s.dealActorStates = dealActorStates
+//	return nil
+//}

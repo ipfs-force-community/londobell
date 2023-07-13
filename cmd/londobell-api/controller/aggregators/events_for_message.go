@@ -13,11 +13,11 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
 
-func GetDealByID(c *gin.Context) {
+func GetEventsForMessage(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	alog := log.With("method", "GetDealByID")
+	alog := log.With("method", "GetEventsForMessage")
 	req := model.CommonReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
@@ -34,46 +34,42 @@ func GetDealByID(c *gin.Context) {
 		return
 	}
 
-	pipe, err := util.Parse(model.Ctx{ID: req.ID}, string(dealByIDAggregator))
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(eventsForMessageAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	var detailForDealRes model.Deal
+	var eventsForMessage []model.EventForActor
 
 	// multi dbs query
 	{
-		// todo: 空会覆盖真实的吗？
-		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "DealProposal")
+		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "ActorEvent")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
 		}
 
-		if len(multiResult) == 0 {
-			c.JSON(http.StatusOK, res)
-			return
-		}
+		if len(multiResult) != 0 {
+			raw := multiResult
+			rawByte, err := json.Marshal(raw)
+			if err != nil {
+				log.Error(err)
+				util.ReturnOnErr(c, err)
+				return
+			}
 
-		raw := multiResult[0]
-		rawByte, err := json.Marshal(raw)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		err = json.Unmarshal(rawByte, &detailForDealRes)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
+			err = json.Unmarshal(rawByte, &eventsForMessage)
+			if err != nil {
+				log.Error(err)
+				util.ReturnOnErr(c, err)
+				return
+			}
 		}
 	}
 
-	res.Data = []model.Deal{detailForDealRes}
+	res.Data = eventsForMessage
 	c.JSON(http.StatusOK, res)
 }

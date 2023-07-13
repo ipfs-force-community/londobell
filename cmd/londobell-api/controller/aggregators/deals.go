@@ -3,6 +3,7 @@ package aggregators
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 
 	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
@@ -33,43 +34,29 @@ func GetDeals(c *gin.Context) {
 		return
 	}
 
-	formal := multiquery.DBStateManager.GetFormalCfg()
-	cols, ok := multiquery.DBStateManager.GetDBCollections(formal.Url())
-	if !ok {
-		alog.Error(fmt.Errorf("url %v not found in DBCollectionsMap", formal.Url()))
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	// todo: req.StartEpoch被强制转为latestEpoch
-	latestEpoch, err := GetLatestEpoch(ctx, cols, "DealProposal")
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	totalCount, err := GetTotalCountForAllDeals(ctx, cols, latestEpoch)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
 	curEpoch := common.GetCurEpoch()
 
-	countUtils, err := multiquery.GetEpochRange(ctx, &multiquery.DBStateManager, curEpoch)
+	countUtils, err := multiquery.GetDealRange(ctx, &multiquery.DBStateManager, curEpoch)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
+	}
+
+	totalCount := int64(0)
+	for _, countUtil := range countUtils {
+		totalCount += countUtil.DealState
+	}
+
+	if req.Index == 0 && req.Limit == 0 {
+		req.Limit = math.MaxInt64
 	}
 
 	var deals []model.Deal
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, int64(latestEpoch), int64(latestEpoch)+1, countUtils, dealsAggregator, req, "DealProposal")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.DealState, countUtils, dealsAggregator, req, "DealProposal")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

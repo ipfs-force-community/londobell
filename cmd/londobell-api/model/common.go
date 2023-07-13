@@ -47,4 +47,6 @@ type Ctx struct {
 	To         string
 	Skip       int64
 	Limit      int64
+	Start      int64
+	End        int64
 }
