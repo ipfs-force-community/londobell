@@ -199,6 +199,10 @@ var extractors = []extractor{
 		name:   "block-message",
 		method: extractBlockMessage,
 	},
+	{
+		name:   "actor-address",
+		method: extractActorAddress,
+	},
 }
 
 type extractor struct {
@@ -1208,6 +1212,75 @@ func extractBlockMessage(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	for bcid, mcids := range blockMessageMap {
 		blockMessage, _ := model.NewBlockMessage(bcid, ts.Height(), mcids)
 		res.Docs = append(res.Docs, blockMessage)
+	}
+
+	return nil
+}
+
+func extractActorAddress(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if tmp {
+		return nil
+	}
+
+	_, span := trace.StartSpan(ctx.C, "extractor.extractActorAddress")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
+	height := ts.Height()
+	if !common.IsZeroHour(ctx.Opts.ZeroHourExtract.ActorAddress, height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorAddressTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractActorBalance {
+		return nil
+	}
+
+	// todo: 对整点的null tipset不强求
+	root := ts.ParentState()
+	tree, err := ctx.D.StateTree(root)
+	if err != nil {
+		return fmt.Errorf("load state tree for %s: %w", root, err)
+	}
+	actorAddresses := []*model.ActorAddress{}
+	iact, err := tree.GetActor(_init.Address)
+	if err != nil {
+		return fmt.Errorf("failed to load init actor: %w", err)
+	}
+	store := ctx.D.ActorStore(ctx.C)
+	ist, err := _init.Load(store, iact)
+	if err != nil {
+		return fmt.Errorf("failed to load init actor state: %w", err)
+	}
+	robustMap := make(map[address.Address][]address.Address)
+	err = ist.ForEachActor(func(id abi.ActorID, addr address.Address) error {
+		idAddr, err := address.NewIDAddress(uint64(id))
+		if err != nil {
+			return fmt.Errorf("failed to write to addr map: %w", err)
+		}
+
+		robustMap[idAddr] = append(robustMap[idAddr], addr)
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walk through actors: %w", err)
+	}
+
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("actor address extracted")
+	for actorID, addresses := range robustMap {
+		actorAddress := &model.ActorAddress{ActorID: actorID, Epoch: ts.Height()}
+		for _, addr := range addresses {
+			switch addr.Protocol() {
+			case address.SECP256K1, address.Actor, address.BLS:
+				actorAddress.RobustAddress = addr
+			case address.Delegated:
+				actorAddress.DelegatedAddress = addr
+			default:
+				return fmt.Errorf("invalid address for %v, addr: %v, protocol: %v", actorID, addr, addr.Protocol())
+			}
+		}
+
+		actorAddresses = append(actorAddresses, actorAddress)
+	}
+
+	for i := range actorAddresses {
+		res.Docs = append(res.Docs, actorAddresses[i])
 	}
 
 	return nil

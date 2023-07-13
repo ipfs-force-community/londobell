@@ -1,4 +1,15 @@
 ## Schema
+### ActorAddress
+
+```
+{
+	"DelegatedAddress": "address.Address",
+	"Epoch": "abi.ChainEpoch",
+	"RobustAddress": "address.Address",
+	"_id": "address.Address"
+}
+```
+
 ### ActorBalance
 
 ```
