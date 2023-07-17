@@ -50,3 +50,7 @@ func (bm *BlockMessage) EpochField() *string {
 func (bm *BlockMessage) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(blockMessageEpochField, lower, upper), true
 }
+
+func (bm *BlockMessage) IsMutable() bool {
+	return false
+}

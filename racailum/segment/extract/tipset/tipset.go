@@ -12,26 +12,35 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/go-state-types/builtin/v10/evm"
-
-	"github.com/filecoin-project/go-state-types/exitcode"
-
-	"github.com/filecoin-project/go-state-types/crypto"
-	"github.com/filecoin-project/lotus/build"
-	"github.com/filecoin-project/lotus/chain/types/ethtypes"
-	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
-
 	"github.com/filecoin-project/go-address"
-	"github.com/ipfs/go-cid"
-
+	amt4 "github.com/filecoin-project/go-amt-ipld/v4"
+	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
+	builtintypes "github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/builtin/v10/evm"
+	"github.com/filecoin-project/go-state-types/builtin/v11/miner"
+	sverifreg "github.com/filecoin-project/go-state-types/builtin/v11/verifreg"
+	"github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/go-state-types/exitcode"
+	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/build"
+	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
+	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
+	lminer "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/chain/types/ethtypes"
+	"github.com/filecoin-project/lotus/chain/vm"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	multisig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
 	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
+	"github.com/ipfs/go-cid"
+	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.opencensus.io/trace"
+	"golang.org/x/xerrors"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mir"
@@ -40,14 +49,6 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
-
-	amt4 "github.com/filecoin-project/go-amt-ipld/v4"
-	builtintypes "github.com/filecoin-project/go-state-types/builtin"
-	"github.com/filecoin-project/lotus/api"
-	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
-	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/chain/vm"
 )
 
 func init() {
@@ -157,6 +158,14 @@ func init() {
 		schema.Model{
 			Name: "actor-event",
 			D:    &model.ActorEvent{},
+		},
+		schema.Model{
+			Name: "miner-sector",
+			D:    &model.MinerSector{},
+		},
+		schema.Model{
+			Name: "sector-claim",
+			D:    &model.SectorClaim{},
 		},
 	)
 }
@@ -314,7 +323,8 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return nil
 	}
 
-	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot && !ctx.Opts.EnabelExtract.EnableExtractExplicitMessage && !ctx.Opts.EnabelExtract.EnableExtractEvmByteCode && !ctx.Opts.EnabelExtract.EnableExtractActorEvent {
+	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot &&
+		!ctx.Opts.EnabelExtract.EnableExtractExplicitMessage && !ctx.Opts.EnabelExtract.EnableExtractEvmByteCode && !ctx.Opts.EnabelExtract.EnableExtractActorEvent && !ctx.Opts.EnabelExtract.EnableExtractMinerSector && !ctx.Opts.EnabelExtract.EnableExtractSectorClaim {
 		return nil
 	}
 
@@ -412,7 +422,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		allmsgsMap[key] = msg
 	}
 
-	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt, aecnt int
+	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt, aecnt, mstCnt, sctCnt int
 
 	if ctx.Opts.EnabelExtract.EnableExtractEthHash {
 		for _, cmsg := range allmsgs {
@@ -432,7 +442,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 			eht, err := model.NewEthHash(hash, smsg.Cid(), ts.Height())
 			if err != nil {
-				elog.Errorw("convert to model.EthHash", "mcid", smsg.Cid(), "err", err.Error())
+				elog.Warnw("convert to model.EthHash", "mcid", smsg.Cid(), "err", err.Error())
 			} else {
 				ethCnt++
 				res.Docs = append(res.Docs, eht)
@@ -458,7 +468,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				return fmt.Errorf("lookup method info for %s/%d: %w", msg.To, msg.Method, err)
 			}
 
-			elog.Errorf("%s", err)
+			elog.Warnf("%s", err)
 		}
 
 		mcid := msg.Cid()
@@ -480,7 +490,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			if _, has := dupmsgs[mcid]; !has {
 				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 				if err != nil {
-					elog.Errorw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+					elog.Warnw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 				} else {
 					res.Docs = append(res.Docs, mmsg)
 					msgcnt++
@@ -493,7 +503,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			isBlock := IsBlock(p.seq, msg.From)
 			met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock)
 			if err != nil {
-				elog.Errorw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
+				elog.Warnw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
 				tracecnt++
 				res.Docs = append(res.Docs, met)
@@ -515,7 +525,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
 						etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
 						if err != nil {
-							elog.Errorw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+							elog.Warnw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
 						} else {
 							res.Docs = append(res.Docs, etm)
 							etcnt++
@@ -540,7 +550,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 							removed := false
 							aet, err := model.NewActorEvent(actorID, ts.Height(), mcid, signedCid, topics, data, logIndex, removed, p.seq)
 							if err != nil {
-								elog.Errorw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+								elog.Warnw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
 							} else {
 								aecnt++
 								res.Docs = append(res.Docs, aet)
@@ -578,7 +588,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			for ID, mtype := range storeMap {
 				amsg, err := model.NewActorMessage(ID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock, p.seq)
 				if err != nil {
-					elog.Errorw("convert to model.ActorMessage", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
+					elog.Warnw("convert to model.ActorMessage", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
 				} else {
 					actorMsgCnt++
 					res.Docs = append(res.Docs, amsg)
@@ -612,9 +622,318 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				res.Docs = append(res.Docs, eit)
 			}
 		}
+
+		if ctx.Opts.EnabelExtract.EnableExtractMinerSector || ctx.Opts.EnabelExtract.EnableExtractSectorClaim {
+			var (
+				minerID address.Address
+				cmas    lminer.State
+				err     error
+			)
+
+			if p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") {
+				minerID, err = extract.LookupID(ctx, msg.To, ts.TipSet)
+				if err != nil {
+					return fmt.Errorf("lookup ID for %v failed: %v", msg.To, err)
+				}
+
+				cmact, err := ctx.D.LoadActor(ctx.C, msg.To, ts.Child)
+				if err != nil {
+					return fmt.Errorf("load actor %v at %v failed: %v", msg.To, ts.Child, err)
+				}
+
+				cmas, err = lminer.Load(ctx.D.ActorStore(ctx.C), cmact)
+				if err != nil {
+					return fmt.Errorf("load state for miner %v failed: %v", msg.To, err)
+				}
+
+			}
+
+			cvact, err := ctx.D.LoadActor(ctx.C, builtin.VerifiedRegistryActorAddr, ts.Child)
+			if err != nil {
+				return fmt.Errorf("failed to load verifiedRegistry actor at %v: %v", ts.Child.Height(), err)
+			}
+
+			cvas, err := verifreg.Load(ctx.D.ActorStore(ctx.C), cvact)
+			if err != nil {
+				return fmt.Errorf("failed to load verifiedRegistry state: %v", err)
+			}
+
+			cmkact, err := ctx.D.LoadActor(ctx.C, builtin.StorageMarketActorAddr, ts.Child)
+			if err != nil {
+				return fmt.Errorf("failed to load StorageMarketActorAddr actor at %v: %v", ts.Child.Height(), err)
+			}
+
+			cmkas, err := market.Load(ctx.D.ActorStore(ctx.C), cmkact)
+			if err != nil {
+				return fmt.Errorf("failed to load storageMarket state: %v", err)
+			}
+
+			// ProveCommitSector & ProveCommitAggregate generate部分sector
+			if p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") && (p.exec.Msg.Method == builtintypes.MethodsMiner.ProveCommitSector || p.exec.Msg.Method == builtintypes.MethodsMiner.ProveCommitAggregate) {
+				var sectorNumbers = bitfield.New()
+				// 解析参数，version
+				switch p.exec.Msg.Method {
+				case builtintypes.MethodsMiner.ProveCommitSector:
+					var params miner.ProveCommitSectorParams // todo
+					if err := params.UnmarshalCBOR(bytes.NewReader(p.exec.Msg.Params)); err != nil {
+						return fmt.Errorf("unmarshal ProveCommitSectorParams for %v failed: %v", p.exec.Msg.Cid(), err)
+					}
+
+					sectorNumbers.Set(uint64(params.SectorNumber))
+				case builtintypes.MethodsMiner.ProveCommitAggregate:
+					var params miner.ProveCommitAggregateParams
+					if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
+						return fmt.Errorf("unmarshal ProveCommitAggregateParams for %v failed: %v", msg.Cid(), err)
+					}
+
+					sectorNumbers = params.SectorNumbers
+				default:
+					return fmt.Errorf("invalid method: %v", p.exec.Msg.Method)
+				}
+
+				if ctx.Opts.EnabelExtract.EnableExtractMinerSector {
+					// get sectors for sectorNumbers from state
+					var sectorInfos []*lminer.SectorOnChainInfo
+					if err := sectorNumbers.ForEach(func(i uint64) error {
+						sectorInfo, err := cmas.GetSector(abi.SectorNumber(i))
+						if err != nil {
+							// err is nil when not found
+							return fmt.Errorf("get sector %v for %v failed: %v", i, msg.To, err)
+						}
+
+						if sectorInfo != nil {
+							sectorInfos = append(sectorInfos, sectorInfo)
+						}
+
+						return nil
+					}); err != nil {
+						return fmt.Errorf("load sector info for %v at %v failed: %v", msg.To, ts.Height(), err)
+					}
+
+					for _, info := range sectorInfos {
+						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, false, ts.Height())
+						mstCnt++
+						res.Docs = append(res.Docs, mst)
+					}
+				}
+
+				if ctx.Opts.EnabelExtract.EnableExtractSectorClaim {
+					// get claims for sectors
+					claims, err := cvas.GetClaims(minerID)
+					if err != nil {
+						return fmt.Errorf("failed to get claims for provider: %v: %v", minerID, err)
+					}
+
+					if err := sectorNumbers.ForEach(func(i uint64) error {
+						for claimID, claim := range claims {
+							if claim.Sector == abi.SectorNumber(i) {
+								sct := model.NewSectorClaim(uint64(claimID), claim.Provider, claim.Client, claim.Data, claim.Size, claim.TermMin, claim.TermMax, claim.TermStart, claim.Sector, ts.Height())
+								sctCnt++
+								res.Docs = append(res.Docs, sct)
+								continue
+							}
+						}
+
+						return nil
+					}); err != nil {
+						return fmt.Errorf("load sectorclaim info for %v at %v failed: %v", msg.To, ts.Height(), err)
+					}
+				}
+			}
+
+			// ExtendSectorExpiration || ExtendSectorExpiration2 续期
+			if ctx.Opts.EnabelExtract.EnableExtractMinerSector {
+				if p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") && (p.exec.Msg.Method == builtintypes.MethodsMiner.ExtendSectorExpiration || p.exec.Msg.Method == builtintypes.MethodsMiner.ExtendSectorExpiration2) {
+					var extendSectors []bitfield.BitField
+					if p.exec.Msg.Method == builtintypes.MethodsMiner.ExtendSectorExpiration {
+						var params miner.ExtendSectorExpirationParams
+						if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
+							return fmt.Errorf("unmarshal ExtendSectorExpirationParams for %v failed: %v", msg.Cid(), err)
+						}
+
+						for _, extension := range params.Extensions {
+							extendSectors = append(extendSectors, extension.Sectors)
+						}
+					} else if p.exec.Msg.Method == builtintypes.MethodsMiner.ExtendSectorExpiration2 {
+						var params miner.ExtendSectorExpiration2Params
+						if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
+							return fmt.Errorf("unmarshal ExtendSectorExpiration2Params for %v failed: %v", msg.Cid(), err)
+						}
+
+						for _, extension := range params.Extensions {
+							extendSectors = append(extendSectors, extension.Sectors)
+						}
+					}
+
+					for i := range extendSectors {
+						sectorInfos, err := cmas.LoadSectors(&extendSectors[i])
+						if err != nil {
+							return fmt.Errorf("load sector infos for %v failed: %v", msg.To, err)
+						}
+
+						for _, info := range sectorInfos {
+							mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, false, ts.Height())
+							mstCnt++
+							res.Docs = append(res.Docs, mst)
+						}
+					}
+				}
+			}
+
+			// ProveReplicaUpdates: replace proven sector
+			if p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") && (p.exec.Msg.Method == builtintypes.MethodsMiner.ProveReplicaUpdates || p.exec.Msg.Method == builtintypes.MethodsMiner.ProveReplicaUpdates2) {
+				var (
+					Deals            []abi.DealID
+					succeededSectors = bitfield.New()
+				)
+
+				if p.exec.Msg.Method == builtintypes.MethodsMiner.ProveReplicaUpdates {
+					var params miner.ProveReplicaUpdatesParams
+
+					if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
+						return fmt.Errorf("unmarshal ProveReplicaUpdatesParams for %v failed: %v", msg.Cid(), err)
+					}
+
+					if err := succeededSectors.UnmarshalCBOR(bytes.NewReader(p.exec.MsgRct.Return)); err != nil {
+						return fmt.Errorf("unmarshal ProveReplicaUpdates returns for %v failed: %v", msg.Cid(), err)
+					}
+				} else {
+					var params miner.ProveReplicaUpdatesParams2
+					if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
+						return fmt.Errorf("unmarshal ProveReplicaUpdatesParams2 for %v failed: %v", msg.Cid(), err)
+					}
+
+					if err := succeededSectors.UnmarshalCBOR(bytes.NewReader(p.exec.MsgRct.Return)); err != nil {
+						return fmt.Errorf("unmarshal ProveReplicaUpdates2 returns for %v failed: %v", msg.Cid(), err)
+					}
+				}
+
+				if ctx.Opts.EnabelExtract.EnableExtractMinerSector {
+					var sectorInfos []*lminer.SectorOnChainInfo
+					if err := succeededSectors.ForEach(func(i uint64) error {
+						sectorInfo, err := cmas.GetSector(abi.SectorNumber(i))
+						if err != nil {
+							return fmt.Errorf("get sector %v for %v failed: %v", i, msg.To, err)
+						}
+
+						if sectorInfo != nil {
+							sectorInfos = append(sectorInfos, sectorInfo)
+						}
+
+						return nil
+					}); err != nil {
+						return fmt.Errorf("load sector info for %v at %v failed: %v", msg.To, ts.Height(), err)
+					}
+
+					for _, info := range sectorInfos {
+						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, false, ts.Height())
+						mstCnt++
+						res.Docs = append(res.Docs, mst)
+
+						Deals = append(Deals, info.DealIDs...)
+					}
+				}
+
+				if ctx.Opts.EnabelExtract.EnableExtractSectorClaim {
+					var allocIDs []verifreg.AllocationId
+
+					state, err := cmkas.States()
+					if err != nil {
+						return fmt.Errorf("get market state failed: %v", err)
+					}
+
+					for _, deal := range Deals {
+						dealState, found, err := state.Get(deal)
+						if err != nil {
+							return fmt.Errorf("get dealstate failed: %v", err)
+						}
+
+						if found {
+							allocIDs = append(allocIDs, dealState.VerifiedClaim)
+						}
+					}
+
+					for _, allocID := range allocIDs {
+						claim, found, err := cvas.GetClaim(minerID, verifreg.ClaimId(allocID))
+						if err != nil {
+							return fmt.Errorf("get cliam for %v of %v failed: %v", allocID, minerID, err)
+						}
+
+						if found {
+							sct := model.NewSectorClaim(uint64(allocID), claim.Provider, claim.Client, claim.Data, claim.Size, claim.TermMin, claim.TermMax, claim.TermStart, claim.Sector, ts.Height())
+							sctCnt++
+							res.Docs = append(res.Docs, sct)
+						}
+					}
+				}
+			}
+
+			// TerminateSectors: on-time terminate or early terminate
+			if ctx.Opts.EnabelExtract.EnableExtractMinerSector && p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") && p.exec.Msg.Method == builtintypes.MethodsMiner.TerminateSectors {
+				var params miner.TerminateSectorsParams
+				if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
+					return fmt.Errorf("unmarshal TerminateSectorsParams for %v failed: %v", msg.Cid(), err)
+				}
+
+				var terminateSectors = bitfield.New()
+				for _, termination := range params.Terminations {
+					var err error
+					if terminateSectors, err = bitfield.MergeBitFields(terminateSectors, termination.Sectors); err != nil {
+						return fmt.Errorf("merge termination sectors failed for %v: %v", msg.To, err)
+					}
+				}
+
+				var sectorInfos []*lminer.SectorOnChainInfo
+				if err := terminateSectors.ForEach(func(i uint64) error {
+					sectorInfo, err := cmas.GetSector(abi.SectorNumber(i))
+					if err != nil {
+						// err is nil when not found
+						return fmt.Errorf("get sector %v for %v failed: %v", i, msg.To, err)
+					}
+
+					if sectorInfo != nil {
+						sectorInfos = append(sectorInfos, sectorInfo)
+					}
+
+					return nil
+				}); err != nil {
+					return fmt.Errorf("load sector info for %v at %v failed: %v", msg.To, ts.Height(), err)
+				}
+
+				for _, info := range sectorInfos {
+					mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, true, ts.Height())
+					mstCnt++
+					res.Docs = append(res.Docs, mst)
+				}
+			}
+
+			// ExtendClaimTerms allows Partial failure
+			if ctx.Opts.EnabelExtract.EnableExtractSectorClaim && p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "verifiedregistry") && (p.exec.Msg.Method == builtintypes.MethodsVerifiedRegistry.ExtendClaimTerms || p.exec.Msg.Method == builtintypes.MethodsVerifiedRegistry.ExtendClaimTermsExported) {
+				var params sverifreg.ExtendClaimTermsParams
+				if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
+					return fmt.Errorf("unmarshal ExtendClaimTermsParams for %v failed: %v", msg.Cid(), err)
+				}
+
+				for _, term := range params.Terms {
+					providerID, err := address.NewIDAddress(uint64(term.Provider))
+					if err != nil {
+						return fmt.Errorf("new id address for %v failed: %v", term.Provider, err)
+					}
+
+					claim, found, err := cvas.GetClaim(providerID, verifreg.ClaimId(term.ClaimId))
+					if err != nil || !found {
+						return fmt.Errorf("get claim for %v of %v failed: %v", providerID, term.ClaimId, err)
+					}
+
+					sct := model.NewSectorClaim(uint64(term.ClaimId), claim.Provider, claim.Client, claim.Data, claim.Size, claim.TermMin, claim.TermMax, claim.TermStart, claim.Sector, ts.Height())
+					sctCnt++
+					res.Docs = append(res.Docs, sct)
+				}
+			}
+		}
 	}
 
-	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "eth-hash", ethCnt, "events-root", etcnt, "explicit-message", emtCnt, "evm-initcode", initCodeCnt, "actor-event", aecnt)
+	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "eth-hash", ethCnt, "events-root", etcnt, "explicit-message", emtCnt, "evm-initcode", initCodeCnt, "actor-event", aecnt, "miner-sector", mstCnt, "sector-claim", sctCnt)
 
 	return nil
 }

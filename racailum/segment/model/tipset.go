@@ -77,3 +77,7 @@ func (t *TipSet) EpochField() *string {
 func (t *TipSet) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(tipsetEpochField, lower, upper), true
 }
+
+func (t *TipSet) IsMutable() bool {
+	return false
+}

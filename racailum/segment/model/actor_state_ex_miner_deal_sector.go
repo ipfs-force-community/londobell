@@ -48,3 +48,7 @@ func (m *MinerDealSector) Indexes() [][]string {
 		[]string{minerDealSectorEpochField, "Miner"},
 	}
 }
+
+func (m *MinerDealSector) IsMutable() bool {
+	return false
+}

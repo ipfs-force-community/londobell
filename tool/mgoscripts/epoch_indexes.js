@@ -89,6 +89,13 @@ db.MinerDealSector.createIndex({"Epoch":1,"Miner":1}, {"sparse": true});
 
 db.MinerFunds.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
+db.MinerSector.createIndex({"Miner":1,"SectorNumber":1}, {"sparse": true});
+db.MinerSector.createIndex({"Miner":1,"SimpleQaPower":1}, {"sparse": true});
+db.MinerSector.createIndex({"Miner":1,"DealIDs":1}, {"sparse": true});
+db.MinerSector.createIndex({"Miner":1,"Expiration":1}, {"sparse": true});
+db.MinerSector.createIndex({"Epoch":1,"Activation":1,"Replaced":1}, {"sparse": true});
+db.MinerSector.createIndex({"Miner":1,"Terminated":1}, {"sparse": true});
+
 db.MinerSectorSummary.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.MiningProfitability.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
@@ -98,6 +105,10 @@ db.MultisigBalance.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 db.PendingTxns.createIndex({"Addr":1}, {"sparse": true});
 db.PendingTxns.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 db.PendingTxns.createIndex({"Epoch":1,"Addr":1,"Detail.TxnID":1}, {"sparse": true});
+
+db.SectorClaim.createIndex({"Provider":1}, {"sparse": true});
+db.SectorClaim.createIndex({"Provider":1,"Sector":1}, {"sparse": true});
+db.SectorClaim.createIndex({"Provider":1,"Drop":1}, {"sparse": true});
 
 db.StateFinalHeight.createIndex({"Cids":1}, {"sparse": true});
 

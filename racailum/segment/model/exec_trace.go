@@ -176,6 +176,10 @@ func (et *ExecTrace) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, boo
 	return rangedFilter(execTraceEpochField, lower, upper), true
 }
 
+func (et *ExecTrace) IsMutable() bool {
+	return false
+}
+
 func (et *ExecTrace) genID() {
 	seqStrs := make([]string, 0, len(et.Seq))
 	for i := range et.Seq {
@@ -205,4 +209,8 @@ func (eg *ExecGas) EpochField() *string {
 // ResetPolicy impls common.Document
 func (eg *ExecGas) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(execGasEpochField, lower, upper), true
+}
+
+func (eg *ExecGas) IsMutable() bool {
+	return false
 }

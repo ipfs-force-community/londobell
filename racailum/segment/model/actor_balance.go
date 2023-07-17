@@ -62,3 +62,7 @@ func (a *ActorBalance) Indexes() [][]string {
 		[]string{"Addresses", "Code"},
 	}
 }
+
+func (a *ActorBalance) IsMutable() bool {
+	return false
+}

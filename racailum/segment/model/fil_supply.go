@@ -34,3 +34,7 @@ func (f *FilSupply) EpochField() *string {
 func (f *FilSupply) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(filSupplyEpochField, lower, upper), true
 }
+
+func (f *FilSupply) IsMutable() bool {
+	return false
+}

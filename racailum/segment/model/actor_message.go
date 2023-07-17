@@ -86,3 +86,7 @@ func (am *ActorMessage) genID(epoch abi.ChainEpoch, mtype string, seq []int) {
 
 	am.ID = fmt.Sprintf("%d-%s-%s", epoch, strings.Join(seqStrs, "-"), mtype)
 }
+
+func (am *ActorMessage) IsMutable() bool {
+	return false
+}

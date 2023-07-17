@@ -55,3 +55,7 @@ func (m *MinerSectorHealth) EpochField() *string {
 func (m *MinerSectorHealth) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(minerSectorHealthEpochField, lower, upper), true
 }
+
+func (m *MinerSectorHealth) IsMutable() bool {
+	return false
+}

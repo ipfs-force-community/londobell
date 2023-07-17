@@ -83,6 +83,7 @@ type Document interface {
 	CollectionName() string
 	EpochField() *string
 	ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool)
+	IsMutable() bool
 }
 
 // IndexedDocument will return pre-planed indexes
@@ -95,12 +96,14 @@ type IndexedDocument interface {
 type DocumentDB interface {
 	Insert(ctx context.Context, col string, docs []interface{}) (int, error)
 	Find(ctx context.Context, col string, filter interface{}, opts ...*options.FindOptions) (*mongo.Cursor, error)
-	Update(ctx context.Context, col string, filter, docs interface{}) (int, error)
+	Update(ctx context.Context, col string, filter, docs interface{}) (*mongo.UpdateResult, error)
 	Delete(ctx context.Context, col string, filter interface{}) (int, error)
 	Aggregate(ctx context.Context, col string, pipeline interface{}, res interface{}) error
 	FindOneAndUpdate(ctx context.Context, col string, filter interface{},
 		update interface{}) error
 	CountDocuments(ctx context.Context, col string, filter interface{}) (int64, error)
+	FindOne(ctx context.Context, col string, filter interface{},
+		opts ...*options.FindOneOptions) *mongo.SingleResult
 }
 
 // DetailPrinter prints more detailed info

@@ -46,3 +46,7 @@ func (f *FinalHeight) EpochField() *string {
 func (f *FinalHeight) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(finalHeightEpochField, lower, upper), true
 }
+
+func (f *FinalHeight) IsMutable() bool {
+	return false
+}

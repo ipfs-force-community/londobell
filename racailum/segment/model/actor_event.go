@@ -78,3 +78,7 @@ func (ae *ActorEvent) genID(epoch abi.ChainEpoch, logIndex uint64, seq []int) {
 
 	ae.ID = fmt.Sprintf("%d-%s-%d", epoch, strings.Join(seqStrs, "-"), logIndex)
 }
+
+func (ae *ActorEvent) IsMutable() bool {
+	return false
+}

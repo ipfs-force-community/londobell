@@ -477,6 +477,25 @@
 }
 ```
 
+### MinerSector
+
+```
+{
+	"Activation": "abi.ChainEpoch",
+	"DealIDs": "[]abi.DealID",
+	"DealWeight": "big.Int",
+	"Epoch": "abi.ChainEpoch",
+	"Expiration": "abi.ChainEpoch",
+	"InitialPledge": "big.Int",
+	"Miner": "address.Address",
+	"SectorNumber": "abi.SectorNumber",
+	"SimpleQaPower": "bool",
+	"Terminated": "bool",
+	"VerifiedDealWeight": "big.Int",
+	"_id": "string"
+}
+```
+
 ### MinerSectorSummary
 
 ```
@@ -543,6 +562,23 @@
 	"Epoch": "abi.ChainEpoch",
 	"Path": "[]cid.Cid",
 	"_id": "cid.Cid"
+}
+```
+
+### SectorClaim
+
+```
+{
+	"Client": "abi.ActorID",
+	"Data": "cid.Cid",
+	"Epoch": "abi.ChainEpoch",
+	"Provider": "abi.ActorID",
+	"Sector": "abi.SectorNumber",
+	"Size": "abi.PaddedPieceSize",
+	"TermMax": "abi.ChainEpoch",
+	"TermMin": "abi.ChainEpoch",
+	"TermStart": "abi.ChainEpoch",
+	"_id": "uint64"
 }
 ```
 

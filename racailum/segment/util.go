@@ -2,6 +2,11 @@ package segment
 
 import (
 	"context"
+	"fmt"
+	"reflect"
+	"strings"
+
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -89,4 +94,97 @@ func TraverseTipSets(cs common.ChainStore, curts *types.TipSet, traverseFn func(
 
 		curts = parentTS
 	}
+}
+
+func ExtractPrimaryKeyValue(doc interface{}) (interface{}, error) {
+	dt := reflect.TypeOf(doc)
+	vt := reflect.ValueOf(doc)
+	if dt.Kind() == reflect.Ptr {
+		dt = dt.Elem()
+		vt = vt.Elem()
+	}
+
+	if !vt.IsValid() {
+		return nil, fmt.Errorf("invalid doc: %+v", doc)
+	}
+
+	for i := 0; i < dt.NumField(); i++ {
+		if tagstr := dt.Field(i).Tag.Get("bson"); tagstr != "" {
+			if name := strings.Split(tagstr, ",")[0]; name == "_id" {
+				return vt.Field(i).Interface(), nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("field _id not found for %+v", doc)
+}
+
+func ExtractEpochField(doc interface{}) (string, error) {
+	dt := reflect.TypeOf(doc)
+	if dt.Kind() == reflect.Ptr {
+		dt = dt.Elem()
+	}
+
+	field, ok := dt.FieldByName("Epoch")
+	if !ok {
+		return "", fmt.Errorf("field Epoch not found for %+v", doc)
+	}
+
+	if tagstr := field.Tag.Get("bson"); tagstr != "" {
+		if name := strings.Split(tagstr, ",")[0]; name != "" {
+			return name, nil
+		}
+	}
+
+	return field.Name, nil
+}
+
+func ExtractEpochValue(doc interface{}) (int64, error) {
+	dt := reflect.TypeOf(doc)
+	vt := reflect.ValueOf(doc)
+	if dt.Kind() == reflect.Ptr {
+		dt = dt.Elem()
+		vt = vt.Elem()
+	}
+
+	if !vt.IsValid() {
+		return 0, fmt.Errorf("invalid doc: %+v", doc)
+	}
+
+	if _, ok := dt.FieldByName("Epoch"); !ok {
+		return 0, fmt.Errorf("field Epoch not found for %+v", doc)
+	}
+
+	if vt.FieldByName("Epoch").Type().ConvertibleTo(reflect.TypeOf(int64(0))) {
+		return vt.FieldByName("Epoch").Convert(reflect.TypeOf(int64(0))).Int(), nil
+	}
+
+	return 0, fmt.Errorf("field Epoch is not convertible to int64: %+v", doc)
+}
+
+func ExtractUpdateDoc(doc interface{}) (bson.M, error) {
+	dt := reflect.TypeOf(doc)
+	vt := reflect.ValueOf(doc)
+	if dt.Kind() == reflect.Ptr {
+		dt = dt.Elem()
+		vt = vt.Elem()
+	}
+
+	if !vt.IsValid() {
+		return nil, fmt.Errorf("null doc for ExtractUpdateDoc: %+v", doc)
+	}
+
+	res := bson.M{}
+	for i := 0; i < dt.NumField(); i++ {
+		if tagstr := dt.Field(i).Tag.Get("bson"); tagstr != "" {
+			if name := strings.Split(tagstr, ",")[0]; name != "" {
+				res[name] = vt.Field(i).Interface()
+				continue
+			}
+		}
+
+		res[dt.Field(i).Name] = vt.Field(i).Interface()
+	}
+
+	return res, nil
 }

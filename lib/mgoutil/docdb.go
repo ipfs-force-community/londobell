@@ -72,14 +72,8 @@ func (m *MgoDocDB) Find(ctx context.Context, colName string, filter interface{},
 	return cursor, nil
 }
 
-func (m *MgoDocDB) Update(ctx context.Context, colName string, filter, docs interface{}) (int, error) {
-	res, err := m.getCol(colName).UpdateMany(ctx, filter, docs, m.updateOpt)
-	var upserted int
-	if res != nil {
-		upserted = int(res.UpsertedCount) // todo: more log, such as UpsertedID
-	}
-
-	return upserted, err
+func (m *MgoDocDB) Update(ctx context.Context, colName string, filter, docs interface{}) (*mongo.UpdateResult, error) {
+	return m.getCol(colName).UpdateMany(ctx, filter, docs, m.updateOpt)
 }
 
 // Delete impl common.DocumentDB
@@ -122,6 +116,11 @@ func (m *MgoDocDB) FindOneAndUpdate(ctx context.Context, col string, filter inte
 
 func (m *MgoDocDB) CountDocuments(ctx context.Context, col string, filter interface{}) (int64, error) {
 	return m.getCol(col).CountDocuments(ctx, filter)
+}
+
+func (m *MgoDocDB) FindOne(ctx context.Context, col string, filter interface{},
+	opts ...*options.FindOneOptions) *mongo.SingleResult {
+	return m.getCol(col).FindOne(ctx, filter, opts...)
 }
 
 func (m *MgoDocDB) getCol(name string) *mongo.Collection {
@@ -209,20 +208,20 @@ func (m *MultiDB) Find(ctx context.Context, col string, filter interface{},
 	return nil, err
 }
 
-func (m *MultiDB) Update(ctx context.Context, col string, filter, docs interface{}) (int, error) {
+func (m *MultiDB) Update(ctx context.Context, col string, filter, docs interface{}) (*mongo.UpdateResult, error) {
 	var (
-		upserted int
-		err      error
+		res *mongo.UpdateResult
+		err error
 	)
 
 	for _, db := range m.dbs {
-		upserted, err = db.Update(ctx, col, filter, docs)
+		res, err = db.Update(ctx, col, filter, docs)
 		if err != nil {
-			return upserted, err
+			return res, err
 		}
 	}
 
-	return upserted, nil
+	return res, nil
 }
 
 func (m *MultiDB) Delete(ctx context.Context, col string, filter interface{}) (int, error) {
@@ -280,4 +279,17 @@ func (m *MultiDB) CountDocuments(ctx context.Context, col string, filter interfa
 	}
 
 	return 0, nil
+}
+
+func (m *MultiDB) FindOne(ctx context.Context, col string, filter interface{},
+	opts ...*options.FindOneOptions) *mongo.SingleResult {
+	var res *mongo.SingleResult
+	for _, db := range m.dbs {
+		res = db.FindOne(ctx, col, filter, opts...)
+		if res.Err() != nil && res.Err() != mongo.ErrNoDocuments {
+			return res
+		}
+	}
+
+	return res
 }

@@ -62,3 +62,7 @@ func (m *MinerSectorSummary) PrintDetail(l *zap.SugaredLogger) {
 		l.Infof("\tSummary #%d: %#v", si, m.Detail.Summaries[si])
 	}
 }
+
+func (m *MinerSectorSummary) IsMutable() bool {
+	return false
+}

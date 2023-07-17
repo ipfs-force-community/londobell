@@ -61,3 +61,7 @@ func (em *ExplicitMessage) EpochField() *string {
 func (em *ExplicitMessage) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(explicitMessageEpochField, lower, upper), true
 }
+
+func (em *ExplicitMessage) IsMutable() bool {
+	return false
+}

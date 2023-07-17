@@ -2,8 +2,9 @@ package model
 
 import (
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs/go-cid"
+
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 var (
@@ -48,4 +49,8 @@ func (c *Claims) Indexes() [][]string {
 		[]string{claimsEpochField, "Provider", "ClaimID"},
 		[]string{claimsEpochField, "Client", "ClaimID"},
 	}
+}
+
+func (c *Claims) IsMutable() bool {
+	return false
 }

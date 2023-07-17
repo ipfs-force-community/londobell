@@ -40,3 +40,7 @@ func (c *MultisigBalance) EpochField() *string {
 func (c *MultisigBalance) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(multisigBalanceEpochField, lower, upper), true
 }
+
+func (c *MultisigBalance) IsMutable() bool {
+	return false
+}

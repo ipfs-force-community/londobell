@@ -39,3 +39,7 @@ func (a *DatacapAllowances) Indexes() [][]string {
 		[]string{datacapAllowancesEpochField, "Owner", "Operator"},
 	}
 }
+
+func (a *DatacapAllowances) IsMutable() bool {
+	return false
+}

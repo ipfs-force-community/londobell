@@ -70,3 +70,7 @@ func (a *ActorState) EpochField() *string {
 func (a *ActorState) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(actorStateEpochField, lower, upper), true
 }
+
+func (a *ActorState) IsMutable() bool {
+	return false
+}

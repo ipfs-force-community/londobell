@@ -448,7 +448,7 @@ func (s *Segment) SaveFinalHeight(ctx context.Context, hi *common.LinkedTipSet) 
 
 	res.Docs = append(res.Docs, doc)
 	docs[0] = res.Docs
-	if err := s.insertMany(ctx, elog, docs, false); err != nil {
+	if err := s.insertMany(ctx, elog, docs); err != nil {
 		return fmt.Errorf("SaveFinalHeight err: %w", err)
 	}
 
@@ -495,7 +495,7 @@ func (s *Segment) SaveStateFinalHeight(ctx context.Context, hi *common.LinkedTip
 
 	res.Docs = append(res.Docs, doc)
 	docs[0] = res.Docs
-	if err := s.insertMany(ctx, elog, docs, false); err != nil {
+	if err := s.insertMany(ctx, elog, docs); err != nil {
 		return fmt.Errorf("SaveFinalHeight err: %w", err)
 	}
 
