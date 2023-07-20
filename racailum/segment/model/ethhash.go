@@ -51,3 +51,7 @@ func (eh *EthHash) EpochField() *string {
 func (eh *EthHash) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(ethHashEpochField, lower, upper), true
 }
+
+func (eh *EthHash) IsMutable() bool {
+	return false
+}

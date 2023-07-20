@@ -46,3 +46,7 @@ func (m *MarketFunds) EpochField() *string {
 func (m *MarketFunds) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(marketFundsDetailEpochField, lower, upper), true
 }
+
+func (m *MarketFunds) IsMutable() bool {
+	return false
+}

@@ -75,6 +75,10 @@ func (d *DealProposal) Indexes() [][]string {
 	}
 }
 
+func (d *DealProposal) IsMutable() bool {
+	return false
+}
+
 func (d *DealProposalV8) CollectionName() string {
 	return dealProposalColName
 }
@@ -94,4 +98,8 @@ func (d *DealProposalV8) Indexes() [][]string {
 		[]string{"Provider"},
 		[]string{"Client"},
 	}
+}
+
+func (d *DealProposalV8) IsMutable() bool {
+	return false
 }

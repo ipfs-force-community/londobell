@@ -65,3 +65,7 @@ func (bh *BlockHeader) EpochField() *string {
 func (bh *BlockHeader) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(blockHeaderEpochField, lower, upper), true
 }
+
+func (bh *BlockHeader) IsMutable() bool {
+	return false
+}

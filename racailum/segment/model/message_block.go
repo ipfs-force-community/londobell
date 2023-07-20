@@ -49,3 +49,7 @@ func (bh *MessageBlock) EpochField() *string {
 func (bh *MessageBlock) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(messageBlockEpochField, lower, upper), true
 }
+
+func (bh *MessageBlock) IsMutable() bool {
+	return false
+}

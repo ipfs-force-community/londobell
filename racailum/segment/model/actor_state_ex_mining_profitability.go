@@ -44,3 +44,7 @@ func (m *MiningProfitability) EpochField() *string {
 func (m *MiningProfitability) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(miningProfitabilityEpochField, lower, upper), true
 }
+
+func (m *MiningProfitability) IsMutable() bool {
+	return false
+}

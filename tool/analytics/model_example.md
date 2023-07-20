@@ -1347,13 +1347,37 @@
 ```
 
 
+### MinerSector
+
+#### miner-sector
+
+```
+{
+	"Activation": 0,
+	"DealIDs": [
+		0
+	],
+	"DealWeight": "1024",
+	"Epoch": 0,
+	"Expiration": 0,
+	"InitialPledge": "340282591298641078465964189926313473653",
+	"Miner": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"SectorNumber": 0,
+	"SimpleQaPower": false,
+	"Terminated": false,
+	"VerifiedDealWeight": "1073741824",
+	"_id": ""
+}
+```
+
+
 ### MinerSectorSummary
 
 #### miner-sector-summary
 
 ```
 {
-	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
 		"CommittedCapacity": 0,
 		"Summaries": [
@@ -1385,7 +1409,7 @@
 
 ```
 {
-	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 	"Detail": {
 		"ExpectedDayReward": "1073741824",
 		"InitialConsensusPledge": "1024",
@@ -1410,7 +1434,7 @@
 
 ```
 {
-	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Addr": "073366",
 	"Detail": {
 		"Locked": "340282591298641078465964189926313473653",
 		"VestInFuture": [
@@ -1433,10 +1457,10 @@
 
 ```
 {
-	"Addr": "073366",
+	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
 		"Approved": [
-			"2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q"
+			"3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla"
 		],
 		"Params": {
 			"$binary": {
@@ -1444,7 +1468,7 @@
 				"subType": "00"
 			}
 		},
-		"To": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+		"To": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 		"TxnID": 0,
 		"Value": "340282591298641078465964189926313473653"
 	},
@@ -1457,6 +1481,26 @@
 ```
 
 
+### SectorClaim
+
+#### sector-claim
+
+```
+{
+	"Client": 0,
+	"Data": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"Epoch": 0,
+	"Provider": 0,
+	"Sector": 0,
+	"Size": 0,
+	"TermMax": 0,
+	"TermMin": 0,
+	"TermStart": 0,
+	"_id": 0
+}
+```
+
+
 ### StateFinalHeight
 
 #### state-final-height
@@ -1464,7 +1508,7 @@
 ```
 {
 	"Cids": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
 	"_id": 0
 }
@@ -1480,11 +1524,11 @@
 	"BaseFee": "1073741824",
 	"ChildEpoch": 0,
 	"Cids": [
-		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
 	"MinTimestamp": 0,
-	"Receipts": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-	"State": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+	"Receipts": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"State": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 	"Weight": "1024",
 	"_id": 0
 }
@@ -1497,16 +1541,16 @@
 
 ```
 {
-	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Addr": "073366",
 	"Detail": {
 		"Cap": "340282591298641078465964189926313473653",
 		"Type": ""
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	],
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 

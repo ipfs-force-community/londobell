@@ -36,3 +36,7 @@ func (c *AllocatedSectors) EpochField() *string {
 func (c *AllocatedSectors) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(allocatedSectorsEpochField, lower, upper), true
 }
+
+func (c *AllocatedSectors) IsMutable() bool {
+	return false
+}

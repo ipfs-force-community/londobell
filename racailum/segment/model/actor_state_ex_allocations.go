@@ -3,8 +3,9 @@ package model
 import (
 	"github.com/filecoin-project/go-state-types/abi"
 	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
-	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs/go-cid"
+
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 var (
@@ -50,4 +51,8 @@ func (a *Allocations) Indexes() [][]string {
 		[]string{allocationsEpochField, "Client", "AllocationID"},
 		[]string{allocationsEpochField, "Provider", "AllocationID"},
 	}
+}
+
+func (a *Allocations) IsMutable() bool {
+	return false
 }

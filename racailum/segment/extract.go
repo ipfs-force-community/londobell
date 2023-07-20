@@ -176,10 +176,9 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 		return fmt.Errorf("extract part: %w", err)
 	}
 
-	upsert := tmp
 	if s.opts.Persist.Async {
 		ctx.asyncPersistWaitGroup.Go(func() error {
-			if err := s.insertMany(ctx.ctx, elog, docs, upsert); err != nil {
+			if err := s.insertMany(ctx.ctx, elog, docs); err != nil {
 				if nerr := common.NonCtxCanceledErr(err); nerr != nil {
 					stats.Record(ctx.ctx, metrics.ExtractError.M(1))
 					elog.Errorf("insert extracted documents from tipsets: %s", err)
@@ -190,7 +189,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 			return nil
 		})
 	} else {
-		if err := s.insertMany(ctx.ctx, elog, docs, upsert); err != nil {
+		if err := s.insertMany(ctx.ctx, elog, docs); err != nil {
 			return fmt.Errorf("insert extracted documents from tipsets: %w", err)
 		}
 	}
@@ -287,14 +286,14 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, pctx *persistCtx, heads
 
 	if s.opts.Persist.AsyncState {
 		pctx.asyncPersistWaitGroup.Go(func() error {
-			if err := s.insertMany(originCtx, ctx.L, docs, false); err != nil {
+			if err := s.insertMany(originCtx, ctx.L, docs); err != nil {
 				stats.Record(originCtx, metrics.ExtractError.M(1))
 				return fmt.Errorf("insert extracted documents from regular states: %w", err)
 			}
 			return nil
 		})
 	} else {
-		if err := s.insertMany(originCtx, ctx.L, docs, false); err != nil {
+		if err := s.insertMany(originCtx, ctx.L, docs); err != nil {
 			return fmt.Errorf("insert extracted documents from regular states: %w", err)
 		}
 	}

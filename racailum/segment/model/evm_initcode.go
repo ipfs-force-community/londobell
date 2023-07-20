@@ -55,3 +55,7 @@ func (ei *EvmInitCode) EpochField() *string {
 func (ei *EvmInitCode) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(evmInitCodeEpochField, lower, upper), true
 }
+
+func (ei *EvmInitCode) IsMutable() bool {
+	return false
+}

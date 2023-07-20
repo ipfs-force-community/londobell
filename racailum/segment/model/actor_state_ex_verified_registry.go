@@ -39,3 +39,7 @@ func (c *VerifiedRegistry) EpochField() *string {
 func (c *VerifiedRegistry) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(verifiedRegistryEpochField, lower, upper), true
 }
+
+func (c *VerifiedRegistry) IsMutable() bool {
+	return false
+}

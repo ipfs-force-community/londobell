@@ -42,3 +42,7 @@ func (c *ClaimedPower) EpochField() *string {
 func (c *ClaimedPower) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(claimedPowerEpochField, lower, upper), true
 }
+
+func (c *ClaimedPower) IsMutable() bool {
+	return false
+}

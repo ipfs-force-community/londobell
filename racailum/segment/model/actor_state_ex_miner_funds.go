@@ -3,6 +3,7 @@ package model
 import (
 	addr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/ipfs-force-community/londobell/common"
 )
 
@@ -86,4 +87,8 @@ func (m *MinerFunds) EpochField() *string {
 // ResetPolicy impl common.Document
 func (m *MinerFunds) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(minerFundsEpochField, lower, upper), true
+}
+
+func (m *MinerFunds) IsMutable() bool {
+	return false
 }

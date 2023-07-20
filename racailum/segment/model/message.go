@@ -70,6 +70,10 @@ func (m *Message) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) 
 	return nil, false
 }
 
+func (m *Message) IsMutable() bool {
+	return false
+}
+
 // NewMessage converts from *types.Message to *Message with required infomations
 func NewMessage(mcid, signedCid cid.Cid, raw *types.Message, act, meth string, params cbor.Er, epoch abi.ChainEpoch) (*Message, error) {
 	msg := &Message{

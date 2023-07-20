@@ -123,6 +123,8 @@ type EnableExtractOptions struct {
 	EnableExtractExplicitMessage bool
 	EnableExtractEvmByteCode     bool
 	EnableExtractActorEvent      bool
+	EnableExtractMinerSector     bool // 由于需要取未来sectorinfo，故临时库不抽； 变化延迟15分钟能接受吗？
+	EnableExtractSectorClaim     bool // 同上
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -143,6 +145,8 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractExplicitMessage: false,
 		EnableExtractEvmByteCode:     true,
 		EnableExtractActorEvent:      true,
+		EnableExtractMinerSector:     true,
+		EnableExtractSectorClaim:     true,
 	}
 }
 

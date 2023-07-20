@@ -52,3 +52,7 @@ func (s *SegmentState) EpochField() *string {
 func (s *SegmentState) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return nil, false
 }
+
+func (s *SegmentState) IsMutable() bool {
+	return false
+}

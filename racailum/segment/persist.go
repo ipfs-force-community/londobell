@@ -13,19 +13,24 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 )
 
-func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets [][]common.Document, upsert bool) error {
+func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets [][]common.Document) error {
 	if len(docSets) == 0 {
 		return nil
 	}
 
 	limit := s.opts.Persist.BatchInsertLimit
-	docs := map[string][]interface{}{}
-	counts := map[string]int{}
+	insertDocs := map[string][]interface{}{}
+	updateDocs := map[string][]interface{}{}
+	insertedCounts := map[string]int{}
+	matchedCounts := map[string]int{}
+	modifiedCounts := map[string]int{}
+	upsertedCounts := map[string]int{}
 	totals := map[string]int{}
 	insertOps := 0
+	updateOps := 0
 
 	insert := func(col string) error {
-		if len(docs[col]) == 0 {
+		if len(insertDocs[col]) == 0 {
 			return nil
 		}
 		var (
@@ -34,13 +39,72 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 		)
 
 		insertOps++
-		inserted, err = s.db.Insert(ctx, col, docs[col])
+		inserted, err = s.db.Insert(ctx, col, insertDocs[col])
 		if err != nil {
 			return err
 		}
 
-		docs[col] = docs[col][:0]
-		counts[col] = counts[col] + inserted
+		insertDocs[col] = insertDocs[col][:0]
+		insertedCounts[col] = insertedCounts[col] + inserted
+		return nil
+	}
+
+	update := func(col string) error {
+		if len(updateDocs[col]) == 0 {
+			return nil
+		}
+
+		updateOps++
+		for _, doc := range updateDocs[col] {
+			// update操作不允许在一个库中重新跑之前epoch，会覆盖后面epoch的记录
+			primaryKeyValue, err := ExtractPrimaryKeyValue(doc)
+			if err != nil {
+				return err
+			}
+			epochValue, err := ExtractEpochValue(doc)
+			if err != nil {
+				return err
+			}
+
+			updateDoc, err := ExtractUpdateDoc(doc)
+			if err != nil {
+				return err
+			}
+
+			var existingDoc bson.M
+			err = s.db.FindOne(ctx, col, bson.M{"_id": primaryKeyValue}).Decode(&existingDoc)
+			if err != nil && err != mongo.ErrNoDocuments {
+				return err
+			}
+
+			var res = &mongo.UpdateResult{}
+			if err == mongo.ErrNoDocuments {
+				res, err = s.db.Update(ctx, col, bson.M{"_id": primaryKeyValue}, bson.M{"$set": updateDoc})
+				if err != nil {
+					return err
+				}
+			} else {
+				existingEpoch, ok := existingDoc["Epoch"].(int64)
+				if !ok {
+					return fmt.Errorf("field Epoch is not int64 type: %+v", existingDoc)
+				}
+
+				if epochValue >= existingEpoch {
+					res, err = s.db.Update(ctx, col, bson.M{"_id": primaryKeyValue}, bson.M{"$set": updateDoc})
+					if err != nil {
+						return err
+					}
+				} else {
+					continue
+				}
+			}
+
+			matchedCounts[col] = matchedCounts[col] + int(res.MatchedCount)
+			modifiedCounts[col] = modifiedCounts[col] + int(res.ModifiedCount)
+			upsertedCounts[col] = upsertedCounts[col] + int(res.UpsertedCount)
+		}
+
+		updateDocs[col] = updateDocs[col][:0]
 		return nil
 	}
 
@@ -48,37 +112,63 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 		for di := range docSets[si] {
 			d := docSets[si][di]
 			colName := d.CollectionName()
-			docs[colName] = append(docs[colName], d)
+			if !d.IsMutable() {
+				insertDocs[colName] = append(insertDocs[colName], d)
+			} else {
+				updateDocs[colName] = append(updateDocs[colName], d)
+			}
+
 			totals[colName] = totals[colName] + 1
 
-			if len(docs[colName]) >= limit {
+			if len(insertDocs[colName]) >= limit {
 				if err := insert(colName); err != nil {
+					return err
+				}
+			}
+
+			if len(updateDocs[colName]) >= limit {
+				if err := update(colName); err != nil {
 					return err
 				}
 			}
 		}
 	}
 
-	for col := range docs {
+	for col := range insertDocs {
 		if err := insert(col); err != nil {
 			return err
 		}
 	}
 
-	colNames := make([]string, 0, len(docs))
-	for col := range docs {
-		colNames = append(colNames, col)
+	for col := range updateDocs {
+		if err := update(col); err != nil {
+			return err
+		}
 	}
 
-	sort.Strings(colNames)
-
-	logFields := make([]interface{}, 0, len(colNames)*2+2)
-	logFields = append(logFields, "ops", insertOps)
-	for _, col := range colNames {
-		logFields = append(logFields, col, fmt.Sprintf("%d/%d", counts[col], totals[col]))
+	insertColNames := make([]string, 0, len(insertDocs))
+	updateColNames := make([]string, 0, len(updateDocs))
+	for col := range insertDocs {
+		insertColNames = append(insertColNames, col)
+	}
+	for col := range updateDocs {
+		updateColNames = append(updateColNames, col)
 	}
 
-	l.Infow("documents inserted", logFields...)
+	sort.Strings(insertColNames)
+	sort.Strings(updateColNames)
+
+	logFields := make([]interface{}, 0, (len(insertColNames)+len(updateColNames))*2+2)
+	logFields = append(logFields, "insertOps", insertOps, "updateOps", updateOps)
+	for _, col := range insertColNames {
+		logFields = append(logFields, col, fmt.Sprintf("%d/%d", insertedCounts[col], totals[col]))
+	}
+
+	for _, col := range updateColNames {
+		logFields = append(logFields, col, fmt.Sprintf("matched: %v, modified: %d, upserted: %d, total: %d", matchedCounts[col], modifiedCounts[col], upsertedCounts[col], totals[col]))
+	}
+
+	l.Infow("documents inserted and updated", logFields...)
 
 	return nil
 }

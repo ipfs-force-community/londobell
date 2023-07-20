@@ -58,3 +58,7 @@ func (s *DealState) EpochField() *string {
 func (s *DealState) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return nil, false
 }
+
+func (s *DealState) IsMutable() bool {
+	return false
+}

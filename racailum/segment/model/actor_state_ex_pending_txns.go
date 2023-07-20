@@ -3,6 +3,7 @@ package model
 import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/ipfs-force-community/londobell/common"
 )
 
@@ -43,4 +44,8 @@ func (p *PendingTxns) Indexes() [][]string {
 		[]string{pendingTxnsEpochField, "Addr"},
 		[]string{pendingTxnsEpochField, "Addr", "Detail.TxnID"},
 	}
+}
+
+func (p *PendingTxns) IsMutable() bool {
+	return false
 }

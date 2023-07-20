@@ -60,3 +60,7 @@ func (d *DealProposalSummary) EpochField() *string {
 func (d *DealProposalSummary) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(dealProposalSummaryEpochField, lower, upper), true
 }
+
+func (d *DealProposalSummary) IsMutable() bool {
+	return false
+}

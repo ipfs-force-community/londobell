@@ -54,3 +54,7 @@ func (f *EventsRoot) EpochField() *string {
 func (f *EventsRoot) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(eventsRootEpochField, lower, upper), true
 }
+
+func (f *EventsRoot) IsMutable() bool {
+	return false
+}

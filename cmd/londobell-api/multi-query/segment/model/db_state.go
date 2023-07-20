@@ -68,3 +68,7 @@ func (d *DBState) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) 
 func (d *DBState) GetDType() DType {
 	return d.DType
 }
+
+func (d *DBState) IsMutable() bool {
+	return false
+}
