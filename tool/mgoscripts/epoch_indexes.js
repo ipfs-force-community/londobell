@@ -1,3 +1,7 @@
+db.ActorAddress.createIndex({"RobustAddress":1}, {"sparse": true});
+db.ActorAddress.createIndex({"DelegatedAddress":1}, {"sparse": true});
+db.ActorAddress.createIndex({"Epoch":1}, {"sparse": true});
+
 db.ActorBalance.createIndex({"Addresses":1}, {"sparse": true});
 db.ActorBalance.createIndex({"Code":1}, {"sparse": true});
 db.ActorBalance.createIndex({"Addresses":1,"Code":1}, {"sparse": true});

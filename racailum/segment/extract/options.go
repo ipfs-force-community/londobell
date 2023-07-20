@@ -59,6 +59,7 @@ func defaultActorStateRegularOptions() ActorStateRegularOptions {
 		ClaimsTicks:              4,                    //4h
 		DatacapBalancesTicks:     4,                    //4h
 		DatacapAllowancesTicks:   4,                    //4h
+		ActorAddressTicks:        1,                    // 1h
 	}
 }
 
@@ -97,6 +98,7 @@ type ActorStateRegularOptions struct {
 	ClaimsTicks              int
 	DatacapBalancesTicks     int
 	DatacapAllowancesTicks   int
+	ActorAddressTicks        int
 }
 
 func IsExtract(tickOption int, ctx *Ctx, curEpoch abi.ChainEpoch) bool {
@@ -125,6 +127,7 @@ type EnableExtractOptions struct {
 	EnableExtractActorEvent      bool
 	EnableExtractMinerSector     bool // 由于需要取未来sectorinfo，故临时库不抽； 变化延迟15分钟能接受吗？
 	EnableExtractSectorClaim     bool // 同上
+	EnableExtractActorAddress    bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -147,6 +150,7 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractActorEvent:      true,
 		EnableExtractMinerSector:     true,
 		EnableExtractSectorClaim:     true,
+		EnableExtractActorAddress:    true,
 	}
 }
 
@@ -168,6 +172,7 @@ type ZeroHourExtractOptions struct {
 	Claims              bool
 	DatacapAllowances   bool
 	DatacapBalances     bool
+	ActorAddress        bool
 }
 
 func defaultZeroHourExtractOptions() ZeroHourExtractOptions {
