@@ -135,6 +135,19 @@
 }
 ```
 
+### ChangedActor
+
+```
+{
+	"ActorID": "address.Address",
+	"Address": "*address.Address",
+	"Balance": "big.Int",
+	"Code": "string",
+	"Epoch": "abi.ChainEpoch",
+	"_id": "cid.Cid"
+}
+```
+
 ### ClaimedPower
 
 ```

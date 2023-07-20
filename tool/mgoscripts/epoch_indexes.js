@@ -29,6 +29,11 @@ db.BlockHeader.createIndex({"Epoch":1,"Miner":1}, {"sparse": true});
 db.BlockMessage.createIndex({"Epoch":1,"_id":1}, {"sparse": true});
 db.BlockMessage.createIndex({"Epoch":1,"Messages":1}, {"sparse": true});
 
+db.ChangedActor.createIndex({"ActorID":1}, {"sparse": true});
+db.ChangedActor.createIndex({"Code":1}, {"sparse": true});
+db.ChangedActor.createIndex({"Epoch":1}, {"sparse": true});
+db.ChangedActor.createIndex({"ActorID":1,"Epoch":1}, {"sparse": true});
+
 db.ClaimedPower.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.Claims.createIndex({"Provider":1}, {"sparse": true});
