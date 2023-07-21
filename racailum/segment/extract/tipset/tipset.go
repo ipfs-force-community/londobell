@@ -1239,7 +1239,7 @@ func extractActorAddress(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 	height := ts.Height()
-	if !common.IsZeroHour(ctx.Opts.ZeroHourExtract.ActorAddress, height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorAddressTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractActorBalance {
+	if !common.IsZeroHour(ctx.Opts.ZeroHourExtract.ActorAddress, height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorAddressTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractActorAddress {
 		return nil
 	}
 
