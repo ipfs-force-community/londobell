@@ -5,9 +5,9 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	lmarket "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	{{- if ge .Ver 8 }}
 	"bytes"
-	lmarket "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	market{{ .Ver }} "{{ .ImportPath }}/market"
     adt{{ .Ver }} "{{ .ImportPath }}/util/adt"
     {{ else }}
@@ -50,6 +50,7 @@ func init() {
 	{{- end }}
 }
 
+// extract in chronological order, Otherwise deals created and deleted earlier will be left over
 func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market{{ .Ver }}.State) error {
     id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
     if err != nil {
@@ -58,12 +59,12 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
 
     details := map[address.Address]*model.DealProposalDetail{}
 
-    {{ if ge .Ver 8 }}
     state, err := lmarket.Load(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), head.Actor)
     if err != nil {
         return fmt.Errorf("failed to load market actor state: %w", err)
     }
 
+    {{ if ge .Ver 8 }}
     dealsStateArr, err := state.States()
     if err != nil {
         return fmt.Errorf("load deal state array: %w", err)
@@ -76,7 +77,6 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
 
     var dealProposals []model.DealProposalV8
 
-    err = deals.ForEach(func(idx abi.DealID, out lmarket.DealProposal) error {
     {{- else }}
     deals, err := market{{ .Ver }}.AsDealProposalArray(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
     if err != nil {
@@ -88,41 +88,51 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
         return fmt.Errorf("load deal state array: %w", err)
     }
 
-    var out market{{ .Ver }}.DealProposal
     var dealProposals []model.DealProposal
 
-    err = deals.ForEach(&out, func(idx int64) error {
-    {{- end -}}
-		if _, ok := details[out.Provider]; !ok {
-			details[out.Provider] = &model.DealProposalDetail{
-				ActorStateExBasic: model.ActorStateExBasic{
-					ID:    id,
-					Path:  []cid.Cid{head.Head, st.Proposals},
-					Addr:  out.Provider,
-					Epoch: head.Epoch,
-				},
-			}
-		}
+    {{- end }}
 
-		dealState, found, err := dealsStateArr.Get(abi.DealID(idx))
-		if err != nil {
-			return fmt.Errorf("load deal state failed: %w", err)
-		}
+    nextID, err := state.NextID()
+    if err != nil {
+        return fmt.Errorf("get next ID failed: %w", err)
+    }
 
-		// no matter expire or slash
-		unExpired := out.EndEpoch > head.Epoch || (found && dealState.SlashEpoch != -1)
-		if unExpired && out.VerifiedDeal {
-			details[out.Provider].Detail.VerifiedDealCount++
-		} else if unExpired {
-			details[out.Provider].Detail.UnVerifiedDealCount++
-		} else if out.VerifiedDeal {
-			details[out.Provider].Detail.VerifiedDealEndCount++
-		} else {
-			details[out.Provider].Detail.UnVerifiedDealEndCount++
-		}
+    for idx := ctx.LatestDealID + 1; idx < int64(nextID); idx++ {
+        out, found, err := deals.Get(abi.DealID(idx))
+        if err != nil {
+            return fmt.Errorf("get dealId %v failed: %v", idx, err)
+        }
 
-        if int64(idx) <= ctx.LatestDealID {
-            return nil
+        if !found {
+            continue
+        }
+
+        if _, ok := details[out.Provider]; !ok {
+            details[out.Provider] = &model.DealProposalDetail{
+                ActorStateExBasic: model.ActorStateExBasic{
+                    ID:    id,
+                    Path:  []cid.Cid{head.Head, st.Proposals},
+                    Addr:  out.Provider,
+                    Epoch: head.Epoch,
+                },
+            }
+        }
+
+        dealState, found, err := dealsStateArr.Get(abi.DealID(idx))
+        if err != nil {
+            return fmt.Errorf("load deal state failed: %w", err)
+        }
+
+        // no matter expire or slash
+        unExpired := out.EndEpoch > head.Epoch || (found && dealState.SlashEpoch != -1)
+        if unExpired && out.VerifiedDeal {
+            details[out.Provider].Detail.VerifiedDealCount++
+        } else if unExpired {
+            details[out.Provider].Detail.UnVerifiedDealCount++
+        } else if out.VerifiedDeal {
+            details[out.Provider].Detail.VerifiedDealEndCount++
+        } else {
+            details[out.Provider].Detail.UnVerifiedDealEndCount++
         }
 
         providerID, err := extract.LookupID(ctx, out.Provider, head.TipSet)
@@ -135,23 +145,23 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
             return fmt.Errorf("lookup ID for client %v at %v failed: %v", out.Client, head.Epoch, err)
         }
 
-        {{ if lt .Ver 8}}
-		dealProposals = append(dealProposals, model.DealProposal{
-			ID:           idx,
-			Epoch:        head.Epoch,
-			ProviderID: providerID,
+        {{ if lt .Ver 8 }}
+        dealProposals = append(dealProposals, model.DealProposal{
+            ID:           idx,
+            Epoch:        head.Epoch,
+            ProviderID: providerID,
             ClientID:   clientID,
-			DealProposal: out,
-		})
-		{{ else }}
-		labelBytes := new(bytes.Buffer)
+            DealProposal: *out,
+        })
+        {{ else }}
+        labelBytes := new(bytes.Buffer)
         err = out.Label.MarshalCBOR(labelBytes)
         if err != nil {
             return fmt.Errorf("marshal label failed: %v", err)
         }
 
-		dealProposals = append(dealProposals, model.DealProposalV8{
-            ID:           int64(idx),
+        dealProposals = append(dealProposals, model.DealProposalV8{
+            ID:           idx,
             Epoch:        head.Epoch,
             ProviderID: providerID,
             ClientID:   clientID,
@@ -169,20 +179,15 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
                 ClientCollateral:     out.ClientCollateral,
             },
         })
-        {{ end }}
-		return nil
-	})
+        {{ end -}}
+    }
 
-	if err != nil {
-		return fmt.Errorf("walk through deal proposals: %w", err)
-	}
+    for i := range details {
+        res.Docs = append(res.Docs, details[i])
+    }
 
-	for i := range details {
-		res.Docs = append(res.Docs, details[i])
-	}
-
-	for i := range dealProposals {
-		res.Docs = append(res.Docs, &dealProposals[i])
-	}
-	return nil
+    for i := range dealProposals {
+        res.Docs = append(res.Docs, &dealProposals[i])
+    }
+    return nil
 }

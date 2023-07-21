@@ -9,6 +9,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	lmarket "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	market0 "github.com/filecoin-project/specs-actors/actors/builtin/market"
 	adt0 "github.com/filecoin-project/specs-actors/actors/util/adt"
 	"github.com/ipfs/go-cid"
@@ -43,6 +44,7 @@ func init() {
 	)
 }
 
+// extract in chronological order, Otherwise deals created and deleted earlier will be left over
 func extractDealProposalDetailedV0(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market0.State) error {
 	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
@@ -50,6 +52,11 @@ func extractDealProposalDetailedV0(ctx *extract.Ctx, res *extract.Res, head *com
 	}
 
 	details := map[address.Address]*model.DealProposalDetail{}
+
+	state, err := lmarket.Load(adt0.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), head.Actor)
+	if err != nil {
+		return fmt.Errorf("failed to load market actor state: %w", err)
+	}
 
 	deals, err := market0.AsDealProposalArray(adt0.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
 	if err != nil {
@@ -61,10 +68,23 @@ func extractDealProposalDetailedV0(ctx *extract.Ctx, res *extract.Res, head *com
 		return fmt.Errorf("load deal state array: %w", err)
 	}
 
-	var out market0.DealProposal
 	var dealProposals []model.DealProposal
 
-	err = deals.ForEach(&out, func(idx int64) error {
+	nextID, err := state.NextID()
+	if err != nil {
+		return fmt.Errorf("get next ID failed: %w", err)
+	}
+
+	for idx := ctx.LatestDealID + 1; idx < int64(nextID); idx++ {
+		out, found, err := deals.Get(abi.DealID(idx))
+		if err != nil {
+			return fmt.Errorf("get dealId %v failed: %v", idx, err)
+		}
+
+		if !found {
+			continue
+		}
+
 		if _, ok := details[out.Provider]; !ok {
 			details[out.Provider] = &model.DealProposalDetail{
 				ActorStateExBasic: model.ActorStateExBasic{
@@ -93,10 +113,6 @@ func extractDealProposalDetailedV0(ctx *extract.Ctx, res *extract.Res, head *com
 			details[out.Provider].Detail.UnVerifiedDealEndCount++
 		}
 
-		if int64(idx) <= ctx.LatestDealID {
-			return nil
-		}
-
 		providerID, err := extract.LookupID(ctx, out.Provider, head.TipSet)
 		if err != nil {
 			return fmt.Errorf("lookup ID for client %v at %v failed: %v", out.Provider, head.Epoch, err)
@@ -112,14 +128,8 @@ func extractDealProposalDetailedV0(ctx *extract.Ctx, res *extract.Res, head *com
 			Epoch:        head.Epoch,
 			ProviderID:   providerID,
 			ClientID:     clientID,
-			DealProposal: out,
+			DealProposal: *out,
 		})
-
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("walk through deal proposals: %w", err)
 	}
 
 	for i := range details {

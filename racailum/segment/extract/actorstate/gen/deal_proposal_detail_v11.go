@@ -31,6 +31,7 @@ func init() {
 
 }
 
+// extract in chronological order, Otherwise deals created and deleted earlier will be left over
 func extractDealProposalDetailedV11(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market11.State) error {
 	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
@@ -56,7 +57,21 @@ func extractDealProposalDetailedV11(ctx *extract.Ctx, res *extract.Res, head *co
 
 	var dealProposals []model.DealProposalV8
 
-	err = deals.ForEach(func(idx abi.DealID, out lmarket.DealProposal) error {
+	nextID, err := state.NextID()
+	if err != nil {
+		return fmt.Errorf("get next ID failed: %w", err)
+	}
+
+	for idx := ctx.LatestDealID + 1; idx < int64(nextID); idx++ {
+		out, found, err := deals.Get(abi.DealID(idx))
+		if err != nil {
+			return fmt.Errorf("get dealId %v failed: %v", idx, err)
+		}
+
+		if !found {
+			continue
+		}
+
 		if _, ok := details[out.Provider]; !ok {
 			details[out.Provider] = &model.DealProposalDetail{
 				ActorStateExBasic: model.ActorStateExBasic{
@@ -85,10 +100,6 @@ func extractDealProposalDetailedV11(ctx *extract.Ctx, res *extract.Res, head *co
 			details[out.Provider].Detail.UnVerifiedDealEndCount++
 		}
 
-		if int64(idx) <= ctx.LatestDealID {
-			return nil
-		}
-
 		providerID, err := extract.LookupID(ctx, out.Provider, head.TipSet)
 		if err != nil {
 			return fmt.Errorf("lookup ID for client %v at %v failed: %v", out.Provider, head.Epoch, err)
@@ -106,7 +117,7 @@ func extractDealProposalDetailedV11(ctx *extract.Ctx, res *extract.Res, head *co
 		}
 
 		dealProposals = append(dealProposals, model.DealProposalV8{
-			ID:         int64(idx),
+			ID:         idx,
 			Epoch:      head.Epoch,
 			ProviderID: providerID,
 			ClientID:   clientID,
@@ -124,12 +135,6 @@ func extractDealProposalDetailedV11(ctx *extract.Ctx, res *extract.Res, head *co
 				ClientCollateral:     out.ClientCollateral,
 			},
 		})
-
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("walk through deal proposals: %w", err)
 	}
 
 	for i := range details {
