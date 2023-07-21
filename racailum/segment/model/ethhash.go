@@ -33,7 +33,7 @@ func NewEthHash(txHash ethtypes.EthHash, cid cid.Cid, epoch abi.ChainEpoch) (*Et
 // Indexes impl common.Indexed
 func (eh *EthHash) Indexes() [][]string {
 	return [][]string{
-		[]string{"Cid", ethHashEpochField},
+		[]string{"Cid"},
 	}
 }
 

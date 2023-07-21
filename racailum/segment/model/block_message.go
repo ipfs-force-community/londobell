@@ -31,8 +31,7 @@ func NewBlockMessage(bcid cid.Cid, epoch abi.ChainEpoch, mcids []cid.Cid) (*Bloc
 // Indexes impl common.Indexed
 func (bm *BlockMessage) Indexes() [][]string {
 	return [][]string{
-		[]string{blockMessageEpochField, "_id"},
-		[]string{blockMessageEpochField, "Messages"},
+		[]string{"Messages"},
 	}
 }
 

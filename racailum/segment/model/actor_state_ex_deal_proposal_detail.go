@@ -66,12 +66,13 @@ func (d *DealProposal) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, b
 // Indexes impl common.Indexed
 func (d *DealProposal) Indexes() [][]string {
 	return [][]string{
-		[]string{dealProposalEpochField, "VerifiedDeal"},
-		[]string{"VerifiedDeal"},
-		[]string{"Provider"},
-		[]string{"Client"},
+		[]string{"VerifiedDeal", "_id"},
 		[]string{"ProviderID", "-_id"},
 		[]string{"ClientID", "-_id"},
+		[]string{"ProviderID", "VerifiedDeal", "-_id"},
+		[]string{"ClientID", "VerifiedDeal", "-_id"},
+		[]string{dealProposalEpochField},
+		[]string{dealProposalEpochField, "_id"},
 	}
 }
 
@@ -93,10 +94,13 @@ func (d *DealProposalV8) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{},
 
 func (d *DealProposalV8) Indexes() [][]string {
 	return [][]string{
-		[]string{dealProposalEpochFieldV8, "VerifiedDeal"},
-		[]string{"VerifiedDeal"},
-		[]string{"Provider"},
-		[]string{"Client"},
+		[]string{"VerifiedDeal", "_id"},
+		[]string{"ProviderID", "-_id"},
+		[]string{"ClientID", "-_id"},
+		[]string{"ProviderID", "VerifiedDeal", "-_id"},
+		[]string{"ClientID", "VerifiedDeal", "-_id"},
+		[]string{dealProposalEpochFieldV8},
+		[]string{dealProposalEpochFieldV8, "_id"},
 	}
 }
 
