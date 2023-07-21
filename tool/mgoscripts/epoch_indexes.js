@@ -12,7 +12,7 @@ db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"Epoch":1}, {"sparse": true
 db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"MethodName":1,"Epoch":1}, {"sparse": true});
 db.ActorMessage.createIndex({"ActorID":1,"ExitCode":1,"Type":1,"Epoch":1,"Value":1}, {"sparse": true});
 
-db.ActorState.createIndex({"Epoch":1,"Code":1,"Addr":1}, {"sparse": true});
+db.ActorState.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.AllocatedSectors.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
@@ -70,12 +70,12 @@ db.EvmInitCode.createIndex({"Epoch":1}, {"sparse": true});
 
 db.ExecGas.createIndex({"Epoch":1}, {"sparse": true});
 
-db.ExecTrace.createIndex({"Epoch":1,"Msg.To":1,"Msg.Method":1,"MsgRct.ExitCode":1}, {"sparse": true});
-db.ExecTrace.createIndex({"Epoch":1,"Msg.To":1,"Seq":1}, {"sparse": true});
 db.ExecTrace.createIndex({"Cid":1}, {"sparse": true});
 db.ExecTrace.createIndex({"SignedCid":1}, {"sparse": true});
-db.ExecTrace.createIndex({"Depth":1,"Epoch":1}, {"sparse": true});
-db.ExecTrace.createIndex({"Depth":1,"Msg.MethodName":1,"Epoch":1}, {"sparse": true});
+db.ExecTrace.createIndex({"Epoch":1}, {"sparse": true});
+db.ExecTrace.createIndex({"IsBlock":1,"MsgRct.ExitCode":1,"Msg.Method":1,"Epoch":1}, {"sparse": true});
+db.ExecTrace.createIndex({"IsBlock":1,"Epoch":1}, {"sparse": true});
+db.ExecTrace.createIndex({"IsBlock":1,"Msg.MethodName":1,"Epoch":1}, {"sparse": true});
 
 db.ExplicitMessage.createIndex({"Epoch":1}, {"sparse": true});
 db.ExplicitMessage.createIndex({"MethodName":1,"Epoch":1}, {"sparse": true});
