@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filecoin-project/go-state-types/actors"
+
 	"github.com/filecoin-project/go-address"
 	amt4 "github.com/filecoin-project/go-amt-ipld/v4"
 	"github.com/filecoin-project/go-bitfield"
@@ -431,6 +433,11 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		allmsgsMap[key] = msg
 	}
 
+	av, err := actors.VersionForNetwork(ctx.D.GetNetworkVersion(ctx.C, ts.Height()))
+	if err != nil {
+		return fmt.Errorf("get version for network failed: %v", err)
+	}
+
 	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt, aecnt, mstCnt, sctCnt int
 
 	if ctx.Opts.EnabelExtract.EnableExtractEthHash {
@@ -726,7 +733,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					}
 				}
 
-				if ctx.Opts.EnabelExtract.EnableExtractSectorClaim {
+				if ctx.Opts.EnabelExtract.EnableExtractSectorClaim && av > actors.Version8 {
 					// get claims for sectors
 					claims, err := cvas.GetClaims(minerID)
 					if err != nil {
@@ -843,7 +850,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					}
 				}
 
-				if ctx.Opts.EnabelExtract.EnableExtractSectorClaim {
+				if ctx.Opts.EnabelExtract.EnableExtractSectorClaim && av > actors.Version8 {
 					var allocIDs []verifreg.AllocationId
 
 					state, err := cmkas.States()
