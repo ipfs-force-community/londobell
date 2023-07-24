@@ -3,9 +3,12 @@ package dep
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
+
+	"github.com/filecoin-project/lotus/node/modules/helpers"
 
 	"github.com/ipfs/go-cid"
 	dstore "github.com/ipfs/go-datastore"
@@ -82,6 +85,25 @@ func ChainIOBlockstore(full v0api.FullNode) (dtypes.BasicChainBlockstore, error)
 	}
 
 	return cached, nil
+}
+
+func ChainOfflineBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, r repo.LockedRepo) (dtypes.BasicChainBlockstore, error) {
+	bs, err := r.Blockstore(helpers.LifecycleCtx(mctx, lc), repo.UniversalBlockstore)
+	if err != nil {
+		return nil, err
+	}
+	wrapBlockStore := &WrapAPIBlockstore{
+		bs,
+	}
+
+	if c, ok := bs.(io.Closer); ok {
+		lc.Append(fx.Hook{
+			OnStop: func(_ context.Context) error {
+				return c.Close()
+			},
+		})
+	}
+	return wrapBlockStore, err
 }
 
 type raIn struct {
