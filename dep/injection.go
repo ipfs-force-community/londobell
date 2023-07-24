@@ -8,13 +8,14 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
+	metricsi "github.com/ipfs/go-metrics-interface"
+	"github.com/urfave/cli/v2"
+	"go.uber.org/fx"
+
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/cliex"
 	"github.com/ipfs-force-community/londobell/racailum"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
-	metricsi "github.com/ipfs/go-metrics-interface"
-	"github.com/urfave/cli/v2"
-	"go.uber.org/fx"
 
 	"github.com/filecoin-project/lotus/chain/beacon"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
@@ -93,7 +94,7 @@ func OfflineDataSource() dix.Option {
 		// Notice: we may need to use other datastore someday. It depends on
 		// the origin data structs.
 		dix.Override(new(dtypes.AfterGenesisSet), modules.SetGenesis),
-		dix.Override(new(dtypes.BasicChainBlockstore), modules.UniversalBlockstore),
+		dix.Override(new(dtypes.BasicChainBlockstore), ChainOfflineBlockstore),
 		dix.Override(new(dtypes.MetadataDS), modules.Datastore(true)),
 	)
 }
