@@ -521,6 +521,51 @@ func GetTotalCountForTransfersForLargeAmount(ctx context.Context, dbsm *DataBase
 	return countUtils, nil
 }
 
+func GetTotalCountForActorTransferBlockRewardMsgs(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorTransferBlockRewardMsgs)
+	if err != nil {
+		return nil, err
+	}
+
+	return countUtils, nil
+}
+
+func GetTotalCountForActorTransferBurnMsgs(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorTransferBurnMsgs)
+	if err != nil {
+		return nil, err
+	}
+
+	return countUtils, nil
+}
+
+func GetTotalCountForActorTransferSendAndReceiveMsgs(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorTransferSendAndReceiveMsgs)
+	if err != nil {
+		return nil, err
+	}
+
+	return countUtils, nil
+}
+
+func GetTotalCountForActorTransferSendMsgs(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorTransferSendMsgs)
+	if err != nil {
+		return nil, err
+	}
+
+	return countUtils, nil
+}
+
+func GetTotalCountForActorTransferReceiveMsgs(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorTransferReceiveMsgs)
+	if err != nil {
+		return nil, err
+	}
+
+	return countUtils, nil
+}
+
 func GetAllBlockMsgsByMethodName(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) (map[string]int64, error) {
 	curTime := time.Now()
 	alk.RLock()
@@ -1353,6 +1398,186 @@ func refreshTotalCountForTransfersForLargeAmount(ctx context.Context, state *seg
 	}
 }
 
+func refreshTotalCountForActorTransferBlockRewardMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+	switch state.GetDType() {
+	case smodel.Formal:
+		count, err := GetActorTransferBlockRewardStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+		*tmpStartEpoch = state.GetEndEpoch()
+		return nil
+	case smodel.Tmp:
+		state.SetStartEpoch(*tmpStartEpoch)
+		state.SetEndEpoch(curEpoch + 1)
+
+		count, err := GetActorTransferBlockRewardStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+		return nil
+	case smodel.Cold:
+		count, err := GetActorTransferBlockRewardStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+
+		return nil
+	default:
+		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
+	}
+}
+
+func refreshTotalCountForActorTransferBurnMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+	switch state.GetDType() {
+	case smodel.Formal:
+		count, err := GetActorTransferBurnStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+		*tmpStartEpoch = state.GetEndEpoch()
+		return nil
+	case smodel.Tmp:
+		state.SetStartEpoch(*tmpStartEpoch)
+		state.SetEndEpoch(curEpoch + 1)
+
+		count, err := GetActorTransferBurnStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+		return nil
+	case smodel.Cold:
+		count, err := GetActorTransferBurnStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+
+		return nil
+	default:
+		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
+	}
+}
+
+func refreshTotalCountForActorTransferSendAndReceiveMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+	switch state.GetDType() {
+	case smodel.Formal:
+		count, err := GetActorTransferSendAndReceiveStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+		*tmpStartEpoch = state.GetEndEpoch()
+		return nil
+	case smodel.Tmp:
+		state.SetStartEpoch(*tmpStartEpoch)
+		state.SetEndEpoch(curEpoch + 1)
+
+		count, err := GetActorTransferSendAndReceiveStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+		return nil
+	case smodel.Cold:
+		count, err := GetActorTransferSendAndReceiveStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+
+		return nil
+	default:
+		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
+	}
+}
+
+func refreshTotalCountForActorTransferSendMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+	switch state.GetDType() {
+	case smodel.Formal:
+		count, err := GetActorTransferSendStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+		*tmpStartEpoch = state.GetEndEpoch()
+		return nil
+	case smodel.Tmp:
+		state.SetStartEpoch(*tmpStartEpoch)
+		state.SetEndEpoch(curEpoch + 1)
+
+		count, err := GetActorTransferSendStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+		return nil
+	case smodel.Cold:
+		count, err := GetActorTransferSendStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+
+		return nil
+	default:
+		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
+	}
+}
+
+func refreshTotalCountForActorTransferReceiveMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+	switch state.GetDType() {
+	case smodel.Formal:
+		count, err := GetActorTransferReceiveStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+		*tmpStartEpoch = state.GetEndEpoch()
+		return nil
+	case smodel.Tmp:
+		state.SetStartEpoch(*tmpStartEpoch)
+		state.SetEndEpoch(curEpoch + 1)
+
+		count, err := GetActorTransferReceiveStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+		return nil
+	case smodel.Cold:
+		count, err := GetActorTransferReceiveStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
+
+		return nil
+	default:
+		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
+	}
+}
+
 // 更新formal，新增cold   异步程序更新cold state,   中间会有一段时间数据断层？
 // only for tmp, get from londobell
 func GetBlockStates(ctx context.Context, state *segment.State, cols common.Collections, actorID, methodName string) ([]smodel.SegmentState, error) {
@@ -1846,6 +2071,241 @@ func GetDealActorStates(ctx context.Context, state *segment.State, cols common.C
 	}
 
 	return 0, fmt.Errorf("no DealProposal collection")
+}
+
+func GetActorTransferBlockRewardStates(ctx context.Context, state *segment.State, cols common.Collections, actorID string) (int64, error) {
+	rlog := log.With("query", "GetActorTransferBlockRewardStates")
+
+	start := time.Now()
+	startEpoch, endEpoch := state.GetStartEpoch(), state.GetEndEpoch()
+	defer func() {
+		rlog.Infof("refresh actorTransferBlockRewardStates successfully for [%v, %v], elapsed: %v", startEpoch, endEpoch, time.Now().Sub(start).String())
+	}()
+
+	if endEpoch <= startEpoch {
+		return 0, nil
+	}
+
+	var countRes []model.CountRes
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetCountOfTransferBlockRewardForActorAggregator()))
+	if err != nil {
+		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+		return 0, err
+	}
+
+	tableName := "ActorMessage"
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == tableName {
+			cur, err := col.Aggregate(ctx, pipe)
+			if err != nil {
+				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			err = cur.All(ctx, &countRes)
+			if err != nil {
+				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			if len(countRes) == 0 {
+				rlog.Warnf("no actor between %v and %v", startEpoch, endEpoch)
+				return 0, nil
+			}
+
+			return countRes[0].Count, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no ActorMessage collection")
+}
+
+func GetActorTransferBurnStates(ctx context.Context, state *segment.State, cols common.Collections, actorID string) (int64, error) {
+	rlog := log.With("query", "GetActorTransferBurnStates")
+
+	start := time.Now()
+	startEpoch, endEpoch := state.GetStartEpoch(), state.GetEndEpoch()
+	defer func() {
+		rlog.Infof("refresh actorTransferBurnStates successfully for [%v, %v], elapsed: %v", startEpoch, endEpoch, time.Now().Sub(start).String())
+	}()
+
+	if endEpoch <= startEpoch {
+		return 0, nil
+	}
+
+	var countRes []model.CountRes
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetCountOfTransferBurnForActorAggregator()))
+	if err != nil {
+		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+		return 0, err
+	}
+
+	tableName := "ActorMessage"
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == tableName {
+			cur, err := col.Aggregate(ctx, pipe)
+			if err != nil {
+				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			err = cur.All(ctx, &countRes)
+			if err != nil {
+				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			if len(countRes) == 0 {
+				rlog.Warnf("no actor between %v and %v", startEpoch, endEpoch)
+				return 0, nil
+			}
+
+			return countRes[0].Count, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no ActorMessage collection")
+}
+
+func GetActorTransferSendAndReceiveStates(ctx context.Context, state *segment.State, cols common.Collections, actorID string) (int64, error) {
+	rlog := log.With("query", "GetActorTransferSendAndReceiveStates")
+
+	start := time.Now()
+	startEpoch, endEpoch := state.GetStartEpoch(), state.GetEndEpoch()
+	defer func() {
+		rlog.Infof("refresh actorTransferSendAndReceiveStates successfully for [%v, %v], elapsed: %v", startEpoch, endEpoch, time.Now().Sub(start).String())
+	}()
+
+	if endEpoch <= startEpoch {
+		return 0, nil
+	}
+
+	var countRes []model.CountRes
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetCountOfTransferSendAndReceiveForActorAggregator()))
+	if err != nil {
+		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+		return 0, err
+	}
+
+	tableName := "ActorMessage"
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == tableName {
+			cur, err := col.Aggregate(ctx, pipe)
+			if err != nil {
+				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			err = cur.All(ctx, &countRes)
+			if err != nil {
+				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			if len(countRes) == 0 {
+				rlog.Warnf("no actor between %v and %v", startEpoch, endEpoch)
+				return 0, nil
+			}
+
+			return countRes[0].Count, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no ActorMessage collection")
+}
+
+func GetActorTransferSendStates(ctx context.Context, state *segment.State, cols common.Collections, actorID string) (int64, error) {
+	rlog := log.With("query", "GetActorTransferSendStates")
+
+	start := time.Now()
+	startEpoch, endEpoch := state.GetStartEpoch(), state.GetEndEpoch()
+	defer func() {
+		rlog.Infof("refresh actorTransferSendStates successfully for [%v, %v], elapsed: %v", startEpoch, endEpoch, time.Now().Sub(start).String())
+	}()
+
+	if endEpoch <= startEpoch {
+		return 0, nil
+	}
+
+	var countRes []model.CountRes
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetCountOfTransferSendForActorAggregator()))
+	if err != nil {
+		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+		return 0, err
+	}
+
+	tableName := "ActorMessage"
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == tableName {
+			cur, err := col.Aggregate(ctx, pipe)
+			if err != nil {
+				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			err = cur.All(ctx, &countRes)
+			if err != nil {
+				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			if len(countRes) == 0 {
+				rlog.Warnf("no actor between %v and %v", startEpoch, endEpoch)
+				return 0, nil
+			}
+
+			return countRes[0].Count, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no ActorMessage collection")
+}
+
+func GetActorTransferReceiveStates(ctx context.Context, state *segment.State, cols common.Collections, actorID string) (int64, error) {
+	rlog := log.With("query", "GetActorTransferReceiveStates")
+
+	start := time.Now()
+	startEpoch, endEpoch := state.GetStartEpoch(), state.GetEndEpoch()
+	defer func() {
+		rlog.Infof("refresh actorTransferReceiveStates successfully for [%v, %v], elapsed: %v", startEpoch, endEpoch, time.Now().Sub(start).String())
+	}()
+
+	if endEpoch <= startEpoch {
+		return 0, nil
+	}
+
+	var countRes []model.CountRes
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetCountOfTransferReceiveForActorAggregator()))
+	if err != nil {
+		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+		return 0, err
+	}
+
+	tableName := "ActorMessage"
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == tableName {
+			cur, err := col.Aggregate(ctx, pipe)
+			if err != nil {
+				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			err = cur.All(ctx, &countRes)
+			if err != nil {
+				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			if len(countRes) == 0 {
+				rlog.Warnf("no actor between %v and %v", startEpoch, endEpoch)
+				return 0, nil
+			}
+
+			return countRes[0].Count, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no ActorMessage collection")
 }
 
 func GetIDForAddr(ctx context.Context, from, to string, log *zap.SugaredLogger, api v0api.FullNode) (fromID, toID string, fromErr, toErr bool) {
