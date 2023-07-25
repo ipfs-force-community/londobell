@@ -649,17 +649,17 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			if p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") {
 				minerID, err = extract.LookupID(ctx, msg.To, ts.TipSet)
 				if err != nil {
-					return fmt.Errorf("lookup ID for %v failed: %v, msg: %v", msg.To, err, signedCid)
+					return fmt.Errorf("lookup ID for %v failed: %v, msg: %v, signedCid: %v", msg.To, err, msg.Cid(), signedCid)
 				}
 
 				cmact, err := ctx.D.LoadActor(ctx.C, msg.To, ts.Child)
 				if err != nil {
-					return fmt.Errorf("load actor %v at %v failed: %v, msg: %v", msg.To, ts.Child, err, signedCid)
+					return fmt.Errorf("load actor %v at %v failed: %v, msg: %v, signedCid: %v", msg.To, ts.Child, err, msg.Cid(), signedCid)
 				}
 
 				cmas, err = lminer.Load(ctx.D.ActorStore(ctx.C), cmact)
 				if err != nil {
-					return fmt.Errorf("load state for miner %v failed: %v, msg: %v", msg.To, err, signedCid)
+					return fmt.Errorf("load state for miner %v failed: %v, msg: %v, signedCid: %v", msg.To, err, msg.Cid(), signedCid)
 				}
 
 			}
