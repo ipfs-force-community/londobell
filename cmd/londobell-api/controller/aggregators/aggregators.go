@@ -59,13 +59,18 @@ var (
 	richListAggregator                                   []byte
 	//allActorsForBlockMessageAggregator                   []byte
 	//transferCountForActorAggregator                      []byte
-	countOfTransfersForActor2Aggregator   []byte
-	countOfLargeAmountTransfersAggregator []byte
-	transferMsgsForActorAggregator        []byte
-	childCallsForMessageAggregator        []byte
-	eventsByActorAggregator               []byte
-	eventsForMessageAggregator            []byte
-	eventsForEpochRangeAggregator         []byte
+	countOfTransfersForActor2Aggregator      []byte
+	countOfLargeAmountTransfersAggregator    []byte
+	transferMsgsForActorAggregator           []byte
+	childCallsForMessageAggregator           []byte
+	eventsByActorAggregator                  []byte
+	eventsForMessageAggregator               []byte
+	eventsForEpochRangeAggregator            []byte
+	transferBlockRewardForActorAggregator    []byte
+	transferBurnForActorAggregator           []byte
+	transferSendAndReceiveForActorAggregator []byte
+	transferSendForActorAggregator           []byte
+	transferReceiveForActorAggregator        []byte
 )
 
 type Methodlist struct {
@@ -149,4 +154,9 @@ func InitAggregators() {
 	eventsByActorAggregator = monitor.GetEventsByActorAggregator()
 	eventsForMessageAggregator = monitor.GetEventsForMessageAggregator()
 	eventsForEpochRangeAggregator = monitor.GetEventsForEpochRangeAggregator()
+	transferBlockRewardForActorAggregator = monitor.GetTransferBlockRewardForActorAggregator()
+	transferBurnForActorAggregator = monitor.GetTransferBurnForActorAggregator()
+	transferSendAndReceiveForActorAggregator = monitor.GetCountOfTransferSendAndReceiveForActorAggregator()
+	transferSendForActorAggregator = monitor.GetTransferSendForActorAggregator()
+	transferReceiveForActorAggregator = monitor.GetTransferReceiveForActorAggregator()
 }
