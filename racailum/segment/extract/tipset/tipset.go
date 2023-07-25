@@ -646,7 +646,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				err     error
 			)
 
-			if p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") {
+			if p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") && IsBlock(p.seq, msg.From) {
 				minerID, err = extract.LookupID(ctx, msg.To, ts.TipSet)
 				if err != nil {
 					return fmt.Errorf("lookup ID for %v failed: %v", msg.To, err)
