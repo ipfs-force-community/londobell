@@ -8,8 +8,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/filecoin-project/lotus/api/v0api"
-
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/dep"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
@@ -55,21 +53,24 @@ var segmentUpdateCmd = &cli.Command{
 		&cli.BoolFlag{
 			Name: "set-active",
 		},
+		&cli.BoolFlag{
+			Name:  "local",
+			Value: true,
+			Usage: "local or remote",
+		},
 	},
 
 	Action: func(cctx *cli.Context) error {
 		di := struct {
 			fx.In
 			SegMgr *segment.Manager
-			Full   v0api.FullNode
 			CStore common.ChainStore
 		}{}
 
 		stopper, err := dix.New(
 			cctx.Context,
-			dep.Bell(cctx.Context, fxlog, &di),
+			dep.WalkRaCalium(cctx, fxlog, &di),
 			dep.InjectRepoPath(cctx),
-			dep.InjectFullNode(cctx),
 		)
 		if err != nil {
 			return err
@@ -111,7 +112,7 @@ var segmentUpdateCmd = &cli.Command{
 		}
 
 		if cctx.IsSet("child-hi") || cctx.IsSet("child-lo") {
-			if err := setSegmentBoundary(cctx, slog, di.Full, di.CStore, segname, di.SegMgr); err != nil {
+			if err := setSegmentBoundary(cctx, slog, di.CStore, segname, di.SegMgr); err != nil {
 				return err
 			}
 		}
@@ -129,7 +130,7 @@ var segmentUpdateCmd = &cli.Command{
 	},
 }
 
-func setSegmentBoundary(cctx *cli.Context, slog *zap.SugaredLogger, full v0api.FullNode, cstore common.ChainStore, segname string, segmgr *segment.Manager) error {
+func setSegmentBoundary(cctx *cli.Context, slog *zap.SugaredLogger, cstore common.ChainStore, segname string, segmgr *segment.Manager) error {
 	bound, _, err := segmgr.LoadBoundary(segname)
 	if err != nil {
 		return fmt.Errorf("load boundary for %s: %w", segname, err)
