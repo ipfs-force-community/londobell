@@ -16,6 +16,13 @@ var MethodSend = MethodInfo{
 	},
 }
 
+var MethodPlaceHolder = MethodInfo{
+	Actor: "",
+	Method: vm.MethodMeta{
+		Name: "Send(placeholder)",
+	},
+}
+
 // MethodInfo includes actor name & method meta
 type MethodInfo struct {
 	Actor  string

@@ -8,6 +8,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/filecoin-project/go-state-types/builtin"
+
+	"github.com/multiformats/go-varint"
+
 	"github.com/filecoin-project/lotus/chain/vm"
 
 	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
@@ -165,6 +169,18 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 		act, err := stm.LoadActor(ctx, call.To, ts)
 		if err != nil {
 			if errors.Is(err, types.ErrActorNotFound) {
+				if call.To.Protocol() == address.Delegated {
+					payload := call.To.Payload()
+					namespace, _, err := varint.FromUvarint(payload)
+					if err != nil {
+						return MethodInfo{}, fmt.Errorf("FromUvarint payload for %v failed: %v", call.To, err)
+					}
+
+					if namespace == builtin.EthereumAddressManagerActorID {
+						return MethodPlaceHolder, nil
+					}
+				}
+
 				return MethodInfo{}, fmt.Errorf("%w: %s", ErrActorMethodNotFound, err)
 			}
 
