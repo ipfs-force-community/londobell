@@ -94,17 +94,17 @@ func GetMessagesForActor(c *gin.Context) {
 		}
 	}
 
-	if int64(len(messagesForActor)) < req.Limit {
-		createMessage, err := getCreateMessage(ctx, req.Addr, api, countUtils)
-		if err != nil {
-			log.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
+	createMessage, err := getCreateMessage(ctx, req.Addr, api, countUtils)
+	if err != nil {
+		log.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
 
-		if createMessage != nil {
+	if createMessage != nil {
+		totalCount++
+		if int64(len(messagesForActor)) < req.Limit {
 			messagesForActor = append(messagesForActor, *createMessage)
-			totalCount++
 		}
 	}
 
