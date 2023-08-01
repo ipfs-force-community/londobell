@@ -639,7 +639,8 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractMinerSector || ctx.Opts.EnabelExtract.EnableExtractSectorClaim {
+		// todo: ts.Child调用可能会出问题： 当actor在msg后销毁
+		if !tmp && (ctx.Opts.EnabelExtract.EnableExtractMinerSector || ctx.Opts.EnabelExtract.EnableExtractSectorClaim) {
 			var (
 				minerID address.Address
 				cmas    lminer.State
