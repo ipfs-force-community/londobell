@@ -1319,8 +1319,8 @@ func extractChangedActor(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	elog := ctx.L.With("epoch", height)
 	elog.Infow("changed actor extracted")
 
-	old := ts.ParentState()
-	new := ts.Parent.ParentState()
+	old := ts.Parent.ParentState()
+	new := ts.ParentState()
 
 	oldTree, err := ctx.D.StateTree(old)
 	if err != nil {
