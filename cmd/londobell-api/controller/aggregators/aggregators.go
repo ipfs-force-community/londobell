@@ -156,7 +156,7 @@ func InitAggregators() {
 	eventsForEpochRangeAggregator = monitor.GetEventsForEpochRangeAggregator()
 	transferBlockRewardForActorAggregator = monitor.GetTransferBlockRewardForActorAggregator()
 	transferBurnForActorAggregator = monitor.GetTransferBurnForActorAggregator()
-	transferSendAndReceiveForActorAggregator = monitor.GetCountOfTransferSendAndReceiveForActorAggregator()
+	transferSendAndReceiveForActorAggregator = monitor.GetTransferSendAndReceiveForActorAggregator()
 	transferSendForActorAggregator = monitor.GetTransferSendForActorAggregator()
 	transferReceiveForActorAggregator = monitor.GetTransferReceiveForActorAggregator()
 }
