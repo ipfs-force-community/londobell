@@ -32,7 +32,8 @@ var demandCmd = &cli.Command{
 		}
 
 		database := rcli.Database(cctx.String("name"))
-		col := database.Collection("MinerFunds")
+		minerFundsCol := database.Collection("MinerFunds")
+		execTraceCol := database.Collection("ExecTrace")
 
 		full, closer, err := client.NewFullNodeRPCV0(cctx.Context, cctx.String("api-url"), nil)
 		if err != nil {
@@ -68,7 +69,7 @@ var demandCmd = &cli.Command{
 			return err
 		}
 
-		cur, err := col.Aggregate(context.TODO(), pipe)
+		cur, err := minerFundsCol.Aggregate(context.TODO(), pipe)
 		if err != nil {
 			return err
 		}
@@ -88,7 +89,7 @@ var demandCmd = &cli.Command{
 			return err
 		}
 
-		cur2, err := col.Aggregate(context.TODO(), pipe2)
+		cur2, err := execTraceCol.Aggregate(context.TODO(), pipe2)
 		if err != nil {
 			return err
 		}
@@ -108,7 +109,7 @@ var demandCmd = &cli.Command{
 			return err
 		}
 
-		cur3, err := col.Aggregate(context.TODO(), pipe3)
+		cur3, err := execTraceCol.Aggregate(context.TODO(), pipe3)
 		if err != nil {
 			return err
 		}
