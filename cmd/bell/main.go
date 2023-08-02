@@ -33,6 +33,7 @@ func main() {
 			checkCmd,
 			offlineCmd,
 			fixActorMessageCmd,
+			demandCmd,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{
