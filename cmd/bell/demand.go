@@ -135,9 +135,13 @@ func WriteToExcelAllActiveMiner(activeMiners []string) error {
 	f := excelize.NewFile()
 	for i := 0; i < len(activeMiners); i++ {
 		if i == 0 {
-			f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+1), "miner")
+			if err := f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+1), "miner"); err != nil {
+				return err
+			}
 		}
-		f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+2), activeMiners[i])
+		if err := f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+2), activeMiners[i]); err != nil {
+			return err
+		}
 	}
 
 	if err := f.SaveAs("excel/activeminer.xlsx"); err != nil {
@@ -151,9 +155,13 @@ func WriteToExcelAllActiveMiner2(activeMiners []string) error {
 	f := excelize.NewFile()
 	for i := 0; i < len(activeMiners); i++ {
 		if i == 0 {
-			f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+1), "miner")
+			if err := f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+1), "miner"); err != nil {
+				return err
+			}
 		}
-		f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+2), activeMiners[i])
+		if err := f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+2), activeMiners[i]); err != nil {
+			return err
+		}
 	}
 
 	if err := f.SaveAs("excel/activeminer2.xlsx"); err != nil {
@@ -167,9 +175,13 @@ func WriteToExcelAllActiveMiner3(activeMiners []string) error {
 	f := excelize.NewFile()
 	for i := 0; i < len(activeMiners); i++ {
 		if i == 0 {
-			f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+1), "miner")
+			if err := f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+1), "miner"); err != nil {
+				return err
+			}
 		}
-		f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+2), activeMiners[i])
+		if err := f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i+2), activeMiners[i]); err != nil {
+			return err
+		}
 	}
 
 	if err := f.SaveAs("excel/activeminer1.xlsx"); err != nil {
