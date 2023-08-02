@@ -46,6 +46,10 @@ var demandCmd = &cli.Command{
 		}
 
 		miners, err := full.StateListMiners(context.TODO(), ts.Key())
+		if err != nil {
+			return err
+		}
+
 		log.Infof("ts: %v all miners: %v", ts.Height(), len(miners))
 
 		type Res struct {
