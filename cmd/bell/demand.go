@@ -48,7 +48,6 @@ var demandCmd = &cli.Command{
 		miners, err := full.StateListMiners(context.TODO(), ts.Key())
 		log.Infof("ts: %v all miners: %v", ts.Height(), len(miners))
 
-		activeMiners := make([]string, 0)
 		type Res struct {
 			Miners []string
 		}
@@ -75,9 +74,7 @@ var demandCmd = &cli.Command{
 			return err
 		}
 
-		activeMiners = res.Miners
-
-		err = WriteToExcelAllActiveMiner(activeMiners)
+		err = WriteToExcelAllActiveMiner(res.Miners)
 		if err != nil {
 			return err
 		}
