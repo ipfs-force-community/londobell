@@ -66,61 +66,79 @@ var demandCmd = &cli.Command{
 		latestHeight := int64(3088200)
 		pipe, err := util.Parse(model.Ctx{StartEpoch: latestHeight}, allActiveMinerJS)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
 		cur, err := minerFundsCol.Aggregate(context.TODO(), pipe)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
 		err = cur.All(context.TODO(), &res)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
 		err = WriteToExcelAllActiveMiner(res[0].Miners)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
+		log.Info("1 done")
+
 		pipe2, err := util.Parse(model.Ctx{StartEpoch: 3000240, EndEpoch: 3086640}, newActiveMinerJS)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
 		cur2, err := execTraceCol.Aggregate(context.TODO(), pipe2)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
 		err = cur2.All(context.TODO(), &res2)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
 		err = WriteToExcelAllActiveMiner2(res2[0].Miners)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
+		log.Info("2 done")
+
 		pipe3, err := util.Parse(model.Ctx{StartEpoch: 2913840, EndEpoch: 3000240}, newActiveMinerJS)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
 		cur3, err := execTraceCol.Aggregate(context.TODO(), pipe3)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
 		err = cur3.All(context.TODO(), &res3)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
+		log.Info("3 done")
+
 		err = WriteToExcelAllActiveMiner3(res3[0].Miners)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
