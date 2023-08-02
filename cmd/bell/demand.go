@@ -58,9 +58,9 @@ var demandCmd = &cli.Command{
 		}
 
 		var (
-			res  Res
-			res2 Res
-			res3 Res
+			res  []Res
+			res2 []Res
+			res3 []Res
 		)
 
 		latestHeight := int64(3088200)
@@ -79,7 +79,7 @@ var demandCmd = &cli.Command{
 			return err
 		}
 
-		err = WriteToExcelAllActiveMiner(res.Miners)
+		err = WriteToExcelAllActiveMiner(res[0].Miners)
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ var demandCmd = &cli.Command{
 			return err
 		}
 
-		err = WriteToExcelAllActiveMiner2(res2.Miners)
+		err = WriteToExcelAllActiveMiner2(res2[0].Miners)
 		if err != nil {
 			return err
 		}
@@ -119,7 +119,7 @@ var demandCmd = &cli.Command{
 			return err
 		}
 
-		err = WriteToExcelAllActiveMiner3(res3.Miners)
+		err = WriteToExcelAllActiveMiner3(res3[0].Miners)
 		if err != nil {
 			return err
 		}
