@@ -5,6 +5,8 @@ import (
 	"math"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -43,7 +45,7 @@ func GetEventsForActor(c *gin.Context) {
 		totalCount += countUtil.ActorEventStates
 	}
 
-	actorID, err := GetIDByAddr(ctx, req.Addr)
+	actorID, err := common2.GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -60,7 +62,7 @@ func GetEventsForActor(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorEventStates, countUtils, eventsByActorAggregator, req, "ActorEvent")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorEventStates, countUtils, common2.EventsByActorAggregator, req, "ActorEvent")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

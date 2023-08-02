@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -48,7 +50,7 @@ func GetBlock(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.BlockStates, countUtils, blockAggregator, req, "ExecTrace")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.BlockStates, countUtils, common2.BlockAggregator, req, "ExecTrace")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

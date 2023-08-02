@@ -363,6 +363,15 @@ func GetDealRange(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.
 	return countUtils, nil
 }
 
+//func GetMinerSectorRange(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
+//	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", refreshMinerSectorRange)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return countUtils, nil
+//}
+
 func GetTotalCountForActorDeals(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorDeals)
 	if err != nil {
@@ -981,7 +990,7 @@ func GetAllMinersMinedCount(ctx context.Context, startEpoch, endEpoch abi.ChainE
 func refreshEpochRange(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols})
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
 		// todo: *tmpStartEpoch = state.GetEndEpoch() 保证所有状态做完才更新EndEpoch
 		*tmpStartEpoch = state.GetEndEpoch()
 
@@ -990,10 +999,10 @@ func refreshEpochRange(ctx context.Context, state *segment.State, cols common.Co
 		state.SetStartEpoch(*tmpStartEpoch)
 		state.SetEndEpoch(curEpoch + 1)
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols})
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols})
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
@@ -1065,6 +1074,25 @@ func refreshDealRange(ctx context.Context, state *segment.State, cols common.Col
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
 }
+
+//func refreshMinerSectorRange(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
+//	switch state.GetDType() {
+//	case smodel.Formal, smodel.Cold:
+//		sectorBoundary, err := GetMinerSectorBoundary(ctx, cols, int64(state.GetStartEpoch()), int64(state.GetEndEpoch()))
+//		if err != nil {
+//			return err
+//		}
+//
+//		count := sectorBoundary.End - sectorBoundary.Start
+//
+//		*countUtils = append(*countUtils, CountUtil{Start: int64(sectorBoundary.Start), End: int64(sectorBoundary.End), SectorState: int64(count), Cols: cols})
+//		return nil
+//	case smodel.Tmp:
+//		return nil
+//	default:
+//		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
+//	}
+//}
 
 func refreshTotalCountForBlockMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {

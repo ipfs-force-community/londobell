@@ -3,6 +3,8 @@ package aggregators
 import (
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -25,7 +27,7 @@ func GetMessageCidByHash(c *gin.Context) {
 		return
 	}
 
-	cid, err := GetCidFromEthHash(ctx, req.Cid)
+	cid, err := common.GetCidFromEthHash(ctx, req.Cid)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

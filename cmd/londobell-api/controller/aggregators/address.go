@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -26,7 +28,7 @@ func GetAddress(c *gin.Context) {
 		return
 	}
 
-	addressRes, err := GetAddrs(ctx, req.Addr)
+	addressRes, err := common.GetAddrs(ctx, req.Addr)
 	if err != nil {
 		if err != util.ErrNotFound {
 			alog.Error(err)

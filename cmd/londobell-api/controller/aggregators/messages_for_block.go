@@ -5,6 +5,8 @@ import (
 	"math"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -42,7 +44,7 @@ func GetMessagesForBlock(c *gin.Context) {
 		req.Limit = math.MaxInt64
 	}
 
-	pipe, err := util.Parse(model.Ctx{Cid: req.Cid, Skip: req.Index * req.Limit, Limit: req.Limit}, string(messagesForBlockAggregator))
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid, Skip: req.Index * req.Limit, Limit: req.Limit}, string(common2.MessagesForBlockAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

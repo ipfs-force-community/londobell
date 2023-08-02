@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -38,7 +40,7 @@ func GetBalance(c *gin.Context) {
 	}
 
 	// convert to ID
-	req.Addr, err = GetIDByAddr(ctx, req.Addr)
+	req.Addr, err = common2.GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -49,7 +51,7 @@ func GetBalance(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, balanceAggregator, req, "ActorBalance")
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, common2.BalanceAggregator, req, "ActorBalance")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

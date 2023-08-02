@@ -53,6 +53,8 @@ type CountUtil struct {
 	DealState       int64 // todo： 暂时不分段，测试下
 	DealActorStates int64
 	TipSetStates    int64
+
+	SectorState int64 // new sector count
 }
 
 type segmentUtil struct {

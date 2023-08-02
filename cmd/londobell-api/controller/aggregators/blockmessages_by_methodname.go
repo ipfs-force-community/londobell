@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -47,7 +49,7 @@ func GetBlockMessagesByMethodName(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.BlockMethodStates, countUtils, blockMessagesByMethodNameAggregator, req, "ExecTrace")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.BlockMethodStates, countUtils, common2.BlockMessagesByMethodNameAggregator, req, "ExecTrace")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

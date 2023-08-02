@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -44,7 +46,7 @@ func GetTipSetsList(c *gin.Context) {
 	var tipSetRes []model.TipSetRes
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.TipSetStates, countUtils, tipsetsListAggregator, req, "Tipset")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.TipSetStates, countUtils, common2.TipsetsListAggregator, req, "Tipset")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

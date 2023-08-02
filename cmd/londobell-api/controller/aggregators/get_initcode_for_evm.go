@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
@@ -37,7 +39,7 @@ func GetInitCodeForEvm(c *gin.Context) {
 		return
 	}
 
-	req.Addr, err = GetIDByAddr(ctx, req.Addr)
+	req.Addr, err = common.GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

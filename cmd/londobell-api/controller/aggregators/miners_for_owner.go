@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
 
 	"context"
@@ -49,7 +51,7 @@ func GetMinersForOwner(c *gin.Context) {
 	}
 
 	var minersForOwnerRes []model.MinersForOwnerRes
-	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(latestEpoch), EndEpoch: int64(latestEpoch) + 1, Addr: req.Addr}, string(minersForOwnerAggregator))
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(latestEpoch), EndEpoch: int64(latestEpoch) + 1, Addr: req.Addr}, string(common2.MinersForOwnerAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

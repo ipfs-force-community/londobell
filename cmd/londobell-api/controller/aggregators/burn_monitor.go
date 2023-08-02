@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 
 	"context"
@@ -31,7 +33,7 @@ func GetBurnMonitor(c *gin.Context) {
 	}
 
 	api := fullnode.API.GetAppropriateAPI()
-	addrs, err := GetAllAddrs(ctx, req.Addr, api)
+	addrs, err := common2.GetAllAddrs(ctx, req.Addr, api)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -52,7 +54,7 @@ func GetBurnMonitor(c *gin.Context) {
 	var burnMonitorRes []model.BurnMonitorRes
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, burnMonitorAggregator, req, "ExecTrace")
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, common2.BurnMonitorAggregator, req, "ExecTrace")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

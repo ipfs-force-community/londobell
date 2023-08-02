@@ -1,12 +1,11 @@
 package aggregators
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
 	"sort"
-
-	"context"
 
 	"github.com/filecoin-project/go-address"
 	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
@@ -16,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/buildnet"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
@@ -73,14 +73,14 @@ func GetCreateTime(c *gin.Context) {
 			return
 		}
 
-		req.Addr, err = GetIDByAddr(ctx, req.Addr)
+		req.Addr, err = common.GetIDByAddr(ctx, req.Addr)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
 		}
 
-		pipe, err := util.Parse(model.Ctx{StartEpoch: 0, EndEpoch: math.MaxInt64, Addr: req.Addr, Sort: 1}, string(timeOfTraceAggregator))
+		pipe, err := util.Parse(model.Ctx{StartEpoch: 0, EndEpoch: math.MaxInt64, Addr: req.Addr, Sort: 1}, string(common.TimeOfTraceAggregator))
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
@@ -172,13 +172,13 @@ func GetCreateTime(c *gin.Context) {
 		// ]
 		// `
 
-		pipe, err := util.Parse(model.Ctx{Addr: req.Addr}, timeOfCreateAggregator)
-
+		pipe, err := util.Parse(model.Ctx{Addr: req.Addr}, common.TimeOfCreateAggregator)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
 		}
+
 		countUtils, err := multiquery.GetColsOnly(&multiquery.DBStateManager)
 		if err != nil {
 			alog.Error(err)

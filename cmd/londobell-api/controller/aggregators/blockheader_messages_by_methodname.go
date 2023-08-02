@@ -6,6 +6,8 @@ import (
 	"math"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -47,7 +49,7 @@ func GetBlockHeaderMessagesByMethodName(c *gin.Context) {
 		messagesForBlockByMethodNameRes           []model.BlockHeaderMessage
 	)
 
-	pipe, err := util.Parse(model.Ctx{Cid: req.Cid, MethodName: req.MethodName}, string(countOfMessagesForBlockHeaderByMethodNameAggregator))
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid, MethodName: req.MethodName}, string(common2.CountOfMessagesForBlockHeaderByMethodNameAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -94,7 +96,7 @@ func GetBlockHeaderMessagesByMethodName(c *gin.Context) {
 			}
 		}
 
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.BlockHeaderMethodStates, countUtils, blockHeaderMessagesByMethodNameAggregator, req, "BlockMessage")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.BlockHeaderMethodStates, countUtils, common2.BlockHeaderMessagesByMethodNameAggregator, req, "BlockMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

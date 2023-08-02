@@ -180,6 +180,37 @@ func GetDealIDRange(ctx context.Context, cols common.Collections, startEpoch, en
 	return 0, 0, fmt.Errorf("no NewDealProposal collection")
 }
 
+//func GetMinerSectorBoundary(ctx context.Context, cols common.Collections, startEpoch, endEpoch int64) (Boundrary, error) {
+//	var res []Boundrary
+//
+//	pipe, err := util.Parse(model.Ctx{StartEpoch: startEpoch, EndEpoch: endEpoch}, string(monitor.GetMinerSectorRangeAggregator()))
+//	if err != nil {
+//		return Boundrary{}, err
+//	}
+//
+//	for _, col := range cols.Cols {
+//		if col != nil && col.Name() == "MinerNewSectorNumber" {
+//			cur, err := col.Aggregate(ctx, pipe)
+//			if err != nil {
+//				return Boundrary{}, err
+//			}
+//
+//			err = cur.All(ctx, &res)
+//			if err != nil {
+//				return Boundrary{}, err
+//			}
+//
+//			if len(res) == 0 {
+//				return Boundrary{}, nil
+//			}
+//
+//			return res[0], nil
+//		}
+//	}
+//
+//	return Boundrary{}, fmt.Errorf("no MinerNewSectorNumber collection")
+//}
+
 //// todo: 递归
 //func determineSegments(skip, limit,requestTotalCount int64, ptype string, countUtils []CountUtil,skipTag func(int64,int64) bool,limitTag func(int64, int64) bool) (result []CountUtil) {
 //	for _, countlist := range countUtils {
@@ -596,7 +627,7 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 				req.Limit = math.MaxInt64
 			}
 
-			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Addr: req.Addr, Addrs: req.Addrs, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, Cids: req.Cids, ID: req.ID, Sort: req.Sort, To: req.To, Skip: req.Index * req.Limit, Limit: req.Limit}, string(aggregator))
+			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Addr: req.Addr, Addrs: req.Addrs, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, Cids: req.Cids, ID: req.ID, Sort: req.Sort, To: req.To, Skip: req.Index * req.Limit, Limit: req.Limit, ExpirationStartEpoch: req.ExpirationStartEpoch, ExpirationEndEpoch: req.ExpirationEndEpoch, SectorSize: req.SectorSize, TransferType: req.TransferType}, string(aggregator))
 			if err != nil {
 				return err
 			}

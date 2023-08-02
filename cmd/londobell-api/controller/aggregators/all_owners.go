@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/gin-gonic/gin"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -42,7 +45,7 @@ func GetAllOwners(c *gin.Context) {
 	}
 
 	var allOwnersRes []model.AllOwnersRes
-	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(latestEpoch)}, string(allOwnersAggregator))
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(latestEpoch)}, string(common.AllOwnersAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

@@ -5,6 +5,8 @@ import (
 	"math"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -29,7 +31,7 @@ func GetDealsByAddr(c *gin.Context) {
 		return
 	}
 
-	actorID, err := GetIDByAddr(ctx, req.Addr)
+	actorID, err := common2.GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -59,7 +61,7 @@ func GetDealsByAddr(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.DealActorStates, countUtils, dealsByAddrAggregator, req, "NewDealProposal")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.DealActorStates, countUtils, common2.DealsByAddrAggregator, req, "NewDealProposal")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -40,7 +42,7 @@ func GetChildEpoch(c *gin.Context) {
 	var childEpochRes []model.ChildEpochRes
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, childEpochAggregator, req, "Tipset")
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, common2.ChildEpochAggregator, req, "Tipset")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
