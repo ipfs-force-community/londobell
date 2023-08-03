@@ -47,11 +47,6 @@ func GetChildEpoch(c *gin.Context) {
 			return
 		}
 
-		if len(multiResult) == 0 {
-			c.JSON(http.StatusOK, res)
-			return
-		}
-
 		raw := multiResult
 		rawByte, err := json.Marshal(raw)
 		if err != nil {
@@ -66,6 +61,42 @@ func GetChildEpoch(c *gin.Context) {
 			util.ReturnOnErr(c, err)
 			return
 		}
+	}
+
+	if len(childEpochRes) == 0 || childEpochRes[0].ChildEpoch == 0 {
+		// multi dbs query
+		{
+			multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, childEpoch2Aggregator, req, "Tipset")
+			if err != nil {
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
+				return
+			}
+
+			if len(multiResult) == 0 {
+				c.JSON(http.StatusOK, res)
+				return
+			}
+
+			raw := multiResult
+			rawByte, err := json.Marshal(raw)
+			if err != nil {
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
+				return
+			}
+
+			err = json.Unmarshal(rawByte, &childEpochRes)
+			if err != nil {
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
+				return
+			}
+		}
+
+		res.Data = childEpochRes
+		c.JSON(http.StatusOK, res)
+		return
 	}
 
 	res.Data = childEpochRes
