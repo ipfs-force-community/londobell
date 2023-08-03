@@ -3,6 +3,7 @@ package aggregators
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
@@ -38,8 +39,68 @@ func GetTransferMessages(c *gin.Context) {
 		return
 	}
 
-	countUtils, err := multiquery.GetTotalCountForActorTransferMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
-	if err != nil {
+	var (
+		countUtils []multiquery.CountUtil
+		pipe       []byte
+	)
+
+	switch req.TransferType {
+	case "":
+		countUtils, err = multiquery.GetTotalCountForActorTransferMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		pipe = transferMsgsForActorAggregator
+	case "blockreward":
+		countUtils, err = multiquery.GetTotalCountForActorTransferBlockRewardMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		pipe = transferBlockRewardForActorAggregator
+	case "burn":
+		countUtils, err = multiquery.GetTotalCountForActorTransferBurnMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		pipe = transferBurnForActorAggregator
+	case "transfer":
+		countUtils, err = multiquery.GetTotalCountForActorTransferSendAndReceiveMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		pipe = transferSendAndReceiveForActorAggregator
+	case "send":
+		countUtils, err = multiquery.GetTotalCountForActorTransferSendMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		pipe = transferSendForActorAggregator
+	case "receive":
+		countUtils, err = multiquery.GetTotalCountForActorTransferReceiveMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		pipe = transferReceiveForActorAggregator
+	default:
+		err = fmt.Errorf("invalid transfer type: %v", req.TransferType)
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
@@ -53,7 +114,7 @@ func GetTransferMessages(c *gin.Context) {
 	var transferMessages []model.TransferMessage
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorTransferStates, countUtils, transferMsgsForActorAggregator, req, "ActorMessage")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorTransferStates, countUtils, pipe, req, "ActorMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
