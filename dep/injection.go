@@ -53,6 +53,10 @@ func ContextModule(ctx context.Context) dix.Option {
 		dix.Override(new(helpers.MetricsCtx), metricsi.CtxScope(ctx, "bell")))
 }
 
+func WritableOfflineMoudle(writeOffline bool) dix.Option {
+	return dix.Options(dix.Override(new(WritableOffline), writeOffline))
+}
+
 func SegmentManager() dix.Option {
 	return dix.Options(dix.Override(new(racailum.Config), LoadRaConfig),
 		dix.Override(new(SegmentMetaDS), OpenSegmentDS),
@@ -127,6 +131,7 @@ func Bell(ctx context.Context, logger fx.Printer, target ...interface{}) dix.Opt
 func WalkRaCalium(cctx *cli.Context, logger fx.Printer, target ...interface{}) dix.Option {
 	return dix.Options(
 		ContextModule(context.Background()),
+		WritableOfflineMoudle(cctx.Bool("writableOffline")),
 
 		dix.If(logger != nil, dix.Logger(logger)),
 		dix.If(len(target) > 0, dix.Populate(invokePopulate, target...)),

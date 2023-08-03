@@ -12,3 +12,5 @@ type GlobalContext context.Context
 type RepoPath string
 
 type SegmentMetaDS dtypes.MetadataDS
+
+type WritableOffline bool

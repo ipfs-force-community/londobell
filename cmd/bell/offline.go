@@ -40,6 +40,11 @@ var extractorCmd = &cli.Command{
 			Value: true,
 			Usage: "local or remote",
 		},
+		&cli.BoolFlag{
+			Name:  "writableOffline",
+			Value: false,
+			Usage: "writable or readonly for offline extract",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := context.Background()
