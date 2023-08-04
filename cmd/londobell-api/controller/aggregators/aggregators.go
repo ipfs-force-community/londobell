@@ -71,6 +71,7 @@ var (
 	transferSendAndReceiveForActorAggregator []byte
 	transferSendForActorAggregator           []byte
 	transferReceiveForActorAggregator        []byte
+	childEpoch2Aggregator                    []byte
 )
 
 type Methodlist struct {
@@ -159,4 +160,5 @@ func InitAggregators() {
 	transferSendAndReceiveForActorAggregator = monitor.GetTransferSendAndReceiveForActorAggregator()
 	transferSendForActorAggregator = monitor.GetTransferSendForActorAggregator()
 	transferReceiveForActorAggregator = monitor.GetTransferReceiveForActorAggregator()
+	childEpoch2Aggregator = monitor.GetChildEpoch2Aggregator()
 }
