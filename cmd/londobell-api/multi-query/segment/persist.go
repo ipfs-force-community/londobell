@@ -587,10 +587,10 @@ func (s *Segment) GetState(ctx context.Context, dsn string) (*State, bool, error
 		return nil, false, err
 	}
 
-	dealState, _, err := s.GetDealState(ctx, dsn)
-	if err != nil {
-		return nil, false, err
-	}
+	//dealState, _, err := s.GetDealState(ctx, dsn)
+	//if err != nil {
+	//	return nil, false, err
+	//}
 
 	state := &State{}
 	state.SetDBState(dbState)
@@ -622,7 +622,7 @@ func (s *Segment) GetState(ctx context.Context, dsn string) (*State, bool, error
 		return nil, false, err
 	}
 
-	state.SetDealState(dealState)
+	//state.SetDealState(dealState)
 
 	return state, true, nil
 }

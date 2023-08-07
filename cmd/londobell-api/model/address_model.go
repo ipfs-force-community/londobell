@@ -1,5 +1,7 @@
 package model
 
 type AddressRes struct {
-	Addresses []string
+	ActorID          string
+	RobustAddress    string
+	DelegatedAddress string
 }

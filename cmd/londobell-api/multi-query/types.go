@@ -22,6 +22,7 @@ const (
 	LargeAmountTransferStates
 	DealState
 	DealActorStates
+	TipSetStates
 )
 
 type CountUtil struct {
@@ -45,6 +46,7 @@ type CountUtil struct {
 
 	DealState       int64 // todo： 暂时不分段，测试下
 	DealActorStates int64
+	TipSetStates    int64
 }
 
 type segmentUtil struct {
@@ -67,6 +69,7 @@ type segmentUtil struct {
 	LargeAmountTransferStates int64
 	DealState                 int64
 	DealActorStates           int64
+	TipSetStates              int64
 }
 
 type aggUtil struct {

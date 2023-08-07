@@ -25,11 +25,11 @@ type State struct {
 
 func DefaultState(dsn string, dtype model.DType, interval int64, startEpoch, endEpoch abi.ChainEpoch, startDealID, endDealID uint64) *State {
 	dbState := model.NewDBState(dsn, dtype, interval, startEpoch, endEpoch)
-	dealState := model.NewDealState(dsn, dtype, model.NoneInterval, startDealID, endDealID, 0)
+	//dealState := model.NewDealState(dsn, dtype, model.NoneInterval, startDealID, endDealID, 0)
 	blockStates := make([]model.SegmentState, 0)
 	return &State{
-		dbState:     dbState,    // todo
-		dealState:   *dealState, // todo
+		dbState: dbState, // todo
+		//dealState:   *dealState, // todo
 		blockStates: blockStates,
 	}
 }
