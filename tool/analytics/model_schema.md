@@ -501,6 +501,17 @@
 }
 ```
 
+### MinerNewSectorNumber
+
+```
+{
+	"Epoch": "abi.ChainEpoch",
+	"Miner": "address.Address",
+	"SectorNumber": "abi.SectorNumber",
+	"_id": "string"
+}
+```
+
 ### MinerSector
 
 ```

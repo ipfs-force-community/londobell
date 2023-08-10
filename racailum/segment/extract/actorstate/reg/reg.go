@@ -171,7 +171,7 @@ func registerPreCheck(pre *preCheck, name string, getZeroHourOption func(*extrac
 
 func validate(ctx *extract.Ctx, check Check, epoch abi.ChainEpoch) bool {
 	isZeroHour := check.ZeroHourOption != nil && common.IsZeroHour(check.ZeroHourOption(ctx), epoch)
-	isExtract := check.TickOption == nil || check.TickOption != nil && extract.IsExtract(check.TickOption(ctx), ctx, epoch)
+	isExtract := check.TickOption == nil || check.TickOption != nil && extract.IsExtract(check.TickOption(ctx), ctx.Opts.StateRegular.Interval, epoch)
 
 	if !isZeroHour && !isExtract {
 		return false

@@ -170,6 +170,10 @@ func init() {
 			Name: "sector-claim",
 			D:    &model.SectorClaim{},
 		},
+		schema.Model{
+			Name: "miner-new-sectornumber",
+			D:    &model.MinerNewSectorNumber{},
+		},
 	)
 }
 
@@ -237,10 +241,7 @@ func Extract(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, allowN
 }
 
 func extractTipSet(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error { // nolint: deadcode
-	if !ctx.Opts.EnabelExtract.EnableExtractTipset {
-		return nil
-	}
-	if tmp {
+	if !extract.EnableExtractTipset(tmp, ctx.Opts) {
 		return nil
 	}
 
@@ -272,7 +273,7 @@ func extractTipSetForTmp(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 }
 
 func extractBlochHeaders(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error { // nolint: deadcode
-	if !ctx.Opts.EnabelExtract.EnableExtractBlockHeader {
+	if !extract.EnableExtractBlockHeader(ctx.Opts) {
 		return nil
 	}
 
@@ -328,14 +329,13 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	elog := ctx.L.With("epoch", ts.Height())
 
-	if ctx.Opts.SkipExpensiveEpoch && isExpensive(ctx.C, ctx.D, ts) {
-		// TODO: extract simple invoc results here
-		elog.Warn("ignore expensive epoch exec trace")
+	if extract.SkipExtractExecTrace(ctx.Opts) {
 		return nil
 	}
 
-	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot &&
-		!ctx.Opts.EnabelExtract.EnableExtractExplicitMessage && !ctx.Opts.EnabelExtract.EnableExtractEvmByteCode && !ctx.Opts.EnabelExtract.EnableExtractActorEvent && !ctx.Opts.EnabelExtract.EnableExtractMinerSector && !ctx.Opts.EnabelExtract.EnableExtractSectorClaim {
+	if skipExpensiveEpoch(ctx.C, ctx.Opts, ctx.D, ts) {
+		// TODO: extract simple invoc results here
+		elog.Warn("ignore expensive epoch exec trace")
 		return nil
 	}
 
@@ -438,9 +438,9 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return fmt.Errorf("get version for network failed: %v", err)
 	}
 
-	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt, aecnt, mstCnt, sctCnt int
+	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt, aecnt, mstCnt, sctCnt, mnsCnt int
 
-	if ctx.Opts.EnabelExtract.EnableExtractEthHash {
+	if extract.EnableExtractEthHash(ctx.Opts) {
 		for _, cmsg := range allmsgs {
 			smsg, ok := cmsg.(*types.SignedMessage)
 			if !ok {
@@ -502,7 +502,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractMessage {
+		if extract.EnableExtractMessage(ctx.Opts) {
 			if _, has := dupmsgs[mcid]; !has {
 				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
 				if err != nil {
@@ -515,7 +515,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractExecTrace {
+		if extract.EnableExtractExecTrace(ctx.Opts) {
 			isBlock := IsBlock(p.seq, msg.From)
 			met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock)
 			if err != nil {
@@ -529,7 +529,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractEventsRoot || ctx.Opts.EnabelExtract.EnableExtractActorEvent {
+		if extract.EnableExtractEvent(ctx.Opts) {
 			if p.exec != nil && p.exec.MsgRct.Version() == types.MessageReceiptV1 {
 				eventsRoot := p.exec.MsgRct.EventsRoot
 				if eventsRoot != nil {
@@ -538,7 +538,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 						return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
 					}
 
-					if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
+					if extract.EnableExtractEventsRoot(ctx.Opts) {
 						etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
 						if err != nil {
 							elog.Warnw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
@@ -548,7 +548,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 						}
 					}
 
-					if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
+					if extract.EnableExtractActorEvent(ctx.Opts) {
 						for i, evt := range events {
 							actorID, err := address.NewIDAddress(uint64(evt.Emitter))
 							if err != nil {
@@ -577,7 +577,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractActorMessage {
+		if extract.EnableExtractActorMessage(ctx.Opts) {
 			isBlock := IsBlock(p.seq, msg.From)
 			storeMap := make(map[address.Address]string)
 
@@ -612,7 +612,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractExplicitMessage {
+		if extract.EnableExtractExplicitMessage(ctx.Opts) {
 			if cmsg, ok := allmsgsMap[key]; ok {
 				var exitCode exitcode.ExitCode
 				if p.exec != nil {
@@ -625,7 +625,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractEvmByteCode {
+		if extract.EnableExtractEvmByteCode(ctx.Opts) {
 			if p.exec != nil && p.exec.Msg.Method == builtintypes.MethodsEVM.Constructor && strings.Contains(mi.Actor, "evm") && p.exec.MsgRct.ExitCode.IsSuccess() {
 				var params evm.ConstructorParams
 				param := bytes.NewReader(p.exec.Msg.Params)
@@ -640,7 +640,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		// todo: ts.Child调用可能会出问题： 当actor在msg后销毁
-		if !tmp && (ctx.Opts.EnabelExtract.EnableExtractMinerSector || ctx.Opts.EnabelExtract.EnableExtractSectorClaim) {
+		if extract.EnableExtractSector(tmp, ctx.Opts, av) {
 			var (
 				minerID address.Address
 				cmas    lminer.State
@@ -708,7 +708,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					return fmt.Errorf("invalid method: %v", p.exec.Msg.Method)
 				}
 
-				if ctx.Opts.EnabelExtract.EnableExtractMinerSector {
+				if extract.EnableExtractMinerSector(tmp, ctx.Opts) || extract.EnableExtractMinerNewSectorNumber(tmp, ctx.Opts) {
 					// get sectors for sectorNumbers from state
 					var sectorInfos []*lminer.SectorOnChainInfo
 					if err := sectorNumbers.ForEach(func(i uint64) error {
@@ -727,14 +727,24 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 						return fmt.Errorf("load sector info for %v at %v failed: %v", msg.To, ts.Height(), err)
 					}
 
-					for _, info := range sectorInfos {
-						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, false, ts.Height())
-						mstCnt++
-						res.Docs = append(res.Docs, mst)
+					if extract.EnableExtractMinerSector(tmp, ctx.Opts) {
+						for _, info := range sectorInfos {
+							mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, false, ts.Height())
+							mstCnt++
+							res.Docs = append(res.Docs, mst)
+						}
+					}
+
+					if extract.EnableExtractMinerNewSectorNumber(tmp, ctx.Opts) {
+						for _, info := range sectorInfos {
+							mst := model.NewMinerNewSectorNumber(minerID, info.SectorNumber, ts.Height())
+							mnsCnt++
+							res.Docs = append(res.Docs, mst)
+						}
 					}
 				}
 
-				if ctx.Opts.EnabelExtract.EnableExtractSectorClaim && av > actors.Version8 {
+				if extract.EnableExtractSectorClaim(tmp, ctx.Opts, av) {
 					// get claims for sectors
 					claims, err := cvas.GetClaims(minerID)
 					if err != nil {
@@ -759,7 +769,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 
 			// ExtendSectorExpiration || ExtendSectorExpiration2 续期
-			if ctx.Opts.EnabelExtract.EnableExtractMinerSector {
+			if extract.EnableExtractMinerSector(tmp, ctx.Opts) {
 				if p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") && (p.exec.Msg.Method == builtintypes.MethodsMiner.ExtendSectorExpiration || p.exec.Msg.Method == builtintypes.MethodsMiner.ExtendSectorExpiration2) {
 					var extendSectors []bitfield.BitField
 					if p.exec.Msg.Method == builtintypes.MethodsMiner.ExtendSectorExpiration {
@@ -825,7 +835,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					}
 				}
 
-				if ctx.Opts.EnabelExtract.EnableExtractMinerSector {
+				if extract.EnableExtractMinerSector(tmp, ctx.Opts) {
 					var sectorInfos []*lminer.SectorOnChainInfo
 					if err := succeededSectors.ForEach(func(i uint64) error {
 						sectorInfo, err := cmas.GetSector(abi.SectorNumber(i))
@@ -851,7 +861,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					}
 				}
 
-				if ctx.Opts.EnabelExtract.EnableExtractSectorClaim && av > actors.Version8 {
+				if extract.EnableExtractSectorClaim(tmp, ctx.Opts, av) {
 					var allocIDs []verifreg.AllocationId
 
 					state, err := cmkas.States()
@@ -886,7 +896,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 
 			// TerminateSectors: on-time terminate or early terminate
-			if ctx.Opts.EnabelExtract.EnableExtractMinerSector && p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") && p.exec.Msg.Method == builtintypes.MethodsMiner.TerminateSectors {
+			if extract.EnableExtractMinerSector(tmp, ctx.Opts) && p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") && p.exec.Msg.Method == builtintypes.MethodsMiner.TerminateSectors {
 				var params miner.TerminateSectorsParams
 				if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
 					return fmt.Errorf("unmarshal TerminateSectorsParams for %v failed: %v", msg.Cid(), err)
@@ -925,7 +935,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 
 			// ExtendClaimTerms allows Partial failure
-			if ctx.Opts.EnabelExtract.EnableExtractSectorClaim && p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "verifiedregistry") && (p.exec.Msg.Method == builtintypes.MethodsVerifiedRegistry.ExtendClaimTerms || p.exec.Msg.Method == builtintypes.MethodsVerifiedRegistry.ExtendClaimTermsExported) {
+			if extract.EnableExtractSectorClaim(tmp, ctx.Opts, av) && p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "verifiedregistry") && (p.exec.Msg.Method == builtintypes.MethodsVerifiedRegistry.ExtendClaimTerms || p.exec.Msg.Method == builtintypes.MethodsVerifiedRegistry.ExtendClaimTermsExported) {
 				var params sverifreg.ExtendClaimTermsParams
 				if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
 					return fmt.Errorf("unmarshal ExtendClaimTermsParams for %v failed: %v", msg.Cid(), err)
@@ -950,7 +960,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 	}
 
-	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "eth-hash", ethCnt, "events-root", etcnt, "explicit-message", emtCnt, "evm-initcode", initCodeCnt, "actor-event", aecnt, "miner-sector", mstCnt, "sector-claim", sctCnt)
+	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "eth-hash", ethCnt, "events-root", etcnt, "explicit-message", emtCnt, "evm-initcode", initCodeCnt, "actor-event", aecnt, "miner-sector", mstCnt, "sector-claim", sctCnt, "miner-new-sectornumber", mnsCnt)
 
 	return nil
 }
@@ -984,15 +994,11 @@ func GetEvents(ctx context.Context, root cid.Cid, cs common.ChainStore) ([]types
 }
 
 func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
-	if tmp {
-		return nil
-	}
-
 	_, span := trace.StartSpan(ctx.C, "extractor.extractActorBalance")
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 	height := ts.Height()
-	if !common.IsZeroHour(ctx.Opts.ZeroHourExtract.ActorBalance, height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorBalanceTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractActorBalance {
+	if !extract.EnableExtractActorBalance(tmp, ctx.Opts, height) {
 		return nil
 	}
 
@@ -1074,7 +1080,7 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 }
 
 func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
-	if tmp {
+	if extract.SkipExtractActorHead(ctx, ts, tmp) {
 		return nil
 	}
 
@@ -1082,20 +1088,6 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 	height := ts.Height()
-
-	forRegular := ctx.Opts.StateRegular.Interval > 0 && height%ctx.Opts.StateRegular.Interval == 0
-
-	var extractEvenNullTipSet bool
-	for h := ts.Parent.Height() + 1; h <= ts.Height(); h++ {
-		if ctx.Opts.StateRegular.Interval > 0 && h%ctx.Opts.StateRegular.Interval == 0 || common.IsZeroHour(true, h) {
-			extractEvenNullTipSet = true
-			break
-		}
-	}
-
-	if !extractEvenNullTipSet || !ctx.Opts.EnabelExtract.EnableExtractState && !ctx.Opts.EnabelExtract.EnableExtractFilSupply {
-		return nil
-	}
 
 	root := ts.ParentState()
 	tree, err := ctx.D.StateTree(root)
@@ -1108,7 +1100,7 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return fmt.Errorf("get vm circulating supply: %w", err)
 	}
 
-	if ctx.Opts.EnabelExtract.EnableExtractState {
+	if extract.EnableExtractState(ctx.Opts) {
 		count := 0
 		actors := []*common.ActorHead{}
 		var powerActor *types.Actor
@@ -1147,7 +1139,7 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		res.RegularStates = actors
 	}
 
-	if ctx.Opts.EnabelExtract.EnableExtractFilSupply && (forRegular || common.IsZeroHour(ctx.Opts.ZeroHourExtract.FilSupply, height)) {
+	if extract.EnableExtractFilSupply(ctx.Opts, height) {
 		res.Docs = append(res.Docs, &model.FilSupply{
 			Epoch:             height,
 			CirculatingSupply: supply,
@@ -1203,7 +1195,7 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 //}
 
 func extractBlockMessage(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
-	if !ctx.Opts.EnabelExtract.EnableExtractBlockMessage {
+	if !extract.EnableExtractBlockMessage(ctx.Opts) {
 		return nil
 	}
 
@@ -1239,15 +1231,11 @@ func extractBlockMessage(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 }
 
 func extractActorAddress(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
-	if tmp {
-		return nil
-	}
-
 	_, span := trace.StartSpan(ctx.C, "extractor.extractActorAddress")
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 	height := ts.Height()
-	if !common.IsZeroHour(ctx.Opts.ZeroHourExtract.ActorAddress, height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorAddressTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractActorAddress {
+	if extract.SkipExtractActorAddress(tmp, ctx.Opts, height) {
 		return nil
 	}
 
@@ -1312,7 +1300,7 @@ func extractChangedActor(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 	height := ts.Height()
-	if !ctx.Opts.EnabelExtract.EnableExtractChangedActor {
+	if !extract.EnableExtractChangedActor(ctx.Opts) {
 		return nil
 	}
 

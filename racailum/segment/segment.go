@@ -276,11 +276,9 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		return err
 	}
 
-	if s.opts.Extract.OnlyExtractState {
-		if s.opts.Extract.ExtractOptions.EnabelExtract.EnableExtractState {
-			if err := s.SaveStateFinalHeight(ctx, tipsets[len(tipsets)-1]); err != nil {
-				return err
-			}
+	if s.opts.Extract.ExtractOptions.OnlyExtractState {
+		if err := s.SaveStateFinalHeight(ctx, tipsets[len(tipsets)-1]); err != nil {
+			return err
 		}
 	} else {
 		if err := s.SaveFinalHeight(ctx, tipsets[len(tipsets)-1]); err != nil {

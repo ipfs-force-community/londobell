@@ -98,6 +98,9 @@ db.MinerDealSector.createIndex({"Epoch":1,"Miner":1}, {"sparse": true});
 
 db.MinerFunds.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
+db.MinerNewSectorNumber.createIndex({"Miner":1,"Epoch":1,"SectorNumber":1}, {"sparse": true});
+db.MinerNewSectorNumber.createIndex({"Epoch":1}, {"sparse": true});
+
 db.MinerSector.createIndex({"Miner":1,"SectorNumber":1}, {"sparse": true});
 db.MinerSector.createIndex({"Miner":1,"SimpleQaPower":1}, {"sparse": true});
 db.MinerSector.createIndex({"Miner":1,"DealIDs":1}, {"sparse": true});

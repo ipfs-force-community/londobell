@@ -3,6 +3,8 @@ package tipset
 import (
 	"context"
 
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+
 	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
@@ -30,4 +32,8 @@ func isExpensive(ctx context.Context, stm common.StateManager, ts *common.Linked
 
 	_, is := expensiveNetworkVersions[next]
 	return is
+}
+
+func skipExpensiveEpoch(ctx context.Context, opts extract.Options, stm common.StateManager, ts *common.LinkedTipSet) bool {
+	return opts.SkipExpensiveEpoch && isExpensive(ctx, stm, ts)
 }

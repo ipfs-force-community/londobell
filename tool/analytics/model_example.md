@@ -1377,6 +1377,20 @@
 ```
 
 
+### MinerNewSectorNumber
+
+#### miner-new-sectornumber
+
+```
+{
+	"Epoch": 0,
+	"Miner": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"SectorNumber": 0,
+	"_id": ""
+}
+```
+
+
 ### MinerSector
 
 #### miner-sector
@@ -1391,7 +1405,7 @@
 	"Epoch": 0,
 	"Expiration": 0,
 	"InitialPledge": "1024",
-	"Miner": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Miner": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"SectorNumber": 0,
 	"SimpleQaPower": false,
 	"Terminated": false,
@@ -1407,7 +1421,7 @@
 
 ```
 {
-	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 	"Detail": {
 		"CommittedCapacity": 0,
 		"Summaries": [
@@ -1439,7 +1453,7 @@
 
 ```
 {
-	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"Addr": "073366",
 	"Detail": {
 		"ExpectedDayReward": "340282591298641078465964189926313473653",
 		"InitialConsensusPledge": "1073741824",
@@ -1464,7 +1478,7 @@
 
 ```
 {
-	"Addr": "073366",
+	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
 		"Locked": "1024",
 		"VestInFuture": [
@@ -1487,10 +1501,10 @@
 
 ```
 {
-	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
 		"Approved": [
-			"3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla"
+			"073366"
 		],
 		"Params": {
 			"$binary": {
@@ -1498,7 +1512,7 @@
 				"subType": "00"
 			}
 		},
-		"To": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+		"To": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 		"TxnID": 0,
 		"Value": "1024"
 	},
@@ -1571,7 +1585,7 @@
 
 ```
 {
-	"Addr": "073366",
+	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
 		"Cap": "1024",
 		"Type": ""

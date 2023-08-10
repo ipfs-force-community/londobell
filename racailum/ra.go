@@ -241,14 +241,12 @@ func (r *RaCailum) AlertOutdatedFinalHeight(ctx context.Context, outdatedGap int
 				err         error
 			)
 
-			if r.cfg.Segment.Extract.OnlyExtractState {
-				if r.cfg.Segment.Extract.ExtractOptions.EnabelExtract.EnableExtractState {
-					finalHeight, err = r.activeSeg.GetStateFinalHeight(ctx)
-					if err != nil {
-						log.Errorf("get state final height failed: %v", err)
-						stats.Record(ctx, metrics.OutdatedFinalHeight.M(1))
-						continue
-					}
+			if r.cfg.Segment.Extract.ExtractOptions.OnlyExtractState {
+				finalHeight, err = r.activeSeg.GetStateFinalHeight(ctx)
+				if err != nil {
+					log.Errorf("get state final height failed: %v", err)
+					stats.Record(ctx, metrics.OutdatedFinalHeight.M(1))
+					continue
 				}
 			} else {
 				finalHeight, err = r.activeSeg.GetFinalHeight(ctx)
