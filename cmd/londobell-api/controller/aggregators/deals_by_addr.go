@@ -36,6 +36,7 @@ func GetDealsByAddr(c *gin.Context) {
 		return
 	}
 
+	req.Addr = actorID
 	curEpoch := common.GetCurEpoch()
 
 	countUtils, err := multiquery.GetTotalCountForActorDeals(ctx, actorID, &multiquery.DBStateManager, curEpoch)
