@@ -87,13 +87,19 @@ func ChainIOBlockstore(full v0api.FullNode) (dtypes.BasicChainBlockstore, error)
 	return cached, nil
 }
 
-func ChainOfflineBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, r repo.LockedRepo) (dtypes.BasicChainBlockstore, error) {
+func ChainOfflineBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, r repo.LockedRepo, writableOffline WritableOffline) (dtypes.BasicChainBlockstore, error) {
 	bs, err := r.Blockstore(helpers.LifecycleCtx(mctx, lc), repo.UniversalBlockstore)
 	if err != nil {
 		return nil, err
 	}
-	wrapBlockStore := &WrapAPIBlockstore{
-		bs,
+
+	var wrapBlockStore dtypes.BasicChainBlockstore
+	if !writableOffline {
+		wrapBlockStore = bs
+	} else {
+		wrapBlockStore = &WrapAPIBlockstore{
+			bs,
+		}
 	}
 
 	if c, ok := bs.(io.Closer); ok {
