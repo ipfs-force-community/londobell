@@ -56,6 +56,7 @@ var extractorCmd = &cli.Command{
 		_, err := dix.New(ctx,
 			dep.WalkRaCalium(cctx, fxlog, &components),
 			dep.InjectRepoPath(cctx),
+			dep.InjectWritableOffline(cctx),
 			dix.Override(new(dtypes.ShutdownChan), shutdownCh),
 		)
 		if err != nil {
