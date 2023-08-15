@@ -109,6 +109,16 @@ func InjectChainRepo(cctx *cli.Context) dix.Option {
 	})
 }
 
+func GetWritableOffline(cctx *cli.Context) WritableOffline {
+	return WritableOffline(cctx.Bool("writableOffline"))
+}
+
+func InjectWritableOffline(cctx *cli.Context) dix.Option {
+	return dix.Override(new(WritableOffline), func() WritableOffline {
+		return GetWritableOffline(cctx)
+	})
+}
+
 func ConfigFilePath(rpath RepoPath) string {
 	return filepath.Join(string(rpath), "config")
 }
