@@ -470,6 +470,16 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	dupmsgs := map[cid.Cid]struct{}{}
 
 	for i := range etraces {
+		seq := etraces[i].seq
+		// skip failed child traces
+		if len(seq) > 1 {
+			bmsgSeq := seq[0]
+			bp := etraces[bmsgSeq]
+			if bp.exec != nil && !bp.exec.MsgRct.ExitCode.IsSuccess() {
+				continue
+			}
+		}
+
 		p := etraces[i]
 		msg := &p.exec.Msg
 
