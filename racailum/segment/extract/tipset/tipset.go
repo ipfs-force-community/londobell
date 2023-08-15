@@ -170,6 +170,10 @@ func init() {
 			Name: "sector-claim",
 			D:    &model.SectorClaim{},
 		},
+		schema.Model{
+			Name: "changed-sector",
+			D:    &model.ChangedSector{},
+		},
 	)
 }
 
@@ -209,6 +213,14 @@ var extractors = []extractor{
 	{
 		name:   "changed-actor",
 		method: extractChangedActor,
+	},
+	{
+		name:   "changed-sector",
+		method: extractChangedSector,
+	},
+	{
+		name:   "all-sectors",
+		method: extractAllSectors,
 	},
 }
 
@@ -1308,16 +1320,22 @@ func extractActorAddress(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 }
 
 func extractChangedActor(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
-	_, span := trace.StartSpan(ctx.C, "extractor.extractChangedActor")
-	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
-	defer span.End()
-	height := ts.Height()
 	if !ctx.Opts.EnabelExtract.EnableExtractChangedActor {
 		return nil
 	}
 
+	height := ts.Height()
 	elog := ctx.L.With("epoch", height)
 	elog.Infow("changed actor extracted")
+
+	if ctx.Opts.SkipExpensiveEpoch && isExpensive(ctx.C, ctx.D, ts) {
+		elog.Warn("ignore expensive epoch for changed actor")
+		return nil
+	}
+
+	_, span := trace.StartSpan(ctx.C, "extractor.extractChangedActor")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
 
 	old := ts.Parent.ParentState()
 	new := ts.ParentState()
@@ -1513,4 +1531,162 @@ func ethLogFromEvent(ctx *extract.Ctx, ts *types.TipSet, entries []types.EventEn
 		return nil, nil, false
 	}
 	return data, topics, true
+}
+
+func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if tmp || !ctx.Opts.EnabelExtract.EnableExtractChangedSector {
+		return nil
+	}
+
+	height := ts.Height()
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("changed sector extracted")
+
+	// upgrade skip
+	if ctx.Opts.SkipExpensiveEpoch && isExpensive(ctx.C, ctx.D, ts) {
+		elog.Warn("ignore expensive epoch for changed actor")
+		return nil
+	}
+
+	_, span := trace.StartSpan(ctx.C, "extractor.extractChangedSector")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
+
+	old := ts.ParentState()
+	new := ts.Child.ParentState()
+
+	oldTree, err := ctx.D.StateTree(old)
+	if err != nil {
+		return fmt.Errorf("failed to load old state tree: %w", err)
+	}
+
+	newTree, err := ctx.D.StateTree(new)
+	if err != nil {
+		return fmt.Errorf("failed to load new state tree: %w", err)
+	}
+
+	changedActors, err := state.Diff(ctx.C, oldTree, newTree)
+	if err != nil {
+		return err
+	}
+
+	astore := ctx.D.ActorStore(ctx.C)
+	changedSectors := []*model.ChangedSector{}
+	for addr, act := range changedActors {
+		act := act
+		if !builtin2.IsStorageMinerActor(act.Code) {
+			continue
+		}
+
+		actAddr, err := address.NewFromString(addr)
+		if err != nil {
+			return fmt.Errorf("new address from string for addr: %v failed: %v", addr, err)
+		}
+
+		pact, err := ctx.D.LoadActor(ctx.C, actAddr, ts.TipSet)
+		if err != nil {
+			return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", addr, ts.TipSet.Height(), err)
+		}
+
+		pmas, err := lminer.Load(astore, pact)
+		if err != nil {
+			return fmt.Errorf("load miner parent state for addr: %v failed: %v", addr, err)
+		}
+
+		mas, err := lminer.Load(astore, &act)
+		if err != nil {
+			return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
+		}
+
+		sectorChanges, err := lminer.DiffSectors(pmas, mas)
+		if err != nil {
+			return fmt.Errorf("get sectorChanges for addr: %v failed: %v", addr, err)
+		}
+
+		for _, add := range sectorChanges.Added {
+			// todo: 保证addr是actorID
+			changedSector := model.NewChangedSector(add, actAddr, height, true, false)
+			changedSectors = append(changedSectors, changedSector)
+		}
+
+		for _, extend := range sectorChanges.Extended {
+			// todo: 保证addr是actorID
+			changedSector := model.NewChangedSector(extend.To, actAddr, height, false, false)
+			changedSectors = append(changedSectors, changedSector)
+		}
+
+		for _, remove := range sectorChanges.Removed {
+			// todo: 保证addr是actorID
+			changedSector := model.NewChangedSector(remove, actAddr, height, false, true)
+			changedSectors = append(changedSectors, changedSector)
+		}
+	}
+
+	for i := range changedSectors {
+		res.Docs = append(res.Docs, changedSectors[i])
+	}
+
+	return nil
+}
+
+// extractAllSectors extract all sectors at startEpoch of Tipset to ChangedSector in an offline way, only when ChangedSector has been inserted
+func extractAllSectors(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if tmp || !ctx.Opts.EnabelExtract.EnableExtractAllSectors {
+		return nil
+	}
+
+	height := ts.Height()
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("all sectors extracted")
+
+	_, span := trace.StartSpan(ctx.C, "extractor.extractAllSectors")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
+
+	root := ts.Child.ParentState()
+	tree, err := ctx.D.StateTree(root)
+	if err != nil {
+		return fmt.Errorf("load state tree for %s: %w", root, err)
+	}
+
+	astore := ctx.D.ActorStore(ctx.C)
+	allSectors := []*model.ChangedSector{}
+
+	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
+		if !builtin2.IsStorageMinerActor(act.Code) {
+			return nil
+		}
+
+		idaddr, err := ctx.D.LookupID(ctx.C, addr, ts.Child)
+		if err != nil {
+			return fmt.Errorf("lookup ID for addr %v failed: %v", addr, err)
+		}
+
+		mas, err := lminer.Load(astore, act)
+		if err != nil {
+			return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
+		}
+
+		sectorInfos, err := mas.LoadSectors(nil)
+		if err != nil {
+			return fmt.Errorf("load all sector infos for addr: %v failed: %v", addr, err)
+		}
+
+		for _, sectorInfo := range sectorInfos {
+			sector := model.NewChangedSector(*sectorInfo, idaddr, height, false, false)
+			allSectors = append(allSectors, sector)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("walk through actors: %w", err)
+	}
+
+	for i := range allSectors {
+		res.Docs = append(res.Docs, allSectors[i])
+	}
+
+	return nil
 }
