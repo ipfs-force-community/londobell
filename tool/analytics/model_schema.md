@@ -148,6 +148,33 @@
 }
 ```
 
+### ChangedSector
+
+```
+{
+	"Activation": "abi.ChainEpoch",
+	"Added": "bool",
+	"DealIDs": "[]abi.DealID",
+	"DealWeight": "big.Int",
+	"Epoch": "abi.ChainEpoch",
+	"ExpectedDayReward": "big.Int",
+	"ExpectedStoragePledge": "big.Int",
+	"Expiration": "abi.ChainEpoch",
+	"InitialPledge": "big.Int",
+	"Miner": "address.Address",
+	"Removed": "bool",
+	"ReplacedDayReward": "big.Int",
+	"ReplacedSectorAge": "abi.ChainEpoch",
+	"SealProof": "abi.RegisteredSealProof",
+	"SealedCID": "cid.Cid",
+	"SectorKeyCID": "*cid.Cid",
+	"SectorNumber": "abi.SectorNumber",
+	"SimpleQAPower": "bool",
+	"VerifiedDealWeight": "big.Int",
+	"_id": "string"
+}
+```
+
 ### ClaimedPower
 
 ```
