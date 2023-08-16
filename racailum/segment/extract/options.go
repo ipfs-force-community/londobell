@@ -120,17 +120,19 @@ type EnableExtractOptions struct {
 	EnableExtractActorBalance bool
 	EnableExtractBlockHeader  bool
 	//EnableExtractMessageBlock bool
-	EnableExtractBlockMessage    bool
-	EnableExtractActorMessage    bool
-	EnableExtractEthHash         bool
-	EnableExtractEventsRoot      bool
-	EnableExtractExplicitMessage bool
-	EnableExtractEvmByteCode     bool
-	EnableExtractActorEvent      bool
-	EnableExtractMinerSector     bool // 由于需要取未来sectorinfo，故临时库不抽； 变化延迟15分钟能接受吗？
-	EnableExtractSectorClaim     bool // 同上
-	EnableExtractActorAddress    bool
-	EnableExtractChangedActor    bool
+	EnableExtractBlockMessage     bool
+	EnableExtractActorMessage     bool
+	EnableExtractEthHash          bool
+	EnableExtractEventsRoot       bool
+	EnableExtractExplicitMessage  bool
+	EnableExtractEvmByteCode      bool
+	EnableExtractActorEvent       bool
+	EnableExtractMinerSector      bool // 由于需要取未来sectorinfo，故临时库不抽； 变化延迟15分钟能接受吗？
+	EnableExtractSectorClaim      bool // 同上
+	EnableExtractActorAddress     bool
+	EnableExtractChangedActor     bool
+	EnableExtractChangedDealState bool
+	EnableExtractAllDealStates    bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -145,16 +147,18 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		//EnableExtractMessageBlock: true,
 		EnableExtractBlockMessage: true,
 
-		EnableExtractActorMessage:    true,
-		EnableExtractEthHash:         true,
-		EnableExtractEventsRoot:      true,
-		EnableExtractExplicitMessage: false,
-		EnableExtractEvmByteCode:     true,
-		EnableExtractActorEvent:      true,
-		EnableExtractMinerSector:     true,
-		EnableExtractSectorClaim:     true,
-		EnableExtractActorAddress:    true,
-		EnableExtractChangedActor:    true,
+		EnableExtractActorMessage:     true,
+		EnableExtractEthHash:          true,
+		EnableExtractEventsRoot:       true,
+		EnableExtractExplicitMessage:  false,
+		EnableExtractEvmByteCode:      true,
+		EnableExtractActorEvent:       true,
+		EnableExtractMinerSector:      true,
+		EnableExtractSectorClaim:      true,
+		EnableExtractActorAddress:     true,
+		EnableExtractChangedActor:     true,
+		EnableExtractChangedDealState: true,
+		EnableExtractAllDealStates:    false,
 	}
 }
 
