@@ -133,6 +133,8 @@ type EnableExtractOptions struct {
 	EnableExtractChangedActor    bool
 	EnableExtractChangedSector   bool
 	EnableExtractAllSectors      bool
+	EnableExtractChangedClaim    bool
+	EnableExtractAllClaims       bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -159,6 +161,8 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractChangedActor:    true,
 		EnableExtractChangedSector:   true,
 		EnableExtractAllSectors:      false,
+		EnableExtractChangedClaim:    true,
+		EnableExtractAllClaims:       false,
 	}
 }
 

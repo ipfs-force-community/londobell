@@ -148,6 +148,26 @@
 }
 ```
 
+### ChangedClaim
+
+```
+{
+	"Added": "bool",
+	"ClaimID": "verifreg.ClaimId",
+	"Client": "abi.ActorID",
+	"Data": "cid.Cid",
+	"Epoch": "abi.ChainEpoch",
+	"Provider": "abi.ActorID",
+	"Removed": "bool",
+	"Sector": "abi.SectorNumber",
+	"Size": "abi.PaddedPieceSize",
+	"TermMax": "abi.ChainEpoch",
+	"TermMin": "abi.ChainEpoch",
+	"TermStart": "abi.ChainEpoch",
+	"_id": "string"
+}
+```
+
 ### ChangedSector
 
 ```
