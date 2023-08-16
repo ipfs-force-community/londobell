@@ -470,18 +470,19 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	dupmsgs := map[cid.Cid]struct{}{}
 
 	for i := range etraces {
+		p := etraces[i]
+		msg := &p.exec.Msg
+
 		seq := etraces[i].seq
 		// skip failed child traces
 		if len(seq) > 1 {
 			bmsgSeq := seq[0]
-			bp := etraces[bmsgSeq]
-			if bp.exec != nil && !bp.exec.MsgRct.ExitCode.IsSuccess() {
+			bp := invocs[bmsgSeq]
+			if bp.MsgRct != nil && !bp.MsgRct.ExitCode.IsSuccess() {
+				elog.Warnf("skip failed child traces, seq: %v, bmsgseq: %v, bp: %+v, bp.MsgRct: %+v, bmsgcid: %v, p: %+v, msg: %+v, p.exec: %+v", seq, bmsgSeq, bp, bp.MsgRct, bp.MsgCid.String(), p, p.exec.Msg, p.exec.MsgRct)
 				continue
 			}
 		}
-
-		p := etraces[i]
-		msg := &p.exec.Msg
 
 		var parentMsg *types.Message
 		if p.parent != nil {
