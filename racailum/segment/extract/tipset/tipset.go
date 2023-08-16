@@ -170,6 +170,10 @@ func init() {
 			Name: "sector-claim",
 			D:    &model.SectorClaim{},
 		},
+		schema.Model{
+			Name: "new-deal-proposal",
+			D:    &model.NewDealProposal{},
+		},
 	)
 }
 
@@ -209,6 +213,10 @@ var extractors = []extractor{
 	{
 		name:   "changed-actor",
 		method: extractChangedActor,
+	},
+	{
+		name:   "new-dealproposal",
+		method: extractDealProposal,
 	},
 }
 
@@ -1555,4 +1563,112 @@ func GetTransferType(from, to address.Address, mtype, methodName string, value a
 	}
 
 	return model.Null
+}
+
+func extractDealProposal(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if tmp || !ctx.Opts.EnabelExtract.EnableExtractNewDealProposal {
+		return nil
+	}
+
+	height := ts.Height()
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("new dealproposal extracted")
+
+	// upgrade skip
+	if ctx.Opts.SkipExpensiveEpoch && isExpensive(ctx.C, ctx.D, ts) {
+		elog.Warn("ignore expensive epoch for new dealproposal")
+		return nil
+	}
+
+	_, span := trace.StartSpan(ctx.C, "extractor.extractDealProposal")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
+
+	astore := ctx.D.ActorStore(ctx.C)
+
+	av, err := actors.VersionForNetwork(ctx.D.GetNetworkVersion(ctx.C, ts.Height()))
+	if err != nil {
+		return fmt.Errorf("get version for network failed: %v", err)
+	}
+
+	pmact, err := ctx.D.LoadActor(ctx.C, builtin.StorageMarketActorAddr, ts.TipSet)
+	if err != nil {
+		return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.StorageMarketActorAddr, ts.TipSet.Height(), err)
+	}
+
+	mact, err := ctx.D.LoadActor(ctx.C, builtin.StorageMarketActorAddr, ts.Child)
+	if err != nil {
+		return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.StorageMarketActorAddr, ts.Child.Height(), err)
+	}
+
+	pmas, err := market.Load(astore, pmact)
+	if err != nil {
+		return fmt.Errorf("load market parent state for addr: %v failed: %v", builtin.StorageMarketActorAddr, err)
+	}
+
+	mas, err := market.Load(astore, mact)
+	if err != nil {
+		return fmt.Errorf("load market state for addr: %v failed: %v", builtin.StorageMarketActorAddr, err)
+	}
+
+	startID, err := pmas.NextID()
+	if err != nil {
+		return fmt.Errorf("get startID for deal failed: %v", err)
+	}
+
+	nextID, err := mas.NextID()
+	if err != nil {
+		return fmt.Errorf("get nextID for deal failed: %v", err)
+	}
+
+	curProposals, err := mas.Proposals()
+	if err != nil {
+		return fmt.Errorf("load market proposals failed: %v", err)
+	}
+
+	for id := startID; id < nextID; id++ {
+		deal, found, err := curProposals.Get(id)
+		if err != nil {
+			return fmt.Errorf("get deal for id %v failed: %v", id, err)
+		}
+
+		if !found {
+			return fmt.Errorf("deal id: %v not found", id)
+		}
+
+		providerID, err := extract.LookupID(ctx, deal.Provider, ts.Child)
+		if err != nil {
+			return fmt.Errorf("lookup ID for provider: %v at height %v failed: %v", deal.Provider, ts.Child.Height(), err)
+		}
+		clientID, err := extract.LookupID(ctx, deal.Client, ts.Child)
+		if err != nil {
+			return fmt.Errorf("lookup ID for client: %v at height %v failed: %v", deal.Client, ts.Child.Height(), err)
+		}
+
+		// get Label bytes after V8
+		if av > actors.Version8 {
+			dealProposals := []*model.NewDealProposalV8{}
+			dealProposal, err := model.NewNewDealProposalV8(id, height, providerID, clientID, *deal)
+			if err != nil {
+				return fmt.Errorf("new NewDealProposalV8 for dealID: %v failed: %v", id, err)
+			}
+
+			dealProposals = append(dealProposals, dealProposal)
+
+			for i := range dealProposals {
+				res.Docs = append(res.Docs, dealProposals[i])
+			}
+
+		} else {
+			dealProposals := []*model.NewDealProposal{}
+			dealProposal, _ := model.NewNewDealProposal(id, height, providerID, clientID, *deal)
+			dealProposals = append(dealProposals, dealProposal)
+
+			for i := range dealProposals {
+				res.Docs = append(res.Docs, dealProposals[i])
+			}
+		}
+	}
+
+	return nil
 }
