@@ -177,6 +177,10 @@ func init() {
 			Name: "changed-claim",
 			D:    &model.ChangedClaim{},
 		},
+		schema.Model{
+			Name: "new-deal-proposal",
+			D:    &model.NewDealProposal{},
+		},
 	)
 }
 
@@ -232,6 +236,10 @@ var extractors = []extractor{
 	{
 		name:   "all-claims",
 		method: extractAllClaims,
+	},
+	{
+		name:   "new-dealproposal",
+		method: extractDealProposal,
 	},
 }
 
@@ -1876,6 +1884,115 @@ func extractAllClaims(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	for i := range allClaims {
 		res.Docs = append(res.Docs, allClaims[i])
+	}
+
+	return nil
+}
+
+func extractDealProposal(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if tmp || !ctx.Opts.EnabelExtract.EnableExtractNewDealProposal {
+		return nil
+	}
+
+	height := ts.Height()
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("new dealproposal extracted")
+
+	// upgrade skip
+	if ctx.Opts.SkipExpensiveEpoch && isExpensive(ctx.C, ctx.D, ts) {
+		elog.Warn("ignore expensive epoch for new dealproposal")
+		return nil
+	}
+
+	_, span := trace.StartSpan(ctx.C, "extractor.extractDealProposal")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
+
+	astore := ctx.D.ActorStore(ctx.C)
+
+	av, err := actors.VersionForNetwork(ctx.D.GetNetworkVersion(ctx.C, ts.Height()))
+	if err != nil {
+		return fmt.Errorf("get version for network failed: %v", err)
+	}
+
+	pmact, err := ctx.D.LoadActor(ctx.C, builtin.StorageMarketActorAddr, ts.TipSet)
+	if err != nil {
+		return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.StorageMarketActorAddr, ts.TipSet.Height(), err)
+	}
+
+	mact, err := ctx.D.LoadActor(ctx.C, builtin.StorageMarketActorAddr, ts.Child)
+	if err != nil {
+		return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.StorageMarketActorAddr, ts.Child.Height(), err)
+	}
+
+	pmas, err := market.Load(astore, pmact)
+	if err != nil {
+		return fmt.Errorf("load markset parent state for addr: %v failed: %v", builtin.StorageMarketActorAddr, err)
+	}
+
+	mas, err := market.Load(astore, mact)
+	if err != nil {
+		return fmt.Errorf("load market state for addr: %v failed: %v", builtin.StorageMarketActorAddr, err)
+	}
+
+	preProposals, err := pmas.Proposals()
+	if err != nil {
+		return fmt.Errorf("load parent market proposals failed: %v", err)
+	}
+
+	curProposals, err := mas.Proposals()
+	if err != nil {
+		return fmt.Errorf("load market proposals failed: %v", err)
+	}
+
+	dealChanges, err := market.DiffDealProposals(preProposals, curProposals)
+	if err != nil {
+		return fmt.Errorf("get dealChanges failed: %v", err)
+	}
+
+	// get Label bytes after V8
+	if av > actors.Version8 {
+		dealProposals := []*model.NewDealProposalV8{}
+		for _, add := range dealChanges.Added {
+			providerID, err := extract.LookupID(ctx, add.Proposal.Provider, ts.Child)
+			if err != nil {
+				return fmt.Errorf("lookup ID for provider: %v at height %v failed: %v", add.Proposal.Provider, ts.Child.Height(), err)
+			}
+			clientID, err := extract.LookupID(ctx, add.Proposal.Client, ts.Child)
+			if err != nil {
+				return fmt.Errorf("lookup ID for client: %v at height %v failed: %v", add.Proposal.Client, ts.Child.Height(), err)
+			}
+
+			dealProposal, err := model.NewNewDealProposalV8(add.ID, height, providerID, clientID, add.Proposal)
+			if err != nil {
+				return fmt.Errorf("new NewDealProposalV8 for dealID: %v failed: %v", add.ID, err)
+			}
+
+			dealProposals = append(dealProposals, dealProposal)
+		}
+
+		for i := range dealProposals {
+			res.Docs = append(res.Docs, dealProposals[i])
+		}
+	} else {
+		dealProposals := []*model.NewDealProposal{}
+		for _, add := range dealChanges.Added {
+			providerID, err := extract.LookupID(ctx, add.Proposal.Provider, ts.Child)
+			if err != nil {
+				return fmt.Errorf("lookup ID for provider: %v at height %v failed: %v", add.Proposal.Provider, ts.Child.Height(), err)
+			}
+			clientID, err := extract.LookupID(ctx, add.Proposal.Client, ts.Child)
+			if err != nil {
+				return fmt.Errorf("lookup ID for client: %v at height %v failed: %v", add.Proposal.Client, ts.Child.Height(), err)
+			}
+
+			dealProposal, _ := model.NewNewDealProposal(add.ID, height, providerID, clientID, add.Proposal)
+			dealProposals = append(dealProposals, dealProposal)
+		}
+
+		for i := range dealProposals {
+			res.Docs = append(res.Docs, dealProposals[i])
+		}
 	}
 
 	return nil
