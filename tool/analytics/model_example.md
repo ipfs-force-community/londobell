@@ -600,6 +600,25 @@
 ```
 
 
+### ChangedDealState
+
+#### changed-dealstate
+
+```
+{
+	"Added": false,
+	"DealID": 0,
+	"Epoch": 0,
+	"LastUpdatedEpoch": 0,
+	"Removed": false,
+	"SectorStartEpoch": 0,
+	"SlashEpoch": 0,
+	"VerifiedClaim": 0,
+	"_id": ""
+}
+```
+
+
 ### ChangedSector
 
 #### changed-sector

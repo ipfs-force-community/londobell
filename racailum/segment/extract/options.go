@@ -120,22 +120,24 @@ type EnableExtractOptions struct {
 	EnableExtractActorBalance bool
 	EnableExtractBlockHeader  bool
 	//EnableExtractMessageBlock bool
-	EnableExtractBlockMessage    bool
-	EnableExtractActorMessage    bool
-	EnableExtractEthHash         bool
-	EnableExtractEventsRoot      bool
-	EnableExtractExplicitMessage bool
-	EnableExtractEvmByteCode     bool
-	EnableExtractActorEvent      bool
-	EnableExtractMinerSector     bool // 由于需要取未来sectorinfo，故临时库不抽； 变化延迟15分钟能接受吗？
-	EnableExtractSectorClaim     bool // 同上
-	EnableExtractActorAddress    bool
-	EnableExtractChangedActor    bool
-	EnableExtractChangedSector   bool
-	EnableExtractAllSectors      bool
-	EnableExtractChangedClaim    bool
-	EnableExtractAllClaims       bool
-	EnableExtractNewDealProposal bool
+	EnableExtractBlockMessage     bool
+	EnableExtractActorMessage     bool
+	EnableExtractEthHash          bool
+	EnableExtractEventsRoot       bool
+	EnableExtractExplicitMessage  bool
+	EnableExtractEvmByteCode      bool
+	EnableExtractActorEvent       bool
+	EnableExtractMinerSector      bool // 由于需要取未来sectorinfo，故临时库不抽； 变化延迟15分钟能接受吗？
+	EnableExtractSectorClaim      bool // 同上
+	EnableExtractActorAddress     bool
+	EnableExtractChangedActor     bool
+	EnableExtractChangedSector    bool
+	EnableExtractAllSectors       bool
+	EnableExtractChangedClaim     bool
+	EnableExtractAllClaims        bool
+	EnableExtractNewDealProposal  bool
+	EnableExtractChangedDealState bool
+	EnableExtractAllDealStates    bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -148,23 +150,24 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractActorBalance: true,
 		EnableExtractBlockHeader:  true,
 		//EnableExtractMessageBlock: true,
-		EnableExtractBlockMessage: true,
-
-		EnableExtractActorMessage:    true,
-		EnableExtractEthHash:         true,
-		EnableExtractEventsRoot:      true,
-		EnableExtractExplicitMessage: false,
-		EnableExtractEvmByteCode:     true,
-		EnableExtractActorEvent:      true,
-		EnableExtractMinerSector:     true,
-		EnableExtractSectorClaim:     true,
-		EnableExtractActorAddress:    true,
-		EnableExtractChangedActor:    true,
-		EnableExtractChangedSector:   true,
-		EnableExtractAllSectors:      false,
-		EnableExtractChangedClaim:    true,
-		EnableExtractAllClaims:       false,
-		EnableExtractNewDealProposal: true,
+		EnableExtractBlockMessage:     true,
+		EnableExtractActorMessage:     true,
+		EnableExtractEthHash:          true,
+		EnableExtractEventsRoot:       true,
+		EnableExtractExplicitMessage:  false,
+		EnableExtractEvmByteCode:      true,
+		EnableExtractActorEvent:       true,
+		EnableExtractMinerSector:      true,
+		EnableExtractSectorClaim:      true,
+		EnableExtractActorAddress:     true,
+		EnableExtractChangedActor:     true,
+		EnableExtractChangedSector:    true,
+		EnableExtractAllSectors:       false,
+		EnableExtractChangedClaim:     true,
+		EnableExtractAllClaims:        false,
+		EnableExtractNewDealProposal:  true,
+		EnableExtractChangedDealState: true,
+		EnableExtractAllDealStates:    false,
 	}
 }
 
