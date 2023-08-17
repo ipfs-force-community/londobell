@@ -87,25 +87,25 @@ func (dbsm *DataBaseStateManager) GetDBState(ctx context.Context, dsn string) (*
 	return dbState, true, nil
 }
 
-func (dbsm *DataBaseStateManager) GetDealState(ctx context.Context, dsn string) (smodel.DealState, bool, error) {
-	dealState, ok := dbsm.DBStateCache.GetDealState(dsn)
-	if !ok {
-		dealState, found, err := dbsm.Segment.GetDealState(ctx, dsn)
-		if err != nil {
-			return smodel.DealState{}, false, err
-		}
-
-		if !found {
-			return smodel.DealState{}, false, err
-		}
-
-		dbsm.DBStateCache.FindAndUpdateDealState(dsn, dealState)
-
-		return dealState, true, nil
-	}
-
-	return dealState, true, nil
-}
+//func (dbsm *DataBaseStateManager) GetDealState(ctx context.Context, dsn string) (smodel.DealState, bool, error) {
+//	dealState, ok := dbsm.DBStateCache.GetDealState(dsn)
+//	if !ok {
+//		dealState, found, err := dbsm.Segment.GetDealState(ctx, dsn)
+//		if err != nil {
+//			return smodel.DealState{}, false, err
+//		}
+//
+//		if !found {
+//			return smodel.DealState{}, false, err
+//		}
+//
+//		dbsm.DBStateCache.FindAndUpdateDealState(dsn, dealState)
+//
+//		return dealState, true, nil
+//	}
+//
+//	return dealState, true, nil
+//}
 
 func (dbsm *DataBaseStateManager) GetBlockStates(ctx context.Context, dsn string) ([]smodel.SegmentState, error) {
 	blockStates, ok := dbsm.DBStateCache.GetBlockStates(dsn)
@@ -584,9 +584,10 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		stateFinalHeightCol := database.Collection("StateFinalHeight")
 		evmInitCodeCol := database.Collection("EvmInitCode")
 		actorEventCodeCol := database.Collection("ActorEvent")
+		actorAddressCol := database.Collection("ActorAddress")
 
 		cols := make([]*mongo.Collection, 0)
-		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol)
+		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol)
 		dbsm.UpdateDBCollectionsMap(db.Url(), config2.Collections{DB: database, Cols: cols})
 	}
 
@@ -689,9 +690,10 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 	stateFinalHeightCol := database.Collection("StateFinalHeight")
 	evmInitCodeCol := database.Collection("EvmInitCode")
 	actorEventCodeCol := database.Collection("ActorEvent")
+	actorAddressCol := database.Collection("ActorAddress")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol)
+	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol)
 
 	return config2.Collections{DB: database, Cols: cols}, nil
 }
@@ -821,11 +823,11 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols con
 		// [start, end) [1,6) [3,6) [3,4) [1,4)  [2,4)（大，小】 [11,2)
 		// [2,3)  [5,8)  [10,11)  [13, ...)   [2,5) [8,10) [11,13)
 	case smodel.Cold:
-		// 添加上下边界
-		minStartEpoch := int64(0)
-		if len(countUtils) > 0 {
-			minStartEpoch = countUtils[len(countUtils)-1].Start
-		}
+		//// 添加上下边界
+		//minStartEpoch := int64(0)
+		//if len(countUtils) > 0 {
+		//	minStartEpoch = countUtils[len(countUtils)-1].Start
+		//}
 
 		if !cfg.Formal.IsInvalidDB() {
 			formalState, found, err := dbsm.GetState(ctx, cfg.Formal.Url())
@@ -844,7 +846,7 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols con
 			})
 		}
 
-		countUtils = append(countUtils, CountUtil{Start: 0, End: minStartEpoch}, CountUtil{Start: math.MaxInt64, End: math.MaxInt64})
+		countUtils = append(countUtils, CountUtil{Start: 0, End: 0}, CountUtil{Start: math.MaxInt64, End: math.MaxInt64})
 		sort.Slice(countUtils, func(i, j int) bool {
 			return countUtils[i].Start > countUtils[j].Start
 		})
@@ -1079,143 +1081,143 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 
 	flog.Infow("get boundary for db", "db", newDB, "boundary", boundary)
 
-	// 保证有两轮dealProposal入库了
-	dealRange, err := dbsm.GetDealRangeForDB(ctx, cols, dbType)
-	if err != nil {
-		log.Errorf("get deal range for db %v failed: %v", newDB, err)
-	}
+	//// 保证有两轮dealProposal入库了
+	//dealRange, err := dbsm.GetDealRangeForDB(ctx, cols, dbType)
+	//if err != nil {
+	//	log.Errorf("get deal range for db %v failed: %v", newDB, err)
+	//}
+	//
+	//flog.Infow("get dealRange for db", "db", newDB, "dealRange", dealRange)
 
-	flog.Infow("get dealRange for db", "db", newDB, "dealRange", dealRange)
-
-	state := segment.DefaultState(newDB.Url(), dbType, interval, boundary.Start, boundary.End, dealRange.Start, dealRange.End)
+	state := segment.DefaultState(newDB.Url(), dbType, interval, boundary.Start, boundary.End, 0, 0)
 	if err != nil {
 		return err
 	}
 
 	addUpState := segment.NewAddUpState(*state)
 
-	if dbType == smodel.Cold {
-		log.Infof("暂不处理cold")
-		return nil
+	//if dbType == smodel.Cold {
+	//	log.Infof("暂不处理cold")
+	//	return nil
+	//
+	//	//log.Infow("begin RefreshDataBaseState...")
+	//	////if err := RefreshDataBaseState(ctx, dbState, cols); err != nil {
+	//	////	log.Errorf("refresh DataBaseState failed: %v", err)
+	//	////	return err
+	//	////}
+	//	//
+	//	//log.Infow("begin SetBlockState...")
+	//	//
+	//	//slog := log.With("segment")
+	//	//// todo: 暂时不对cold分段
+	//	//blockStates, err := GetBlockStates(ctx, dbState, cols, "", "")
+	//	//if err != nil {
+	//	//	return err
+	//	//}
+	//	//
+	//	//err = dbsm.Segment.SetBlockState(ctx, slog, blockStates)
+	//	//if err != nil {
+	//	//	log.Errorf("set DataBaseState failed: %v", err)
+	//	//	return err
+	//	//}
+	//	//
+	//	//log.Infow("begin RefreshBlockMsgsByMethodName...")
+	//	//allBlockMethodNames, err := GetAllBlockMethodNamesMap(ctx, dbState.GetStartEpoch(), dbState.GetEndEpoch(), cols)
+	//	//if err != nil {
+	//	//	return err
+	//	//}
+	//	//
+	//	//for _, allBlockMethodName := range allBlockMethodNames {
+	//	//	dbState.BlockMsgsByMethodNameMap[allBlockMethodName.MethodName] += allBlockMethodName.Count
+	//	//}
+	//	//
+	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+	//	//	log.Errorf("set DataBaseState failed: %v", err)
+	//	//	return err
+	//	//}
+	//	//
+	//	//log.Infow("begin RefreshActorMsgsByMethodName...")
+	//	//allActorsMethods, err := GetAllActorsMethods(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+	//	//if err != nil {
+	//	//	return err
+	//	//}
+	//	//
+	//	//for _, allActorMethods := range allActorsMethods {
+	//	//	if _, ok := dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName]; !ok {
+	//	//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName] = make(map[string]int64)
+	//	//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] = allActorMethods.Count
+	//	//	} else {
+	//	//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] += allActorMethods.Count
+	//	//	}
+	//	//}
+	//	//
+	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+	//	//	log.Errorf("set DataBaseState failed: %v", err)
+	//	//	return err
+	//	//}
+	//	//
+	//	//log.Infow("begin RefreshActorMsgs...")
+	//	//allActorsMsgsCount, err := GetAllActorsMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+	//	//if err != nil {
+	//	//	return err
+	//	//}
+	//	//
+	//	//for _, allActorMsgsCount := range allActorsMsgsCount {
+	//	//	dbState.ActorMsgsCountMap[allActorMsgsCount.ActorID] += allActorMsgsCount.Count
+	//	//}
+	//	//
+	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+	//	//	log.Errorf("set DataBaseState failed: %v", err)
+	//	//	return err
+	//	//}
+	//	//
+	//	//log.Infow("begin RefreshActorTransferMsgs...")
+	//	//allActorsTransferMsgsCount, err := GetAllActorsTransferMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+	//	//if err != nil {
+	//	//	return err
+	//	//}
+	//	//
+	//	//for _, allActorTransferMsgsCount := range allActorsTransferMsgsCount {
+	//	//	dbState.ActorTransfersCountMap[allActorTransferMsgsCount.ActorID] += allActorTransferMsgsCount.Count
+	//	//}
+	//	//
+	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+	//	//	log.Errorf("set DataBaseState failed: %v", err)
+	//	//	return err
+	//	//}
+	//	//
+	//	//log.Infow("begin RefreshMinedMsgsMaps...")
+	//	//allMinersMinedCount, err := GetAllMinersMinedCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
+	//	//if err != nil {
+	//	//	return err
+	//	//}
+	//	//
+	//	//for _, allMinerMinedCount := range allMinersMinedCount {
+	//	//	dbState.MinedMsgsMap[allMinerMinedCount.ActorID] += allMinerMinedCount.Count
+	//	//}
+	//	//
+	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+	//	//	log.Errorf("set DataBaseState failed: %v", err)
+	//	//	return err
+	//	//}
+	//	//
+	//	//log.Infow("begin RefreshTransfersForLargeAmount...")
+	//	//transfersLargeAmountCount, err := RefreshTransfersForLargeAmount(ctx, dbState, cols, "", "")
+	//	//if err != nil {
+	//	//	return err
+	//	//}
+	//	//
+	//	//dbState.TransfersLargeAmountCount = transfersLargeAmountCount
+	//	//
+	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
+	//	//	log.Errorf("set DataBaseState failed: %v", err)
+	//	//	return err
+	//	//}
+	//	//
+	//	//return nil
+	//}
 
-		//log.Infow("begin RefreshDataBaseState...")
-		////if err := RefreshDataBaseState(ctx, dbState, cols); err != nil {
-		////	log.Errorf("refresh DataBaseState failed: %v", err)
-		////	return err
-		////}
-		//
-		//log.Infow("begin SetBlockState...")
-		//
-		//slog := log.With("segment")
-		//// todo: 暂时不对cold分段
-		//blockStates, err := GetBlockStates(ctx, dbState, cols, "", "")
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//err = dbsm.Segment.SetBlockState(ctx, slog, blockStates)
-		//if err != nil {
-		//	log.Errorf("set DataBaseState failed: %v", err)
-		//	return err
-		//}
-		//
-		//log.Infow("begin RefreshBlockMsgsByMethodName...")
-		//allBlockMethodNames, err := GetAllBlockMethodNamesMap(ctx, dbState.GetStartEpoch(), dbState.GetEndEpoch(), cols)
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//for _, allBlockMethodName := range allBlockMethodNames {
-		//	dbState.BlockMsgsByMethodNameMap[allBlockMethodName.MethodName] += allBlockMethodName.Count
-		//}
-		//
-		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		//	log.Errorf("set DataBaseState failed: %v", err)
-		//	return err
-		//}
-		//
-		//log.Infow("begin RefreshActorMsgsByMethodName...")
-		//allActorsMethods, err := GetAllActorsMethods(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//for _, allActorMethods := range allActorsMethods {
-		//	if _, ok := dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName]; !ok {
-		//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName] = make(map[string]int64)
-		//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] = allActorMethods.Count
-		//	} else {
-		//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] += allActorMethods.Count
-		//	}
-		//}
-		//
-		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		//	log.Errorf("set DataBaseState failed: %v", err)
-		//	return err
-		//}
-		//
-		//log.Infow("begin RefreshActorMsgs...")
-		//allActorsMsgsCount, err := GetAllActorsMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//for _, allActorMsgsCount := range allActorsMsgsCount {
-		//	dbState.ActorMsgsCountMap[allActorMsgsCount.ActorID] += allActorMsgsCount.Count
-		//}
-		//
-		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		//	log.Errorf("set DataBaseState failed: %v", err)
-		//	return err
-		//}
-		//
-		//log.Infow("begin RefreshActorTransferMsgs...")
-		//allActorsTransferMsgsCount, err := GetAllActorsTransferMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//for _, allActorTransferMsgsCount := range allActorsTransferMsgsCount {
-		//	dbState.ActorTransfersCountMap[allActorTransferMsgsCount.ActorID] += allActorTransferMsgsCount.Count
-		//}
-		//
-		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		//	log.Errorf("set DataBaseState failed: %v", err)
-		//	return err
-		//}
-		//
-		//log.Infow("begin RefreshMinedMsgsMaps...")
-		//allMinersMinedCount, err := GetAllMinersMinedCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//for _, allMinerMinedCount := range allMinersMinedCount {
-		//	dbState.MinedMsgsMap[allMinerMinedCount.ActorID] += allMinerMinedCount.Count
-		//}
-		//
-		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		//	log.Errorf("set DataBaseState failed: %v", err)
-		//	return err
-		//}
-		//
-		//log.Infow("begin RefreshTransfersForLargeAmount...")
-		//transfersLargeAmountCount, err := RefreshTransfersForLargeAmount(ctx, dbState, cols, "", "")
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//dbState.TransfersLargeAmountCount = transfersLargeAmountCount
-		//
-		//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-		//	log.Errorf("set DataBaseState failed: %v", err)
-		//	return err
-		//}
-		//
-		//return nil
-	}
-
-	if dbType == smodel.Formal {
+	if dbType == smodel.Formal || dbType == smodel.Cold {
 		if err != nil {
 			return err
 		}
@@ -1224,7 +1226,7 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 			i := i
 			addup := addupes[i]
 			ewg.Go(func() error {
-				if err := addup(ctx, flog, addUpState, cols, dbsm.Segment); err != nil {
+				if err := addup(ctx, flog, addUpState, cols, dbsm.Segment, false); err != nil {
 					return err
 				}
 

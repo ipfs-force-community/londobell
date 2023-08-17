@@ -283,6 +283,8 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 			totalCount = countlist.DealState
 		case DealActorStates:
 			totalCount = countlist.DealActorStates
+		case TipSetStates:
+			totalCount = countlist.TipSetStates
 
 		default:
 			return nil, fmt.Errorf("invalid type for paging: %v", ptype)
@@ -298,6 +300,7 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 			LargeAmountTransferStates: countlist.LargeAmountTransferStates,
 			DealState:                 countlist.DealState,
 			DealActorStates:           countlist.DealActorStates,
+			TipSetStates:              countlist.TipSetStates,
 		}
 
 		skipflag := skipTag(skip, totalCount)
@@ -461,6 +464,18 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 				limit: segmentList.limit,
 				cols:  segmentList.Cols,
 				count: segmentList.DealActorStates,
+			})
+		}
+
+	case TipSetStates:
+		for _, segmentList := range segmentLists {
+			aggLists = append(aggLists, &aggUtil{
+				start: segmentList.start,
+				end:   segmentList.end,
+				skip:  segmentList.skip,
+				limit: segmentList.limit,
+				cols:  segmentList.Cols,
+				count: segmentList.TipSetStates,
 			})
 		}
 

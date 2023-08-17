@@ -14,3 +14,8 @@ type TipSetRes struct {
 	Weight       string
 	BaseFee      string
 }
+
+type TipSetListRes struct {
+	TotalCount int64       `json:"totalCount"`
+	TipSets    []TipSetRes `json:"tipSets"`
+}

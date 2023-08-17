@@ -309,6 +309,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/events_for_actor", aggregators.GetEventsForActor)
 		group.POST("/events_for_message", aggregators.GetEventsForMessage)
 		group.POST("/events_for_epochrange", aggregators.GetEventsForEpochRange)
+		group.POST("/tipsets_list", aggregators.GetTipSetsList)
 
 	}
 }

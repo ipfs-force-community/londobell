@@ -100,7 +100,7 @@ func GetIDByAddr(ctx context.Context, addrStr string) (string, error) {
 	}
 }
 
-// GetAddrs get [ID,robust] from ActorBalance
+// GetAddrs get {ID,robust,delegated} from ActorAddress, there is a delay for newly created actors
 func GetAddrs(ctx context.Context, addr string) (model.AddressRes, error) {
 	formal := multiquery.DBStateManager.GetFormalCfg()
 	cols, ok := multiquery.DBStateManager.GetDBCollections(formal.Url())
@@ -116,7 +116,7 @@ func GetAddrs(ctx context.Context, addr string) (model.AddressRes, error) {
 	}
 
 	for _, col := range cols.Cols {
-		if col != nil && col.Name() == "ActorBalance" {
+		if col != nil && col.Name() == "ActorAddress" {
 			cur, err := col.Aggregate(ctx, pipe)
 			if err != nil {
 				return model.AddressRes{}, err
@@ -135,7 +135,7 @@ func GetAddrs(ctx context.Context, addr string) (model.AddressRes, error) {
 		}
 	}
 
-	return model.AddressRes{}, fmt.Errorf("no table ActorBalance")
+	return model.AddressRes{}, fmt.Errorf("no table ActorAddress")
 }
 
 func GetRobustByID(ctx context.Context, api v0api.FullNode, IDAddr address.Address, actor *types.Actor) (string, error) {
@@ -160,16 +160,11 @@ func GetRobustByID(ctx context.Context, api v0api.FullNode, IDAddr address.Addre
 	}
 
 	if err == nil {
-		for _, addr := range res.Addresses {
-			if addr == "" {
-				continue
-			}
-			if addr[0] == '1' || addr[0] == '2' || addr[0] == '3' {
-				RLock.Lock()
-				defer RLock.Unlock()
-				RobustMap[actorID] = addr
-				return addr, nil
-			}
+		if res.RobustAddress != "" {
+			RLock.Lock()
+			defer RLock.Unlock()
+			RobustMap[actorID] = res.RobustAddress
+			return res.RobustAddress, nil
 		}
 
 		// 该actor没有robust地址

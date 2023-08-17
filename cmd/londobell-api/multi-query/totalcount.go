@@ -40,7 +40,7 @@ var (
 
 var (
 	addupOnce sync.Once
-	addupes   = make([]func(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment) error, 0)
+	addupes   = make([]func(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, addup bool) error, 0)
 
 	AllMethods     = make(map[string]int64, 0)
 	alk            sync.RWMutex
@@ -142,7 +142,7 @@ func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbs
 		i := i
 		addup := addupes[i]
 		ewg.Go(func() error {
-			if err := addup(ctx, log, addUpState, cols, dbsm.Segment); err != nil {
+			if err := addup(ctx, log, addUpState, cols, dbsm.Segment, true); err != nil {
 				return err
 			}
 
@@ -163,13 +163,17 @@ func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbs
 	return nil
 }
 
-func AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment) error {
-	finalHeight, err := GetFinalHeight(ctx, cols)
-	if err != nil {
-		return err
-	}
+func AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, addup bool) error {
+	state := addUpState.GetState()
+	nextEndEpoch := int64(state.GetEndEpoch())
+	if addup {
+		finalHeight, err := GetFinalHeight(ctx, cols)
+		if err != nil {
+			return err
+		}
 
-	nextEndEpoch := int64(finalHeight + 1)
+		nextEndEpoch = int64(finalHeight + 1)
+	}
 
 	return seg.AddUpBlockState(ctx, log, nextEndEpoch, addUpState, cols)
 }
@@ -326,6 +330,15 @@ func refresh(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.Chain
 
 func GetEpochRange(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", refreshEpochRange)
+	if err != nil {
+		return nil, err
+	}
+
+	return countUtils, nil
+}
+
+func GetTotalCountForTipSets(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
+	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", refreshTotalCountForTipSets)
 	if err != nil {
 		return nil, err
 	}
@@ -621,13 +634,13 @@ func GetAllBlockMsgsByMethodName(ctx context.Context, dbsm *DataBaseStateManager
 
 			tmpStartEpoch = state.GetEndEpoch()
 		case smodel.Cold:
-			allBlockMethodStates, err := dbsm.GetAllBlockMethodStates(ctx, dsn)
+			allBlockMethodNames, err := GetAllBlockMethodNames(ctx, state, cols)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("GetAllBlockMethodNames for db %v failed: %v", tmp.Url(), err)
 			}
 
-			for _, bs := range allBlockMethodStates {
-				blockMsgsByMethodNames = append(blockMsgsByMethodNames, bs.MethodName)
+			if len(allBlockMethodNames) != 0 {
+				blockMsgsByMethodNames = append(blockMsgsByMethodNames, allBlockMethodNames[0].MethodNames...)
 			}
 		default:
 			return nil, fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
@@ -751,15 +764,13 @@ func GetAllActorMsgsByMethodNameMap(ctx context.Context, dbsm *DataBaseStateMana
 
 			tmpStartEpoch = state.GetEndEpoch()
 		case smodel.Cold:
-			allActorMethodStates, err := dbsm.GetAllActorMethodStates(ctx, dsn)
+			actorMethodsMap, err := GetAllActorMethodStates(ctx, state, cols, actorID)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("GetAllActorMethods for db %v failed: %v", tmp.Url(), err)
 			}
 
-			for _, ams := range allActorMethodStates {
-				if ams.ActorID == actorID {
-					actorMsgsByMethodNameMap[ams.MethodName] += ams.Count
-				}
+			for _, actorMethod := range actorMethodsMap {
+				actorMsgsByMethodNameMap[actorMethod.MethodName] += actorMethod.Count
 			}
 		default:
 			return nil, fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
@@ -981,9 +992,44 @@ func refreshEpochRange(ctx context.Context, state *segment.State, cols common.Co
 	}
 }
 
-func refreshDealRange(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
+func refreshTotalCountForTipSets(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
+		count, err := GetTipSetStates(ctx, state, cols, methodName)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, TipSetStates: count})
+		*tmpStartEpoch = state.GetEndEpoch()
+		return nil
+	case smodel.Tmp:
+		state.SetStartEpoch(*tmpStartEpoch)
+		state.SetEndEpoch(curEpoch + 1)
+
+		count, err := GetTipSetStates(ctx, state, cols, methodName)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, TipSetStates: count})
+		return nil
+	case smodel.Cold:
+		count, err := GetTipSetStates(ctx, state, cols, methodName)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, TipSetStates: count})
+		return nil
+	default:
+		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
+	}
+}
+
+func refreshDealRange(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
+	switch state.GetDType() {
+	case smodel.Formal, smodel.Cold:
 		StartEpoch, err := GetStartEpochForDeal(ctx, cols)
 		if err != nil {
 			return err
@@ -1005,18 +1051,18 @@ func refreshDealRange(ctx context.Context, state *segment.State, cols common.Col
 		return nil
 	case smodel.Tmp:
 		return nil
-	case smodel.Cold:
-		dealState, found, err := DBStateManager.GetDealState(ctx, state.GetDSN())
-		if err != nil {
-			return err
-		}
-
-		if !found {
-			return fmt.Errorf("dealState of dsn %v not found", state.GetDSN())
-		}
-
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetDealStartID()), End: int64(state.GetDealEndID()), DealState: dealState.Count, Cols: cols})
-		return nil
+	//case smodel.Cold:
+	//	dealState, found, err := DBStateManager.GetDealState(ctx, state.GetDSN())
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	if !found {
+	//		return fmt.Errorf("dealState of dsn %v not found", state.GetDSN())
+	//	}
+	//
+	//	*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetDealStartID()), End: int64(state.GetDealEndID()), DealState: dealState.Count, Cols: cols})
+	//	return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
@@ -1117,6 +1163,7 @@ func refreshTotalCountForActorDeals(ctx context.Context, state *segment.State, c
 	}
 }
 
+// todo: colds存下永久状态 或 缓存
 func refreshTotalCountForBlockMsgsByMethodName(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
@@ -1140,14 +1187,9 @@ func refreshTotalCountForBlockMsgsByMethodName(ctx context.Context, state *segme
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: count})
 		return nil
 	case smodel.Cold:
-		blockMethodStates, err := DBStateManager.GetBlockMethodStates(ctx, state.GetDSN(), methodName)
+		count, err := GetBlockMethodStates(ctx, state, cols, methodName)
 		if err != nil {
 			return err
-		}
-
-		count := int64(0)
-		for _, bms := range blockMethodStates {
-			count += bms.Count
 		}
 
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: count})
@@ -1180,14 +1222,9 @@ func refreshTotalCountForActorMsgs(ctx context.Context, state *segment.State, co
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count})
 		return nil
 	case smodel.Cold:
-		actorStates, err := DBStateManager.GetActorStates(ctx, state.GetDSN(), actorID)
+		count, err := GetActorStates(ctx, state, cols, actorID)
 		if err != nil {
 			return err
-		}
-
-		count := int64(0)
-		for _, as := range actorStates {
-			count += as.Count
 		}
 
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count})
@@ -1220,14 +1257,9 @@ func refreshTotalCountForActorMsgByMethodName(ctx context.Context, state *segmen
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: count})
 		return nil
 	case smodel.Cold:
-		actorMethodStates, err := DBStateManager.GetActorMethodStates(ctx, state.GetDSN(), actorID, methodName)
+		count, err := GetActorMethodStates(ctx, state, cols, actorID, methodName)
 		if err != nil {
 			return err
-		}
-
-		count := int64(0)
-		for _, ams := range actorMethodStates {
-			count += ams.Count
 		}
 
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: count})
@@ -1260,14 +1292,9 @@ func refreshTotalCountForActorTransferMsgs(ctx context.Context, state *segment.S
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
 		return nil
 	case smodel.Cold:
-		actorTransferStates, err := DBStateManager.GetActorTransferStates(ctx, state.GetDSN(), actorID)
+		count, err := GetActorTransferStates(ctx, state, cols, actorID)
 		if err != nil {
 			return err
-		}
-
-		count := int64(0)
-		for _, ats := range actorTransferStates {
-			count += ats.Count
 		}
 
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count})
@@ -1300,18 +1327,12 @@ func refreshTotalCountForActorEvents(ctx context.Context, state *segment.State, 
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count})
 		return nil
 	case smodel.Cold:
-		/// todo: 暂时不管冷库
-		//actorStates, err := DBStateManager.GetActorEventStates(ctx, state.GetDSN(), actorID)
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//count := int64(0)
-		//for _, aes := range actorEventStates {
-		//	count += aes.Count
-		//}
-		//
-		//*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count})
+		count, err := GetActorEventStates(ctx, state, cols, actorID)
+		if err != nil {
+			return err
+		}
+
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
@@ -1341,14 +1362,9 @@ func refreshTotalCountForMinedMsgsMap(ctx context.Context, state *segment.State,
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, MinedStates: count})
 		return nil
 	case smodel.Cold:
-		minedStates, err := DBStateManager.GetMinedStates(ctx, state.GetDSN(), actorID)
+		count, err := GetMinedStates(ctx, state, cols, actorID)
 		if err != nil {
 			return err
-		}
-
-		count := int64(0)
-		for _, ms := range minedStates {
-			count += ms.Count
 		}
 
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, MinedStates: count})
@@ -1381,14 +1397,9 @@ func refreshTotalCountForTransfersForLargeAmount(ctx context.Context, state *seg
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, LargeAmountTransferStates: count})
 		return nil
 	case smodel.Cold:
-		largeAmountTransferStates, err := DBStateManager.GetLargeAmountTransferStates(ctx, state.GetDSN())
+		count, err := GetLargeAmountTransferStates(ctx, state, cols)
 		if err != nil {
 			return err
-		}
-
-		count := int64(0)
-		for _, lts := range largeAmountTransferStates {
-			count += lts.Count
 		}
 
 		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, LargeAmountTransferStates: count})
@@ -1576,6 +1587,54 @@ func refreshTotalCountForActorTransferReceiveMsgs(ctx context.Context, state *se
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
+}
+
+func GetTipSetStates(ctx context.Context, state *segment.State, cols common.Collections, methodName string) (int64, error) {
+	rlog := log.With("query", "GetTipSetStates")
+
+	start := time.Now()
+	startEpoch, endEpoch := state.GetStartEpoch(), state.GetEndEpoch()
+	defer func() {
+		rlog.Infof("get BlockMethodStates successfully for [%v, %v), elapsed: %v", startEpoch, endEpoch, time.Now().Sub(start).String())
+	}()
+
+	if endEpoch <= startEpoch {
+		return 0, nil
+	}
+
+	var countRes []model.CountRes
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), MethodName: methodName}, string(monitor.GetCountOfTipsetAggregator()))
+	if err != nil {
+		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+		return 0, err
+	}
+
+	tableName := "Tipset"
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == tableName {
+			cur, err := col.Aggregate(ctx, pipe)
+			if err != nil {
+				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			err = cur.All(ctx, &countRes)
+			if err != nil {
+				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
+				return 0, err
+			}
+
+			if len(countRes) == 0 {
+				return 0, nil
+			}
+
+			return countRes[0].Count, nil
+		}
+	}
+
+	// log.Warnf
+
+	return 0, fmt.Errorf("no Tipset collection")
 }
 
 // 更新formal，新增cold   异步程序更新cold state,   中间会有一段时间数据断层？
