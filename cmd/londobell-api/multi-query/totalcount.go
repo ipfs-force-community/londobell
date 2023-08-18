@@ -973,7 +973,7 @@ func GetAllMinersMinedCount(ctx context.Context, startEpoch, endEpoch abi.ChainE
 func refreshEpochRange(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols})
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
 		// todo: *tmpStartEpoch = state.GetEndEpoch() 保证所有状态做完才更新EndEpoch
 		*tmpStartEpoch = state.GetEndEpoch()
 
@@ -982,10 +982,10 @@ func refreshEpochRange(ctx context.Context, state *segment.State, cols common.Co
 		state.SetStartEpoch(*tmpStartEpoch)
 		state.SetEndEpoch(curEpoch + 1)
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols})
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols})
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
