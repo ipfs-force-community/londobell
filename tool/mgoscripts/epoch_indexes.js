@@ -11,6 +11,7 @@ db.ActorEvent.createIndex({"ActorID":1,"Epoch":1,"LogIndex":1}, {"sparse": true}
 db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"Epoch":1}, {"sparse": true});
 db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"MethodName":1,"Epoch":1}, {"sparse": true});
 db.ActorMessage.createIndex({"ActorID":1,"ExitCode":1,"Type":1,"Epoch":1,"Value":1}, {"sparse": true});
+db.ActorMessage.createIndex({"Type":1,"Epoch":1,"ActorID":1}, {"sparse": true});
 
 db.ActorState.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
@@ -76,6 +77,9 @@ db.ExecTrace.createIndex({"Epoch":1}, {"sparse": true});
 db.ExecTrace.createIndex({"IsBlock":1,"MsgRct.ExitCode":1,"Msg.Method":1,"Epoch":1}, {"sparse": true});
 db.ExecTrace.createIndex({"IsBlock":1,"Epoch":1}, {"sparse": true});
 db.ExecTrace.createIndex({"IsBlock":1,"Msg.MethodName":1,"Epoch":1}, {"sparse": true});
+db.ExecTrace.createIndex({"IsBlock":1,"Msg.MethodName":1,"MsgRct.ExitCode":1,"Detail.Return.RobustAddress":1}, {"sparse": true});
+db.ExecTrace.createIndex({"IsBlock":1,"Msg.MethodName":1,"MsgRct.ExitCode":1,"Detail.Return.ActorID":1}, {"sparse": true});
+db.ExecTrace.createIndex({"IsBlock":1,"Msg.MethodName":1,"MsgRct.ExitCode":1,"Detail.Return.IDAddress":1}, {"sparse": true});
 
 db.ExplicitMessage.createIndex({"Epoch":1}, {"sparse": true});
 db.ExplicitMessage.createIndex({"MethodName":1,"Epoch":1}, {"sparse": true});
@@ -88,9 +92,11 @@ db.FinalHeight.createIndex({"Cids":1}, {"sparse": true});
 db.MarketFunds.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.Message.createIndex({"SignedCid":1}, {"sparse": true});
+db.Message.createIndex({"Detail.Method":1,"Detail.PackedHeight":1,"Detail.Params.Deals.Proposal.Provider":1}, {"sparse": true});
 
 db.MinerDealSector.createIndex({"Epoch":1,"Miner":1}, {"sparse": true});
 
+db.MinerFunds.createIndex({"Info.Owner":1,"Epoch":1}, {"sparse": true});
 db.MinerFunds.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.MinerSector.createIndex({"Miner":1,"SectorNumber":1}, {"sparse": true});

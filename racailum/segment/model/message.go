@@ -47,6 +47,7 @@ type Message struct {
 func (m *Message) Indexes() [][]string {
 	return [][]string{
 		[]string{"SignedCid"},
+		[]string{"Detail.Method", "Detail.PackedHeight", "Detail.Params.Deals.Proposal.Provider"},
 	}
 }
 
