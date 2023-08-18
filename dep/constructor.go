@@ -94,7 +94,7 @@ func ChainOfflineBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, r repo.Loc
 	}
 
 	var wrapBlockStore dtypes.BasicChainBlockstore
-	if !writableOffline {
+	if writableOffline {
 		wrapBlockStore = bs
 	} else {
 		wrapBlockStore = &WrapAPIBlockstore{
