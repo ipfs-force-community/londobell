@@ -334,6 +334,24 @@ func (dbsm *DataBaseStateManager) GetLargeAmountTransferStates(ctx context.Conte
 	return largeAmountTransferStates, nil
 }
 
+func (dbsm *DataBaseStateManager) GetAllMethodNameState(ctx context.Context, dsn string) (smodel.SegmentState, error) {
+	allMethodNameState, ok := dbsm.DBStateCache.GetAllMethodNameState(dsn)
+	if !ok {
+		allMethodNameState, err := dbsm.Segment.GetAllMethodNameState(ctx, dsn)
+		if err != nil {
+			return smodel.SegmentState{}, err
+		}
+
+		if err := dbsm.DBStateCache.SetAllMethodNameState(dsn, allMethodNameState); err != nil {
+			return smodel.SegmentState{}, err
+		}
+
+		return allMethodNameState, nil
+	}
+
+	return allMethodNameState, nil
+}
+
 //func (dbsm *DataBaseStateManager) GetAllDealActorStates(ctx context.Context, dsn string) ([]smodel.SegmentDealState, error) {
 //	dealActorStates, ok := dbsm.DBStateCache.GetAllDealActorStates(dsn)
 //	if !ok {
@@ -1094,8 +1112,6 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 		return err
 	}
 
-	addUpState := segment.NewAddUpState(*state)
-
 	//if dbType == smodel.Cold {
 	//	log.Infof("暂不处理cold")
 	//	return nil
@@ -1226,7 +1242,7 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 			i := i
 			addup := addupes[i]
 			ewg.Go(func() error {
-				if err := addup(ctx, flog, addUpState, cols, dbsm.Segment, false); err != nil {
+				if err := addup(ctx, flog, state, cols, dbsm.Segment, false); err != nil {
 					return err
 				}
 

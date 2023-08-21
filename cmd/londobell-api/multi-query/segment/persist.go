@@ -20,31 +20,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-type AddUpState struct {
-	State State
-	lk    sync.RWMutex
-}
-
-func NewAddUpState(state State) *AddUpState {
-	return &AddUpState{
-		State: state,
-	}
-}
-
-func (a *AddUpState) GetState() State {
-	a.lk.RLock()
-	defer a.lk.RUnlock()
-
-	return a.State
-}
-
-func (a *AddUpState) UpdateState(state State) {
-	a.lk.Lock()
-	defer a.lk.Unlock()
-
-	a.State = state
-}
-
 type PersistState struct {
 	Dsn       string
 	Start     int64
@@ -54,10 +29,8 @@ type PersistState struct {
 }
 
 // 累加
-func (s *Segment) AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, nextEndEpoch int64, addUpState *AddUpState, cols common.Collections) error {
+func (s *Segment) AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, nextEndEpoch int64, state *State, cols common.Collections) error {
 	rlog := log.With("AddUp", "BlockState")
-
-	state := addUpState.GetState()
 
 	dbState := state.GetDBState()
 	blockStates := state.GetBlockStates()
@@ -195,7 +168,77 @@ func (s *Segment) AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, n
 		return err
 	}
 
-	addUpState.UpdateState(state)
+	return nil
+}
+
+func (s *Segment) AddUpAllMethodName(ctx context.Context, log *zap.SugaredLogger, nextEndEpoch int64, state *State, cols common.Collections) error {
+	rlog := log.With("AddUp", "AllMethodName")
+
+	dbState := state.GetDBState()
+	allMethodNameStates := state.GetAllMethodNameStates()
+
+	startEpoch, dsn, dType := int64(dbState.StartEpoch), dbState.Dsn, dbState.DType
+
+	starttime := time.Now()
+	defer func() {
+		rlog.Infof("addup BlockState successfully between %v and %v, elapsed: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String())
+	}()
+
+	endEpoch := int64(allMethodNameStates.EndEpoch)
+	if nextEndEpoch <= endEpoch {
+		rlog.Infof("skip for nextEndEpoch %v <= endEpoch %v", nextEndEpoch, endEpoch)
+		return nil
+	}
+
+	preAllMethodNames := allMethodNameStates.AllMethodNames
+	allMethodNamesFilter := "[\n    {\n        $match: {\n            \"IsBlock\": true,\n            \"Epoch\": {$gte: , $lt: ctx.EndEpoch},\n        }\n    },\n    {\n        $group: {\n            _id: 0,\n            MethodNames: {$addToSet: \"$Msg.MethodName\"},\n        }\n    }\n]"
+
+	var newMethodNames []string
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == "ExecTrace" {
+			var result []struct {
+				MethodNames []string
+			}
+
+			cur, err := col.Aggregate(ctx, []byte(allMethodNamesFilter))
+			if err != nil {
+				return fmt.Errorf("aggregate for all methodnames failed: %w", err)
+			}
+
+			err = cur.All(ctx, &result)
+			if err != nil {
+				return fmt.Errorf("cur.all failed: %v", err)
+			}
+
+			if len(result) > 0 {
+				newMethodNames = result[0].MethodNames
+			}
+		}
+	}
+
+	var curAllMethodNames []string
+	curAllMethodNames = append(curAllMethodNames, preAllMethodNames...)
+	for _, new := range newMethodNames {
+		exist := false
+		for _, pre := range preAllMethodNames {
+			if pre == new {
+				exist = true
+				break
+			}
+		}
+
+		if !exist {
+			curAllMethodNames = append(curAllMethodNames, new)
+		}
+	}
+
+	err := s.db.FindOneAndUpdate(ctx, "AllMethodNameState", bson.D{{Key: "_id", Value: dsn}, {Key: "Dsn", Value: dsn}, {Key: "StartEpoch", Value: dbState.StartEpoch}, {Key: "DType", Value: dType}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndEpoch", Value: nextEndEpoch}, {Key: "AllMethodNames", Value: curAllMethodNames}}}})
+	if err != nil {
+		return fmt.Errorf("update dbstate failed: %w", err)
+	}
+
+	allMethodNameStates.AllMethodNames = curAllMethodNames
+	state.SetAllMethodNameState(allMethodNameStates)
 
 	return nil
 }
@@ -824,6 +867,24 @@ func (s *Segment) GetLargeAmountTransferStates(ctx context.Context, dsn string) 
 	}
 
 	return res, nil
+}
+
+func (s *Segment) GetAllMethodNameState(ctx context.Context, dsn string) (model.SegmentState, error) {
+	cur, err := s.rdb.Find(ctx, "AllMethodNameState", bson.D{{Key: "Dsn", Value: dsn}})
+	if err != nil {
+		return model.SegmentState{}, err
+	}
+
+	var res []model.SegmentState
+	if err = cur.All(ctx, &res); err != nil {
+		return model.SegmentState{}, err
+	}
+
+	if len(res) == 0 {
+		return model.SegmentState{}, nil
+	}
+
+	return res[0], nil
 }
 
 //func (s *Segment) GetAllDealActorStates(ctx context.Context, dsn string) ([]model.SegmentDealState, error) {

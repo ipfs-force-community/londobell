@@ -40,7 +40,7 @@ var (
 
 var (
 	addupOnce sync.Once
-	addupes   = make([]func(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, addup bool) error, 0)
+	addupes   = make([]func(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.State, cols common.Collections, seg *segment.Segment, addup bool) error, 0)
 
 	AllMethods     = make(map[string]int64, 0)
 	alk            sync.RWMutex
@@ -49,7 +49,7 @@ var (
 
 func init() {
 	addupOnce.Do(func() {
-		addupes = append(addupes, AddUpBlockState /* AddUpDealActorState */)
+		addupes = append(addupes, AddUpBlockState, AddUpAllMethodName /* AddUpDealActorState */)
 	})
 }
 
@@ -134,15 +134,15 @@ func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbs
 		return fmt.Errorf("url %v not found in DBCollectionsMap", formal.Url())
 	}
 
-	newState := *state // todo: 指针get出来是否会导致原来错误
-	addUpState := segment.NewAddUpState(newState)
+	//newState := *state // todo: 指针get出来是否会导致原来错误
+	//addUpState := segment.NewAddUpState(newState)
 
 	var ewg multierror.Group
 	for i := range addupes {
 		i := i
 		addup := addupes[i]
 		ewg.Go(func() error {
-			if err := addup(ctx, log, addUpState, cols, dbsm.Segment, true); err != nil {
+			if err := addup(ctx, log, state, cols, dbsm.Segment, true); err != nil {
 				return err
 			}
 
@@ -155,16 +155,14 @@ func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbs
 		return err
 	}
 
-	newState = addUpState.GetState()
-	dbsm.DBStateCache.SetState(dsn, &newState)
+	dbsm.DBStateCache.SetState(dsn, state)
 
-	log.Infof("RefreshFormalDataBaseState successfully, dbState.EndEpoch: %v", newState.GetEndEpoch())
+	log.Infof("RefreshFormalDataBaseState successfully, dbState.EndEpoch: %v", state.GetEndEpoch())
 
 	return nil
 }
 
-func AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, addup bool) error {
-	state := addUpState.GetState()
+func AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, state *segment.State, cols common.Collections, seg *segment.Segment, addup bool) error {
 	nextEndEpoch := int64(state.GetEndEpoch())
 	if addup {
 		finalHeight, err := GetFinalHeight(ctx, cols)
@@ -175,7 +173,21 @@ func AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, addUpState *se
 		nextEndEpoch = int64(finalHeight + 1)
 	}
 
-	return seg.AddUpBlockState(ctx, log, nextEndEpoch, addUpState, cols)
+	return seg.AddUpBlockState(ctx, log, nextEndEpoch, state, cols)
+}
+
+func AddUpAllMethodName(ctx context.Context, log *zap.SugaredLogger, state *segment.State, cols common.Collections, seg *segment.Segment, addup bool) error {
+	nextEndEpoch := int64(state.GetEndEpoch())
+	if addup {
+		finalHeight, err := GetFinalHeight(ctx, cols)
+		if err != nil {
+			return err
+		}
+
+		nextEndEpoch = int64(finalHeight + 1)
+	}
+
+	return seg.AddUpAllMethodName(ctx, log, nextEndEpoch, state, cols)
 }
 
 //func AddUpDealActorState(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment) error {
@@ -616,32 +628,23 @@ func GetAllBlockMsgsByMethodName(ctx context.Context, dbsm *DataBaseStateManager
 			return nil, fmt.Errorf("state of dsn %v not found", dsn)
 		}
 
-		cols, ok := dbsm.GetDBCollections(dsn)
-		if !ok {
-			return nil, fmt.Errorf("url %v not found in DBCollectionsMap", db.Url())
-		}
-
 		switch state.GetDType() {
 		case smodel.Formal:
-			allBlockMethodNames, err := GetAllBlockMethodNames(ctx, state, cols)
+			allMethodNameState, err := dbsm.GetAllMethodNameState(ctx, dsn)
 			if err != nil {
-				return nil, fmt.Errorf("GetAllBlockMethodNames for db %v failed: %v", tmp.Url(), err)
+				return nil, fmt.Errorf("GetAllMethodNameState for db %v failed: %v", tmp.Url(), err)
 			}
 
-			if len(allBlockMethodNames) != 0 {
-				blockMsgsByMethodNames = append(blockMsgsByMethodNames, allBlockMethodNames[0].MethodNames...)
-			}
+			blockMsgsByMethodNames = append(blockMsgsByMethodNames, allMethodNameState.MethodName)
 
 			tmpStartEpoch = state.GetEndEpoch()
 		case smodel.Cold:
-			allBlockMethodNames, err := GetAllBlockMethodNames(ctx, state, cols)
+			allMethodNameState, err := dbsm.GetAllMethodNameState(ctx, dsn)
 			if err != nil {
-				return nil, fmt.Errorf("GetAllBlockMethodNames for db %v failed: %v", tmp.Url(), err)
+				return nil, fmt.Errorf("GetAllMethodNameState for db %v failed: %v", tmp.Url(), err)
 			}
 
-			if len(allBlockMethodNames) != 0 {
-				blockMsgsByMethodNames = append(blockMsgsByMethodNames, allBlockMethodNames[0].MethodNames...)
-			}
+			blockMsgsByMethodNames = append(blockMsgsByMethodNames, allMethodNameState.MethodName)
 		default:
 			return nil, fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 		}

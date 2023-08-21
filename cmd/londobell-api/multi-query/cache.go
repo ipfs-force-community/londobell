@@ -185,6 +185,17 @@ func (dbsc *DataBaseStateCache) GetDealState(dsn string) (model.DealState, bool)
 	return model.DealState{}, false
 }
 
+func (dbsc *DataBaseStateCache) GetAllMethodNameState(dsn string) (model.SegmentState, bool) {
+	dbsc.clk.RLock()
+	defer dbsc.clk.RUnlock()
+
+	if state, ok := dbsc.states[dsn]; ok {
+		return state.GetAllMethodNameStates(), true
+	}
+
+	return model.SegmentState{}, false
+}
+
 //func (dbsc *DataBaseStateCache) GetAllDealActorStates(dsn string) (model.SegmentDealState, bool) {
 //	dbsc.clk.RLock()
 //	defer dbsc.clk.RUnlock()
@@ -341,6 +352,21 @@ func (dbsc *DataBaseStateCache) SetLargeAmountTransferStates(dsn string, largeAm
 
 	if state, ok := dbsc.states[dsn]; ok {
 		if err := state.SetLargeAmountTransferStates(largeAmountTransferStates); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("state of dsn %v not found", dsn)
+}
+
+func (dbsc *DataBaseStateCache) SetAllMethodNameState(dsn string, allMethodNameState smodel.SegmentState) error {
+	dbsc.clk.Lock()
+	defer dbsc.clk.Unlock()
+
+	if state, ok := dbsc.states[dsn]; ok {
+		if err := state.SetAllMethodNameState(allMethodNameState); err != nil {
 			return err
 		}
 

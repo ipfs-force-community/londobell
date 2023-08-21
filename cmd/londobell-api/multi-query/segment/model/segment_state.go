@@ -19,6 +19,8 @@ type SegmentState struct {
 
 	ActorID    string
 	MethodName string
+
+	AllMethodNames []string
 }
 
 func NewSegmentState(dsn string, startEpoch, endEpoch abi.ChainEpoch, count int64) *SegmentState {

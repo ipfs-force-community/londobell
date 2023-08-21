@@ -21,6 +21,8 @@ type State struct {
 
 	dealState model.DealState
 	//dealActorStates []model.SegmentDealState
+
+	allMethodNameState model.SegmentState
 }
 
 func DefaultState(dsn string, dtype model.DType, interval int64, startEpoch, endEpoch abi.ChainEpoch, startDealID, endDealID uint64) *State {
@@ -68,6 +70,10 @@ func (s *State) GetDealEndID() uint64 {
 
 func (s *State) GetBlockStates() []model.SegmentState {
 	return s.blockStates
+}
+
+func (s *State) GetAllMethodNameStates() model.SegmentState {
+	return s.allMethodNameState
 }
 
 func (s *State) GetBlockMethodStates(methodName string) []model.SegmentState {
@@ -216,6 +222,11 @@ func (s *State) SetMinedStates(MinedStates []model.SegmentState) error {
 
 func (s *State) SetLargeAmountTransferStates(largeAmountTransferStates []model.SegmentState) error {
 	s.largeAmountTransferStates = largeAmountTransferStates
+	return nil
+}
+
+func (s *State) SetAllMethodNameState(allMethodNameState model.SegmentState) error {
+	s.allMethodNameState = allMethodNameState
 	return nil
 }
 
