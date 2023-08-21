@@ -238,7 +238,9 @@ func (s *Segment) AddUpAllMethodName(ctx context.Context, log *zap.SugaredLogger
 	}
 
 	allMethodNameStates.AllMethodNames = curAllMethodNames
-	state.SetAllMethodNameState(allMethodNameStates)
+	if err := state.SetAllMethodNameState(allMethodNameStates); err != nil {
+		return err
+	}
 
 	return nil
 }
