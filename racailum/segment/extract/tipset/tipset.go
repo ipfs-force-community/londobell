@@ -1804,23 +1804,38 @@ func extractDealProposal(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.StorageMarketActorAddr, ts.TipSet.Height(), err)
 	}
 
-	pmas, err := market.Load(astore, pmact)
+	mact, err := ctx.D.LoadActor(ctx.C, builtin.StorageMarketActorAddr, ts.Child)
 	if err != nil {
-		return fmt.Errorf("load markset parent state for addr: %v failed: %v", builtin.StorageMarketActorAddr, err)
+		return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.StorageMarketActorAddr, ts.Child.Height(), err)
 	}
 
-	nextID, err := pmas.NextID()
+	pmas, err := market.Load(astore, pmact)
+	if err != nil {
+		return fmt.Errorf("load market parent state for addr: %v failed: %v", builtin.StorageMarketActorAddr, err)
+	}
+
+	mas, err := market.Load(astore, mact)
+	if err != nil {
+		return fmt.Errorf("load market state for addr: %v failed: %v", builtin.StorageMarketActorAddr, err)
+	}
+
+	startID, err := pmas.NextID()
+	if err != nil {
+		return fmt.Errorf("get startID for deal failed: %v", err)
+	}
+
+	nextID, err := mas.NextID()
 	if err != nil {
 		return fmt.Errorf("get nextID for deal failed: %v", err)
 	}
 
-	preProposals, err := pmas.Proposals()
+	curProposals, err := mas.Proposals()
 	if err != nil {
-		return fmt.Errorf("load parent market proposals failed: %v", err)
+		return fmt.Errorf("load market proposals failed: %v", err)
 	}
 
-	for id := abi.DealID(ctx.LatestDealID) + 1; id < nextID; id++ {
-		deal, found, err := preProposals.Get(id)
+	for id := startID; id < nextID; id++ {
+		deal, found, err := curProposals.Get(id)
 		if err != nil {
 			return fmt.Errorf("get deal for id %v failed: %v", id, err)
 		}
