@@ -1841,7 +1841,7 @@ func extractDealProposal(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		}
 
 		if !found {
-			continue
+			return fmt.Errorf("deal id: %v not found", id)
 		}
 
 		providerID, err := extract.LookupID(ctx, deal.Provider, ts.Child)
