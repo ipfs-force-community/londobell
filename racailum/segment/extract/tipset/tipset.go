@@ -170,6 +170,10 @@ func init() {
 			Name: "sector-claim",
 			D:    &model.SectorClaim{},
 		},
+		schema.Model{
+			Name: "changed-dealstate",
+			D:    &model.ChangedDealState{},
+		},
 	)
 }
 
@@ -209,6 +213,14 @@ var extractors = []extractor{
 	{
 		name:   "changed-actor",
 		method: extractChangedActor,
+	},
+	{
+		name:   "changed-dealstate",
+		method: extractChangedDealState,
+	},
+	{
+		name:   "all-dealstates",
+		method: extractAllDealStates,
 	},
 }
 
@@ -1513,4 +1525,131 @@ func ethLogFromEvent(ctx *extract.Ctx, ts *types.TipSet, entries []types.EventEn
 		return nil, nil, false
 	}
 	return data, topics, true
+}
+
+func extractChangedDealState(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if tmp || !ctx.Opts.EnabelExtract.EnableExtractChangedDealState {
+		return nil
+	}
+
+	height := ts.Height()
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("changed deal state extracted")
+
+	// upgrade skip
+	if ctx.Opts.SkipExpensiveEpoch && isExpensive(ctx.C, ctx.D, ts) {
+		elog.Warn("ignore expensive epoch for deal state")
+		return nil
+	}
+
+	_, span := trace.StartSpan(ctx.C, "extractor.extractChangedDealState")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
+
+	changedDealStates := []*model.ChangedDealState{}
+
+	pmact, err := ctx.D.LoadActor(ctx.C, builtin.StorageMarketActorAddr, ts.TipSet)
+	if err != nil {
+		return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.StorageMarketActorAddr, ts.TipSet.Height(), err)
+	}
+
+	mact, err := ctx.D.LoadActor(ctx.C, builtin.StorageMarketActorAddr, ts.Child)
+	if err != nil {
+		return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.StorageMarketActorAddr, ts.Child.Height(), err)
+	}
+
+	astore := ctx.D.ActorStore(ctx.C)
+
+	pmas, err := market.Load(astore, pmact)
+	if err != nil {
+		return fmt.Errorf("load market parent state for addr: %v failed: %v", builtin.StorageMarketActorAddr, err)
+	}
+
+	mas, err := market.Load(astore, mact)
+	if err != nil {
+		return fmt.Errorf("load market state for addr: %v failed: %v", builtin.StorageMarketActorAddr, err)
+	}
+
+	preDealStates, err := pmas.States()
+	if err != nil {
+		return fmt.Errorf("get market state at height %v failed: %v", ts.TipSet.Height(), err)
+	}
+	curDealStates, err := mas.States()
+	if err != nil {
+		return fmt.Errorf("get market state at height %v failed: %v", ts.Child.Height(), err)
+	}
+	dealStateChanges, err := market.DiffDealStates(preDealStates, curDealStates)
+	if err != nil {
+		return fmt.Errorf("get diff deal state failed: %v", err)
+	}
+
+	for _, added := range dealStateChanges.Added {
+		changedDealState := model.NewChangedDealState(added.ID, added.Deal, height, true, false)
+		changedDealStates = append(changedDealStates, changedDealState)
+	}
+
+	for _, modified := range dealStateChanges.Modified {
+		changedDealState := model.NewChangedDealState(modified.ID, *modified.To, height, false, false)
+		changedDealStates = append(changedDealStates, changedDealState)
+	}
+
+	for _, removed := range dealStateChanges.Removed {
+		changedDealState := model.NewChangedDealState(removed.ID, removed.Deal, height, false, true)
+		changedDealStates = append(changedDealStates, changedDealState)
+	}
+
+	for i := range changedDealStates {
+		res.Docs = append(res.Docs, changedDealStates[i])
+	}
+
+	return nil
+}
+
+// extractAllDealStates extract all dealstates at startEpoch of Tipset to ChangedDealState, when ChangedDealState has been inserted
+func extractAllDealStates(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if tmp || !ctx.Opts.EnabelExtract.EnableExtractAllDealStates {
+		return nil
+	}
+
+	height := ts.Height()
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("all dealStates extracted")
+
+	_, span := trace.StartSpan(ctx.C, "extractor.extractAllDealStates")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
+
+	mact, err := ctx.D.LoadActor(ctx.C, builtin.StorageMarketActorAddr, ts.Child)
+	if err != nil {
+		return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.StorageMarketActorAddr, ts.Child.Height(), err)
+	}
+
+	astore := ctx.D.ActorStore(ctx.C)
+
+	mas, err := market.Load(astore, mact)
+	if err != nil {
+		return fmt.Errorf("load market state for addr: %v failed: %v", builtin.StorageMarketActorAddr, err)
+	}
+
+	dealStates, err := mas.States()
+	if err != nil {
+		return fmt.Errorf("get market dealStates failed: %v", err)
+	}
+
+	allDealStates := []*model.ChangedDealState{}
+	err = dealStates.ForEach(func(dealID abi.DealID, ds market.DealState) error {
+		dealState := model.NewChangedDealState(dealID, ds, height, false, false)
+		allDealStates = append(allDealStates, dealState)
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("foreach dealstates failed: %v", err)
+	}
+
+	for i := range allDealStates {
+		res.Docs = append(res.Docs, allDealStates[i])
+	}
+
+	return nil
 }

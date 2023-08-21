@@ -34,6 +34,10 @@ db.ChangedActor.createIndex({"Code":1}, {"sparse": true});
 db.ChangedActor.createIndex({"Epoch":1}, {"sparse": true});
 db.ChangedActor.createIndex({"ActorID":1,"Epoch":1}, {"sparse": true});
 
+db.ChangedDealState.createIndex({"Epoch":1,"DealID":1,"Added":1}, {"sparse": true});
+db.ChangedDealState.createIndex({"Epoch":1,"DealID":1,"Removed":1}, {"sparse": true});
+db.ChangedDealState.createIndex({"DealID":1}, {"sparse": true});
+
 db.ClaimedPower.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.Claims.createIndex({"Provider":1}, {"sparse": true});

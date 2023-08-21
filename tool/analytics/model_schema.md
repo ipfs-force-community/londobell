@@ -148,6 +148,22 @@
 }
 ```
 
+### ChangedDealState
+
+```
+{
+	"Added": "bool",
+	"DealID": "abi.DealID",
+	"Epoch": "abi.ChainEpoch",
+	"LastUpdatedEpoch": "abi.ChainEpoch",
+	"Removed": "bool",
+	"SectorStartEpoch": "abi.ChainEpoch",
+	"SlashEpoch": "abi.ChainEpoch",
+	"VerifiedClaim": "verifreg.AllocationId",
+	"_id": "string"
+}
+```
+
 ### ClaimedPower
 
 ```
