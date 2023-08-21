@@ -90,6 +90,7 @@ func (d *NewDealProposal) Indexes() [][]string {
 		[]string{newDealProposalEpochField, "VerifiedDeal"},
 		[]string{"ProviderID", "-_id"},
 		[]string{"ClientID", "-_id"},
+		[]string{newDealProposalEpochField, "_id"},
 	}
 }
 
