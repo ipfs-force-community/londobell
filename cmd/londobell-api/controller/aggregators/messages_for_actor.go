@@ -1,13 +1,13 @@
 package aggregators
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
 
 	"github.com/filecoin-project/lotus/api/v0api"
-
-	"context"
+	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
 	"github.com/filecoin-project/go-address"
 	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
@@ -69,13 +69,15 @@ func GetMessagesForActor(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorStates, countUtils, messagesForActorAggregator, req, "ActorMessage")
+		//multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorStates, countUtils, messagesForActorAggregator, req, "ActorMessage")
+
+		multiResult, err := multiquery.MultiBiSearch(ctx, req.Index*req.Limit, req.Limit, countUtils, actorMessageNoSkip,
+			monitor.GetCountOfMessageForActorAggregator(), req, "ActorMessage", multiquery.ActorStates)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
 		}
-
 		if len(multiResult) != 0 {
 			raw := multiResult
 			rawByte, err := json.Marshal(raw)

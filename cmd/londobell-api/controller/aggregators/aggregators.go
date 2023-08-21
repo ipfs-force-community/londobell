@@ -28,8 +28,8 @@ var (
 	minerInfoAggregator                     []byte
 	balanceAggregator                       []byte
 	minersForOwnerAggregator                []byte
-	messagesForActorAggregator              []byte
-	transferMessagesAggregator              []byte
+	messagesForActorAggregator              []byte //nolint
+	transferMessagesAggregator              []byte //nolint
 	timeOfTraceAggregator                   []byte
 	createTimeAggregator                    []byte
 	createMessageAggregator                 []byte
@@ -47,8 +47,8 @@ var (
 	parentTipSetAggregator                  []byte
 	blockHeaderByCidAggregator              []byte
 	blockMessagesByMethodNameAggregator     []byte
-	actorMessagesByMethodNameAggregator     []byte
-	blockHeadersByMinerAggregator           []byte
+	actorMessagesByMethodNameAggregator     []byte //nolint
+	blockHeadersByMinerAggregator           []byte //nolint
 	minedByMinerRangeAggregator             []byte
 	//allMethodsAggregator                                 []byte
 	blocksForMessageAggregator                           []byte
@@ -59,8 +59,8 @@ var (
 	richListAggregator                                   []byte
 	//allActorsForBlockMessageAggregator                   []byte
 	//transferCountForActorAggregator                      []byte
-	countOfTransfersForActor2Aggregator      []byte
-	countOfLargeAmountTransfersAggregator    []byte
+	countOfTransfersForActor2Aggregator      []byte //nolint
+	countOfLargeAmountTransfersAggregator    []byte //nolint
 	transferMsgsForActorAggregator           []byte
 	childCallsForMessageAggregator           []byte
 	eventsByActorAggregator                  []byte
@@ -72,6 +72,9 @@ var (
 	transferSendForActorAggregator           []byte
 	transferReceiveForActorAggregator        []byte
 	tipsetsListAggregator                    []byte
+
+	actorMessageNoSkip []byte
+	//countActorMessage  []byte //nolint
 )
 
 type Methodlist struct {
@@ -161,4 +164,6 @@ func InitAggregators() {
 	transferSendForActorAggregator = monitor.GetTransferSendForActorAggregator()
 	transferReceiveForActorAggregator = monitor.GetTransferReceiveForActorAggregator()
 	tipsetsListAggregator = monitor.GetTipsetsListAggregator()
+
+	actorMessageNoSkip = monitor.GetMessagesForActorNoSkip()
 }
