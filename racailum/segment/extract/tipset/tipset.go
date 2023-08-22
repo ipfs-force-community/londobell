@@ -1620,12 +1620,12 @@ func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedT
 		}
 
 		pact, err := ctx.D.LoadActor(ctx.C, actAddr, ts.TipSet)
-		if err != nil && !xerrors.Is(err, types.ErrActorNotFound) {
+		if err != nil && !errors.Is(err, types.ErrActorNotFound) {
 			return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", addr, ts.Parent.Height(), err)
 		}
 
 		var sectorChanges = &lminer.SectorChanges{}
-		if xerrors.Is(err, types.ErrActorNotFound) {
+		if errors.Is(err, types.ErrActorNotFound) {
 			added, err := mas.LoadSectors(nil)
 			if err != nil {
 				return fmt.Errorf("load all sectors at height: %v failed: %v", height, err)
