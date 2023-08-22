@@ -94,19 +94,50 @@ func GetMessagesForActor(c *gin.Context) {
 		}
 	}
 
-	createMessage, err := getCreateMessage(ctx, req.Addr, api, countUtils)
+	// todo: Skip the query creation message temporarily
+	addr, err := address.NewFromString(buildnet.NetPrefix + req.Addr)
+	if err != nil {
+		log.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+	actor, err := api.StateGetActor(ctx, addr, types.EmptyTSK)
 	if err != nil {
 		log.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	if createMessage != nil {
+	if builtin.IsStorageMinerActor(actor.Code) || builtin.IsEvmActor(actor.Code) {
 		totalCount++
-		if int64(len(messagesForActor)) < req.Limit {
+	}
+
+	if int64(len(messagesForActor)) < req.Limit {
+		createMessage, err := getCreateMessage(ctx, req.Addr, api, countUtils)
+		if err != nil {
+			log.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		if createMessage != nil {
 			messagesForActor = append(messagesForActor, *createMessage)
 		}
 	}
+
+	//createMessage, err := getCreateMessage(ctx, req.Addr, api, countUtils)
+	//if err != nil {
+	//	log.Error(err)
+	//	util.ReturnOnErr(c, err)
+	//	return
+	//}
+	//
+	//if createMessage != nil {
+	//	totalCount++
+	//	if int64(len(messagesForActor)) < req.Limit {
+	//		messagesForActor = append(messagesForActor, *createMessage)
+	//	}
+	//}
 
 	res.Data = model.MessagesForActorRes{TotalCount: totalCount, MessagesForActor: messagesForActor}
 	c.JSON(http.StatusOK, res)
