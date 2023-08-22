@@ -158,9 +158,10 @@ func (et *ExecTrace) Indexes() [][]string {
 		[]string{"IsBlock", "MsgRct.ExitCode", "Msg.Method", execTraceEpochField},
 		[]string{"IsBlock", execTraceEpochField},
 		[]string{"IsBlock", "Msg.MethodName", execTraceEpochField},
-		[]string{"IsBlock", "Msg.MethodName", "MsgRct.ExitCode", "Detail.Return.RobustAddress"},
-		[]string{"IsBlock", "Msg.MethodName", "MsgRct.ExitCode", "Detail.Return.ActorID"},
-		[]string{"IsBlock", "Msg.MethodName", "MsgRct.ExitCode", "Detail.Return.IDAddress"},
+		// store in another table
+		//[]string{"IsBlock", "Msg.MethodName", "MsgRct.ExitCode", "Detail.Return.RobustAddress"},
+		//[]string{"IsBlock", "Msg.MethodName", "MsgRct.ExitCode", "Detail.Return.ActorID"},
+		//[]string{"IsBlock", "Msg.MethodName", "MsgRct.ExitCode", "Detail.Return.IDAddress"},
 	}
 }
 
