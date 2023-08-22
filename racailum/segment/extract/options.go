@@ -166,7 +166,7 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractChangedClaim:     true,
 		EnableExtractAllClaims:        false,
 		EnableExtractNewDealProposal:  true,
-		EnableExtractChangedDealState: true,
+		EnableExtractChangedDealState: false,
 		EnableExtractAllDealStates:    false,
 	}
 }
