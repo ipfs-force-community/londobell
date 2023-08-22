@@ -1282,6 +1282,17 @@ func extractActorAddress(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		return fmt.Errorf("walk through actors: %w", err)
 	}
 
+	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
+		if _, ok := robustMap[addr]; !ok {
+			robustMap[addr] = []address.Address{}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walk through all actors: %w", err)
+	}
+
 	elog := ctx.L.With("epoch", height)
 	elog.Infow("actor address extracted")
 	for actorID, addresses := range robustMap {

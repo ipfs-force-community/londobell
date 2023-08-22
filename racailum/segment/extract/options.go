@@ -198,5 +198,6 @@ func defaultZeroHourExtractOptions() ZeroHourExtractOptions {
 		Claims:              true,
 		DatacapAllowances:   true,
 		DatacapBalances:     true,
+		ActorAddress:        true,
 	}
 }
