@@ -1609,29 +1609,41 @@ func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedT
 			continue
 		}
 
+		mas, err := lminer.Load(astore, &act)
+		if err != nil {
+			return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
+		}
+
 		actAddr, err := address.NewFromString(addr)
 		if err != nil {
 			return fmt.Errorf("new address from string for addr: %v failed: %v", addr, err)
 		}
 
 		pact, err := ctx.D.LoadActor(ctx.C, actAddr, ts.TipSet)
-		if err != nil {
-			return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", addr, ts.TipSet.Height(), err)
+		if err != nil && !xerrors.Is(err, types.ErrActorNotFound) {
+			return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", addr, ts.Parent.Height(), err)
 		}
 
-		pmas, err := lminer.Load(astore, pact)
-		if err != nil {
-			return fmt.Errorf("load miner parent state for addr: %v failed: %v", addr, err)
-		}
+		var sectorChanges = &lminer.SectorChanges{}
+		if xerrors.Is(err, types.ErrActorNotFound) {
+			added, err := mas.LoadSectors(nil)
+			if err != nil {
+				return fmt.Errorf("load all sectors at height: %v failed: %v", height, err)
+			}
 
-		mas, err := lminer.Load(astore, &act)
-		if err != nil {
-			return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
-		}
+			for _, a := range added {
+				sectorChanges.Added = append(sectorChanges.Added, *a)
+			}
+		} else {
+			pmas, err := lminer.Load(astore, pact)
+			if err != nil {
+				return fmt.Errorf("load miner parent state for addr: %v failed: %v", addr, err)
+			}
 
-		sectorChanges, err := lminer.DiffSectors(pmas, mas)
-		if err != nil {
-			return fmt.Errorf("get sectorChanges for addr: %v failed: %v", addr, err)
+			sectorChanges, err = lminer.DiffSectors(pmas, mas)
+			if err != nil {
+				return fmt.Errorf("get sectorChanges for addr: %v failed: %v", addr, err)
+			}
 		}
 
 		for _, add := range sectorChanges.Added {
@@ -1717,7 +1729,7 @@ func extractChangedClaim(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 
 		pvact, err := ctx.D.LoadActor(ctx.C, builtin.VerifiedRegistryActorAddr, ts.TipSet)
 		if err != nil {
-			return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.VerifiedRegistryActorAddr, ts.TipSet.Height(), err)
+			return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.VerifiedRegistryActorAddr, ts.Parent.Height(), err)
 		}
 
 		vact, err := ctx.D.LoadActor(ctx.C, builtin.VerifiedRegistryActorAddr, ts.Child)
