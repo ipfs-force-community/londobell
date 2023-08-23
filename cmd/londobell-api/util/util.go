@@ -25,6 +25,17 @@ const (
 	RegExp   = "RegExp"
 )
 
+// filfox: AddLockedFund
+// todo: update upgrade
+// Other is ""
+var AllMethodList = []string{"AddBalance", "AddVerifiedClient", "AllowanceExported", "Approve", "AuthenticateMessage", "Cancel", "CancelExported",
+	"ChangeBeneficiary", "ChangeMultiaddrs", "ChangeOwnerAddress", "ChangePeerID", "ChangeWorkerAddress", "Collect", "CompactPartitions", "CompactSectorNumbers",
+	"ConfirmChangeWorkerAddress", "ConfirmUpdateWorkerKey", "Constructor", "ControlAddresses", "CreateExternal", "CreateMiner", "DeclareFaults", "DeclareFaultsRecovered",
+	"DisputeWindowedPoSt", "Exec", "ExtendClaimTerms", "ExtendSectorExpiration", "ExtendSectorExpiration2", "GetBeneficiary", "IncreaseAllowanceExported",
+	"InvokeContract", "Other", "PreCommitSector", "PreCommitSectorBatch", "PreCommitSectorBatch2", "Propose", "ProveCommitAggregate", "ProveCommitSector",
+	"ProveReplicaUpdates", "PubkeyAddress", "PublishStorageDeals", "RemoveExpiredAllocations", "RemoveSigner", "RepayDebt", "ReportConsensusFault", "Send",
+	"Send(ethaccount)", "Send(placeholder)", "Settle", "SubmitWindowedPoSt", "SwapSigner", "TerminateSectors", "TransferFromExported", "UpdateChannelState", "WithdrawBalance"}
+
 // Parse generates a aggregation pipeline from the given source code with context
 func Parse(ctx, src interface{}) (interface{}, error) {
 	vm := otto.New()
