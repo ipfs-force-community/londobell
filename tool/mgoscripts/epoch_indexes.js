@@ -7,6 +7,8 @@ db.ActorBalance.createIndex({"Code":1}, {"sparse": true});
 db.ActorBalance.createIndex({"Addresses":1,"Code":1}, {"sparse": true});
 
 db.ActorEvent.createIndex({"ActorID":1,"Epoch":1,"LogIndex":1}, {"sparse": true});
+db.ActorEvent.createIndex({"Cid":1}, {"sparse": true});
+db.ActorEvent.createIndex({"SignedCid":1}, {"sparse": true});
 
 db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"Epoch":1}, {"sparse": true});
 db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"MethodName":1,"Epoch":1}, {"sparse": true});
