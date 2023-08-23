@@ -83,11 +83,13 @@ func (m *MinerSector) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bo
 func (m *MinerSector) Indexes() [][]string {
 	return [][]string{
 		[]string{"Miner", "SectorNumber"},
-		[]string{"Miner", "SimpleQaPower"},
+		[]string{"Miner", "SimpleQaPower", "SectorNumber"},
+		[]string{"Miner", "VerifiedDealWeight", "SectorNumber"},
+		[]string{"Miner", "DealWeight", "SectorNumber"},
 		[]string{"Miner", "DealIDs"},
 		[]string{"Miner", "Expiration"},
-		[]string{minerSectorEpochField, "Activation", "Replaced"},
-		[]string{"Miner", "Terminated"},
+		[]string{minerSectorEpochField, "Activation"},
+		[]string{"Miner", "Terminated", "SectorNumber"},
 	}
 }
 

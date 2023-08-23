@@ -52,7 +52,7 @@ type ActorState struct {
 // Indexes impl common.Indexed
 func (a *ActorState) Indexes() [][]string {
 	return [][]string{
-		[]string{actorStateEpochField, "Code", "Addr"},
+		[]string{actorStateEpochField, "Addr"},
 	}
 }
 

@@ -52,6 +52,8 @@ func NewActorEvent(actorID address.Address, epoch abi.ChainEpoch, cid, signedCid
 func (ae *ActorEvent) Indexes() [][]string {
 	return [][]string{
 		[]string{"ActorID", actorEventEpochField, "LogIndex"},
+		[]string{"Cid"},
+		[]string{"SignedCid"},
 	}
 }
 

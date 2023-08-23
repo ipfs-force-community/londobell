@@ -151,13 +151,17 @@ type ExecTrace struct {
 // Indexes impl common.Indexed
 func (et *ExecTrace) Indexes() [][]string {
 	return [][]string{
-		[]string{execTraceEpochField, "Msg.To", "Msg.Method", "MsgRct.ExitCode"},
-		[]string{execTraceEpochField, "Msg.To", "Seq"},
 		[]string{"Cid"},
 		[]string{"SignedCid"},
 
-		[]string{"Depth", execTraceEpochField},
-		[]string{"Depth", "Msg.MethodName", execTraceEpochField},
+		[]string{execTraceEpochField},
+		[]string{"IsBlock", "MsgRct.ExitCode", "Msg.Method", execTraceEpochField},
+		[]string{"IsBlock", execTraceEpochField},
+		[]string{"IsBlock", "Msg.MethodName", execTraceEpochField},
+		// store in another table
+		//[]string{"IsBlock", "Msg.MethodName", "MsgRct.ExitCode", "Detail.Return.RobustAddress"},
+		//[]string{"IsBlock", "Msg.MethodName", "MsgRct.ExitCode", "Detail.Return.ActorID"},
+		//[]string{"IsBlock", "Msg.MethodName", "MsgRct.ExitCode", "Detail.Return.IDAddress"},
 	}
 }
 

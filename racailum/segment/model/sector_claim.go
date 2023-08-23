@@ -61,7 +61,6 @@ func (s *SectorClaim) Indexes() [][]string {
 	return [][]string{
 		[]string{"Provider"},
 		[]string{"Provider", "Sector"},
-		[]string{"Provider", "Drop"},
 	}
 }
 

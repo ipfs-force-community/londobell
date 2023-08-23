@@ -46,12 +46,8 @@ type Message struct {
 // Indexes impl common.Indexed
 func (m *Message) Indexes() [][]string {
 	return [][]string{
-		[]string{"From", "Nonce"},
-		[]string{"To", "Method"},
-		[]string{"Detail.Method", "Detail.Actor"},
-		[]string{"Detail.PackedHeight"},
-		[]string{"Detail.PackedHeight", "Detail.Method"},
 		[]string{"SignedCid"},
+		[]string{"Detail.Method", "Detail.PackedHeight", "Detail.Params.Deals.Proposal.Provider"},
 	}
 }
 

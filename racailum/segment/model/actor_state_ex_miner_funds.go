@@ -89,6 +89,14 @@ func (m *MinerFunds) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, boo
 	return rangedFilter(minerFundsEpochField, lower, upper), true
 }
 
+// Indexes impl common.Indexed
+func (m *MinerFunds) Indexes() [][]string {
+	return [][]string{
+		[]string{"Info.Owner", minerFundsEpochField},
+		[]string{minerFundsEpochField, "Addr"},
+	}
+}
+
 func (m *MinerFunds) IsMutable() bool {
 	return false
 }
