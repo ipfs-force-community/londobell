@@ -70,6 +70,7 @@
 	"MethodName": "",
 	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 	"To": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"TransferType": "",
 	"Type": "",
 	"Value": "340282591298641078465964189926313473653",
 	"_id": ""

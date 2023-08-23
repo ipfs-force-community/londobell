@@ -53,6 +53,7 @@
 	"MethodName": "string",
 	"SignedCid": "cid.Cid",
 	"To": "address.Address",
+	"TransferType": "string",
 	"Type": "string",
 	"Value": "big.Int",
 	"_id": "string"

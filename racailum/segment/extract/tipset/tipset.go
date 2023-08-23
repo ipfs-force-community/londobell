@@ -602,7 +602,8 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 
 			for ID, mtype := range storeMap {
-				amsg, err := model.NewActorMessage(ID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock, p.seq)
+				transferType := GetTransferType(msg.From, msg.To, mtype, mi.Method.Name, msg.Value)
+				amsg, err := model.NewActorMessage(ID, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, mtype, msg.From, msg.To, isBlock, p.seq, transferType)
 				if err != nil {
 					elog.Warnw("convert to model.ActorMessage", "actorID", ID, "mcid", mcid, "signedCid", signedCid)
 				} else {
@@ -1524,4 +1525,24 @@ func ethLogFromEvent(ctx *extract.Ctx, ts *types.TipSet, entries []types.EventEn
 		return nil, nil, false
 	}
 	return data, topics, true
+}
+
+func GetTransferType(from, to address.Address, mtype, methodName string, value abi.TokenAmount) string {
+	if mtype == "to" && from == builtintypes.RewardActorAddr && methodName == "ApplyRewards" {
+		return model.Blockreward
+	}
+
+	if mtype == "from" && to == builtintypes.BurntFundsActorAddr {
+		return model.Burn
+	}
+
+	if mtype == "from" && value.GreaterThan(abi.NewTokenAmount(0)) && to != builtintypes.BurntFundsActorAddr {
+		return model.Send
+	}
+
+	if mtype == "to" && value.GreaterThan(abi.NewTokenAmount(0)) && methodName != "ApplyRewards" {
+		return model.Receive
+	}
+
+	return model.Null
 }
