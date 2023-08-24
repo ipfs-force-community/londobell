@@ -10,7 +10,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/hashicorp/go-multierror"
+
+	"github.com/ipfs-force-community/londobell/lib/limiter"
 
 	"github.com/filecoin-project/go-state-types/actors"
 
@@ -218,10 +223,10 @@ var extractors = []extractor{
 		name:   "changed-sector",
 		method: extractChangedSector,
 	},
-	{
-		name:   "all-sectors",
-		method: extractAllSectors,
-	},
+	//{
+	//	name:   "all-sectors",
+	//	method: extractAllSectors,
+	//},
 }
 
 type extractor struct {
@@ -1572,54 +1577,117 @@ func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedT
 
 	astore := ctx.D.ActorStore(ctx.C)
 	changedSectors := []*model.ChangedSector{}
+
+	originCtx := ctx.C
+	innerCtx, innerCancel := context.WithCancel(originCtx)
+	defer innerCancel()
+
+	ctx.C = innerCtx
+	defer func() {
+		ctx.C = originCtx
+	}()
+
+	var ewg multierror.Group
+	var lk sync.Mutex
+	lim := limiter.New(ctx.Opts.ChangedJobLimit)
+
 	for addr, act := range changedActors {
 		act := act
-		if !builtin2.IsStorageMinerActor(act.Code) {
-			continue
-		}
+		addr := addr
+		ewg.Go(func() error {
+			if !lim.Acquire(innerCtx) {
+				return nil
+			}
 
-		actAddr, err := address.NewFromString(addr)
-		if err != nil {
-			return fmt.Errorf("new address from string for addr: %v failed: %v", addr, err)
-		}
+			defer func() {
+				lim.Release(innerCtx)
+			}()
 
-		pact, err := ctx.D.LoadActor(ctx.C, actAddr, ts.TipSet)
-		if err != nil {
-			return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", addr, ts.TipSet.Height(), err)
-		}
+			select {
+			case <-innerCtx.Done():
+				return nil
 
-		pmas, err := lminer.Load(astore, pact)
-		if err != nil {
-			return fmt.Errorf("load miner parent state for addr: %v failed: %v", addr, err)
-		}
+			default:
+			}
 
-		mas, err := lminer.Load(astore, &act)
-		if err != nil {
-			return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
-		}
+			var err error
+			defer func() {
+				if err != nil && !errors.Is(err, types.ErrActorNotFound) {
+					innerCancel()
+				}
+			}()
 
-		sectorChanges, err := lminer.DiffSectors(pmas, mas)
-		if err != nil {
-			return fmt.Errorf("get sectorChanges for addr: %v failed: %v", addr, err)
-		}
+			if !builtin2.IsStorageMinerActor(act.Code) {
+				return nil
+			}
 
-		for _, add := range sectorChanges.Added {
-			// todo: 保证addr是actorID
-			changedSector := model.NewChangedSector(add, actAddr, height, true, false)
-			changedSectors = append(changedSectors, changedSector)
-		}
+			mas, err := lminer.Load(astore, &act)
+			if err != nil {
+				return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
+			}
 
-		for _, extend := range sectorChanges.Extended {
-			// todo: 保证addr是actorID
-			changedSector := model.NewChangedSector(extend.To, actAddr, height, false, false)
-			changedSectors = append(changedSectors, changedSector)
-		}
+			actAddr, err := address.NewFromString(addr)
+			if err != nil {
+				return fmt.Errorf("new address from string for addr: %v failed: %v", addr, err)
+			}
 
-		for _, remove := range sectorChanges.Removed {
-			// todo: 保证addr是actorID
-			changedSector := model.NewChangedSector(remove, actAddr, height, false, true)
-			changedSectors = append(changedSectors, changedSector)
-		}
+			pact, err := ctx.D.LoadActor(ctx.C, actAddr, ts.TipSet)
+			if err != nil && !errors.Is(err, types.ErrActorNotFound) {
+				return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", addr, ts.Parent.Height(), err)
+			}
+
+			var sectorChanges = &lminer.SectorChanges{}
+			if errors.Is(err, types.ErrActorNotFound) {
+				added, err := mas.LoadSectors(nil)
+				if err != nil {
+					return fmt.Errorf("load all sectors at height: %v failed: %v", height, err)
+				}
+
+				for _, a := range added {
+					sectorChanges.Added = append(sectorChanges.Added, *a)
+				}
+			} else {
+				pmas, err := lminer.Load(astore, pact)
+				if err != nil {
+					return fmt.Errorf("load miner parent state for addr: %v failed: %v", addr, err)
+				}
+
+				sectorChanges, err = lminer.DiffSectors(pmas, mas)
+				if err != nil {
+					return fmt.Errorf("get sectorChanges for addr: %v failed: %v", addr, err)
+				}
+			}
+
+			for _, add := range sectorChanges.Added {
+				// todo: 保证addr是actorID
+				changedSector := model.NewChangedSector(add, actAddr, height, true, false)
+				lk.Lock()
+				changedSectors = append(changedSectors, changedSector)
+				lk.Unlock()
+			}
+
+			for _, extend := range sectorChanges.Extended {
+				// todo: 保证addr是actorID
+				changedSector := model.NewChangedSector(extend.To, actAddr, height, false, false)
+				lk.Lock()
+				changedSectors = append(changedSectors, changedSector)
+				lk.Unlock()
+			}
+
+			for _, remove := range sectorChanges.Removed {
+				// todo: 保证addr是actorID
+				changedSector := model.NewChangedSector(remove, actAddr, height, false, true)
+				lk.Lock()
+				changedSectors = append(changedSectors, changedSector)
+				lk.Unlock()
+			}
+
+			return nil
+		})
+	}
+
+	if err := ewg.Wait(); err != nil {
+		return fmt.Errorf("extract changed sectors: %w", err)
 	}
 
 	for i := range changedSectors {
@@ -1629,64 +1697,116 @@ func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedT
 	return nil
 }
 
-// extractAllSectors extract all sectors at startEpoch of Tipset to ChangedSector in an offline way, only when ChangedSector has been inserted
-func extractAllSectors(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
-	if tmp || !ctx.Opts.EnabelExtract.EnableExtractAllSectors {
-		return nil
-	}
-
-	height := ts.Height()
-	elog := ctx.L.With("epoch", height)
-	elog.Infow("all sectors extracted")
-
-	_, span := trace.StartSpan(ctx.C, "extractor.extractAllSectors")
-	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
-	defer span.End()
-
-	root := ts.Child.ParentState()
-	tree, err := ctx.D.StateTree(root)
-	if err != nil {
-		return fmt.Errorf("load state tree for %s: %w", root, err)
-	}
-
-	astore := ctx.D.ActorStore(ctx.C)
-	allSectors := []*model.ChangedSector{}
-
-	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
-		if !builtin2.IsStorageMinerActor(act.Code) {
-			return nil
-		}
-
-		idaddr, err := ctx.D.LookupID(ctx.C, addr, ts.Child)
-		if err != nil {
-			return fmt.Errorf("lookup ID for addr %v failed: %v", addr, err)
-		}
-
-		mas, err := lminer.Load(astore, act)
-		if err != nil {
-			return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
-		}
-
-		sectorInfos, err := mas.LoadSectors(nil)
-		if err != nil {
-			return fmt.Errorf("load all sector infos for addr: %v failed: %v", addr, err)
-		}
-
-		for _, sectorInfo := range sectorInfos {
-			sector := model.NewChangedSector(*sectorInfo, idaddr, height, false, false)
-			allSectors = append(allSectors, sector)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("walk through actors: %w", err)
-	}
-
-	for i := range allSectors {
-		res.Docs = append(res.Docs, allSectors[i])
-	}
-
-	return nil
-}
+// too large
+//func extractAllSectors(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+//	if tmp || !ctx.Opts.EnabelExtract.EnableExtractAllSectors {
+//		return nil
+//	}
+//
+//	height := ts.Height()
+//	elog := ctx.L.With("epoch", height)
+//	elog.Infow("all sectors extracted")
+//
+//	_, span := trace.StartSpan(ctx.C, "extractor.extractAllSectors")
+//	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+//	defer span.End()
+//
+//	root := ts.Child.ParentState()
+//	tree, err := ctx.D.StateTree(root)
+//	if err != nil {
+//		return fmt.Errorf("load state tree for %s: %w", root, err)
+//	}
+//
+//	astore := ctx.D.ActorStore(ctx.C)
+//	allMiners := make(map[address.Address]*types.Actor)
+//
+//	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
+//		if !builtin2.IsStorageMinerActor(act.Code) {
+//			return nil
+//		}
+//
+//		allMiners[addr] = act
+//
+//		return nil
+//	})
+//
+//	if err != nil {
+//		return fmt.Errorf("walk through actors: %w", err)
+//	}
+//
+//	originCtx := ctx.C
+//	innerCtx, innerCancel := context.WithCancel(originCtx)
+//	defer innerCancel()
+//
+//	ctx.C = innerCtx
+//	defer func() {
+//		ctx.C = originCtx
+//	}()
+//
+//	var ewg multierror.Group
+//	var lk sync.Mutex
+//	lim := limiter.New(ctx.Opts.ChangedJobLimit)
+//
+//	allSectors := []*model.ChangedSector{}
+//	for addr, act := range allMiners {
+//		addr := addr
+//		act := act
+//		ewg.Go(func() error {
+//			if !lim.Acquire(innerCtx) {
+//				return nil
+//			}
+//
+//			defer func() {
+//				lim.Release(innerCtx)
+//			}()
+//
+//			select {
+//			case <-innerCtx.Done():
+//				return nil
+//
+//			default:
+//			}
+//
+//			var err error
+//			defer func() {
+//				if err != nil {
+//					innerCancel()
+//				}
+//			}()
+//
+//			idaddr, err := ctx.D.LookupID(ctx.C, addr, ts.Child)
+//			if err != nil {
+//				return fmt.Errorf("lookup ID for addr %v failed: %v", addr, err)
+//			}
+//
+//			mas, err := lminer.Load(astore, act)
+//			if err != nil {
+//				return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
+//			}
+//
+//			sectorInfos, err := mas.LoadSectors(nil)
+//			if err != nil {
+//				return fmt.Errorf("load all sector infos for addr: %v failed: %v", addr, err)
+//			}
+//
+//			for _, sectorInfo := range sectorInfos {
+//				sector := model.NewChangedSector(*sectorInfo, idaddr, height, false, false)
+//				lk.Lock()
+//				allSectors = append(allSectors, sector)
+//				lk.Unlock()
+//			}
+//
+//			return nil
+//		})
+//	}
+//
+//	if err := ewg.Wait(); err != nil {
+//		return fmt.Errorf("extract all sectors: %w", err)
+//	}
+//
+//	for i := range allSectors {
+//		res.Docs = append(res.Docs, allSectors[i])
+//	}
+//
+//	return nil
+//}
