@@ -1673,7 +1673,12 @@ func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedT
 }
 
 func extractChangedClaim(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
-	if tmp || !ctx.Opts.EnabelExtract.EnableExtractChangedClaim {
+	av, err := actors.VersionForNetwork(ctx.D.GetNetworkVersion(ctx.C, ts.Height()))
+	if err != nil {
+		return fmt.Errorf("get version for network failed: %v", err)
+	}
+
+	if tmp || !ctx.Opts.EnabelExtract.EnableExtractChangedClaim && av <= actors.Version8 {
 		return nil
 	}
 
