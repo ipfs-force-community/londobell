@@ -151,6 +151,7 @@ var extractAllSectorsCmd = &cli.Command{
 
 		log.Infof("allminers: %v", len(allMiners))
 
+		doneMiners := make(map[address.Address]struct{})
 		originCtx := ctx
 		innerCtx, innerCancel := context.WithCancel(originCtx)
 		defer innerCancel()
@@ -168,81 +169,93 @@ var extractAllSectorsCmd = &cli.Command{
 
 		allSectors := []*model.ChangedSector{}
 		var totalCount int64
-		for addr, act := range allMiners {
-			addr := addr
-			act := act
-			ewg.Go(func() error {
-				if !lim.Acquire(innerCtx) {
-					return nil
-				}
+		// todo: rpc connect error?
+		for len(doneMiners) < len(allMiners) {
+			for addr, act := range allMiners {
+				addr := addr
+				act := act
+				ewg.Go(func() error {
+					if !lim.Acquire(innerCtx) {
+						return nil
+					}
 
-				defer func() {
-					lim.Release(innerCtx)
-				}()
+					defer func() {
+						lim.Release(innerCtx)
+					}()
 
-				select {
-				case <-innerCtx.Done():
-					return nil
+					select {
+					case <-innerCtx.Done():
+						return nil
 
-				default:
-				}
+					default:
+					}
 
-				var err error
-				defer func() {
+					var err error
+					defer func() {
+						if err != nil {
+							innerCancel()
+						}
+					}()
+
+					if _, ok := doneMiners[addr]; ok {
+						// skip
+						return nil
+					}
+
+					idaddr, err := extract.LookupID(extractCtx, addr, child)
 					if err != nil {
-						innerCancel()
+						return fmt.Errorf("lookup ID for addr %v failed: %v", addr, err)
 					}
-				}()
 
-				idaddr, err := extract.LookupID(extractCtx, addr, child)
-				if err != nil {
-					return fmt.Errorf("lookup ID for addr %v failed: %v", addr, err)
-				}
+					mas, err := lminer.Load(astore, act)
+					if err != nil {
+						return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
+					}
 
-				mas, err := lminer.Load(astore, act)
-				if err != nil {
-					return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
-				}
+					sectorInfos, err := mas.LoadSectors(nil)
+					if err != nil {
+						return fmt.Errorf("load all sector infos for addr: %v failed: %v", addr, err)
+					}
 
-				sectorInfos, err := mas.LoadSectors(nil)
-				if err != nil {
-					return fmt.Errorf("load all sector infos for addr: %v failed: %v", addr, err)
-				}
+					for _, sectorInfo := range sectorInfos {
+						sector := model.NewChangedSector(*sectorInfo, idaddr, height, false, false)
+						lk.Lock()
+						allSectors = append(allSectors, sector)
+						totalCount++
+						lk.Unlock()
+					}
 
-				for _, sectorInfo := range sectorInfos {
-					sector := model.NewChangedSector(*sectorInfo, idaddr, height, false, false)
 					lk.Lock()
-					allSectors = append(allSectors, sector)
-					totalCount++
+					if len(allSectors) > 4096 {
+						for i := range allSectors {
+							res.Docs = append(res.Docs, allSectors[i])
+						}
+
+						docs := make([][]common.Document, 1)
+						docs[0] = res.Docs
+
+						elog.Infof("begin insert, count: %v", len(res.Docs))
+						if err := insertMany(context.TODO(), elog, docs, multiWdocs); err != nil {
+							elog.Errorf("insert failed: %v", err)
+							return err
+						}
+
+						res.Docs = res.Docs[len(res.Docs):]
+						allSectors = allSectors[len(allSectors):]
+					}
 					lk.Unlock()
-				}
 
-				lk.Lock()
-				if len(allSectors) > 4096 {
-					for i := range allSectors {
-						res.Docs = append(res.Docs, allSectors[i])
-					}
+					lk.Lock()
+					doneMiners[addr] = struct{}{}
+					lk.Unlock()
+					return nil
+				})
+			}
 
-					docs := make([][]common.Document, 1)
-					docs[0] = res.Docs
-
-					elog.Infof("begin insert, count: %v", len(res.Docs))
-					if err := insertMany(context.TODO(), elog, docs, multiWdocs); err != nil {
-						elog.Errorf("insert failed: %v", err)
-						return err
-					}
-
-					res.Docs = res.Docs[len(res.Docs):]
-					allSectors = allSectors[len(allSectors):]
-				}
-				lk.Unlock()
-
-				return nil
-			})
-		}
-
-		if err := ewg.Wait(); err != nil {
-			return fmt.Errorf("extract all sectors: %w", err)
+			if err := ewg.Wait(); err != nil {
+				elog.Errorf("extract all sectors: %v", err)
+				continue
+			}
 		}
 
 		elog.Infof("insert done, totalcount: %v", totalCount)
