@@ -11,7 +11,6 @@ type MessageForCreate struct {
 	Value    string
 	ExitCode int64
 	Method   string
-	Return   []byte
 	Caller   string // construtor caller
 }
 

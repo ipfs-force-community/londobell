@@ -32,11 +32,10 @@ type CreateMessage struct {
 	From       address.Address
 	To         address.Address
 	IsBlock    bool            // 是否是块消息
-	Return     []byte          //msg return
 	Caller     address.Address //constructor caller address
 }
 
-func NewCreateMessage(epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, from, to address.Address, isBlock bool, seq []int, msgRet []byte) (*CreateMessage, error) {
+func NewCreateMessage(epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, from, to address.Address, isBlock bool, seq []int) (*CreateMessage, error) {
 
 	am := &CreateMessage{
 		Epoch:      epoch,
@@ -48,7 +47,6 @@ func NewCreateMessage(epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.To
 		From:       from,
 		To:         to,
 		IsBlock:    isBlock,
-		Return:     msgRet,
 	}
 
 	am.genID(epoch, seq)

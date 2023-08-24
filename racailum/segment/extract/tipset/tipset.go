@@ -622,7 +622,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			isBlock := IsBlock(p.seq, msg.From)
 			method := mi.Method.Name
 			if slices.Contains(model.CreateMethods, method) {
-				cmsg, err := model.NewCreateMessage(ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, msg.From, msg.To, isBlock, p.seq, p.exec.MsgRct.Return)
+				cmsg, err := model.NewCreateMessage(ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, msg.From, msg.To, isBlock, p.seq)
 				if method == model.ConstructorMethod {
 					parts := strings.Split(cmsg.ID, "-")
 

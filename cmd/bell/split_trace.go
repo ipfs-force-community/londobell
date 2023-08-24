@@ -62,7 +62,6 @@ func Trace2Message(trace TraceMsg, col *mongo.Collection) (msg apim.MessageForCr
 	msg.Method = trace.Msg.MethodName
 	msg.ExitCode = trace.MsgRct.ExitCode
 	msg.Value = trace.Msg.Value
-	msg.Return = trace.MsgRct.Return
 	msg.ID = trace.ID
 	msg.Caller = getCaller(trace.Msg.MethodName, trace.ID, col)
 	return
