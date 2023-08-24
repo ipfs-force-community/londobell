@@ -122,6 +122,7 @@ type EnableExtractOptions struct {
 	//EnableExtractMessageBlock bool
 	EnableExtractBlockMessage    bool
 	EnableExtractActorMessage    bool
+	EnableExtractCreateMessage   bool
 	EnableExtractEthHash         bool
 	EnableExtractEventsRoot      bool
 	EnableExtractExplicitMessage bool
@@ -146,6 +147,7 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractBlockMessage: true,
 
 		EnableExtractActorMessage:    true,
+		EnableExtractCreateMessage:   true,
 		EnableExtractEthHash:         true,
 		EnableExtractEventsRoot:      true,
 		EnableExtractExplicitMessage: false,
@@ -198,6 +200,5 @@ func defaultZeroHourExtractOptions() ZeroHourExtractOptions {
 		Claims:              true,
 		DatacapAllowances:   true,
 		DatacapBalances:     true,
-		ActorAddress:        true,
 	}
 }
