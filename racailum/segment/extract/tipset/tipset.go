@@ -337,7 +337,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	}
 
 	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot &&
-		!ctx.Opts.EnabelExtract.EnableExtractExplicitMessage && !ctx.Opts.EnabelExtract.EnableExtractEvmByteCode && !ctx.Opts.EnabelExtract.EnableExtractActorEvent && !ctx.Opts.EnabelExtract.EnableExtractMinerSector && !ctx.Opts.EnabelExtract.EnableExtractSectorClaim {
+		!ctx.Opts.EnabelExtract.EnableExtractExplicitMessage && !ctx.Opts.EnabelExtract.EnableExtractEvmByteCode && !ctx.Opts.EnabelExtract.EnableExtractActorEvent && !ctx.Opts.EnabelExtract.EnableExtractMinerSector && !ctx.Opts.EnabelExtract.EnableExtractSectorClaim && !ctx.Opts.EnabelExtract.EnableExtractCreateMessage {
 		return nil
 	}
 
