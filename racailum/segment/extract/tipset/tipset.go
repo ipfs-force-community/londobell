@@ -12,12 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/go-state-types/actors"
-
 	"github.com/filecoin-project/go-address"
 	amt4 "github.com/filecoin-project/go-amt-ipld/v4"
 	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/actors"
 	builtintypes "github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/builtin/v10/evm"
 	"github.com/filecoin-project/go-state-types/builtin/v11/miner"
@@ -170,6 +169,10 @@ func init() {
 			Name: "sector-claim",
 			D:    &model.SectorClaim{},
 		},
+		schema.Model{
+			Name: "changed-claim",
+			D:    &model.ChangedClaim{},
+		},
 	)
 }
 
@@ -209,6 +212,14 @@ var extractors = []extractor{
 	{
 		name:   "changed-actor",
 		method: extractChangedActor,
+	},
+	{
+		name:   "changed-claim",
+		method: extractChangedClaim,
+	},
+	{
+		name:   "all-claims",
+		method: extractAllClaims,
 	},
 }
 
@@ -1524,4 +1535,240 @@ func ethLogFromEvent(ctx *extract.Ctx, ts *types.TipSet, entries []types.EventEn
 		return nil, nil, false
 	}
 	return data, topics, true
+}
+
+func extractChangedClaim(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if tmp || !ctx.Opts.EnabelExtract.EnableExtractChangedClaim {
+		return nil
+	}
+
+	height := ts.Height()
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("changed claim extracted")
+
+	// upgrade skip
+	if ctx.Opts.SkipExpensiveEpoch && isExpensive(ctx.C, ctx.D, ts) {
+		elog.Warn("ignore expensive epoch for changed claim")
+		return nil
+	}
+
+	_, span := trace.StartSpan(ctx.C, "extractor.extractChangedClaim")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
+
+	pre := ts.ParentState()
+	cur := ts.Child.ParentState()
+
+	oldTree, err := ctx.D.StateTree(pre)
+	if err != nil {
+		return fmt.Errorf("failed to load old state tree: %w", err)
+	}
+
+	newTree, err := ctx.D.StateTree(cur)
+	if err != nil {
+		return fmt.Errorf("failed to load new state tree: %w", err)
+	}
+
+	changedActors, err := state.Diff(ctx.C, oldTree, newTree)
+	if err != nil {
+		return err
+	}
+
+	astore := ctx.D.ActorStore(ctx.C)
+	changedClaims := []*model.ChangedClaim{}
+	for addr, act := range changedActors {
+		act := act
+		if !builtin2.IsStorageMinerActor(act.Code) {
+			continue
+		}
+
+		actAddr, err := address.NewFromString(addr)
+		if err != nil {
+			return fmt.Errorf("new address from string for addr: %v failed: %v", addr, err)
+		}
+
+		actID, err := ctx.D.LookupID(ctx.C, actAddr, ts.Child)
+		if err != nil {
+			return fmt.Errorf("lookup ID for addr: %v failed: %v", addr, err)
+		}
+
+		pvact, err := ctx.D.LoadActor(ctx.C, builtin.VerifiedRegistryActorAddr, ts.TipSet)
+		if err != nil {
+			return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.VerifiedRegistryActorAddr, ts.TipSet.Height(), err)
+		}
+
+		vact, err := ctx.D.LoadActor(ctx.C, builtin.VerifiedRegistryActorAddr, ts.Child)
+		if err != nil {
+			return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.VerifiedRegistryActorAddr, ts.TipSet.Height(), err)
+		}
+
+		pvas, err := verifreg.Load(astore, pvact)
+		if err != nil {
+			return fmt.Errorf("load VerifiedRegistry parent state for addr: %v failed: %v", builtin.VerifiedRegistryActorAddr, err)
+		}
+
+		vas, err := verifreg.Load(astore, vact)
+		if err != nil {
+			return fmt.Errorf("load VerifiedRegistry state for addr: %v failed: %v", builtin.VerifiedRegistryActorAddr, err)
+		}
+
+		preMap, err := pvas.GetClaims(actID)
+		if err != nil {
+			return fmt.Errorf("get claims for actID: %v at height %v failed: %v", actID, ts.TipSet.Height(), err)
+		}
+
+		curMap, err := vas.GetClaims(actID)
+		if err != nil {
+			return fmt.Errorf("get claims for actID: %v at height %v failed: %v", actID, ts.Child.Height(), err)
+		}
+
+		claimChanges := new(claimDiff)
+		if err := DiffClaimsMap(preMap, curMap, claimChanges); err != nil {
+			return fmt.Errorf("diff claims map for addr %v failed: %v", actID, err)
+		}
+
+		for _, add := range claimChanges.Added {
+			changedClaim := model.NewChangedClaim(add.ClaimId, add.Claim, height, true, false)
+			changedClaims = append(changedClaims, changedClaim)
+		}
+
+		for _, extend := range claimChanges.Extended {
+			changedClaim := model.NewChangedClaim(extend.To.ClaimId, extend.To.Claim, height, false, false)
+			changedClaims = append(changedClaims, changedClaim)
+		}
+
+		for _, remove := range claimChanges.Removed {
+			changedClaim := model.NewChangedClaim(remove.ClaimId, remove.Claim, height, false, true)
+			changedClaims = append(changedClaims, changedClaim)
+		}
+	}
+
+	for i := range changedClaims {
+		res.Docs = append(res.Docs, changedClaims[i])
+	}
+
+	return nil
+}
+
+// extractAllClaims extract all sectors at startEpoch of Tipset to ChangedSector in an offline way, only when ChangedSector has been inserted
+func extractAllClaims(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+	if tmp || !ctx.Opts.EnabelExtract.EnableExtractAllClaims {
+		return nil
+	}
+
+	height := ts.Height()
+	elog := ctx.L.With("epoch", height)
+	elog.Infow("all claims extracted")
+
+	_, span := trace.StartSpan(ctx.C, "extractor.extractAllClaims")
+	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
+	defer span.End()
+
+	root := ts.Child.ParentState()
+	tree, err := ctx.D.StateTree(root)
+	if err != nil {
+		return fmt.Errorf("load state tree for %s: %w", root, err)
+	}
+
+	astore := ctx.D.ActorStore(ctx.C)
+	allClaims := []*model.ChangedClaim{}
+
+	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
+		if !builtin2.IsStorageMinerActor(act.Code) {
+			return nil
+		}
+
+		idaddr, err := extract.LookupID(ctx, addr, ts.Child)
+		if err != nil {
+			return fmt.Errorf("failed to lookup ID for %v, err: %w", addr, err)
+		}
+
+		vact, err := ctx.D.LoadActor(ctx.C, builtin.VerifiedRegistryActorAddr, ts.Child)
+		if err != nil {
+			return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", builtin.VerifiedRegistryActorAddr, ts.TipSet.Height(), err)
+		}
+
+		vas, err := verifreg.Load(astore, vact)
+		if err != nil {
+			return fmt.Errorf("load verifreg state failed: %v", err)
+		}
+
+		claimMap, err := vas.GetClaims(idaddr)
+		if err != nil {
+			return fmt.Errorf("load all claims for addr: %v failed: %v", idaddr, err)
+		}
+
+		for claimID, claim := range claimMap {
+			changedClaim := model.NewChangedClaim(claimID, claim, height, false, false)
+			allClaims = append(allClaims, changedClaim)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walk through actors: %w", err)
+	}
+
+	for i := range allClaims {
+		res.Docs = append(res.Docs, allClaims[i])
+	}
+
+	return nil
+}
+
+type MapDiff interface {
+}
+
+//type claimDiff struct {
+//	Results *ClaimChanges
+//}
+
+type claimDiff struct {
+	Added    []Claim
+	Extended []ClaimExtensions
+	Removed  []Claim
+}
+
+type ClaimExtensions struct {
+	From Claim
+	To   Claim
+}
+
+type Claim struct {
+	verifreg.ClaimId
+	verifreg.Claim
+}
+
+func DiffClaimsMap(preMap, curMap map[verifreg.ClaimId]verifreg.Claim, out *claimDiff) error {
+	notNew := make(map[verifreg.ClaimId]struct{}, len(curMap))
+	for id, preVal := range preMap {
+		curVal, found := curMap[id]
+		if !found {
+			val := Claim{id, preVal}
+			out.Removed = append(out.Removed, val)
+			continue
+		}
+
+		//var preOut cbor.Unmarshaler
+		//preOut.UnmarshalCBOR(bytes.NewReader(preVal.))
+		// 比较对应claimid的claim
+		if !IsEqualClaim(preVal, curVal) {
+			out.Extended = append(out.Extended, ClaimExtensions{From: Claim{id, preVal}, To: Claim{id, curVal}})
+		}
+		notNew[id] = struct{}{}
+	}
+
+	for id, curVal := range curMap {
+		if _, ok := notNew[id]; !ok {
+			out.Added = append(out.Added, Claim{id, curVal})
+		}
+	}
+
+	return nil
+}
+
+func IsEqualClaim(a, b verifreg.Claim) bool {
+	return a.Provider == b.Provider && a.Client == b.Client && a.Data == b.Data &&
+		a.Size == b.Size && a.TermMin == b.TermMin && a.TermMax == b.TermMax &&
+		a.TermStart == b.TermStart && a.Sector == b.Sector
 }

@@ -131,6 +131,8 @@ type EnableExtractOptions struct {
 	EnableExtractSectorClaim     bool // 同上
 	EnableExtractActorAddress    bool
 	EnableExtractChangedActor    bool
+	EnableExtractChangedClaim    bool
+	EnableExtractAllClaims       bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -155,6 +157,8 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractSectorClaim:     true,
 		EnableExtractActorAddress:    true,
 		EnableExtractChangedActor:    true,
+		EnableExtractChangedClaim:    true,
+		EnableExtractAllClaims:       false,
 	}
 }
 
