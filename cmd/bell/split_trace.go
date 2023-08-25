@@ -27,7 +27,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"golang.org/x/exp/slices"
 )
 
 type TraceMsg struct {
@@ -49,6 +48,9 @@ type TraceMsg struct {
 		GasUsed    int64
 		EventsRoot string
 	}
+	Detail struct {
+		Return interface{}
+	}
 	IsBlock bool
 }
 
@@ -60,6 +62,7 @@ func Trace2Message(trace TraceMsg, col *mongo.Collection) (msg apim.MessageForCr
 	msg.From = trace.Msg.From
 	msg.To = trace.Msg.To
 	msg.Method = trace.Msg.MethodName
+	msg.ActorID = getActorID(trace)
 	msg.ExitCode = trace.MsgRct.ExitCode
 	msg.Value = trace.Msg.Value
 	msg.ID = trace.ID
@@ -90,6 +93,16 @@ func getCaller(methodName, id string, col *mongo.Collection) string {
 	}
 
 	return ""
+}
+
+func getActorID(trace TraceMsg) string {
+	if trace.Msg.MethodName == model.CreateExternal {
+
+		actorID := trace.Detail.Return.(bson.D).Map()["ActorID"].(int64)
+		return fmt.Sprintf("0%d", actorID)
+	}
+	return ""
+
 }
 
 var splitTraceCmd = &cli.Command{
@@ -149,7 +162,7 @@ var splitTraceCmd = &cli.Command{
 			}
 			methodName := execTrace.Msg.MethodName
 			//
-			if slices.Contains(methods, methodName) {
+			if model.IsOkCreateMessage(methodName, execTrace.MsgRct.ExitCode) {
 				var cmsg model.CreateMessage
 				newCollection := db.Collection(cmsg.CollectionName())
 				msg := Trace2Message(execTrace, TraceCol)

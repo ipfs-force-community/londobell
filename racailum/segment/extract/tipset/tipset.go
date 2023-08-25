@@ -43,7 +43,6 @@ import (
 	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.opencensus.io/trace"
-	"golang.org/x/exp/slices"
 	"golang.org/x/xerrors"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -621,23 +620,9 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		if ctx.Opts.EnabelExtract.EnableExtractCreateMessage {
 			isBlock := IsBlock(p.seq, msg.From)
 			method := mi.Method.Name
-			if slices.Contains(model.CreateMethods, method) {
-				cmsg, err := model.NewCreateMessage(ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, msg.From, msg.To, isBlock, p.seq)
-				if method == model.ConstructorMethod {
-					parts := strings.Split(cmsg.ID, "-")
+			if model.IsOkCreateMessage(method, int64(p.exec.MsgRct.ExitCode)) {
+				cmsg, err := model.NewCreateMessage(ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, msg.From, msg.To, isBlock, p.seq, callerAddrMap, mi.ReturnObj(), p.exec)
 
-					// Take the first two segments
-					if len(parts) >= 2 {
-						callerID := parts[0] + "-" + parts[1]
-						if caller, ok := callerAddrMap[callerID]; ok {
-							cmsg.Caller = caller
-						} else {
-							elog.Error("no caller in callerAddrMap")
-						}
-					} else {
-						elog.Error("get constructor caller err ", err)
-					}
-				}
 				if err != nil {
 					elog.Warnw("convert to model.CreateMessage", "mcid", mcid, "signedCid", signedCid)
 				} else {

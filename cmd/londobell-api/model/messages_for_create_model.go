@@ -12,6 +12,7 @@ type MessageForCreate struct {
 	ExitCode int64
 	Method   string
 	Caller   string // construtor caller
+	ActorID  string //CreateExternal Created
 }
 
 type MessagesForCreateRes struct {
