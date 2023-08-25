@@ -1678,7 +1678,7 @@ func extractChangedClaim(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		return fmt.Errorf("get version for network failed: %v", err)
 	}
 
-	if tmp || !ctx.Opts.EnabelExtract.EnableExtractChangedClaim && av <= actors.Version8 {
+	if tmp || !ctx.Opts.EnabelExtract.EnableExtractChangedClaim || av <= actors.Version8 {
 		return nil
 	}
 
