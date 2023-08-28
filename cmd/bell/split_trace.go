@@ -99,6 +99,9 @@ func getActorID(trace TraceMsg) string {
 
 		actorID := trace.Detail.Return.(bson.D).Map()["ActorID"].(int64)
 		return fmt.Sprintf("0%d", actorID)
+	} else if trace.Msg.MethodName == model.CreateMiner {
+		actorID := trace.Detail.Return.(bson.D).Map()["IDAddress"].(string)
+		return actorID
 	}
 	return ""
 
