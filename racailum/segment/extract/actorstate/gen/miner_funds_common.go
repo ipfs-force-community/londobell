@@ -7,6 +7,8 @@ package gen
 import (
 	"fmt"
 
+	logging "github.com/ipfs/go-log/v2"
+
 	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -73,6 +75,8 @@ func init() {
 	)
 }
 
+var log = logging.Logger("minerfunds")
+
 func NewTokenAmountArr(length int) []abi.TokenAmount {
 	s := make([]abi.TokenAmount, length, length)
 	for i := range s {
@@ -124,6 +128,12 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.SectorSize = info.SectorSize
 		mInfo.WindowPoStPartitionSectors = info.WindowPoStPartitionSectors
 
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+			}
+		}()
+
 		mInfo.Balance = head.Balance
 		mInfo.AvailableBalance = st.GetAvailableBalance(head.Balance)
 
@@ -173,6 +183,12 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.Multiaddrs = info.Multiaddrs
 		mInfo.SectorSize = info.SectorSize
 		mInfo.WindowPoStPartitionSectors = info.WindowPoStPartitionSectors
+
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+			}
+		}()
 
 		mInfo.ConsensusFaultElapsed = info.ConsensusFaultElapsed
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
@@ -231,6 +247,12 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.SectorSize = info.SectorSize
 		mInfo.WindowPoStPartitionSectors = info.WindowPoStPartitionSectors
 
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+			}
+		}()
+
 		mInfo.ConsensusFaultElapsed = info.ConsensusFaultElapsed
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 		mInfo.FeeDebt = st.FeeDebt
@@ -287,6 +309,12 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.Multiaddrs = info.Multiaddrs
 		mInfo.SectorSize = info.SectorSize
 		mInfo.WindowPoStPartitionSectors = info.WindowPoStPartitionSectors
+
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+			}
+		}()
 
 		mInfo.ConsensusFaultElapsed = info.ConsensusFaultElapsed
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
@@ -407,6 +435,13 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
+
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+			}
+		}()
+
 		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
 		if err != nil {
 			return fmt.Errorf("get available balance failed: %w", err)
@@ -522,6 +557,13 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
+
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+			}
+		}()
+
 		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
 		if err != nil {
 			return fmt.Errorf("get available balance failed: %w", err)
@@ -637,6 +679,13 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
+
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+			}
+		}()
+
 		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
 		if err != nil {
 			return fmt.Errorf("get available balance failed: %w", err)
@@ -752,6 +801,13 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
+
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+			}
+		}()
+
 		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
 		if err != nil {
 			return fmt.Errorf("get available balance failed: %w", err)
@@ -867,6 +923,13 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
+
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+			}
+		}()
+
 		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
 		if err != nil {
 			return fmt.Errorf("get available balance failed: %w", err)
@@ -993,6 +1056,13 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
+
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+			}
+		}()
+
 		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
 		if err != nil {
 			return fmt.Errorf("get available balance failed: %w", err)
@@ -1119,6 +1189,13 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
 		mInfo.Balance = head.Balance
+
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+			}
+		}()
+
 		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
 		if err != nil {
 			return fmt.Errorf("get available balance failed: %w", err)

@@ -42,6 +42,8 @@ func init() {
 	)
 }
 
+var log = logging.Logger("minerfunds")
+
 func NewTokenAmountArr(length int) []abi.TokenAmount {
 	s := make([]abi.TokenAmount, length, length)
 	for i := range s {
@@ -95,6 +97,12 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
         mInfo.SectorSize = info.SectorSize
         mInfo.WindowPoStPartitionSectors = info.WindowPoStPartitionSectors
 
+        defer func() {
+            if err := recover(); err != nil {
+                log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+            }
+        }()
+
         {{ if ge .Ver 2 -}}
         mInfo.ConsensusFaultElapsed = info.ConsensusFaultElapsed
         mInfo.PendingOwnerAddress = info.PendingOwnerAddress
@@ -102,6 +110,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
         {{ end }}
 
         mInfo.Balance = head.Balance
+
         {{- if eq .Ver 0 }}
         mInfo.AvailableBalance = st.GetAvailableBalance(head.Balance)
         {{- else }}
@@ -233,6 +242,13 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
         mInfo.PendingOwnerAddress = info.PendingOwnerAddress
 
         mInfo.Balance = head.Balance
+
+        defer func() {
+            if err := recover(); err != nil {
+                log.Errorf("panic recover for addr: %v, st: %+v, mInfo: %+v, head: %+v", head.Addr, st, mInfo, head)
+            }
+        }()
+
         mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
         if err != nil {
             return fmt.Errorf("get available balance failed: %w", err)
