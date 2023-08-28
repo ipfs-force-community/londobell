@@ -8,7 +8,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v10/eam"
+	"github.com/filecoin-project/go-state-types/builtin/v11/eam"
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/ipfs/go-cid"
@@ -34,7 +34,6 @@ type CreateMessage struct {
 	SignedCid  cid.Cid
 	Value      abi.TokenAmount // int64
 	MethodName string
-	ExitCode   exitcode.ExitCode
 	From       address.Address
 	To         address.Address
 	IsBlock    bool            // 是否是块消息
@@ -54,7 +53,6 @@ func NewCreateMessage(epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.To
 		SignedCid:  signedCid,
 		Value:      value,
 		MethodName: methodName,
-		ExitCode:   exitcode,
 		From:       from,
 		To:         to,
 		IsBlock:    isBlock,
@@ -80,12 +78,7 @@ func NewCreateMessage(epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.To
 				return nil, fmt.Errorf("unmarshal return: %w", err)
 			}
 
-			id, err := parse(returnObj)
-			if err != nil {
-				return nil, err
-			}
-			var addr address.Address
-			err = addr.Scan(id)
+			addr, err := parse(returnObj)
 			if err != nil {
 				return nil, err
 			}
@@ -96,14 +89,62 @@ func NewCreateMessage(epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.To
 	return am, nil
 }
 
-func parse(obj interface{}) (string, error) {
+func CompareStructPointers(a interface{}, b interface{}) bool {
+	valueA := reflect.ValueOf(a)
+	valueB := reflect.ValueOf(b)
 
-	switch obj.(type) {
-	case *eam.CreateExternalReturn:
-		return fmt.Sprintf("0%d", obj.(*eam.CreateExternalReturn).ActorID), nil
+	if valueA.Kind() != reflect.Ptr || valueB.Kind() != reflect.Ptr {
+		return false
+	}
+
+	elemTypeA := valueA.Elem().Type()
+	elemTypeB := valueB.Elem().Type()
+	if elemTypeA.Kind() != reflect.Struct || elemTypeB.Kind() != reflect.Struct {
+		return false
+	}
+
+	if elemTypeA.String() != elemTypeB.String() {
+		return false
+	}
+
+	numFields := elemTypeA.NumField()
+
+	for i := 0; i < numFields; i++ {
+		fieldTypeA := elemTypeA.Field(i)
+		fieldTypeB := elemTypeB.Field(i)
+
+		if fieldTypeA.Name != fieldTypeB.Name || fieldTypeA.Type != fieldTypeB.Type {
+			return false
+		}
+
+	}
+
+	return true
+}
+
+func parse(obj interface{}) (address.Address, error) {
+	if ret, ok := obj.(*eam.CreateExternalReturn); ok {
+		addr, err := address.NewIDAddress(ret.ActorID)
+		if err != nil {
+			return address.Address{}, fmt.Errorf("parse's convert addr err %w", err)
+		}
+		return addr, nil
+	}
+	// if builtin version changed use the following logic
+	switch reflect.TypeOf(obj).String() {
+	case "*eam.CreateExternalReturn":
+		if CompareStructPointers(obj, &eam.CreateExternalReturn{}) {
+			addr, err := address.NewIDAddress(obj.(*eam.CreateExternalReturn).ActorID)
+			if err != nil {
+				return address.Address{}, fmt.Errorf("parse's convert addr err %w", err)
+			}
+			return addr, nil
+		}
+
+		return address.Address{}, fmt.Errorf("parse err type: %s", reflect.TypeOf(obj))
 
 	default:
-		return "", fmt.Errorf("err type: %s", reflect.TypeOf(obj))
+		return address.Address{}, fmt.Errorf("err type: %s", reflect.TypeOf(obj))
 	}
 }
 
