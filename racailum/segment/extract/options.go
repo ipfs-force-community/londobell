@@ -64,6 +64,7 @@ func defaultActorStateRegularOptions() ActorStateRegularOptions {
 		DatacapBalancesTicks:     4,                    //4h
 		DatacapAllowancesTicks:   4,                    //4h
 		ActorAddressTicks:        1,                    // 1h
+		ChangedSectorTicks:       1,                    // 1h
 	}
 }
 
@@ -103,6 +104,7 @@ type ActorStateRegularOptions struct {
 	DatacapBalancesTicks     int
 	DatacapAllowancesTicks   int
 	ActorAddressTicks        int
+	ChangedSectorTicks       int
 }
 
 func IsExtract(tickOption int, ctx *Ctx, curEpoch abi.ChainEpoch) bool {
@@ -183,6 +185,7 @@ type ZeroHourExtractOptions struct {
 	DatacapAllowances   bool
 	DatacapBalances     bool
 	ActorAddress        bool
+	ChangedSector       bool
 }
 
 func defaultZeroHourExtractOptions() ZeroHourExtractOptions {
@@ -204,5 +207,6 @@ func defaultZeroHourExtractOptions() ZeroHourExtractOptions {
 		Claims:              true,
 		DatacapAllowances:   true,
 		DatacapBalances:     true,
+		ChangedSector:       true,
 	}
 }

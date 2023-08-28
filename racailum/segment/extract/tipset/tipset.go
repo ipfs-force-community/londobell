@@ -1539,7 +1539,7 @@ func ethLogFromEvent(ctx *extract.Ctx, ts *types.TipSet, entries []types.EventEn
 }
 
 func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
-	if tmp || !ctx.Opts.EnabelExtract.EnableExtractChangedSector {
+	if tmp {
 		return nil
 	}
 
@@ -1556,6 +1556,10 @@ func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedT
 	_, span := trace.StartSpan(ctx.C, "extractor.extractChangedSector")
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
+
+	if !common.IsZeroHour(ctx.Opts.ZeroHourExtract.ChangedSector, height) && !extract.IsExtract(ctx.Opts.StateRegular.ChangedSectorTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractChangedSector {
+		return nil
+	}
 
 	old := ts.ParentState()
 	new := ts.Child.ParentState()
