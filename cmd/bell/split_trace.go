@@ -9,7 +9,7 @@
 	根据methodName将execTrace表进行切割
 	PS: 当前只支持一次性的全量操作,后续该功能会合并入londonbell
 	Run Example:
-	./bell split-trace -dsn mongodb://localhost:27017 -name test -methods CreateMiner  -methods Constructor -methods CreateExternal -methods Exec
+	./bell split-trace -dsn mongodb://localhost:27017 -name test
 
 --------------------------------------------------------------
 */
@@ -63,7 +63,6 @@ func Trace2Message(trace TraceMsg, col *mongo.Collection) (msg apim.MessageForCr
 	msg.To = trace.Msg.To
 	msg.Method = trace.Msg.MethodName
 	msg.ActorID = getActorID(trace)
-	msg.ExitCode = trace.MsgRct.ExitCode
 	msg.Value = trace.Msg.Value
 	msg.ID = trace.ID
 	msg.Caller = getCaller(trace.Msg.MethodName, trace.ID, col)
@@ -119,11 +118,6 @@ var splitTraceCmd = &cli.Command{
 			Required: true,
 			Usage:    "name of database",
 		},
-		&cli.StringSliceFlag{
-			Name: "methods",
-			// Required: true,
-			Usage: "methodName list ,if not set,split based on every methodName;",
-		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -136,13 +130,6 @@ var splitTraceCmd = &cli.Command{
 
 		db := client.Database(cctx.String("name"))
 		TraceCol := db.Collection("ExecTrace")
-
-		methods := cctx.StringSlice("methods")
-
-		if len(methods) == 0 {
-			log.Warn("not set methods,use CreateMethods")
-			methods = model.CreateMethods
-		}
 
 		// read ExecTrace table
 		cursor, err := TraceCol.Find(context.Background(), bson.M{})
