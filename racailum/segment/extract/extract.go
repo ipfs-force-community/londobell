@@ -40,6 +40,8 @@ type Ctx struct {
 	}
 
 	LatestDealID int64 // latest dealID of DealProposal
+
+	NullChangedSector bool
 }
 
 // NewRes constructs a new extract result

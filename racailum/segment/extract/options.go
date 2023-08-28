@@ -13,6 +13,7 @@ func DefaultOptions() Options {
 		EnabelExtract:      defaultEnableExtractOptions(),
 		ZeroHourExtract:    defaultZeroHourExtractOptions(),
 		SkipExpensiveEpoch: true,
+		ChangedJobLimit:    32,
 	}
 }
 
@@ -30,6 +31,7 @@ type Options struct {
 	EnabelExtract      EnableExtractOptions
 	ZeroHourExtract    ZeroHourExtractOptions
 	SkipExpensiveEpoch bool
+	ChangedJobLimit    int
 }
 
 func defaultTipSetOptions() TipSetOptions {
@@ -131,6 +133,8 @@ type EnableExtractOptions struct {
 	EnableExtractSectorClaim     bool // 同上
 	EnableExtractActorAddress    bool
 	EnableExtractChangedActor    bool
+	EnableExtractChangedSector   bool
+	EnableExtractAllSectors      bool
 }
 
 func defaultEnableExtractOptions() EnableExtractOptions {
@@ -155,6 +159,8 @@ func defaultEnableExtractOptions() EnableExtractOptions {
 		EnableExtractSectorClaim:     true,
 		EnableExtractActorAddress:    true,
 		EnableExtractChangedActor:    true,
+		EnableExtractChangedSector:   true,
+		EnableExtractAllSectors:      false,
 	}
 }
 

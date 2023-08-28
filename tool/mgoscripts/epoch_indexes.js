@@ -34,6 +34,12 @@ db.ChangedActor.createIndex({"Code":1}, {"sparse": true});
 db.ChangedActor.createIndex({"Epoch":1}, {"sparse": true});
 db.ChangedActor.createIndex({"ActorID":1,"Epoch":1}, {"sparse": true});
 
+db.ChangedSector.createIndex({"Miner":1,"Epoch":1,"SectorNumber":1,"Removed":1}, {"sparse": true});
+db.ChangedSector.createIndex({"Miner":1,"Epoch":1,"Added":1}, {"sparse": true});
+db.ChangedSector.createIndex({"Miner":1,"Epoch":1,"Expiration":1,"Removed":1}, {"sparse": true});
+db.ChangedSector.createIndex({"Miner":1,"SimpleQaPower":1}, {"sparse": true});
+db.ChangedSector.createIndex({"Miner":1,"DealIDs":1}, {"sparse": true});
+
 db.ClaimedPower.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.Claims.createIndex({"Provider":1}, {"sparse": true});
