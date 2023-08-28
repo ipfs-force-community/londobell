@@ -7,8 +7,6 @@ package gen
 import (
 	"fmt"
 
-	logging "github.com/ipfs/go-log/v2"
-
 	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
