@@ -1578,15 +1578,6 @@ func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedT
 	astore := ctx.D.ActorStore(ctx.C)
 	changedSectors := []*model.ChangedSector{}
 
-	originCtx := ctx.C
-	innerCtx, innerCancel := context.WithCancel(originCtx)
-	defer innerCancel()
-
-	ctx.C = innerCtx
-	defer func() {
-		ctx.C = originCtx
-	}()
-
 	var ewg multierror.Group
 	var lk sync.Mutex
 	lim := limiter.New(ctx.Opts.ChangedJobLimit)
@@ -1595,26 +1586,12 @@ func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedT
 		act := act
 		addr := addr
 		ewg.Go(func() error {
-			if !lim.Acquire(innerCtx) {
+			if !lim.Acquire(ctx.C) {
 				return nil
 			}
 
 			defer func() {
-				lim.Release(innerCtx)
-			}()
-
-			select {
-			case <-innerCtx.Done():
-				return nil
-
-			default:
-			}
-
-			var err error
-			defer func() {
-				if err != nil && !errors.Is(err, types.ErrActorNotFound) {
-					innerCancel()
-				}
+				lim.Release(ctx.C)
 			}()
 
 			if !builtin2.IsStorageMinerActor(act.Code) {
