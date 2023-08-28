@@ -7,7 +7,7 @@
 /bell-grafana
 /bell
 .idea
-
+.vscode
 testdb/LOCK
 
 /lotus-api-adapter
