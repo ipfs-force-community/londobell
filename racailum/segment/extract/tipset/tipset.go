@@ -10,12 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/hashicorp/go-multierror"
-
-	"github.com/ipfs-force-community/londobell/lib/limiter"
 
 	"github.com/filecoin-project/go-state-types/actors"
 
@@ -1582,93 +1577,67 @@ func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedT
 	astore := ctx.D.ActorStore(ctx.C)
 	changedSectors := []*model.ChangedSector{}
 
-	var ewg multierror.Group
-	var lk sync.Mutex
-	lim := limiter.New(ctx.Opts.ChangedJobLimit)
-
 	for addr, act := range changedActors {
 		act := act
 		addr := addr
-		ewg.Go(func() error {
-			if !lim.Acquire(ctx.C) {
-				return nil
-			}
-
-			defer func() {
-				lim.Release(ctx.C)
-			}()
-
-			if !builtin2.IsStorageMinerActor(act.Code) {
-				return nil
-			}
-
-			mas, err := lminer.Load(astore, &act)
-			if err != nil {
-				return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
-			}
-
-			actAddr, err := address.NewFromString(addr)
-			if err != nil {
-				return fmt.Errorf("new address from string for addr: %v failed: %v", addr, err)
-			}
-
-			pact, err := ctx.D.LoadActor(ctx.C, actAddr, ts.TipSet)
-			if err != nil && !errors.Is(err, types.ErrActorNotFound) {
-				return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", addr, ts.Parent.Height(), err)
-			}
-
-			var sectorChanges = &lminer.SectorChanges{}
-			if errors.Is(err, types.ErrActorNotFound) {
-				added, err := mas.LoadSectors(nil)
-				if err != nil {
-					return fmt.Errorf("load all sectors at height: %v failed: %v", height, err)
-				}
-
-				for _, a := range added {
-					sectorChanges.Added = append(sectorChanges.Added, *a)
-				}
-			} else {
-				pmas, err := lminer.Load(astore, pact)
-				if err != nil {
-					return fmt.Errorf("load miner parent state for addr: %v failed: %v", addr, err)
-				}
-
-				sectorChanges, err = lminer.DiffSectors(pmas, mas)
-				if err != nil {
-					return fmt.Errorf("get sectorChanges for addr: %v failed: %v", addr, err)
-				}
-			}
-
-			for _, add := range sectorChanges.Added {
-				// todo: 保证addr是actorID
-				changedSector := model.NewChangedSector(add, actAddr, height, true, false)
-				lk.Lock()
-				changedSectors = append(changedSectors, changedSector)
-				lk.Unlock()
-			}
-
-			for _, extend := range sectorChanges.Extended {
-				// todo: 保证addr是actorID
-				changedSector := model.NewChangedSector(extend.To, actAddr, height, false, false)
-				lk.Lock()
-				changedSectors = append(changedSectors, changedSector)
-				lk.Unlock()
-			}
-
-			for _, remove := range sectorChanges.Removed {
-				// todo: 保证addr是actorID
-				changedSector := model.NewChangedSector(remove, actAddr, height, false, true)
-				lk.Lock()
-				changedSectors = append(changedSectors, changedSector)
-				lk.Unlock()
-			}
-
+		if !builtin2.IsStorageMinerActor(act.Code) {
 			return nil
-		})
-	}
+		}
 
-	if err := ewg.Wait(); err != nil {
-		return fmt.Errorf("extract changed sectors: %w", err)
+		mas, err := lminer.Load(astore, &act)
+		if err != nil {
+			return fmt.Errorf("load miner state for addr: %v failed: %v", addr, err)
+		}
+
+		actAddr, err := address.NewFromString(addr)
+		if err != nil {
+			return fmt.Errorf("new address from string for addr: %v failed: %v", addr, err)
+		}
+
+		pact, err := ctx.D.LoadActor(ctx.C, actAddr, ts.TipSet)
+		if err != nil && !errors.Is(err, types.ErrActorNotFound) {
+			return fmt.Errorf("load actor for addr: %v at height: %v failed: %v", addr, ts.Parent.Height(), err)
+		}
+
+		var sectorChanges = &lminer.SectorChanges{}
+		if errors.Is(err, types.ErrActorNotFound) {
+			added, err := mas.LoadSectors(nil)
+			if err != nil {
+				return fmt.Errorf("load all sectors at height: %v failed: %v", height, err)
+			}
+
+			for _, a := range added {
+				sectorChanges.Added = append(sectorChanges.Added, *a)
+			}
+		} else {
+			pmas, err := lminer.Load(astore, pact)
+			if err != nil {
+				return fmt.Errorf("load miner parent state for addr: %v failed: %v", addr, err)
+			}
+
+			sectorChanges, err = lminer.DiffSectors(pmas, mas)
+			if err != nil {
+				return fmt.Errorf("get sectorChanges for addr: %v failed: %v", addr, err)
+			}
+		}
+
+		for _, add := range sectorChanges.Added {
+			// todo: 保证addr是actorID
+			changedSector := model.NewChangedSector(add, actAddr, height, true, false)
+			changedSectors = append(changedSectors, changedSector)
+		}
+
+		for _, extend := range sectorChanges.Extended {
+			// todo: 保证addr是actorID
+			changedSector := model.NewChangedSector(extend.To, actAddr, height, false, false)
+			changedSectors = append(changedSectors, changedSector)
+		}
+
+		for _, remove := range sectorChanges.Removed {
+			// todo: 保证addr是actorID
+			changedSector := model.NewChangedSector(remove, actAddr, height, false, true)
+			changedSectors = append(changedSectors, changedSector)
+		}
 	}
 
 	for i := range changedSectors {
