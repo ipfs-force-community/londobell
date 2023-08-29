@@ -1552,7 +1552,11 @@ func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedT
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 
-	if !common.IsZeroHour(ctx.Opts.ZeroHourExtract.ChangedSector, height) && !extract.IsExtract(ctx.Opts.StateRegular.ChangedSectorTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractChangedSector {
+	//if !common.IsZeroHour(ctx.Opts.ZeroHourExtract.ChangedSector, height) && !extract.IsExtract(ctx.Opts.StateRegular.ChangedSectorTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractChangedSector {
+	//	return nil
+	//}
+
+	if !ctx.Opts.EnabelExtract.EnableExtractChangedSector {
 		return nil
 	}
 
