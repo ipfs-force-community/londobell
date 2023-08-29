@@ -1585,7 +1585,7 @@ func extractChangedSector(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedT
 		act := act
 		addr := addr
 		if !builtin2.IsStorageMinerActor(act.Code) {
-			return nil
+			continue
 		}
 
 		mas, err := lminer.Load(astore, &act)
