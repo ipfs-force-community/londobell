@@ -318,6 +318,7 @@ func copyIndexes(src []int) []int {
 }
 
 func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
+
 	_, span := trace.StartSpan(ctx.C, "extractor.extractExecTrace")
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
@@ -335,7 +336,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	}
 
 	if !ctx.Opts.EnabelExtract.EnableExtractExecTrace && !ctx.Opts.EnabelExtract.EnableExtractMessage && !ctx.Opts.EnabelExtract.EnableExtractActorMessage && !ctx.Opts.EnabelExtract.EnableExtractEthHash && !ctx.Opts.EnabelExtract.EnableExtractEventsRoot &&
-		!ctx.Opts.EnabelExtract.EnableExtractExplicitMessage && !ctx.Opts.EnabelExtract.EnableExtractEvmByteCode && !ctx.Opts.EnabelExtract.EnableExtractActorEvent && !ctx.Opts.EnabelExtract.EnableExtractMinerSector && !ctx.Opts.EnabelExtract.EnableExtractSectorClaim {
+		!ctx.Opts.EnabelExtract.EnableExtractExplicitMessage && !ctx.Opts.EnabelExtract.EnableExtractEvmByteCode && !ctx.Opts.EnabelExtract.EnableExtractActorEvent && !ctx.Opts.EnabelExtract.EnableExtractMinerSector && !ctx.Opts.EnabelExtract.EnableExtractSectorClaim && !ctx.Opts.EnabelExtract.EnableExtractCreateMessage {
 		return nil
 	}
 
@@ -375,6 +376,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	}
 
 	etraces := make([]persistExecTrace, 0, len(invocs)*4)
+	callerAddrMap := make(map[string]address.Address)
 	gasTraceNames := map[string]struct{}{}
 
 	for i := range invocs {
@@ -438,7 +440,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		return fmt.Errorf("get version for network failed: %v", err)
 	}
 
-	var msgcnt, tracecnt, actorMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt, aecnt, mstCnt, sctCnt int
+	var msgcnt, tracecnt, actorMsgCnt, createMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt, aecnt, mstCnt, sctCnt int
 
 	if ctx.Opts.EnabelExtract.EnableExtractEthHash {
 		for _, cmsg := range allmsgs {
@@ -522,6 +524,9 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				elog.Warnw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
 				tracecnt++
+				// update callerAddrMap
+				callerAddrMap[met.ID] = met.Msg.From
+				elog.Info(callerAddrMap)
 				res.Docs = append(res.Docs, met)
 				//if meg != nil && len(meg.Charges) > 0 {
 				//	res.Docs = append(res.Docs, meg)
@@ -610,6 +615,22 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					res.Docs = append(res.Docs, amsg)
 				}
 			}
+		}
+
+		if ctx.Opts.EnabelExtract.EnableExtractCreateMessage {
+			isBlock := IsBlock(p.seq, msg.From)
+			method := mi.Method.Name
+			if model.IsOkCreateMessage(method, int64(p.exec.MsgRct.ExitCode)) {
+				cmsg, err := model.NewCreateMessage(ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, msg.From, msg.To, isBlock, p.seq, callerAddrMap, mi.ReturnObj(), p.exec)
+
+				if err != nil {
+					elog.Warnw("convert to model.CreateMessage", "mcid", mcid, "signedCid", signedCid)
+				} else {
+					createMsgCnt++
+					res.Docs = append(res.Docs, cmsg)
+				}
+			}
+
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractExplicitMessage {
@@ -950,7 +971,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 	}
 
-	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "eth-hash", ethCnt, "events-root", etcnt, "explicit-message", emtCnt, "evm-initcode", initCodeCnt, "actor-event", aecnt, "miner-sector", mstCnt, "sector-claim", sctCnt)
+	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "create-message", createMsgCnt, "eth-hash", ethCnt, "events-root", etcnt, "explicit-message", emtCnt, "evm-initcode", initCodeCnt, "actor-event", aecnt, "miner-sector", mstCnt, "sector-claim", sctCnt)
 
 	return nil
 }
@@ -1280,17 +1301,6 @@ func extractActorAddress(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	})
 	if err != nil {
 		return fmt.Errorf("walk through actors: %w", err)
-	}
-
-	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
-		if _, ok := robustMap[addr]; !ok {
-			robustMap[addr] = []address.Address{}
-		}
-
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("walk through all actors: %w", err)
 	}
 
 	elog := ctx.L.With("epoch", height)
