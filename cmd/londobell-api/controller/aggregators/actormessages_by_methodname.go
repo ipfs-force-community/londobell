@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	pool_monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
@@ -52,7 +53,9 @@ func GetActorMessagesByMethodName(c *gin.Context) {
 	var messagesByMethodName []model.MessageByMethodName
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorMethodStates, countUtils, actorMessagesByMethodNameAggregator, req, "ActorMessage")
+		multiResult, err := multiquery.MultiBiSearch(ctx, req.Index*req.Limit, req.Limit, countUtils, pool_monitor.GetActorMessagesByMethodNameNoskipAggregator(),
+			pool_monitor.GetCountOfActorMessagesByMethodNameAggregator(), req, "ActorMessage", multiquery.ActorMethodStates)
+		//multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorMethodStates, countUtils, actorMessagesByMethodNameAggregator, req, "ActorMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

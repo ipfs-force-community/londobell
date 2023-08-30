@@ -7,6 +7,8 @@ import (
 	"sort"
 	"sync"
 
+	"go.mongodb.org/mongo-driver/mongo"
+
 	"github.com/ipfs-force-community/londobell/lib/limiter"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
@@ -787,4 +789,151 @@ func MultiUnionQuery(ctx context.Context, pipe interface{}, countLists []CountUt
 	}
 
 	return result, nil
+}
+
+// actor message
+func MultiBiSearch(ctx context.Context, indexReq, limitReq int64, countUtils []CountUtil, aggregator, countAgg []byte,
+	req model.CommonReq, tableName string, ptype Ptype) ([]bson.M, error) {
+	sum := int64(0)
+	result := []bson.M{}
+	for i := range countUtils {
+		tmp := int64(0)
+		switch ptype {
+		case ActorStates:
+			tmp = countUtils[i].ActorStates
+		case ActorMethodStates:
+			tmp = countUtils[i].ActorMethodStates
+		case MinedStates:
+			tmp = countUtils[i].MinedStates
+		default:
+			return nil, fmt.Errorf("not support bi search")
+		}
+		if sum+tmp <= indexReq {
+			sum += tmp
+			continue
+		}
+
+		remainSum := indexReq - sum
+		// 找到最大的一个start使得 start->countUtil.end的个数和>剩下的sum个数
+		start, rangeSum, startSum, err := BiSearch(ctx, remainSum, countUtils[i], countAgg, tableName, req)
+		if err != nil {
+			log.Errorf("bi search failed : %w", err)
+			return nil, err
+		}
+		// 从start+1开始，倒序统计从start+1->countUtils.start的 limit+剩下的sum个数的
+		res, err := GetDetail(ctx, start+1, limitReq+(startSum-(rangeSum-remainSum)), countUtils[i], aggregator, tableName, req)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, res[int(startSum-(rangeSum-remainSum)):]...)
+		// 从下一个countUtil开始
+		countUtilsIdx := i + 1
+		for len(result) < int(limitReq) && countUtilsIdx < len(countUtils) {
+			tmp := int64(0)
+			switch ptype {
+			case ActorStates:
+				tmp = countUtils[i].ActorStates
+			case ActorMethodStates:
+				tmp = countUtils[i].ActorMethodStates
+			case MinedStates:
+				tmp = countUtils[i].MinedStates
+			default:
+				return nil, fmt.Errorf("not support bi search")
+			}
+
+			if tmp != 0 {
+				res, err := GetDetail(ctx, countUtils[countUtilsIdx].End, limitReq-int64(len(result)), countUtils[countUtilsIdx], aggregator, tableName, req)
+				if err != nil {
+					return nil, err
+				}
+				result = append(result, res...)
+			}
+			countUtilsIdx++
+		}
+		break
+	}
+
+	return result, nil
+}
+
+func BiSearch(ctx context.Context, targetSum int64, countUtil CountUtil, countAgg []byte, tableName string, req model.CommonReq) (int64, int64, int64, error) {
+	l, r := countUtil.Start, countUtil.End
+	res := countUtil.Start
+	col1 := &mongo.Collection{}
+	for i := range countUtil.Cols.Cols {
+		if countUtil.Cols.Cols[i] != nil && countUtil.Cols.Cols[i].Name() == tableName {
+			col1 = countUtil.Cols.Cols[i]
+		}
+	}
+	resCount := int64(0)
+	startSum := int64(0)
+	for l < r {
+		mid := (l + r) / 2
+		rangeSum, err := CommonCount(ctx, col1, req, countAgg, mid, countUtil.End)
+		if err != nil {
+			log.Errorf("count address messages failed: %w", err)
+			return 0, 0, 0, err
+		}
+
+		if rangeSum > targetSum {
+			res = mid
+			resCount = rangeSum
+
+			l = mid + 1
+		} else {
+			r = mid
+		}
+	}
+	startSum, err := CommonCount(ctx, col1, req, countAgg, res, res+1)
+	return res, resCount, startSum, err
+}
+
+func CommonCount(ctx context.Context, col *mongo.Collection, req model.CommonReq, countAgg []byte, st, ed int64) (int64, error) {
+	pipe, err := util.Parse(model.Ctx{StartEpoch: st, EndEpoch: ed, Addr: req.Addr, Sort: -1,
+		Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, To: req.To, Addrs: req.Addrs}, string(countAgg))
+	if err != nil {
+		return 0, err
+	}
+	var countRes []model.CountRes
+	cur, err := col.Aggregate(ctx, pipe)
+	if err != nil {
+		return 0, err
+	}
+	err = cur.All(ctx, &countRes)
+	if err != nil {
+		return 0, err
+	}
+	res := int64(0)
+	if len(countRes) != 0 {
+		res = countRes[0].Count
+	}
+	return res, nil
+}
+
+func GetDetail(ctx context.Context, end, limit int64, countUtil CountUtil, aggregator []byte, tableName string, req model.CommonReq) ([]bson.M, error) {
+	col1 := &mongo.Collection{}
+	for i := range countUtil.Cols.Cols {
+		if countUtil.Cols.Cols[i] != nil && countUtil.Cols.Cols[i].Name() == tableName {
+			col1 = countUtil.Cols.Cols[i]
+		}
+	}
+	pipe, err := util.Parse(model.Ctx{StartEpoch: countUtil.Start, EndEpoch: end, Addr: req.Addr, Sort: -1, Limit: limit,
+		Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, To: req.To, Addrs: req.Addrs}, string(aggregator))
+	if err != nil {
+		log.Errorf("get detail parse pipe failed: %w", err)
+		return nil, err
+	}
+
+	cur, err := col1.Aggregate(ctx, pipe)
+	if err != nil {
+		log.Errorf("get detail agg failed: %w", err)
+		return nil, err
+	}
+	var aggRes []bson.M
+	err = cur.All(ctx, &aggRes)
+	if err != nil {
+		log.Errorf("get detail all failed: %w", err)
+		return nil, err
+	}
+	return aggRes, nil
 }
