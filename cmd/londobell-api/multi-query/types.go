@@ -14,6 +14,7 @@ type Ptype int
 const (
 	BlockStates Ptype = iota
 	BlockMethodStates
+	BlockHeaderMethodStates
 	ActorStates
 	ActorMethodStates
 	ActorTransferStates
@@ -36,7 +37,8 @@ type CountUtil struct {
 	BlockStates []smodel.SegmentState
 
 	// 暂时不对其他state分段
-	BlockMethodStates         int64
+	BlockMethodStates         []smodel.SegmentState
+	BlockHeaderMethodStates   int64
 	ActorStates               int64
 	ActorMethodStates         int64
 	ActorTransferStates       int64
@@ -60,7 +62,8 @@ type segmentUtil struct {
 	BlockStates []smodel.SegmentState
 
 	// 暂时不对其他state分段
-	BlockMethodStates         int64
+	BlockMethodStates         []smodel.SegmentState
+	BlockHeaderMethodStates   int64
 	ActorStates               int64
 	ActorMethodStates         int64
 	ActorTransferStates       int64

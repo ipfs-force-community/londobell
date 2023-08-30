@@ -38,7 +38,9 @@ func GetBlockMessagesByMethodName(c *gin.Context) {
 
 	totalCount := int64(0)
 	for _, countUtil := range countUtils {
-		totalCount += countUtil.BlockMethodStates
+		for _, bms := range countUtil.BlockMethodStates {
+			totalCount += bms.Count
+		}
 	}
 
 	var messagesByMethodName []model.MessageByMethodName

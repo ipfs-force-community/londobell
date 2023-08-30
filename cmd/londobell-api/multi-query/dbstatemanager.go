@@ -10,10 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/node/config"
+	"github.com/hashicorp/go-multierror"
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
@@ -1081,152 +1080,23 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 
 	flog.Infow("get boundary for db", "db", newDB, "boundary", boundary)
 
-	//// 保证有两轮dealProposal入库了
-	//dealRange, err := dbsm.GetDealRangeForDB(ctx, cols, dbType)
-	//if err != nil {
-	//	log.Errorf("get deal range for db %v failed: %v", newDB, err)
-	//}
-	//
-	//flog.Infow("get dealRange for db", "db", newDB, "dealRange", dealRange)
-
 	state := segment.DefaultState(newDB.Url(), dbType, interval, boundary.Start, boundary.End, 0, 0)
 	if err != nil {
 		return err
 	}
 
-	addUpState := segment.NewAddUpState(*state)
-
-	//if dbType == smodel.Cold {
-	//	log.Infof("暂不处理cold")
-	//	return nil
-	//
-	//	//log.Infow("begin RefreshDataBaseState...")
-	//	////if err := RefreshDataBaseState(ctx, dbState, cols); err != nil {
-	//	////	log.Errorf("refresh DataBaseState failed: %v", err)
-	//	////	return err
-	//	////}
-	//	//
-	//	//log.Infow("begin SetBlockState...")
-	//	//
-	//	//slog := log.With("segment")
-	//	//// todo: 暂时不对cold分段
-	//	//blockStates, err := GetBlockStates(ctx, dbState, cols, "", "")
-	//	//if err != nil {
-	//	//	return err
-	//	//}
-	//	//
-	//	//err = dbsm.Segment.SetBlockState(ctx, slog, blockStates)
-	//	//if err != nil {
-	//	//	log.Errorf("set DataBaseState failed: %v", err)
-	//	//	return err
-	//	//}
-	//	//
-	//	//log.Infow("begin RefreshBlockMsgsByMethodName...")
-	//	//allBlockMethodNames, err := GetAllBlockMethodNamesMap(ctx, dbState.GetStartEpoch(), dbState.GetEndEpoch(), cols)
-	//	//if err != nil {
-	//	//	return err
-	//	//}
-	//	//
-	//	//for _, allBlockMethodName := range allBlockMethodNames {
-	//	//	dbState.BlockMsgsByMethodNameMap[allBlockMethodName.MethodName] += allBlockMethodName.Count
-	//	//}
-	//	//
-	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-	//	//	log.Errorf("set DataBaseState failed: %v", err)
-	//	//	return err
-	//	//}
-	//	//
-	//	//log.Infow("begin RefreshActorMsgsByMethodName...")
-	//	//allActorsMethods, err := GetAllActorsMethods(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-	//	//if err != nil {
-	//	//	return err
-	//	//}
-	//	//
-	//	//for _, allActorMethods := range allActorsMethods {
-	//	//	if _, ok := dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName]; !ok {
-	//	//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName] = make(map[string]int64)
-	//	//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] = allActorMethods.Count
-	//	//	} else {
-	//	//		dbState.ActorMsgsByMethodNameMap[allActorMethods.ActorIDMethod.MethodName][allActorMethods.ActorIDMethod.ActorID] += allActorMethods.Count
-	//	//	}
-	//	//}
-	//	//
-	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-	//	//	log.Errorf("set DataBaseState failed: %v", err)
-	//	//	return err
-	//	//}
-	//	//
-	//	//log.Infow("begin RefreshActorMsgs...")
-	//	//allActorsMsgsCount, err := GetAllActorsMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-	//	//if err != nil {
-	//	//	return err
-	//	//}
-	//	//
-	//	//for _, allActorMsgsCount := range allActorsMsgsCount {
-	//	//	dbState.ActorMsgsCountMap[allActorMsgsCount.ActorID] += allActorMsgsCount.Count
-	//	//}
-	//	//
-	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-	//	//	log.Errorf("set DataBaseState failed: %v", err)
-	//	//	return err
-	//	//}
-	//	//
-	//	//log.Infow("begin RefreshActorTransferMsgs...")
-	//	//allActorsTransferMsgsCount, err := GetAllActorsTransferMsgsCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-	//	//if err != nil {
-	//	//	return err
-	//	//}
-	//	//
-	//	//for _, allActorTransferMsgsCount := range allActorsTransferMsgsCount {
-	//	//	dbState.ActorTransfersCountMap[allActorTransferMsgsCount.ActorID] += allActorTransferMsgsCount.Count
-	//	//}
-	//	//
-	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-	//	//	log.Errorf("set DataBaseState failed: %v", err)
-	//	//	return err
-	//	//}
-	//	//
-	//	//log.Infow("begin RefreshMinedMsgsMaps...")
-	//	//allMinersMinedCount, err := GetAllMinersMinedCount(ctx, dbState.StartEpoch, dbState.EndEpoch, cols)
-	//	//if err != nil {
-	//	//	return err
-	//	//}
-	//	//
-	//	//for _, allMinerMinedCount := range allMinersMinedCount {
-	//	//	dbState.MinedMsgsMap[allMinerMinedCount.ActorID] += allMinerMinedCount.Count
-	//	//}
-	//	//
-	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-	//	//	log.Errorf("set DataBaseState failed: %v", err)
-	//	//	return err
-	//	//}
-	//	//
-	//	//log.Infow("begin RefreshTransfersForLargeAmount...")
-	//	//transfersLargeAmountCount, err := RefreshTransfersForLargeAmount(ctx, dbState, cols, "", "")
-	//	//if err != nil {
-	//	//	return err
-	//	//}
-	//	//
-	//	//dbState.TransfersLargeAmountCount = transfersLargeAmountCount
-	//	//
-	//	//if err := dbsm.Stm.SetDataBaseState(newDB.Url(), *dbState); err != nil {
-	//	//	log.Errorf("set DataBaseState failed: %v", err)
-	//	//	return err
-	//	//}
-	//	//
-	//	//return nil
-	//}
+	newState := *state
+	addUpState := segment.NewAddUpState(newState)
 
 	if dbType == smodel.Formal || dbType == smodel.Cold {
-		if err != nil {
-			return err
-		}
+		nextEndEpoch := int64(state.GetEndEpoch())
+
 		var ewg multierror.Group
 		for i := range addupes {
 			i := i
 			addup := addupes[i]
 			ewg.Go(func() error {
-				if err := addup(ctx, flog, addUpState, cols, dbsm.Segment, false); err != nil {
+				if err := addup(ctx, flog, state, addUpState, cols, dbsm.Segment, nextEndEpoch); err != nil {
 					return err
 				}
 
@@ -1236,6 +1106,12 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 
 		if err := ewg.Wait(); err != nil {
 			log.Errorf("RefreshFormalDataBaseState failed: %v", err)
+			return err
+		}
+
+		// persist dbstate
+		if err := AddUpDBState(ctx, flog, state, addUpState, cols, dbsm.Segment, nextEndEpoch); err != nil {
+			log.Errorf("AddUpDBState faild for nextEndEpoch: %v", nextEndEpoch)
 			return err
 		}
 	}
