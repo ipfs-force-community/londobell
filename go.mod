@@ -346,4 +346,7 @@ require (
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
 
-replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
+replace (
+	github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
+	github.com/filecoin-project/go-jsonrpc => github.com/XianLeiGirl/go-jsonrpc v0.2.3
+)

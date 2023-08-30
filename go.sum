@@ -73,6 +73,8 @@ github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9
 github.com/Stebalien/go-bitfield v0.0.1 h1:X3kbSSPUaJK60wV2hjOPZwmpljr6VGCqdq4cBLhbQBo=
 github.com/Stebalien/go-bitfield v0.0.1/go.mod h1:GNjFpasyUVkHMsfEOk8EFLJ9syQ6SI+XWrX9Wf2XH0s=
 github.com/VividCortex/gohistogram v1.0.0/go.mod h1:Pf5mBqqDxYaXu3hDrrU+w6nw50o/4+TcAqDqk/vUH7g=
+github.com/XianLeiGirl/go-jsonrpc v0.2.3 h1:En0XoVZkryU0Ycpmha7v4uJxNC50GVrte1RIfkW+3Gs=
+github.com/XianLeiGirl/go-jsonrpc v0.2.3/go.mod h1:jBSvPTl8V1N7gSTuCR4bis8wnQnIjHbRPpROol6iQKM=
 github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d h1:licZJFw2RwpHMqeKTCYkitsPqHNxTmd4SNR5r94FGM8=
 github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d/go.mod h1:asat636LX7Bqt5lYEZ27JNDcqxfjdBQuJ/MM4CN/Lzo=
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
@@ -330,10 +332,6 @@ github.com/filecoin-project/go-hamt-ipld/v2 v2.0.0/go.mod h1:7aWZdaQ1b16BVoQUYR+
 github.com/filecoin-project/go-hamt-ipld/v3 v3.0.1/go.mod h1:gXpNmr3oQx8l3o7qkGyDjJjYSRX7hp/FGOStdqrWyDI=
 github.com/filecoin-project/go-hamt-ipld/v3 v3.1.0 h1:rVVNq0x6RGQIzCo1iiJlGFm9AGIZzeifggxtKMU7zmI=
 github.com/filecoin-project/go-hamt-ipld/v3 v3.1.0/go.mod h1:bxmzgT8tmeVQA1/gvBwFmYdT8SOFUwB3ovSUfG1Ux0g=
-github.com/filecoin-project/go-jsonrpc v0.2.1 h1:xfxkfIAO300sPiV59DnxnCb4sdTtWYlRz/TsP+ByT2E=
-github.com/filecoin-project/go-jsonrpc v0.2.1/go.mod h1:jBSvPTl8V1N7gSTuCR4bis8wnQnIjHbRPpROol6iQKM=
-github.com/filecoin-project/go-jsonrpc v0.2.3 h1:xdixRQfLbD8gt56dpBNKiya9gvI/79nNM13IHKTfm5E=
-github.com/filecoin-project/go-jsonrpc v0.2.3/go.mod h1:jBSvPTl8V1N7gSTuCR4bis8wnQnIjHbRPpROol6iQKM=
 github.com/filecoin-project/go-legs v0.4.4 h1:mpMmAOOnamaz0CV9rgeKhEWA8j9kMC+f+UGCGrxKaZo=
 github.com/filecoin-project/go-legs v0.4.4/go.mod h1:JQ3hA6xpJdbR8euZ2rO0jkxaMxeidXf0LDnVuqPAe9s=
 github.com/filecoin-project/go-padreader v0.0.0-20200903213702-ed5fae088b20/go.mod h1:mPn+LRRd5gEKNAtc+r3ScpW2JRU/pj4NBKdADYWHiak=
@@ -680,16 +678,6 @@ github.com/icza/mighty v0.0.0-20180919140131-cfd07d671de6 h1:8UsGZ2rr2ksmEru6lTo
 github.com/icza/mighty v0.0.0-20180919140131-cfd07d671de6/go.mod h1:xQig96I1VNBDIWGCdTt54nHt6EeI639SmHycLYL7FkA=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d/go.mod h1:qj24IKcXYK6Iy9ceXlo3Tc+vtHo9lIhSX5JddghvEPo=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230712065417-18bdf7d4bb1d h1:BAwFnzTw57VzcIlBRZva5Z5P6BwiSmugm0MFjrwtIoA=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230712065417-18bdf7d4bb1d/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230725081702-91e3b0150388 h1:jXN6FSrLPnfdGvzujF3U6bgQxtYr8uL/QwDUo96V/Nw=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230725081702-91e3b0150388/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230726015240-1d5e915ef137 h1:rzeNdVleSvGa9N6Mr8+9AaR9gbklR1am9VsDawF0u4c=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230726015240-1d5e915ef137/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230726023524-d5ee66dbf103 h1:xf9J0cS8lEKcN6V4jQ7DEdG4YyF/6F8qOj7nCemGIko=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230726023524-d5ee66dbf103/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230726025205-b069e537b0c6 h1:SgubHV0SsQ8zMRrFlpP35Bse7GOpwzjWI+fh/wLHg44=
-github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230726025205-b069e537b0c6/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
 github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230803091904-e179571b7140 h1:ULMXbuMRN0vPEemrF4V+q1wrkSa/7nIM+wMy9gcvzY4=
 github.com/ipfs-force-community/londobell-aggregators v0.0.0-20230803091904-e179571b7140/go.mod h1:gI33LTBaDz105mZFo7Bt29FrJ3VxQdZtNX4Hfc0lSUo=
 github.com/ipfs/bbloom v0.0.1/go.mod h1:oqo8CVWsJFMOZqTglBG4wydCE4IQA/G2/SEofB0rjUI=
