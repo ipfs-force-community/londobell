@@ -16,6 +16,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
 var (
@@ -28,6 +29,15 @@ var (
 	createMessageEpochField                        = extractEpochFieldName(CreateMessage{})
 	createMessageColName                           = getColName(CreateMessage{})
 )
+
+func init() {
+	schema.Register(
+		schema.Model{
+			Name: "create-message",
+			D:    &CreateMessage{},
+		},
+	)
+}
 
 // CreateMessage records messages for create
 type CreateMessage struct {
@@ -191,6 +201,8 @@ func (am *CreateMessage) Indexes() [][]string {
 		{"IsBlock", createMessageEpochField},
 		{"Method"},
 		{"Cid", createMessageEpochField},
+		{"ActorID"},
+		{"Caller"},
 	}
 }
 
