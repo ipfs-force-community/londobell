@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	apim "github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -242,6 +243,7 @@ func (sp SplitTask) updateEnd(ctx context.Context, taskCol *mongo.Collection) er
 }
 
 func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo.Collection) error {
+
 	var TotalCount, ProcessedCount, InsertCount int64
 	opts := options.Find()
 	opts.SetSort(bson.D{{Key: "_id", Value: -1}})
@@ -249,10 +251,10 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 	minID := sp.End   // 起始 ID
 	maxID := sp.Start // 结束 ID
 	log.Infof("split task start: %s,end: %s", sp.Start, sp.End)
+	start := time.Now()
 	// 构建查询过滤器
 	filter := bson.M{"_id": bson.M{"$gte": minID, "$lte": maxID}}
 
-	// TODO cursor from span
 	cursor, err := TraceCol.Find(ctx, filter, opts)
 	if err != nil {
 		log.Error(err)
@@ -261,7 +263,7 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 	defer cursor.Close(ctx)
 	countOptions := options.Count().SetHint("_id_")
 
-	if TotalCount, err = TraceCol.CountDocuments(ctx, bson.D{}, countOptions); err != nil {
+	if TotalCount, err = TraceCol.CountDocuments(ctx, filter, countOptions); err != nil {
 		log.Error(err)
 		return err
 	}
@@ -283,7 +285,7 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 				if writeErr, ok := err.(mongo.WriteException); ok {
 					for _, we := range writeErr.WriteErrors {
 						if we.Code == 11000 { // MongoDB错误码：11000 表示Duplicate Key Error
-							log.Warn("Duplicate Key Error:", we.Message)
+							log.Warn(we.Message)
 						} else {
 							log.Fatal(err)
 						}
@@ -300,10 +302,10 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 	}
 	sp.End = execTrace.ID
 	if ProcessedCount == TotalCount {
-		log.Infof("Total %d fields,%d fileds processed,%d fileds inserted,all fileds processed", TotalCount, ProcessedCount, InsertCount)
+		log.Infof("Success!!! Total %d fields,%d fileds processed,%d fileds inserted,all fileds processed", TotalCount, ProcessedCount, InsertCount)
 		sp.Status = true
 	} else {
-		log.Infof("It seems some fileds processed failed,Total %d fields,%d fileds processed,%d fileds inserted", TotalCount, ProcessedCount, InsertCount)
+		log.Infof("Failed!!! Total %d fields,%d fileds processed,%d fileds inserted", TotalCount, ProcessedCount, InsertCount)
 		sp.Status = false
 	}
 
@@ -311,7 +313,8 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 	err = sp.updateEnd(ctx, taskCol)
 	if err != nil {
 		log.Error(err)
+		return err
 	}
-
-	return err
+	log.Infof("task done,spent %f's", time.Now().Sub(start).Seconds())
+	return nil
 }
