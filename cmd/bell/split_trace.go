@@ -144,6 +144,11 @@ var splitTraceCmd = &cli.Command{
 			Required: false,
 			Usage:    "id of end",
 		},
+		&cli.BoolFlag{
+			Name:     "reRun",
+			Required: false,
+			Usage:    "reRun last failed tasks",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		// set env
@@ -152,6 +157,7 @@ var splitTraceCmd = &cli.Command{
 
 		var splitTask SplitTask
 		var cmsg model.CreateMessage
+		var reRun bool
 		client, err := mongo.Connect(ctx, options.Client().ApplyURI(cctx.String("dsn")))
 		if err != nil {
 			log.Error(err)
@@ -165,11 +171,14 @@ var splitTraceCmd = &cli.Command{
 
 		splitTask.Start = cctx.String("start")
 		splitTask.End = cctx.String("end")
+		reRun = cctx.Bool("reRun")
+		if reRun && (splitTask.Start+splitTask.End != "") {
+			log.Fatal("reRun cannot be used together with start or end")
+		}
 		splitTask.Status = false
-		tasks, err := initTasks(ctx, taskCol, traceCol, splitTask)
+		tasks, err := initTasks(ctx, taskCol, traceCol, splitTask, reRun)
 		if err != nil {
-			log.Error(err)
-			return err
+			log.Fatal(err)
 		}
 		for _, task := range tasks {
 			err := task.run(ctx, taskCol, traceCol, createCol)
@@ -182,25 +191,30 @@ var splitTraceCmd = &cli.Command{
 	},
 }
 
-func initTasks(ctx context.Context, taskCol, traceCol *mongo.Collection, st SplitTask) ([]SplitTask, error) {
-
-	cursor, err := taskCol.Find(ctx, bson.M{"Status": false})
-	if err != nil {
-		return nil, err
-	}
+func initTasks(ctx context.Context, taskCol, traceCol *mongo.Collection, st SplitTask, reRun bool) ([]SplitTask, error) {
 	var results []SplitTask
+	var err error
+	if reRun {
+		cursor, err := taskCol.Find(ctx, bson.M{"Status": false})
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
 
-	if err := cursor.All(ctx, &results); err != nil {
-		return nil, err
-	}
-	// if start not set,use ExecTrace collection latest id
-	if st.Start == "" {
-		st.Start = getLatestTraceID(ctx, traceCol)
-	}
-	st.ID = primitive.NewObjectID()
-	_, err = taskCol.InsertOne(ctx, st)
-	if err != nil {
-		log.Fatal(err)
+		if err := cursor.All(ctx, &results); err != nil {
+			log.Error(err)
+			return nil, err
+		}
+	} else {
+		// if start not set,use ExecTrace collection latest id
+		if st.Start == "" {
+			st.Start = getLatestTraceID(ctx, traceCol)
+		}
+		st.ID = primitive.NewObjectID()
+		_, err = taskCol.InsertOne(ctx, st)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	results = append(results, st)
