@@ -1,7 +1,6 @@
 package model
 
 import (
-	"bytes"
 	"fmt"
 	"reflect"
 	"strings"
@@ -9,6 +8,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v11/eam"
+	vinit "github.com/filecoin-project/go-state-types/builtin/v11/init"
 	"github.com/filecoin-project/go-state-types/builtin/v11/power"
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/filecoin-project/go-state-types/exitcode"
@@ -22,7 +22,8 @@ var (
 	ConstructorMethod                              = "Constructor"
 	CreateExternal                                 = "CreateExternal"
 	CreateMiner                                    = "CreateMiner"
-	CreateMethods                                  = []string{CreateMiner, CreateExternal, "Exec", ConstructorMethod}
+	Exec                                           = "Exec"
+	CreateMethods                                  = []string{CreateMiner, CreateExternal, Exec, ConstructorMethod}
 	_                       common.IndexedDocument = (*CreateMessage)(nil)
 	createMessageEpochField                        = extractEpochFieldName(CreateMessage{})
 	createMessageColName                           = getColName(CreateMessage{})
@@ -76,9 +77,6 @@ func NewCreateMessage(epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.To
 		}
 	} else if methodName == CreateExternal || methodName == CreateMiner {
 		if len(raw.MsgRct.Return) > 0 && returnObj != nil {
-			if err := returnObj.UnmarshalCBOR(bytes.NewReader(raw.MsgRct.Return)); err != nil {
-				return nil, fmt.Errorf("unmarshal return: %w", err)
-			}
 
 			addr, err := parse(methodName, returnObj)
 			if err != nil {
@@ -166,8 +164,25 @@ func parse(methodName string, obj interface{}) (address.Address, error) {
 		default:
 			return address.Address{}, fmt.Errorf("CreateMiner err type: %s", reflect.TypeOf(obj))
 		}
+	} else if methodName == Exec {
+		if ret, ok := obj.(*vinit.ExecReturn); ok {
+
+			return ret.IDAddress, nil
+		}
+		// if builtin version changed use the following logic
+		switch reflect.TypeOf(obj).String() {
+		case "*init.ExecReturn":
+			if CompareStructPointers(obj, &vinit.ExecReturn{}) {
+				return obj.(*vinit.ExecReturn).IDAddress, nil
+			}
+
+			return address.Address{}, fmt.Errorf("parse Exec err type: %s", reflect.TypeOf(obj))
+
+		default:
+			return address.Address{}, fmt.Errorf("Exec err type: %s", reflect.TypeOf(obj))
+		}
 	}
-	return address.Address{}, fmt.Errorf("CreateMiner err type: %s", reflect.TypeOf(obj))
+	return address.Address{}, fmt.Errorf("parse err method: %s, type: %s", methodName, reflect.TypeOf(obj))
 }
 
 // Indexes impl common.Indexed
