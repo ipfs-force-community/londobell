@@ -348,5 +348,5 @@ require (
 
 replace (
 	github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
-	github.com/filecoin-project/go-jsonrpc => github.com/XianLeiGirl/go-jsonrpc v0.2.3
+	github.com/filecoin-project/go-jsonrpc => github.com/XianLeiGirl/go-jsonrpc v0.2.4
 )
