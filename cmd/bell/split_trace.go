@@ -31,10 +31,18 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// each CurrentInterval save task current
+var CurrentInterval int64 = 5000
+
 type SplitTask struct {
-	ID     primitive.ObjectID `bson:"_id"`
-	Start  string
-	End    string
+	ID primitive.ObjectID `bson:"_id"`
+	// task start ExecTrace id
+	Start string
+	// current task  ExecTrace id
+	Current string
+	// task end ExecTrace id
+	End string
+
 	Status bool
 }
 
@@ -215,9 +223,9 @@ func initTasks(ctx context.Context, taskCol, traceCol *mongo.Collection, st Spli
 		if err != nil {
 			log.Fatal(err)
 		}
+		results = append(results, st)
 	}
 
-	results = append(results, st)
 	return results, nil
 }
 
@@ -256,15 +264,28 @@ func (sp SplitTask) updateEnd(ctx context.Context, taskCol *mongo.Collection) er
 	return nil
 }
 
+func (sp SplitTask) updateCurrent(ctx context.Context, taskCol *mongo.Collection) error {
+	update := bson.M{"$set": bson.M{"Current": sp.Current, "Status": sp.Status}}
+	_, err := taskCol.UpdateByID(ctx, sp.ID, update)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	return nil
+}
+
 func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo.Collection) error {
 
 	var TotalCount, ProcessedCount, InsertCount int64
 	opts := options.Find()
 	opts.SetSort(bson.D{{Key: "_id", Value: -1}})
 
-	minID := sp.End   // 起始 ID
-	maxID := sp.Start // 结束 ID
-	log.Infof("split task start: %s,end: %s", sp.Start, sp.End)
+	if sp.Current == "" {
+		sp.Current = sp.Start
+	}
+	minID := sp.End     // 结束 ID
+	maxID := sp.Current // 起始 ID
+	log.Infof("split task start: %s,current: %s,end: %s", sp.Start, sp.Current, sp.End)
 	start := time.Now()
 	// 构建查询过滤器
 	filter := bson.M{"_id": bson.M{"$gte": minID, "$lte": maxID}}
@@ -313,8 +334,22 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 		}
 
 		ProcessedCount++
+		if ProcessedCount%CurrentInterval == 0 {
+			sp.Current = execTrace.ID
+			err := sp.updateCurrent(ctx, taskCol)
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+		}
 	}
 	sp.End = execTrace.ID
+	sp.Current = execTrace.ID
+	err = sp.updateCurrent(ctx, taskCol)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
 	if ProcessedCount == TotalCount {
 		log.Infof("Success!!! Total %d fields,%d fileds processed,%d fileds inserted,all fileds processed", TotalCount, ProcessedCount, InsertCount)
 		sp.Status = true
