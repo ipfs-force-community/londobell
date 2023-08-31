@@ -56,7 +56,7 @@ func GetDeals(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.DealState, countUtils, dealsAggregator, req, "DealProposal")
+		multiResult, err := multiquery.MultiPagingQueryForDeal(ctx, req.Index, req.Limit, multiquery.DealState, countUtils, dealsAggregator, req, "NewDealProposal")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
@@ -99,7 +99,7 @@ func GetTotalCountForAllDeals(ctx context.Context, cols common2.Collections, epo
 
 	filter := bson.D{{Key: "Epoch", Value: bson.D{{Key: "$eq", Value: epoch}}}}
 
-	tableName := "DealProposal"
+	tableName := "NewDealProposal"
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == tableName {
 			count, err := col.CountDocuments(ctx, filter)

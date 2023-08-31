@@ -279,8 +279,8 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/parent_tipset", aggregators.GetParentTipSet)
 		group.POST("/latest_time_of_trace", aggregators.GetLatestTimeOfTrace)
 		group.POST("/create_time", aggregators.GetCreateTime)
-		group.POST("/deals", aggregators.GetDeals)         // todo: 阅读nv18后的deal特性
-		group.POST("/deal_by_id", aggregators.GetDealByID) // todo: 阅读nv18后的deal特性
+		group.POST("/deals", aggregators.GetDeals)
+		group.POST("/deal_by_id", aggregators.GetDealByID)
 		group.POST("/detail_for_deal", aggregators.GetDetailForDeal)
 		group.POST("/deals_by_addr", aggregators.GetDealsByAddr)
 		group.POST("/blockmessages_by_methodname", aggregators.GetBlockMessagesByMethodName)

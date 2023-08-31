@@ -46,7 +46,7 @@ func GetDealByID(c *gin.Context) {
 	// multi dbs query
 	{
 		// todo: 空会覆盖真实的吗？
-		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "DealProposal")
+		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "NewDealProposal")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
