@@ -12,3 +12,5 @@ testdb/LOCK
 
 /lotus-api-adapter
 /londobell-api-aggregators
+restart.sh
+config.json

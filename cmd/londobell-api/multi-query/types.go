@@ -23,7 +23,11 @@ const (
 	DealState
 	DealActorStates
 	TipSetStates
+	CreateStates
 )
+
+// use for context
+var TableKey = "tableName"
 
 type CountUtil struct {
 	Start int64
@@ -38,6 +42,7 @@ type CountUtil struct {
 	// 暂时不对其他state分段
 	BlockMethodStates         int64
 	ActorStates               int64
+	CreateStates              int64
 	ActorMethodStates         int64
 	ActorTransferStates       int64
 	ActorEventStates          int64
@@ -62,6 +67,7 @@ type segmentUtil struct {
 	// 暂时不对其他state分段
 	BlockMethodStates         int64
 	ActorStates               int64
+	CreateStates              int64
 	ActorMethodStates         int64
 	ActorTransferStates       int64
 	ActorEventStates          int64
