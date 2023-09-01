@@ -33,21 +33,22 @@ type CommonReq struct {
 }
 
 type Ctx struct {
-	StartEpoch int64
-	EndEpoch   int64
-	Addr       string
-	PrimaryID  string
-	Addrs      []string
-	Method     uint64
-	MethodName string
-	Cid        string
-	Cids       []string
-	ID         uint64
-	IDStr      string
-	Sort       int
-	To         string
-	Skip       int64
-	Limit      int64
-	Start      int64
-	End        int64
+	StartEpoch   int64
+	EndEpoch     int64
+	Addr         string
+	PrimaryID    string
+	Addrs        []string
+	Method       uint64
+	MethodName   string
+	Cid          string
+	Cids         []string
+	ID           uint64
+	IDStr        string
+	Sort         int
+	To           string
+	Skip         int64
+	Limit        int64
+	Start        int64
+	End          int64
+	TransferType string
 }

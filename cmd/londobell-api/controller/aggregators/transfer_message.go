@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
+	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
+
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -42,6 +44,7 @@ func GetTransferMessages(c *gin.Context) {
 	var (
 		countUtils []multiquery.CountUtil
 		pipe       []byte
+		countAgg   []byte
 	)
 
 	switch req.TransferType {
@@ -53,8 +56,10 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferMsgsForActorAggregator
+		pipe = transferMsgsFroActorNoSkipAggregator
+		countAgg = monitor.GetCountOfTransfersForActor2Aggregator()
 	case "blockreward":
+		req.TransferType = "Blockreward"
 		countUtils, err = multiquery.GetTotalCountForActorTransferBlockRewardMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
 		if err != nil {
 			alog.Error(err)
@@ -62,8 +67,10 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferBlockRewardForActorAggregator
+		pipe = transferTypeForActorNoSkipAggregator
+		countAgg = monitor.GetCountOfTransferBlockRewardForActorAggregator()
 	case "burn":
+		req.TransferType = "Burn"
 		countUtils, err = multiquery.GetTotalCountForActorTransferBurnMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
 		if err != nil {
 			alog.Error(err)
@@ -71,7 +78,8 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferBurnForActorAggregator
+		pipe = transferTypeForActorNoSkipAggregator
+		countAgg = monitor.GetCountOfTransferBurnForActorAggregator()
 	case "transfer":
 		countUtils, err = multiquery.GetTotalCountForActorTransferSendAndReceiveMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
 		if err != nil {
@@ -80,8 +88,10 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferSendAndReceiveForActorAggregator
+		pipe = transferSendAndReceiveForActorNoSkipAggregator
+		countAgg = monitor.GetCountOfTransferSendAndReceiveForActorAggregator()
 	case "send":
+		req.TransferType = "Send"
 		countUtils, err = multiquery.GetTotalCountForActorTransferSendMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
 		if err != nil {
 			alog.Error(err)
@@ -89,8 +99,10 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferSendForActorAggregator
+		pipe = transferTypeForActorNoSkipAggregator
+		countAgg = monitor.GetCountOfTransferSendForActorAggregator()
 	case "receive":
+		req.TransferType = "Receive"
 		countUtils, err = multiquery.GetTotalCountForActorTransferReceiveMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
 		if err != nil {
 			alog.Error(err)
@@ -98,7 +110,8 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferReceiveForActorAggregator
+		pipe = transferTypeForActorNoSkipAggregator
+		countAgg = monitor.GetCountOfTransferReceiveForActorAggregator()
 	default:
 		err = fmt.Errorf("invalid transfer type: %v", req.TransferType)
 		alog.Error(err)
@@ -114,7 +127,8 @@ func GetTransferMessages(c *gin.Context) {
 	var transferMessages []model.TransferMessage
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorTransferStates, countUtils, pipe, req, "ActorMessage")
+		multiResult, err := multiquery.MultiBiSearch(ctx, req.Index*req.Limit, req.Limit, countUtils, pipe,
+			countAgg, req, "ActorMessage", multiquery.ActorTransferStates)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
