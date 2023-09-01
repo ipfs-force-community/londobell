@@ -133,12 +133,12 @@ type ActorHead struct {
 // InvocResultCompact is the compact representation of api.InvocResult
 type InvocResultCompact struct {
 	MsgCid cid.Cid
-
-	RawMsg struct {
-		GasLimit   int64
-		GasFeeCap  abi.TokenAmount
-		GasPremium abi.TokenAmount
-	} `mir:"Msg"`
+	Msg    *types.Message
+	//RawMsg struct {
+	//	GasLimit   int64
+	//	GasFeeCap  abi.TokenAmount
+	//	GasPremium abi.TokenAmount
+	//} `mir:"Msg"`
 
 	MsgRct *types.MessageReceipt
 

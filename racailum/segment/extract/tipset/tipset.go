@@ -308,6 +308,7 @@ type persistExecTrace struct {
 	parent *common.ExecutionTraceCompact
 	exec   *common.ExecutionTraceCompact
 	gas    *api.MsgGasCost
+	msg    *types.Message
 }
 
 func walkExecTrace(seq []int, exec *common.ExecutionTraceCompact, walkFn func([]int, *common.ExecutionTraceCompact, *common.ExecutionTraceCompact)) {
@@ -394,6 +395,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			parent: nil,
 			exec:   exec,
 			gas:    &invocs[i].GasCost,
+			msg:    invocs[i].Msg,
 		})
 
 		for ni := range exec.GasCharges {
@@ -408,6 +410,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				seq:    copyIndexes(subseq),
 				parent: subparent,
 				exec:   subexec,
+				msg:    &subexec.Msg, // todo: 失败的没有
 			})
 
 			for ni := range subexec.GasCharges {
@@ -481,7 +484,8 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	for i := range etraces {
 		p := etraces[i]
-		msg := &p.exec.Msg
+		//msg := &p.exec.Msg
+		msg := p.msg
 
 		var parentMsg *types.Message
 		if p.parent != nil {
