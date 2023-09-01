@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	apim "github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
@@ -72,18 +71,45 @@ type TraceMsg struct {
 	IsBlock bool
 }
 
+type MessageForCreate struct {
+	ID         string `bson:"_id" json:"_id"`
+	Cid        string
+	SignedCid  interface{}
+	IsBlock    bool // 是否是块消息
+	Epoch      abi.ChainEpoch
+	From       string
+	To         string
+	Value      string
+	MethodName string
+	Caller     interface{} // construtor caller
+	ActorID    interface{} //CreateExternal Created
+}
+
+/*
+In order to be consistent with other data
+let blank string to null in mongo()
+*/
+func Blank2Nil(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 // Trace2Message Convert ExecTrace to MessageForCreate
-func Trace2Message(trace TraceMsg, col *mongo.Collection) (msg apim.MessageForCreate) {
+func Trace2Message(trace TraceMsg, col *mongo.Collection) (msg MessageForCreate) {
 	msg.Cid = trace.Cid
 	msg.Epoch = trace.Epoch
 	// msg.ExitCode
 	msg.From = trace.Msg.From
 	msg.To = trace.Msg.To
-	msg.Method = trace.Msg.MethodName
-	msg.ActorID = getActorID(trace)
+	msg.MethodName = trace.Msg.MethodName
+	msg.ActorID = Blank2Nil(getActorID(trace))
 	msg.Value = trace.Msg.Value
 	msg.ID = trace.ID
-	msg.Caller = getCaller(trace.Msg.MethodName, trace.ID, col)
+	msg.Caller = Blank2Nil(getCaller(trace.Msg.MethodName, trace.ID, col))
+	msg.SignedCid = Blank2Nil(trace.SignedCid)
+	msg.IsBlock = trace.IsBlock
 	return
 }
 
