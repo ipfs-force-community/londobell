@@ -386,7 +386,7 @@ func GetTotalCountForBlockMsgsByMethodName(ctx context.Context, methodName strin
 	return countUtils, nil
 }
 
-//count_of_actormessages_by_methodname.js
+// count_of_actormessages_by_methodname.js
 func GetTotalCountForActorMsgByMethodName(ctx context.Context, actorID, methodName string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForActorMsgByMethodName")
 
@@ -510,7 +510,7 @@ func GetTotalCountForActorEvents(ctx context.Context, actor string, dbsm *DataBa
 	return countUtils, nil
 }
 
-//出块列表 BlockHeader查，现在就是这样
+// 出块列表 BlockHeader查，现在就是这样
 func GetTotalCountForMinedMsgsMap(ctx context.Context, minerID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForMinedMsgsMap")
 
@@ -522,7 +522,7 @@ func GetTotalCountForMinedMsgsMap(ctx context.Context, minerID string, dbsm *Dat
 	return countUtils, nil
 }
 
-//count_of_largeamount_transfers.js
+// count_of_largeamount_transfers.js
 func GetTotalCountForTransfersForLargeAmount(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForActorMsgs")
 
@@ -1786,7 +1786,7 @@ func GetActorStates(ctx context.Context, state *segment.State, cols common.Colle
 		return 0, err
 	}
 
-	tableName := "ActorMessage"
+	tableName := ctx.Value(TableKey).(string)
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == tableName {
 			cur, err := col.Aggregate(ctx, pipe) // todo
@@ -1833,7 +1833,7 @@ func GetActorMethodStates(ctx context.Context, state *segment.State, cols common
 		return 0, err
 	}
 
-	tableName := "ActorMessage"
+	tableName := ctx.Value(TableKey).(string)
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == tableName {
 			cur, err := col.Aggregate(ctx, pipe) //, options.Aggregate().SetAllowDiskUse(true)

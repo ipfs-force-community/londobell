@@ -6,7 +6,11 @@ import (
 
 	"context"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/exp/slices"
+
+	rmodel "github.com/ipfs-force-community/londobell/racailum/segment/model"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
@@ -17,8 +21,8 @@ import (
 func GetActorMessagesByMethodName(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	alog := log.With("method", "GetActorMessagesByMethodName")
+
 	req := model.CommonReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
@@ -27,7 +31,9 @@ func GetActorMessagesByMethodName(c *gin.Context) {
 		util.ReturnOnErr(c, err)
 		return
 	}
-
+	var count int64
+	var messagesByMethodName []model.MessageByMethodName
+	var createMessages []model.MessageByMethodName
 	curEpoch := common.GetCurEpoch()
 
 	req.Addr, err = GetIDByAddr(ctx, req.Addr)
@@ -37,49 +43,66 @@ func GetActorMessagesByMethodName(c *gin.Context) {
 		return
 	}
 
-	countUtils, err := multiquery.GetTotalCountForActorMsgByMethodName(ctx, req.Addr, req.MethodName, &multiquery.DBStateManager, curEpoch)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
+	if slices.Contains(rmodel.CreateMethods, req.MethodName) {
+		creatCtx := context.WithValue(ctx, multiquery.TableKey, CreateMessageCol)
+		count, createMessages, err = getActorMsgsByMethodName(creatCtx, req.Limit, count, req, curEpoch)
 
-	totalCount := int64(0)
-	for _, countUtil := range countUtils {
-		totalCount += countUtil.ActorMethodStates
-	}
-
-	var messagesByMethodName []model.MessageByMethodName
-	// multi dbs query
-	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorMethodStates, countUtils, actorMessagesByMethodNameAggregator, req, "ActorMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
 		}
-
-		if len(multiResult) == 0 {
+		// update limit
+		if req.Limit < int64(len(messagesByMethodName)) {
+			res.Data = model.MessagesByMethodNameRes{TotalCount: count, MessagesByMethodName: createMessages[:req.Limit]}
 			c.JSON(http.StatusOK, res)
 			return
 		}
-
-		raw := multiResult
-		rawByte, err := json.Marshal(raw)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		err = json.Unmarshal(rawByte, &messagesByMethodName)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
+		req.Limit = req.Limit - int64(len(messagesByMethodName))
 	}
 
-	res.Data = model.MessagesByMethodNameRes{TotalCount: totalCount, MessagesByMethodName: messagesByMethodName}
+	actorCtx := context.WithValue(ctx, multiquery.TableKey, ActorMessageCol)
+	count, messagesByMethodName, err = getActorMsgsByMethodName(actorCtx, req.Limit, count, req, curEpoch)
+
+	res.Data = model.MessagesByMethodNameRes{TotalCount: count, MessagesByMethodName: append(createMessages, messagesByMethodName...)}
 	c.JSON(http.StatusOK, res)
+}
+
+func getActorMsgsByMethodName(ctx context.Context, limit, count int64, req model.CommonReq, curEpoch abi.ChainEpoch) (int64, []model.MessageByMethodName, error) {
+	var (
+		messagesByMethodName []model.MessageByMethodName
+		err                  error
+		countUtils           []multiquery.CountUtil
+	)
+
+	countUtils, err = multiquery.GetTotalCountForActorMsgByMethodName(ctx, req.Addr, req.MethodName, &multiquery.DBStateManager, curEpoch)
+	if err != nil {
+		return count, messagesByMethodName, err
+	}
+
+	for _, countUtil := range countUtils {
+		count += countUtil.ActorMethodStates
+	}
+
+	multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorMethodStates, countUtils, actorMessagesByMethodNameAggregator, req, ctx.Value(multiquery.TableKey).(string))
+	if err != nil {
+		return count, messagesByMethodName, err
+	}
+
+	if len(multiResult) == 0 {
+		return count, messagesByMethodName, err
+	}
+
+	raw := multiResult
+	rawByte, err := json.Marshal(raw)
+	if err != nil {
+		return count, messagesByMethodName, err
+	}
+
+	err = json.Unmarshal(rawByte, &messagesByMethodName)
+	if err != nil {
+		return count, messagesByMethodName, err
+	}
+	return count, messagesByMethodName, err
+
 }

@@ -25,6 +25,9 @@ const (
 	TipSetStates
 )
 
+// use for context
+var TableKey = "tableName"
+
 type CountUtil struct {
 	Start int64
 	End   int64
