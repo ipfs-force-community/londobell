@@ -806,7 +806,7 @@ func GetAllActorMethods(ctx context.Context, startEpoch, endEpoch abi.ChainEpoch
 	}
 
 	var allMethodsForActorRes []model.AllMethodsForActorRes
-	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetAllMethodNamesForActor()))
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetAllMethodNamesForActorAggregator()))
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 		return nil, err
@@ -874,7 +874,7 @@ func GetAllActorsMsgsCount(ctx context.Context, startEpoch, endEpoch abi.ChainEp
 	}
 
 	var allActorsMsgsCountRes []model.AllActorsMsgsCountRes
-	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch)}, string(monitor.GetAllActorsMsgsCountAggregator()))
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch)}, string(monitor.GetAllActorsMsgscountAggregator()))
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 		return nil, err
@@ -1665,7 +1665,7 @@ func GetBlockMethodStates(ctx context.Context, state *segment.State, cols common
 	}
 
 	var countRes []model.CountRes
-	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), MethodName: methodName}, string(monitor.GetCountOfBlockMessagesByMethodNameAggregator()))
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), MethodName: methodName}, string(monitor.GetCountOfBlockmessagesByMethodnameAggregator()))
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 		return 0, err
@@ -1752,7 +1752,7 @@ func GetActorStates(ctx context.Context, state *segment.State, cols common.Colle
 	}()
 
 	var countRes []model.CountRes
-	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetCountOfMessageForActorAggregator())) // todo: ExecTrace
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetCountOfMessagesForActorAggregator())) // todo: ExecTrace
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 		return 0, err
@@ -1799,7 +1799,7 @@ func GetActorMethodStates(ctx context.Context, state *segment.State, cols common
 	}
 
 	var countRes []model.CountRes
-	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID, MethodName: methodName}, string(monitor.GetCountOfActorMessagesByMethodNameAggregator())) // todo: ExecTrace
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID, MethodName: methodName}, string(monitor.GetCountOfActormessagesByMethodnameAggregator())) // todo: ExecTrace
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 		return 0, err
@@ -1847,7 +1847,7 @@ func GetAllActorMethodStates(ctx context.Context, state *segment.State, cols com
 	}
 
 	var allMethodsForActorRes []model.AllMethodsForActorRes
-	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetAllMethodNamesForActor()))
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetAllMethodNamesForActorAggregator()))
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 		return nil, err
@@ -1979,7 +1979,7 @@ func GetMinedStates(ctx context.Context, state *segment.State, cols common.Colle
 	}
 
 	var countRes []model.CountRes
-	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetMinedCountForMinersAggregator())) // todo: ExecTrace
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetMinedcountForMinersAggregator())) // todo: ExecTrace
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 		return 0, err
@@ -2027,7 +2027,7 @@ func GetLargeAmountTransferStates(ctx context.Context, state *segment.State, col
 	}
 
 	var countRes []model.CountRes
-	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch)}, string(monitor.GetCountOfLargeAmountTransfersAggregator())) // todo: ExecTrace
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch)}, string(monitor.GetCountOfLargeamountTransfersAggregator())) // todo: ExecTrace
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 		return 0, err
@@ -2118,7 +2118,7 @@ func GetActorTransferBlockRewardStates(ctx context.Context, state *segment.State
 	}
 
 	var countRes []model.CountRes
-	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetCountOfTransferBlockRewardForActorAggregator()))
+	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetCountOfTransferBlockrewardForActorAggregator()))
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 		return 0, err

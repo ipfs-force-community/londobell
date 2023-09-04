@@ -72,7 +72,7 @@ func GetMessagesForActor(c *gin.Context) {
 		//multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorStates, countUtils, messagesForActorAggregator, req, "ActorMessage")
 
 		multiResult, err := multiquery.MultiBiSearch(ctx, req.Index*req.Limit, req.Limit, countUtils, actorMessageNoSkip,
-			monitor.GetCountOfMessageForActorAggregator(), req, "ActorMessage", multiquery.ActorStates)
+			monitor.GetCountOfMessagesForActorAggregator(), req, "ActorMessage", multiquery.ActorStates)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

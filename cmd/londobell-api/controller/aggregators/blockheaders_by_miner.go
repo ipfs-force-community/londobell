@@ -64,8 +64,8 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 	var blockHeadersByMiner []model.BlockHeader
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiBiSearch(ctx, req.Index*req.Limit, req.Limit, countUtils, pool_monitor.GetBlockHeadersByMinerNoSkipAggregator(),
-			pool_monitor.GetMinedCountForMinersAggregator(), req, "BlockHeader", multiquery.MinedStates)
+		multiResult, err := multiquery.MultiBiSearch(ctx, req.Index*req.Limit, req.Limit, countUtils, pool_monitor.GetBlockheadersByMinerNoskipAggregator(),
+			pool_monitor.GetMinedcountForMinersAggregator(), req, "BlockHeader", multiquery.MinedStates)
 		//multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.MinedStates, countUtils, blockHeadersByMinerAggregator, req, "BlockHeader")
 		if err != nil {
 			//alog.Error(err)

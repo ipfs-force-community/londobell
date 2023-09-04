@@ -53,8 +53,8 @@ func GetActorMessagesByMethodName(c *gin.Context) {
 	var messagesByMethodName []model.MessageByMethodName
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiBiSearch(ctx, req.Index*req.Limit, req.Limit, countUtils, pool_monitor.GetActorMessagesByMethodNameNoskipAggregator(),
-			pool_monitor.GetCountOfActorMessagesByMethodNameAggregator(), req, "ActorMessage", multiquery.ActorMethodStates)
+		multiResult, err := multiquery.MultiBiSearch(ctx, req.Index*req.Limit, req.Limit, countUtils, pool_monitor.GetActormessagesByMethodnameNoskipAggregator(),
+			pool_monitor.GetCountOfActormessagesByMethodnameAggregator(), req, "ActorMessage", multiquery.ActorMethodStates)
 		//multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorMethodStates, countUtils, actorMessagesByMethodNameAggregator, req, "ActorMessage")
 		if err != nil {
 			alog.Error(err)
