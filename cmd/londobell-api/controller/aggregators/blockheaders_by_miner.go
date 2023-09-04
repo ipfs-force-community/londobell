@@ -1,17 +1,14 @@
 package aggregators
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
-
-	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
-
-	"context"
 
 	"github.com/gin-gonic/gin"
 	pool_monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -52,16 +49,6 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 	for _, countUtil := range countUtils {
 		totalCount += countUtil.MinedStates
 	}
-
-	api := fullnode.API.GetAppropriateAPI()
-	addrs, err := common2.GetAllAddrs(ctx, req.Addr, api)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	req.Addrs = addrs
 
 	var blockHeadersByMiner []model.BlockHeader
 	// multi dbs query

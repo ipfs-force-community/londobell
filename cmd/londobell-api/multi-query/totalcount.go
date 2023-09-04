@@ -276,9 +276,12 @@ func AddUpBlockMethodStates(ctx context.Context, log *zap.SugaredLogger, state *
 //	return nil
 //}
 
-func refresh(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch, actorID, methodName string, f func(context.Context, *segment.State, common.Collections, *[]CountUtil, *abi.ChainEpoch, abi.ChainEpoch, string, string) error) ([]CountUtil, error) {
-	countUtils := make([]CountUtil, 0)
+type ConcurrentCountUtils struct {
+	CountUtils []CountUtil
+	lk         sync.Mutex
+}
 
+func refresh(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch, actorID, methodName string, f func(context.Context, *segment.State, common.Collections, *ConcurrentCountUtils, *abi.ChainEpoch, abi.ChainEpoch, string, string) error) ([]CountUtil, error) {
 	colds := dbsm.GetColdsCfg()
 	formal := dbsm.GetFormalCfg()
 	tmp := dbsm.GetTmpCfg()
@@ -289,29 +292,45 @@ func refresh(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.Chain
 
 	var tmpStartEpoch abi.ChainEpoch
 
+	var (
+		ewg                  multierror.Group
+		concurrentCountUtils = &ConcurrentCountUtils{
+			CountUtils: make([]CountUtil, 0),
+		}
+	)
+
 	for _, db := range dbs {
-		if db.IsInvalidDB() {
-			continue
-		}
+		db := db
+		ewg.Go(func() error {
+			if db.IsInvalidDB() {
+				return nil
+			}
 
-		state, found, err := dbsm.GetState(ctx, db.Url())
-		if err != nil {
-			return nil, err
-		}
+			state, found, err := dbsm.GetState(ctx, db.Url())
+			if err != nil {
+				return err
+			}
 
-		if !found {
-			return nil, fmt.Errorf("state of dsn %v not found", db.Url())
-		}
+			if !found {
+				return fmt.Errorf("state of dsn %v not found", db.Url())
+			}
 
-		cols, ok := dbsm.GetDBCollections(db.Url())
-		if !ok {
-			return nil, fmt.Errorf("url %v not found in DBCollectionsMap", db.Url())
-		}
+			cols, ok := dbsm.GetDBCollections(db.Url())
+			if !ok {
+				return fmt.Errorf("url %v not found in DBCollectionsMap", db.Url())
+			}
 
-		err = f(ctx, state, cols, &countUtils, &tmpStartEpoch, curEpoch, actorID, methodName)
-		if err != nil {
-			return nil, err
-		}
+			err = f(ctx, state, cols, concurrentCountUtils, &tmpStartEpoch, curEpoch, actorID, methodName)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+	}
+
+	if err := ewg.Wait(); err != nil {
+		return nil, err
 	}
 
 	// tmp每次都重新刷
@@ -323,17 +342,17 @@ func refresh(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.Chain
 			return nil, fmt.Errorf("url %v not found in DBCollectionsMap", tmp.Url())
 		}
 
-		err := f(ctx, tmpState, tmpCols, &countUtils, &tmpStartEpoch, curEpoch, actorID, methodName)
+		err := f(ctx, tmpState, tmpCols, concurrentCountUtils, &tmpStartEpoch, curEpoch, actorID, methodName)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	sort.Slice(countUtils, func(i, j int) bool {
-		return countUtils[i].End > countUtils[j].End
+	sort.Slice(concurrentCountUtils.CountUtils, func(i, j int) bool {
+		return concurrentCountUtils.CountUtils[i].End > concurrentCountUtils.CountUtils[j].End
 	})
 
-	return countUtils, nil
+	return concurrentCountUtils.CountUtils, nil
 }
 
 func GetEpochRange(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
@@ -987,10 +1006,12 @@ func GetAllMinersMinedCount(ctx context.Context, startEpoch, endEpoch abi.ChainE
 	return nil, fmt.Errorf("no BlockHeader collection")
 }
 
-func refreshEpochRange(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
+func refreshEpochRange(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
 		// todo: *tmpStartEpoch = state.GetEndEpoch() 保证所有状态做完才更新EndEpoch
 		*tmpStartEpoch = state.GetEndEpoch()
 
@@ -999,17 +1020,21 @@ func refreshEpochRange(ctx context.Context, state *segment.State, cols common.Co
 		state.SetStartEpoch(*tmpStartEpoch)
 		state.SetEndEpoch(curEpoch + 1)
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
 }
 
-func refreshTotalCountForTipSets(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
+func refreshTotalCountForTipSets(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetTipSetStates(ctx, state, cols, methodName)
@@ -1017,7 +1042,9 @@ func refreshTotalCountForTipSets(ctx context.Context, state *segment.State, cols
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, TipSetStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, TipSetStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1029,7 +1056,9 @@ func refreshTotalCountForTipSets(ctx context.Context, state *segment.State, cols
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, TipSetStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, TipSetStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetTipSetStates(ctx, state, cols, methodName)
@@ -1037,14 +1066,16 @@ func refreshTotalCountForTipSets(ctx context.Context, state *segment.State, cols
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, TipSetStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, TipSetStates: count, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
 }
 
-func refreshDealRange(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
+func refreshDealRange(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
 	switch state.GetDType() {
 	case smodel.Formal, smodel.Cold:
 		startDealID, endDealID, err := GetDealIDRange(ctx, cols, int64(state.GetStartEpoch()), int64(state.GetEndEpoch()))
@@ -1054,47 +1085,18 @@ func refreshDealRange(ctx context.Context, state *segment.State, cols common.Col
 
 		count := endDealID - startDealID
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(startDealID), End: int64(endDealID), DealState: int64(count), Cols: cols, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(startDealID), End: int64(endDealID), DealState: int64(count), Cols: cols, DType: state.GetDType()})
 		return nil
 	case smodel.Tmp:
 		return nil
-	//case smodel.Cold:
-	//	dealState, found, err := DBStateManager.GetDealState(ctx, state.GetDSN())
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//	if !found {
-	//		return fmt.Errorf("dealState of dsn %v not found", state.GetDSN())
-	//	}
-	//
-	//	*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetDealStartID()), End: int64(state.GetDealEndID()), DealState: dealState.Count, Cols: cols})
-	//	return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
 }
 
-//func refreshMinerSectorRange(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
-//	switch state.GetDType() {
-//	case smodel.Formal, smodel.Cold:
-//		sectorBoundary, err := GetMinerSectorBoundary(ctx, cols, int64(state.GetStartEpoch()), int64(state.GetEndEpoch()))
-//		if err != nil {
-//			return err
-//		}
-//
-//		count := sectorBoundary.End - sectorBoundary.Start
-//
-//		*countUtils = append(*countUtils, CountUtil{Start: int64(sectorBoundary.Start), End: int64(sectorBoundary.End), SectorState: int64(count), Cols: cols})
-//		return nil
-//	case smodel.Tmp:
-//		return nil
-//	default:
-//		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
-//	}
-//}
-
-func refreshTotalCountForBlockMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForBlockMsgs(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		blockStates, err := DBStateManager.GetBlockStates(ctx, state.GetDSN())
@@ -1113,7 +1115,9 @@ func refreshTotalCountForBlockMsgs(ctx context.Context, state *segment.State, co
 			return sortBlockStates[i].StartEpoch > sortBlockStates[j].StartEpoch
 		})
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), BlockStates: sortBlockStates, Cols: cols, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), BlockStates: sortBlockStates, Cols: cols, DType: state.GetDType()})
 		if len(sortBlockStates) > 0 {
 			*tmpStartEpoch = sortBlockStates[0].EndEpoch
 		} else {
@@ -1129,7 +1133,9 @@ func refreshTotalCountForBlockMsgs(ctx context.Context, state *segment.State, co
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), BlockStates: blockStates, Cols: cols, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), BlockStates: blockStates, Cols: cols, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		blockStates, err := DBStateManager.GetBlockStates(ctx, state.GetDSN())
@@ -1137,7 +1143,9 @@ func refreshTotalCountForBlockMsgs(ctx context.Context, state *segment.State, co
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), BlockStates: blockStates, Cols: cols, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), BlockStates: blockStates, Cols: cols, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
@@ -1145,7 +1153,7 @@ func refreshTotalCountForBlockMsgs(ctx context.Context, state *segment.State, co
 }
 
 // actor筛选的，旧库不缓存？
-func refreshTotalCountForActorDeals(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForActorDeals(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal, smodel.Cold:
 		// todo: formal state 每次拿
@@ -1161,7 +1169,9 @@ func refreshTotalCountForActorDeals(ctx context.Context, state *segment.State, c
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(startDealID), End: int64(endDealID), DealActorStates: count, Cols: cols, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(startDealID), End: int64(endDealID), DealActorStates: count, Cols: cols, DType: state.GetDType()})
 
 		return nil
 	case smodel.Tmp:
@@ -1172,7 +1182,7 @@ func refreshTotalCountForActorDeals(ctx context.Context, state *segment.State, c
 }
 
 // todo: colds存下永久状态 或 缓存
-func refreshTotalCountForBlockMsgsByMethodName(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForBlockMsgsByMethodName(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		blockMethodStates, err := DBStateManager.GetBlockMethodStates(ctx, state.GetDSN(), methodName)
@@ -1180,7 +1190,9 @@ func refreshTotalCountForBlockMsgsByMethodName(ctx context.Context, state *segme
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: blockMethodStates, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: blockMethodStates, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1192,22 +1204,26 @@ func refreshTotalCountForBlockMsgsByMethodName(ctx context.Context, state *segme
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: blockMethodStates, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: blockMethodStates, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
-		count, err := DBStateManager.GetBlockMethodStates(ctx, state.GetDSN(), methodName)
+		blockMethodStates, err := DBStateManager.GetBlockMethodStates(ctx, state.GetDSN(), methodName)
 		if err != nil {
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: blockMethodStates, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
 }
 
-func refreshTotalCountForActorMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForActorMsgs(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetActorStates(ctx, state, cols, actorID)
@@ -1215,7 +1231,9 @@ func refreshTotalCountForActorMsgs(ctx context.Context, state *segment.State, co
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1227,7 +1245,9 @@ func refreshTotalCountForActorMsgs(ctx context.Context, state *segment.State, co
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetActorStates(ctx, state, cols, actorID)
@@ -1235,14 +1255,16 @@ func refreshTotalCountForActorMsgs(ctx context.Context, state *segment.State, co
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
 }
 
-func refreshTotalCountForActorMsgByMethodName(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForActorMsgByMethodName(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetActorMethodStates(ctx, state, cols, actorID, methodName)
@@ -1250,7 +1272,9 @@ func refreshTotalCountForActorMsgByMethodName(ctx context.Context, state *segmen
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1262,7 +1286,9 @@ func refreshTotalCountForActorMsgByMethodName(ctx context.Context, state *segmen
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetActorMethodStates(ctx, state, cols, actorID, methodName)
@@ -1270,14 +1296,16 @@ func refreshTotalCountForActorMsgByMethodName(ctx context.Context, state *segmen
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: count, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
 }
 
-func refreshTotalCountForActorTransferMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForActorTransferMsgs(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetActorTransferStates(ctx, state, cols, actorID)
@@ -1285,7 +1313,9 @@ func refreshTotalCountForActorTransferMsgs(ctx context.Context, state *segment.S
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1297,7 +1327,9 @@ func refreshTotalCountForActorTransferMsgs(ctx context.Context, state *segment.S
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetActorTransferStates(ctx, state, cols, actorID)
@@ -1305,14 +1337,16 @@ func refreshTotalCountForActorTransferMsgs(ctx context.Context, state *segment.S
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
 }
 
-func refreshTotalCountForActorEvents(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForActorEvents(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetActorEventStates(ctx, state, cols, actorID)
@@ -1320,7 +1354,9 @@ func refreshTotalCountForActorEvents(ctx context.Context, state *segment.State, 
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1332,7 +1368,9 @@ func refreshTotalCountForActorEvents(ctx context.Context, state *segment.State, 
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetActorEventStates(ctx, state, cols, actorID)
@@ -1340,14 +1378,16 @@ func refreshTotalCountForActorEvents(ctx context.Context, state *segment.State, 
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorEventStates: count, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
 }
 
-func refreshTotalCountForMinedMsgsMap(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForMinedMsgsMap(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetMinedStates(ctx, state, cols, actorID)
@@ -1355,7 +1395,9 @@ func refreshTotalCountForMinedMsgsMap(ctx context.Context, state *segment.State,
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, MinedStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, MinedStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1367,7 +1409,9 @@ func refreshTotalCountForMinedMsgsMap(ctx context.Context, state *segment.State,
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, MinedStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, MinedStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetMinedStates(ctx, state, cols, actorID)
@@ -1375,14 +1419,16 @@ func refreshTotalCountForMinedMsgsMap(ctx context.Context, state *segment.State,
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, MinedStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, MinedStates: count, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
 }
 
-func refreshTotalCountForTransfersForLargeAmount(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForTransfersForLargeAmount(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetLargeAmountTransferStates(ctx, state, cols)
@@ -1390,7 +1436,9 @@ func refreshTotalCountForTransfersForLargeAmount(ctx context.Context, state *seg
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, LargeAmountTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, LargeAmountTransferStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1402,7 +1450,9 @@ func refreshTotalCountForTransfersForLargeAmount(ctx context.Context, state *seg
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, LargeAmountTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, LargeAmountTransferStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetLargeAmountTransferStates(ctx, state, cols)
@@ -1410,14 +1460,16 @@ func refreshTotalCountForTransfersForLargeAmount(ctx context.Context, state *seg
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, LargeAmountTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, LargeAmountTransferStates: count, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
 	}
 }
 
-func refreshTotalCountForActorTransferBlockRewardMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForActorTransferBlockRewardMsgs(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetActorTransferBlockRewardStates(ctx, state, cols, actorID)
@@ -1425,7 +1477,9 @@ func refreshTotalCountForActorTransferBlockRewardMsgs(ctx context.Context, state
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1437,7 +1491,9 @@ func refreshTotalCountForActorTransferBlockRewardMsgs(ctx context.Context, state
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetActorTransferBlockRewardStates(ctx, state, cols, actorID)
@@ -1445,7 +1501,9 @@ func refreshTotalCountForActorTransferBlockRewardMsgs(ctx context.Context, state
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 
 		return nil
 	default:
@@ -1453,7 +1511,7 @@ func refreshTotalCountForActorTransferBlockRewardMsgs(ctx context.Context, state
 	}
 }
 
-func refreshTotalCountForActorTransferBurnMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForActorTransferBurnMsgs(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetActorTransferBurnStates(ctx, state, cols, actorID)
@@ -1461,7 +1519,9 @@ func refreshTotalCountForActorTransferBurnMsgs(ctx context.Context, state *segme
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1473,7 +1533,9 @@ func refreshTotalCountForActorTransferBurnMsgs(ctx context.Context, state *segme
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetActorTransferBurnStates(ctx, state, cols, actorID)
@@ -1481,7 +1543,9 @@ func refreshTotalCountForActorTransferBurnMsgs(ctx context.Context, state *segme
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 
 		return nil
 	default:
@@ -1489,7 +1553,7 @@ func refreshTotalCountForActorTransferBurnMsgs(ctx context.Context, state *segme
 	}
 }
 
-func refreshTotalCountForActorTransferSendAndReceiveMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForActorTransferSendAndReceiveMsgs(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetActorTransferSendAndReceiveStates(ctx, state, cols, actorID)
@@ -1497,7 +1561,9 @@ func refreshTotalCountForActorTransferSendAndReceiveMsgs(ctx context.Context, st
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1509,7 +1575,9 @@ func refreshTotalCountForActorTransferSendAndReceiveMsgs(ctx context.Context, st
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetActorTransferSendAndReceiveStates(ctx, state, cols, actorID)
@@ -1517,7 +1585,9 @@ func refreshTotalCountForActorTransferSendAndReceiveMsgs(ctx context.Context, st
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 
 		return nil
 	default:
@@ -1525,7 +1595,7 @@ func refreshTotalCountForActorTransferSendAndReceiveMsgs(ctx context.Context, st
 	}
 }
 
-func refreshTotalCountForActorTransferSendMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForActorTransferSendMsgs(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetActorTransferSendStates(ctx, state, cols, actorID)
@@ -1533,7 +1603,9 @@ func refreshTotalCountForActorTransferSendMsgs(ctx context.Context, state *segme
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1545,7 +1617,9 @@ func refreshTotalCountForActorTransferSendMsgs(ctx context.Context, state *segme
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetActorTransferSendStates(ctx, state, cols, actorID)
@@ -1553,7 +1627,9 @@ func refreshTotalCountForActorTransferSendMsgs(ctx context.Context, state *segme
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 
 		return nil
 	default:
@@ -1561,7 +1637,7 @@ func refreshTotalCountForActorTransferSendMsgs(ctx context.Context, state *segme
 	}
 }
 
-func refreshTotalCountForActorTransferReceiveMsgs(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
+func refreshTotalCountForActorTransferReceiveMsgs(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
 		count, err := GetActorTransferReceiveStates(ctx, state, cols, actorID)
@@ -1569,7 +1645,9 @@ func refreshTotalCountForActorTransferReceiveMsgs(ctx context.Context, state *se
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
@@ -1581,7 +1659,9 @@ func refreshTotalCountForActorTransferReceiveMsgs(ctx context.Context, state *se
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
 		count, err := GetActorTransferReceiveStates(ctx, state, cols, actorID)
@@ -1589,7 +1669,9 @@ func refreshTotalCountForActorTransferReceiveMsgs(ctx context.Context, state *se
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
+		concurrentCountUtils.lk.Lock()
+		defer concurrentCountUtils.lk.Unlock()
+		concurrentCountUtils.CountUtils = append(concurrentCountUtils.CountUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorTransferStates: count, DType: state.GetDType()})
 
 		return nil
 	default:
