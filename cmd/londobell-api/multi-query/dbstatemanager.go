@@ -589,7 +589,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 
 		cols := make([]*mongo.Collection, 0)
 
-		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol)
+		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol)
 
 		dbsm.UpdateDBCollectionsMap(db.Url(), config2.Collections{DB: database, Cols: cols})
 	}
@@ -613,6 +613,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 	blockMessageCol := database.Collection("BlockMessage")
 	blockHeaderCol := database.Collection("BlockHeader")
 	actorMessageCol := database.Collection("ActorMessage")
+	createMessageCol := database.Collection("CreateMessage")
 	ethHashCol := database.Collection("EthHash")
 	eventsRootCol := database.Collection("EventsRoot")
 	stateFinalHeightCol := database.Collection("StateFinalHeight")
@@ -620,7 +621,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 	actorEventCodeCol := database.Collection("ActorEvent")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol)
+	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, createMessageCol)
 	dbsm.UpdateDBCollectionsMap(tmp.Url(), config2.Collections{DB: database, Cols: cols})
 
 	return nil
@@ -694,9 +695,10 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 	evmInitCodeCol := database.Collection("EvmInitCode")
 	actorEventCodeCol := database.Collection("ActorEvent")
 	actorAddressCol := database.Collection("ActorAddress")
+	createMessageCol := database.Collection("CreateMessage")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol)
+	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol)
 
 	return config2.Collections{DB: database, Cols: cols}, nil
 }

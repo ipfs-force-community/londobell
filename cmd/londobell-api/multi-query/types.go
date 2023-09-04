@@ -10,6 +10,7 @@ import (
 )
 
 type Ptype int
+type CtxKey string
 
 const (
 	BlockStates Ptype = iota
@@ -26,7 +27,7 @@ const (
 )
 
 // use for context
-var TableKey = "tableName"
+var TableKey CtxKey = "tableName"
 
 type CountUtil struct {
 	Start int64

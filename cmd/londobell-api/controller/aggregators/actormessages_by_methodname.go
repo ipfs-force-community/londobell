@@ -51,6 +51,11 @@ func GetActorMessagesByMethodName(c *gin.Context) {
 	// 倒序,先从 actor col查询
 	actorCtx := context.WithValue(ctx, multiquery.TableKey, ActorMessageCol)
 	totalCount, messagesByMethodName, err = getActorMsgsByMethodName(actorCtx, indexReq, req.Limit, totalCount, req, curEpoch)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
 
 	if req.Limit <= int64(len(messagesByMethodName)) {
 		res.Data = model.MessagesByMethodNameRes{TotalCount: totalCount, MessagesByMethodName: messagesByMethodName[:req.Limit]}

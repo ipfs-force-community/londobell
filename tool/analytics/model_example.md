@@ -1503,6 +1503,31 @@
 ```
 
 
+### NewDealProposal
+
+#### new-deal-proposal
+
+```
+{
+	"Client": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
+	"ClientCollateral": "1024",
+	"ClientID": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"EndEpoch": 0,
+	"Epoch": 0,
+	"Label": {},
+	"PieceCID": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"PieceSize": 0,
+	"Provider": "073366",
+	"ProviderCollateral": "340282591298641078465964189926313473653",
+	"ProviderID": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
+	"StartEpoch": 0,
+	"StoragePricePerEpoch": "1073741824",
+	"VerifiedDeal": false,
+	"_id": 0
+}
+```
+
+
 ### PendingTxns
 
 #### pending-txns
@@ -1526,9 +1551,9 @@
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	],
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -1540,7 +1565,7 @@
 ```
 {
 	"Client": 0,
-	"Data": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"Data": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 	"Epoch": 0,
 	"Provider": 0,
 	"Sector": 0,
@@ -1560,7 +1585,7 @@
 ```
 {
 	"Cids": [
-		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
 	"_id": 0
 }
@@ -1576,11 +1601,11 @@
 	"BaseFee": "1024",
 	"ChildEpoch": 0,
 	"Cids": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	],
 	"MinTimestamp": 0,
-	"Receipts": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-	"State": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"Receipts": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+	"State": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 	"Weight": "340282591298641078465964189926313473653",
 	"_id": 0
 }
@@ -1600,9 +1625,9 @@
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
