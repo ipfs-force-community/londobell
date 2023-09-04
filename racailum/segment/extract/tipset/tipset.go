@@ -286,7 +286,12 @@ func extractBlochHeaders(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 
 	rawBHs := ts.Blocks()
 	for bi := range rawBHs {
-		bh, err := model.NewBlockHeader(rawBHs[bi])
+		minerID, err := extract.LookupID(ctx, rawBHs[bi].Miner, ts.TipSet)
+		if err != nil {
+			return err
+		}
+
+		bh, err := model.NewBlockHeader(minerID, rawBHs[bi])
 		if err != nil {
 			return err
 		}

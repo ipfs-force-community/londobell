@@ -32,7 +32,7 @@ type BlockHeader struct {
 }
 
 // NewBlockHeader takes required fields from a raw *types.BlockHeader
-func NewBlockHeader(raw *types.BlockHeader) (*BlockHeader, error) {
+func NewBlockHeader(minerID address.Address, raw *types.BlockHeader) (*BlockHeader, error) {
 	bh := &BlockHeader{
 		ID: raw.Cid(),
 	}
@@ -41,6 +41,7 @@ func NewBlockHeader(raw *types.BlockHeader) (*BlockHeader, error) {
 		return nil, fmt.Errorf("mirroring BlockHeader: %w", err)
 	}
 
+	bh.Miner = minerID
 	return bh, nil
 }
 
