@@ -59,7 +59,7 @@ func GetDealsByAddr(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.DealActorStates, countUtils, dealsByAddrAggregator, req, "DealProposal")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.DealActorStates, countUtils, dealsByAddrAggregator, req, "NewDealProposal")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

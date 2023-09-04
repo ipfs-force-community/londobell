@@ -573,7 +573,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		actorStateCol := database.Collection("ActorState")
 		minerFundsCol := database.Collection("MinerFunds")
 		claimedPowerCol := database.Collection("ClaimedPower")
-		dealProposalCol := database.Collection("DealProposal")
+		newDealProposalCol := database.Collection("NewDealProposal")
 		messageCol := database.Collection("Message")
 		//messageBlockCol := database.Collection("MessageBlock")
 		blockMessageCol := database.Collection("BlockMessage")
@@ -588,7 +588,9 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		createMessageCol := database.Collection("CreateMessage")
 
 		cols := make([]*mongo.Collection, 0)
+
 		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol)
+
 		dbsm.UpdateDBCollectionsMap(db.Url(), config2.Collections{DB: database, Cols: cols})
 	}
 
@@ -680,7 +682,7 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 	actorStateCol := database.Collection("ActorState")
 	minerFundsCol := database.Collection("MinerFunds")
 	claimedPowerCol := database.Collection("ClaimedPower")
-	dealProposalCol := database.Collection("DealProposal")
+	newDealProposalCol := database.Collection("NewDealProposal")
 	messageCol := database.Collection("Message")
 	//messageBlockCol := database.Collection("MessageBlock")
 	blockMessageCol := database.Collection("BlockMessage")
@@ -694,7 +696,7 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 	actorAddressCol := database.Collection("ActorAddress")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, dealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol)
+	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol)
 
 	return config2.Collections{DB: database, Cols: cols}, nil
 }
@@ -950,120 +952,120 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols con
 	}
 }
 
-func (dbsm *DataBaseStateManager) GetDealRangeForDB(ctx context.Context, cols config2.Collections, dbType smodel.DType) (DealRange, error) {
-	cfg := dbsm.GetCfg()
-	countUtils := make([]CountUtil, 0)
-	for _, cold := range cfg.Colds {
-		if cold.IsInvalidDB() {
-			continue
-		}
-
-		state, found, err := dbsm.GetState(ctx, cold.Url())
-		if err != nil {
-			return DealRange{}, fmt.Errorf("load dbState for cold %v failed", cold.Url())
-		}
-
-		if !found {
-			return DealRange{}, fmt.Errorf("state of dsn %v not found, please run cfgUpdateCmd firstly", cold.Url())
-		}
-
-		countUtils = append(countUtils, CountUtil{Start: int64(state.GetDealStartID()), End: int64(state.GetDealEndID())})
-	}
-
-	// 逆序排序
-	sort.Slice(countUtils, func(i, j int) bool {
-		return countUtils[i].End > countUtils[j].End
-	})
-
-	startEpoch, err := GetStartEpochForDeal(ctx, cols)
-	if err != nil {
-		return DealRange{}, err
-	}
-
-	startDealID, err := GetStartDealID(ctx, cols, startEpoch)
-	if err != nil {
-		return DealRange{}, err
-	}
-
-	endDealID, err := GetEndDealID(ctx, cols, startEpoch)
-	if err != nil {
-		return DealRange{}, err
-	}
-
-	switch dbType {
-	case smodel.Formal:
-		if len(countUtils) != 0 {
-			latestEndDealID := uint64(countUtils[0].End)
-			if startDealID <= latestEndDealID {
-				startDealID = latestEndDealID
-			}
-		}
-
-		return DealRange{
-			Start: startDealID,
-			End:   endDealID,
-		}, nil
-
-	case smodel.Cold:
-		// 添加上下边界
-		minStartDealID := int64(0)
-		if len(countUtils) > 0 {
-			minStartDealID = countUtils[len(countUtils)-1].Start
-		}
-
-		if !cfg.Formal.IsInvalidDB() {
-			formalState, found, err := dbsm.GetState(ctx, cfg.Formal.Url())
-			if err != nil {
-				return DealRange{}, fmt.Errorf("load dbState for formal %v failed", cfg.Formal.Url())
-			}
-
-			if !found {
-				return DealRange{}, fmt.Errorf("state of dsn %v not found", cfg.Formal.Url())
-			}
-
-			countUtils = append(countUtils, CountUtil{Start: int64(formalState.GetDealStartID()), End: math.MaxInt64})
-			// 逆序排序
-			sort.Slice(countUtils, func(i, j int) bool {
-				return countUtils[i].End > countUtils[j].End
-			})
-		}
-
-		countUtils = append(countUtils, CountUtil{Start: 0, End: minStartDealID}, CountUtil{Start: math.MaxInt64, End: math.MaxInt64})
-		sort.Slice(countUtils, func(i, j int) bool {
-			return countUtils[i].Start > countUtils[j].Start
-		})
-
-		// 找出不连续的段
-		discontinuousSegment := make([]CountUtil, 0)
-		for i := 1; i < len(countUtils); i++ {
-			if countUtils[i-1].Start != countUtils[i].End {
-				discontinuousSegment = append(discontinuousSegment, CountUtil{
-					Start: countUtils[i].End,
-					End:   countUtils[i-1].Start,
-				})
-			}
-		}
-
-		sort.Slice(discontinuousSegment, func(i, j int) bool {
-			return discontinuousSegment[i].End > discontinuousSegment[j].End
-		})
-
-		for _, seg := range discontinuousSegment {
-			start := uint64(math.Max(float64(startDealID), float64(seg.Start)))
-			end := uint64(math.Min(float64(endDealID), float64(seg.End)))
-			if start >= end {
-				continue
-			}
-
-			return DealRange{Start: start, End: end}, nil
-		}
-
-		return DealRange{}, fmt.Errorf("no needed DealRange")
-
-	default:
-		return DealRange{}, fmt.Errorf("invalid db type: %v", dbType)
-	}
-}
+//func (dbsm *DataBaseStateManager) GetDealRangeForDB(ctx context.Context, cols config2.Collections, dbType smodel.DType) (DealRange, error) {
+//	cfg := dbsm.GetCfg()
+//	countUtils := make([]CountUtil, 0)
+//	for _, cold := range cfg.Colds {
+//		if cold.IsInvalidDB() {
+//			continue
+//		}
+//
+//		state, found, err := dbsm.GetState(ctx, cold.Url())
+//		if err != nil {
+//			return DealRange{}, fmt.Errorf("load dbState for cold %v failed", cold.Url())
+//		}
+//
+//		if !found {
+//			return DealRange{}, fmt.Errorf("state of dsn %v not found, please run cfgUpdateCmd firstly", cold.Url())
+//		}
+//
+//		countUtils = append(countUtils, CountUtil{Start: int64(state.GetDealStartID()), End: int64(state.GetDealEndID())})
+//	}
+//
+//	// 逆序排序
+//	sort.Slice(countUtils, func(i, j int) bool {
+//		return countUtils[i].End > countUtils[j].End
+//	})
+//
+//	startEpoch, err := GetStartEpochForDeal(ctx, cols)
+//	if err != nil {
+//		return DealRange{}, err
+//	}
+//
+//	startDealID, err := GetStartDealID(ctx, cols, startEpoch)
+//	if err != nil {
+//		return DealRange{}, err
+//	}
+//
+//	endDealID, err := GetEndDealID(ctx, cols, startEpoch)
+//	if err != nil {
+//		return DealRange{}, err
+//	}
+//
+//	switch dbType {
+//	case smodel.Formal:
+//		if len(countUtils) != 0 {
+//			latestEndDealID := uint64(countUtils[0].End)
+//			if startDealID <= latestEndDealID {
+//				startDealID = latestEndDealID
+//			}
+//		}
+//
+//		return DealRange{
+//			Start: startDealID,
+//			End:   endDealID,
+//		}, nil
+//
+//	case smodel.Cold:
+//		// 添加上下边界
+//		minStartDealID := int64(0)
+//		if len(countUtils) > 0 {
+//			minStartDealID = countUtils[len(countUtils)-1].Start
+//		}
+//
+//		if !cfg.Formal.IsInvalidDB() {
+//			formalState, found, err := dbsm.GetState(ctx, cfg.Formal.Url())
+//			if err != nil {
+//				return DealRange{}, fmt.Errorf("load dbState for formal %v failed", cfg.Formal.Url())
+//			}
+//
+//			if !found {
+//				return DealRange{}, fmt.Errorf("state of dsn %v not found", cfg.Formal.Url())
+//			}
+//
+//			countUtils = append(countUtils, CountUtil{Start: int64(formalState.GetDealStartID()), End: math.MaxInt64})
+//			// 逆序排序
+//			sort.Slice(countUtils, func(i, j int) bool {
+//				return countUtils[i].End > countUtils[j].End
+//			})
+//		}
+//
+//		countUtils = append(countUtils, CountUtil{Start: 0, End: minStartDealID}, CountUtil{Start: math.MaxInt64, End: math.MaxInt64})
+//		sort.Slice(countUtils, func(i, j int) bool {
+//			return countUtils[i].Start > countUtils[j].Start
+//		})
+//
+//		// 找出不连续的段
+//		discontinuousSegment := make([]CountUtil, 0)
+//		for i := 1; i < len(countUtils); i++ {
+//			if countUtils[i-1].Start != countUtils[i].End {
+//				discontinuousSegment = append(discontinuousSegment, CountUtil{
+//					Start: countUtils[i].End,
+//					End:   countUtils[i-1].Start,
+//				})
+//			}
+//		}
+//
+//		sort.Slice(discontinuousSegment, func(i, j int) bool {
+//			return discontinuousSegment[i].End > discontinuousSegment[j].End
+//		})
+//
+//		for _, seg := range discontinuousSegment {
+//			start := uint64(math.Max(float64(startDealID), float64(seg.Start)))
+//			end := uint64(math.Min(float64(endDealID), float64(seg.End)))
+//			if start >= end {
+//				continue
+//			}
+//
+//			return DealRange{Start: start, End: end}, nil
+//		}
+//
+//		return DealRange{}, fmt.Errorf("no needed DealRange")
+//
+//	default:
+//		return DealRange{}, fmt.Errorf("invalid db type: %v", dbType)
+//	}
+//}
 
 func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, newDB config2.DB, dbType smodel.DType, interval int64) error {
 	flog := log.With("FirstSetDataBaseState", newDB)

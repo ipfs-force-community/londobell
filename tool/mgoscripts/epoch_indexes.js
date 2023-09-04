@@ -116,6 +116,11 @@ db.MiningProfitability.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
 db.MultisigBalance.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 
+db.NewDealProposal.createIndex({"Epoch":1,"VerifiedDeal":1}, {"sparse": true});
+db.NewDealProposal.createIndex({"ProviderID":1,"_id":-1}, {"sparse": true});
+db.NewDealProposal.createIndex({"ClientID":1,"_id":-1}, {"sparse": true});
+db.NewDealProposal.createIndex({"Epoch":1,"_id":1}, {"sparse": true});
+
 db.PendingTxns.createIndex({"Addr":1}, {"sparse": true});
 db.PendingTxns.createIndex({"Epoch":1,"Addr":1}, {"sparse": true});
 db.PendingTxns.createIndex({"Epoch":1,"Addr":1,"Detail.TxnID":1}, {"sparse": true});

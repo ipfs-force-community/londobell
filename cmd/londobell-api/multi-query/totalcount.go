@@ -1030,17 +1030,7 @@ func refreshTotalCountForTipSets(ctx context.Context, state *segment.State, cols
 func refreshDealRange(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, methodName, actorID string) error {
 	switch state.GetDType() {
 	case smodel.Formal, smodel.Cold:
-		StartEpoch, err := GetStartEpochForDeal(ctx, cols)
-		if err != nil {
-			return err
-		}
-
-		startDealID, err := GetStartDealID(ctx, cols, StartEpoch)
-		if err != nil {
-			return err
-		}
-
-		endDealID, err := GetEndDealID(ctx, cols, StartEpoch)
+		startDealID, endDealID, err := GetDealIDRange(ctx, cols, int64(state.GetStartEpoch()), int64(state.GetEndEpoch()))
 		if err != nil {
 			return err
 		}
@@ -1121,19 +1111,9 @@ func refreshTotalCountForBlockMsgs(ctx context.Context, state *segment.State, co
 // actor筛选的，旧库不缓存？
 func refreshTotalCountForActorDeals(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
-	case smodel.Formal:
+	case smodel.Formal, smodel.Cold:
 		// todo: formal state 每次拿
-		StartEpoch, err := GetStartEpochForDeal(ctx, cols)
-		if err != nil {
-			return err
-		}
-
-		startDealID, err := GetStartDealID(ctx, cols, StartEpoch)
-		if err != nil {
-			return err
-		}
-
-		endDealID, err := GetEndDealID(ctx, cols, StartEpoch)
+		startDealID, endDealID, err := GetDealIDRange(ctx, cols, int64(state.GetStartEpoch()), int64(state.GetEndEpoch()))
 		if err != nil {
 			return err
 		}
@@ -1149,14 +1129,6 @@ func refreshTotalCountForActorDeals(ctx context.Context, state *segment.State, c
 
 		return nil
 	case smodel.Tmp:
-		return nil
-	case smodel.Cold:
-		count, err := GetDealActorStates(ctx, state, cols, actorID)
-		if err != nil {
-			return err
-		}
-
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetDealStartID()), End: int64(state.GetDealEndID()), DealActorStates: count, Cols: cols})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
@@ -2105,7 +2077,7 @@ func GetDealActorStates(ctx context.Context, state *segment.State, cols common.C
 		return 0, err
 	}
 
-	tableName := "DealProposal"
+	tableName := "NewDealProposal"
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == tableName {
 			cur, err := col.Aggregate(ctx, pipe)

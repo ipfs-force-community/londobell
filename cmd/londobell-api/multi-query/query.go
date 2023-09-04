@@ -7,6 +7,8 @@ import (
 	"sort"
 	"sync"
 
+	"go.mongodb.org/mongo-driver/mongo"
+
 	"github.com/ipfs-force-community/londobell/lib/limiter"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
@@ -98,7 +100,7 @@ func GetStartEpochForDeal(ctx context.Context, cols common.Collections) (int64, 
 	}
 
 	for _, col := range cols.Cols {
-		if col != nil && col.Name() == "DealProposal" {
+		if col != nil && col.Name() == "NewDealProposal" {
 			cur, err := col.Aggregate(ctx, pipe)
 			if err != nil {
 				return 0, err
@@ -117,74 +119,65 @@ func GetStartEpochForDeal(ctx context.Context, cols common.Collections) (int64, 
 		}
 	}
 
-	return 0, fmt.Errorf("no DealProposal collection")
+	return 0, fmt.Errorf("no NewDealProposal collection")
 }
 
-func GetStartDealID(ctx context.Context, cols common.Collections, startEpoch int64) (uint64, error) {
-	var res []struct {
-		StartDealID uint64
-	}
-
-	pipe, err := util.Parse(model.Ctx{StartEpoch: startEpoch}, string(monitor.GetStartDealIDAggregator()))
+func GetDealIDRange(ctx context.Context, cols common.Collections, startEpoch, endEpoch int64) (uint64, uint64, error) {
+	startDealID, endDealID := uint64(0), uint64(0)
+	startPipe, err := util.Parse(model.Ctx{StartEpoch: startEpoch, EndEpoch: endEpoch, Sort: 1}, string(monitor.GetDealIDRangeAggregator()))
 	if err != nil {
-		return 0, err
+		return 0, 0, err
+	}
+	endPipe, err := util.Parse(model.Ctx{StartEpoch: startEpoch, EndEpoch: endEpoch, Sort: -1}, string(monitor.GetDealIDRangeAggregator()))
+	if err != nil {
+		return 0, 0, err
 	}
 
 	for _, col := range cols.Cols {
-		if col != nil && col.Name() == "DealProposal" {
-			cur, err := col.Aggregate(ctx, pipe)
+		if col != nil && col.Name() == "NewDealProposal" {
+			var startRes []struct {
+				DealID uint64
+			}
+			var endRes []struct {
+				DealID uint64
+			}
+			startCur, err := col.Aggregate(ctx, startPipe)
 			if err != nil {
-				return 0, err
+				return 0, 0, err
 			}
 
-			err = cur.All(ctx, &res)
+			err = startCur.All(ctx, &startRes)
 			if err != nil {
-				return 0, err
+				return 0, 0, err
 			}
 
-			if len(res) == 0 {
-				return 0, nil
+			if len(startRes) == 0 {
+				return 0, 0, nil
 			}
 
-			return res[0].StartDealID, nil
+			startDealID = startRes[0].DealID
+
+			endCur, err := col.Aggregate(ctx, endPipe)
+			if err != nil {
+				return 0, 0, err
+			}
+
+			err = endCur.All(ctx, &endRes)
+			if err != nil {
+				return 0, 0, err
+			}
+
+			if len(endRes) == 0 {
+				return 0, 0, nil
+			}
+
+			endDealID = endRes[0].DealID + 1
+
+			return startDealID, endDealID, nil
 		}
 	}
 
-	return 0, fmt.Errorf("no DealProposal collection")
-}
-
-// max dealID+1
-func GetEndDealID(ctx context.Context, cols common.Collections, startEpoch int64) (uint64, error) {
-	var res []struct {
-		EndDealID uint64
-	}
-
-	pipe, err := util.Parse(model.Ctx{StartEpoch: startEpoch}, string(monitor.GetEndDealIDAggregator()))
-	if err != nil {
-		return 0, err
-	}
-
-	for _, col := range cols.Cols {
-		if col != nil && col.Name() == "DealProposal" {
-			cur, err := col.Aggregate(ctx, pipe)
-			if err != nil {
-				return 0, err
-			}
-
-			err = cur.All(ctx, &res)
-			if err != nil {
-				return 0, err
-			}
-
-			if len(res) == 0 {
-				return 0, nil
-			}
-
-			return res[0].EndDealID + 1, nil
-		}
-	}
-
-	return 0, fmt.Errorf("no DealProposal collection")
+	return 0, 0, fmt.Errorf("no NewDealProposal collection")
 }
 
 //// todo: 递归
@@ -775,6 +768,308 @@ func MultiUnionQuery(ctx context.Context, pipe interface{}, countLists []CountUt
 			}
 
 			return nil
+		})
+	}
+
+	if err := ewg.Wait(); err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < len(res); i++ {
+		result = append(result, res[i]...)
+	}
+
+	return result, nil
+}
+
+// actor message
+func MultiBiSearch(ctx context.Context, indexReq, limitReq int64, countUtils []CountUtil, aggregator, countAgg []byte,
+	req model.CommonReq, tableName string, ptype Ptype) ([]bson.M, error) {
+	sum := int64(0)
+	result := []bson.M{}
+	for i := range countUtils {
+		tmp := int64(0)
+		switch ptype {
+		case ActorStates:
+			tmp = countUtils[i].ActorStates
+		case ActorMethodStates:
+			tmp = countUtils[i].ActorMethodStates
+		case MinedStates:
+			tmp = countUtils[i].MinedStates
+		default:
+			return nil, fmt.Errorf("not support bi search")
+		}
+		if sum+tmp <= indexReq {
+			sum += tmp
+			continue
+		}
+
+		remainSum := indexReq - sum
+		// 找到最大的一个start使得 start->countUtil.end的个数和>剩下的sum个数
+		start, rangeSum, startSum, err := BiSearch(ctx, remainSum, countUtils[i], countAgg, tableName, req)
+		if err != nil {
+			log.Errorf("bi search failed : %w", err)
+			return nil, err
+		}
+		// 从start+1开始，倒序统计从start+1->countUtils.start的 limit+剩下的sum个数的
+		res, err := GetDetail(ctx, start+1, limitReq+(startSum-(rangeSum-remainSum)), countUtils[i], aggregator, tableName, req)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, res[int(startSum-(rangeSum-remainSum)):]...)
+		// 从下一个countUtil开始
+		countUtilsIdx := i + 1
+		for len(result) < int(limitReq) && countUtilsIdx < len(countUtils) {
+			tmp := int64(0)
+			switch ptype {
+			case ActorStates:
+				tmp = countUtils[i].ActorStates
+			case ActorMethodStates:
+				tmp = countUtils[i].ActorMethodStates
+			case MinedStates:
+				tmp = countUtils[i].MinedStates
+			default:
+				return nil, fmt.Errorf("not support bi search")
+			}
+
+			if tmp != 0 {
+				res, err := GetDetail(ctx, countUtils[countUtilsIdx].End, limitReq-int64(len(result)), countUtils[countUtilsIdx], aggregator, tableName, req)
+				if err != nil {
+					return nil, err
+				}
+				result = append(result, res...)
+			}
+			countUtilsIdx++
+		}
+		break
+	}
+
+	return result, nil
+}
+
+func BiSearch(ctx context.Context, targetSum int64, countUtil CountUtil, countAgg []byte, tableName string, req model.CommonReq) (int64, int64, int64, error) {
+	l, r := countUtil.Start, countUtil.End
+	res := countUtil.Start
+	col1 := &mongo.Collection{}
+	for i := range countUtil.Cols.Cols {
+		if countUtil.Cols.Cols[i] != nil && countUtil.Cols.Cols[i].Name() == tableName {
+			col1 = countUtil.Cols.Cols[i]
+		}
+	}
+	resCount := int64(0)
+	startSum := int64(0)
+	for l < r {
+		mid := (l + r) / 2
+		rangeSum, err := CommonCount(ctx, col1, req, countAgg, mid, countUtil.End)
+		if err != nil {
+			log.Errorf("count address messages failed: %w", err)
+			return 0, 0, 0, err
+		}
+
+		if rangeSum > targetSum {
+			res = mid
+			resCount = rangeSum
+
+			l = mid + 1
+		} else {
+			r = mid
+		}
+	}
+	startSum, err := CommonCount(ctx, col1, req, countAgg, res, res+1)
+	return res, resCount, startSum, err
+}
+
+func CommonCount(ctx context.Context, col *mongo.Collection, req model.CommonReq, countAgg []byte, st, ed int64) (int64, error) {
+	pipe, err := util.Parse(model.Ctx{StartEpoch: st, EndEpoch: ed, Addr: req.Addr, Sort: -1,
+		Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, To: req.To, Addrs: req.Addrs}, string(countAgg))
+	if err != nil {
+		return 0, err
+	}
+	var countRes []model.CountRes
+	cur, err := col.Aggregate(ctx, pipe)
+	if err != nil {
+		return 0, err
+	}
+	err = cur.All(ctx, &countRes)
+	if err != nil {
+		return 0, err
+	}
+	res := int64(0)
+	if len(countRes) != 0 {
+		res = countRes[0].Count
+	}
+	return res, nil
+}
+
+func GetDetail(ctx context.Context, end, limit int64, countUtil CountUtil, aggregator []byte, tableName string, req model.CommonReq) ([]bson.M, error) {
+	col1 := &mongo.Collection{}
+	for i := range countUtil.Cols.Cols {
+		if countUtil.Cols.Cols[i] != nil && countUtil.Cols.Cols[i].Name() == tableName {
+			col1 = countUtil.Cols.Cols[i]
+		}
+	}
+	pipe, err := util.Parse(model.Ctx{StartEpoch: countUtil.Start, EndEpoch: end, Addr: req.Addr, Sort: -1, Limit: limit,
+		Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, To: req.To, Addrs: req.Addrs}, string(aggregator))
+	if err != nil {
+		log.Errorf("get detail parse pipe failed: %w", err)
+		return nil, err
+	}
+
+	cur, err := col1.Aggregate(ctx, pipe)
+	if err != nil {
+		log.Errorf("get detail agg failed: %w", err)
+		return nil, err
+	}
+	var aggRes []bson.M
+	err = cur.All(ctx, &aggRes)
+	if err != nil {
+		log.Errorf("get detail all failed: %w", err)
+		return nil, err
+	}
+	return aggRes, nil
+}
+
+// MultiPagingQueryForDeal 对deal分页查询，
+func MultiPagingQueryForDeal(ctx context.Context, indexReq, limitReq int64, ptype Ptype, countUtils []CountUtil, aggregator []byte, req model.CommonReq, tableName string) ([]bson.M, error) {
+	if ptype != DealState {
+		return nil, fmt.Errorf("use MultiPagingQueryForDeal for non deal, ptype: %v", ptype)
+	}
+
+	// skip、limit
+	skipTag := func(skip, count int64) bool {
+		return skip < count
+	}
+	limitTag := func(requestTotalCount, count int64) bool {
+		return requestTotalCount <= count
+	}
+
+	// todo: skip=0 & limit=0 获取全量？
+	skip := int64(0)
+	limit := int64(math.MaxInt64)
+	requestTotalCount := int64(math.MaxInt64)
+
+	if indexReq > 0 || limitReq > 0 {
+		skip = indexReq * limitReq
+		limit = limitReq
+		requestTotalCount = skip + limit
+	}
+
+	segmentLists := make([]*segmentUtil, 0)
+
+	// 锁定库
+	for _, countlist := range countUtils {
+		totalCount := int64(0)
+		totalCount = countlist.DealState
+
+		segment := &segmentUtil{start: countlist.Start, end: countlist.End, Cols: countlist.Cols,
+			BlockStates:               countlist.BlockStates,
+			BlockMethodStates:         countlist.BlockMethodStates,
+			ActorStates:               countlist.ActorStates,
+			ActorMethodStates:         countlist.ActorMethodStates,
+			ActorTransferStates:       countlist.ActorTransferStates,
+			MinedStates:               countlist.MinedStates,
+			LargeAmountTransferStates: countlist.LargeAmountTransferStates,
+			DealState:                 countlist.DealState,
+			DealActorStates:           countlist.DealActorStates,
+			TipSetStates:              countlist.TipSetStates,
+		}
+
+		skipflag := skipTag(skip, totalCount)
+		limitflag := limitTag(requestTotalCount, totalCount)
+		if skipflag && limitflag {
+			segment.skip = skip
+			segment.limit = limit
+			segmentLists = append(segmentLists, segment)
+			break
+		}
+		if skipflag && !limitflag {
+			segment.skip = skip
+			segment.limit = limit
+			segmentLists = append(segmentLists, segment)
+			skip = 0
+			limit = requestTotalCount - totalCount
+			requestTotalCount = requestTotalCount - totalCount // skip 1, limit 5  tmp 8
+			continue
+		}
+		if !skipflag {
+			skip = skip - totalCount
+			requestTotalCount = skip + limit
+			continue
+		}
+	}
+
+	// 直接根据范围拿分页内容，不用skip
+	aggLists := make([]*aggUtil, 0)
+	for _, segmentList := range segmentLists {
+		start := segmentList.start
+		end := segmentList.end
+		skip := segmentList.skip
+		limit := segmentList.limit
+
+		if segmentList.skip > 0 {
+			end = segmentList.end - segmentList.skip
+			start = end - (segmentList.limit)
+			skip = 0
+			limit = segmentList.limit
+		}
+
+		aggLists = append(aggLists, &aggUtil{
+			start: start,
+			end:   end,
+			skip:  skip,
+			limit: limit,
+			cols:  segmentList.Cols,
+			count: segmentList.DealState,
+		})
+	}
+
+	// concurrent agg
+	var (
+		res    = make([][]bson.M, len(aggLists))
+		result = make([]bson.M, 0)
+		ewg    multierror.Group
+	)
+
+	lim := limiter.New(16)
+
+	for i := range aggLists {
+		i := i
+		aggList := aggLists[i]
+		ewg.Go(func() error {
+			if !lim.Acquire(ctx) {
+				return nil
+			}
+
+			defer func() {
+				lim.Release(ctx)
+			}()
+
+			var aggRes []bson.M
+
+			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Start: aggList.start, End: aggList.end, Skip: aggList.skip, Limit: aggList.limit, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, Sort: req.Sort, To: req.To, Addrs: req.Addrs, Addr: req.Addr}, string(aggregator)) // todo: methodName
+			if err != nil {
+				return err
+			}
+
+			for _, col := range aggList.cols.Cols {
+				if col != nil && col.Name() == tableName {
+					cur, err := col.Aggregate(ctx, pipe)
+					if err != nil {
+						return err
+					}
+
+					err = cur.All(ctx, &aggRes)
+					if err != nil {
+						return err
+					}
+
+					res[i] = aggRes
+
+					return nil
+				}
+			}
+
+			return fmt.Errorf("no collection: %v", tableName)
 		})
 	}
 

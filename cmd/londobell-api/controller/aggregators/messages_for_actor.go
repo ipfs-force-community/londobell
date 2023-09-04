@@ -1,11 +1,12 @@
 package aggregators
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
 
-	"context"
+	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/gin-gonic/gin"
@@ -19,6 +20,7 @@ import (
 var (
 	CreateMessageCol = "CreateMessage"
 	ActorMessageCol  = "ActorMessage"
+	ActorMsgCountKey = "ActorMsgCount"
 )
 
 func GetMessagesForActor(c *gin.Context) {
@@ -52,28 +54,31 @@ func GetMessagesForActor(c *gin.Context) {
 
 	var messagesForActor []model.MessageForActor
 	var messagesForCreate []model.MessageForActor
+	limit := req.Limit
+	indexReq := req.Limit * req.Index
 
-	// first search In create col
-	creatCtx := context.WithValue(ctx, multiquery.TableKey, CreateMessageCol)
-	messagesForCreate, totalCount, err = getActorMsgs(creatCtx, req.Limit, totalCount, req, curEpoch)
-
+	// 倒序,先从 actor col查询
+	actorCtx := context.WithValue(ctx, multiquery.TableKey, ActorMessageCol)
+	messagesForActor, totalCount, err = getActorMsgs(actorCtx, indexReq, limit, totalCount, req, curEpoch)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	// update limit
-	if req.Limit < int64(len(messagesForCreate)) {
-		res.Data = model.MessagesForActorRes{TotalCount: req.Limit, MessagesForActor: messagesForCreate[:req.Limit]}
+	if limit <= int64(len(messagesForActor)) {
+		res.Data = model.MessagesForActorRes{TotalCount: req.Limit, MessagesForActor: messagesForActor[:req.Limit]}
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	limit := req.Limit - int64(len(messagesForCreate))
 
-	// search actor col
-	actorCtx := context.WithValue(ctx, multiquery.TableKey, ActorMessageCol)
-	messagesForActor, totalCount, err = getActorMsgs(actorCtx, limit, totalCount, req, curEpoch)
+	// update limit && reqIndex
+	limit, indexReq = updateStartLimit(indexReq, limit, int64(len(messagesForActor)), totalCount)
+
+	// search In create col
+	creatCtx := context.WithValue(ctx, multiquery.TableKey, CreateMessageCol)
+	messagesForCreate, totalCount, err = getActorMsgs(creatCtx, indexReq, limit, totalCount, req, curEpoch)
+
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -84,7 +89,7 @@ func GetMessagesForActor(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-func getActorMsgs(ctx context.Context, limit, count int64, req model.CommonReq, curEpoch abi.ChainEpoch) ([]model.MessageForActor, int64, error) {
+func getActorMsgs(ctx context.Context, indexReq, limit, count int64, req model.CommonReq, curEpoch abi.ChainEpoch) ([]model.MessageForActor, int64, error) {
 	var (
 		messagesForActor []model.MessageForActor
 		countUtils       []multiquery.CountUtil
@@ -99,7 +104,9 @@ func getActorMsgs(ctx context.Context, limit, count int64, req model.CommonReq, 
 		count += countUtil.ActorStates
 	}
 
-	multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, limit, multiquery.ActorStates, countUtils, messagesForActorAggregator, req, colName)
+	// multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, limit, multiquery.ActorStates, countUtils, messagesForActorAggregator, req, colName)
+	multiResult, err := multiquery.MultiBiSearch(ctx, indexReq, limit, countUtils, actorMessageNoSkip,
+		monitor.GetCountOfMessageForActorAggregator(), req, colName, multiquery.ActorStates)
 	if err != nil {
 		return messagesForActor, count, err
 	}
@@ -119,4 +126,11 @@ func getActorMsgs(ctx context.Context, limit, count int64, req model.CommonReq, 
 		}
 	}
 	return messagesForActor, count, nil
+}
+
+// 多表查询,更新reqLimit*req.Index Limit
+func updateStartLimit(start, limit, lastResultsLen, lastCount int64) (int64, int64) {
+	limit -= lastResultsLen
+	start -= lastCount
+	return limit, start
 }

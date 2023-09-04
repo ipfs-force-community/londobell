@@ -534,7 +534,7 @@ func (s *Segment) GetLatestDealID(ctx context.Context) (int64, error) {
 
 	findOpts := make([]*options.FindOptions, 0)
 	findOpts = append(findOpts, options.Find().SetSort(bson.D{{Key: "_id", Value: -1}}), options.Find().SetLimit(-1))
-	cursor, err := s.rdb.Find(ctx, "DealProposal", bson.D{}, findOpts...)
+	cursor, err := s.rdb.Find(ctx, "NewDealProposal", bson.D{}, findOpts...)
 	if err != nil {
 		return 0, err
 	}

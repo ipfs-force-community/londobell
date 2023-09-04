@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	pool_monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -63,9 +64,11 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 	var blockHeadersByMiner []model.BlockHeader
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.MinedStates, countUtils, blockHeadersByMinerAggregator, req, "BlockHeader")
+		multiResult, err := multiquery.MultiBiSearch(ctx, req.Index*req.Limit, req.Limit, countUtils, pool_monitor.GetBlockHeadersByMinerNoSkipAggregator(),
+			pool_monitor.GetMinedCountForMinersAggregator(), req, "BlockHeader", multiquery.MinedStates)
+		//multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.MinedStates, countUtils, blockHeadersByMinerAggregator, req, "BlockHeader")
 		if err != nil {
-			alog.Error(err)
+			//alog.Error(err)
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
