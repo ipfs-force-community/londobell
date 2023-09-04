@@ -700,7 +700,7 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 
 func GetTipSetStartEpoch(ctx context.Context, cols config2.Collections) (abi.ChainEpoch, error) {
 	var boundaryRes []Boundrary
-	pipe, err := util.Parse(model.Ctx{}, string(monitor.GetBoundaryOfDBAggregator()))
+	pipe, err := util.Parse(model.Ctx{}, string(monitor.GetBoundaryOfDbAggregator()))
 	if err != nil {
 		return 0, err
 	}

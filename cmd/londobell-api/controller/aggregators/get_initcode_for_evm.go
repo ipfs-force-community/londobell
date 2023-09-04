@@ -44,7 +44,7 @@ func GetInitCodeForEvm(c *gin.Context) {
 		return
 	}
 
-	pipe, err := util.Parse(model.Ctx{Addr: req.Addr}, monitor.GetEvmInitCodeByActorIDAggregator())
+	pipe, err := util.Parse(model.Ctx{Addr: req.Addr}, monitor.GetGetEvminitcodeByActorIDAggregator())
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

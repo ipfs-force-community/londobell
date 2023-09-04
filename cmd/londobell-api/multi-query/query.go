@@ -94,7 +94,7 @@ func GetStartEpochForDeal(ctx context.Context, cols common.Collections) (int64, 
 		Epoch int64
 	}
 
-	pipe, err := util.Parse(model.Ctx{}, string(monitor.GetStartEpochForDealAggregator()))
+	pipe, err := util.Parse(model.Ctx{}, string(monitor.GetStartepochForDealAggregator()))
 	if err != nil {
 		return 0, err
 	}
@@ -124,11 +124,11 @@ func GetStartEpochForDeal(ctx context.Context, cols common.Collections) (int64, 
 
 func GetDealIDRange(ctx context.Context, cols common.Collections, startEpoch, endEpoch int64) (uint64, uint64, error) {
 	startDealID, endDealID := uint64(0), uint64(0)
-	startPipe, err := util.Parse(model.Ctx{StartEpoch: startEpoch, EndEpoch: endEpoch, Sort: 1}, string(monitor.GetDealIDRangeAggregator()))
+	startPipe, err := util.Parse(model.Ctx{StartEpoch: startEpoch, EndEpoch: endEpoch, Sort: 1}, string(monitor.GetDealidRangeAggregator()))
 	if err != nil {
 		return 0, 0, err
 	}
-	endPipe, err := util.Parse(model.Ctx{StartEpoch: startEpoch, EndEpoch: endEpoch, Sort: -1}, string(monitor.GetDealIDRangeAggregator()))
+	endPipe, err := util.Parse(model.Ctx{StartEpoch: startEpoch, EndEpoch: endEpoch, Sort: -1}, string(monitor.GetDealidRangeAggregator()))
 	if err != nil {
 		return 0, 0, err
 	}

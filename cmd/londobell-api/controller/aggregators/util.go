@@ -813,7 +813,7 @@ func GetEventsByRoot(ctx context.Context, root string) ([]types.Event, error) {
 		return nil, err
 	}
 
-	pipe, err := util.Parse(model.Ctx{Cid: root}, monitor.GetEventsRootAggregator())
+	pipe, err := util.Parse(model.Ctx{Cid: root}, monitor.GetEventsrootAggregator())
 	if err != nil {
 		return nil, err
 	}
@@ -900,7 +900,7 @@ func GetCidFromEthHash(ctx context.Context, hash string) (string, error) {
 		return "", err
 	}
 
-	pipe, err := util.Parse(model.Ctx{Cid: hash}, string(monitor.GetMessageCidByHashAggregator()))
+	pipe, err := util.Parse(model.Ctx{Cid: hash}, string(monitor.GetMessagecidByHashAggregator()))
 	if err != nil {
 		return "", err
 	}
@@ -945,7 +945,7 @@ func GetEthHashByCid(ctx context.Context, mcidStr string) (string, error) {
 		return "", err
 	}
 
-	pipe, err := util.Parse(model.Ctx{Cid: mcidStr}, string(monitor.GetHashByMessageCidAggregator()))
+	pipe, err := util.Parse(model.Ctx{Cid: mcidStr}, string(monitor.GetHashByMessagecidAggregator()))
 	if err != nil {
 		return "", err
 	}
