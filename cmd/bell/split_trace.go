@@ -314,7 +314,7 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 	log.Infof("split task start: %s,current: %s,end: %s", sp.Start, sp.Current, sp.End)
 	start := time.Now()
 	// 构建查询过滤器
-	filter := bson.M{"_id": bson.M{"$gte": minID, "$lte": maxID}}
+	filter := bson.M{"_id": bson.M{"$gte": minID, "$lte": maxID}, "Msg.MethodName": bson.M{"$in": model.CreateMethods}}
 
 	cursor, err := TraceCol.Find(ctx, filter, opts)
 	if err != nil {
