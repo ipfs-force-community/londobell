@@ -43,6 +43,13 @@ func NewDB(url, name string) DB {
 	}
 }
 
+func EmptyDB() DB {
+	return DB{
+		URL:    "",
+		DBName: "",
+	}
+}
+
 func (db DB) Url() string {
 	return db.URL
 }

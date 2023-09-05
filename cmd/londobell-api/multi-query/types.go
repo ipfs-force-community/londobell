@@ -25,6 +25,7 @@ const (
 	DealState
 	DealActorStates
 	TipSetStates
+	AllStates
 )
 
 // use for context

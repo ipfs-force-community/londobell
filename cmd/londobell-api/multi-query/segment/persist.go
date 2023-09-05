@@ -310,6 +310,45 @@ func (s *Segment) AddUpSegment(ctx context.Context, log *zap.SugaredLogger, segm
 	return newSegmentStates, nil
 }
 
+func (s *Segment) DeleteDBState(ctx context.Context, log *zap.SugaredLogger, dsn string) error {
+	filter := bson.D{{Key: "Dsn", Value: dsn}}
+	deleteCount, err := s.db.Delete(ctx, "DBState", filter)
+	if err != nil {
+		log.Errorf("delete DBState for %v failed: %v", dsn, err)
+		return err
+	}
+
+	log.Infof("delete DBState for %v successfully, deleteCount: %v", dsn, deleteCount)
+
+	return nil
+}
+
+func (s *Segment) DeleteBlockState(ctx context.Context, log *zap.SugaredLogger, dsn string) error {
+	filter := bson.D{{Key: "Dsn", Value: dsn}}
+	deleteCount, err := s.db.Delete(ctx, "BlockState", filter)
+	if err != nil {
+		log.Errorf("delete BlockState for %v failed: %v", dsn, err)
+		return err
+	}
+
+	log.Infof("delete BlockState for %v successfully, deleteCount: %v", dsn, deleteCount)
+
+	return nil
+}
+
+func (s *Segment) DeleteBlockMethodState(ctx context.Context, log *zap.SugaredLogger, dsn string) error {
+	filter := bson.D{{Key: "Dsn", Value: dsn}}
+	deleteCount, err := s.db.Delete(ctx, "BlockMethodState", filter)
+	if err != nil {
+		log.Errorf("delete BlockMethodState for %v failed: %v", dsn, err)
+		return err
+	}
+
+	log.Infof("delete BlockMethodState for %v successfully, deleteCount: %v", dsn, deleteCount)
+
+	return nil
+}
+
 func (s *Segment) GetState(ctx context.Context, dsn string) (*State, bool, error) {
 	dbState, found, err := s.GetDBState(ctx, dsn)
 	if err != nil {
