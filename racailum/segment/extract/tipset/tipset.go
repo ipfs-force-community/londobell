@@ -538,7 +538,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				tracecnt++
 				// update callerAddrMap
 				callerAddrMap[met.ID] = met.Msg.From
-				elog.Info(callerAddrMap)
+				//elog.Info(callerAddrMap)
 				res.Docs = append(res.Docs, met)
 				//if meg != nil && len(meg.Charges) > 0 {
 				//	res.Docs = append(res.Docs, meg)
