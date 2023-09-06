@@ -333,7 +333,8 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 				return segmentList.BlockStates[i].StartEpoch > segmentList.BlockStates[j].StartEpoch
 			})
 
-			aggLists = aggListsFromSegmentState(segmentList.BlockStates, segmentList.skip, segmentList.limit, segmentList.Cols, skipTag, limitTag)
+			innerAggLists := aggListsFromSegmentState(segmentList.BlockStates, segmentList.skip, segmentList.limit, segmentList.Cols, skipTag, limitTag)
+			aggLists = append(aggLists, innerAggLists...)
 		}
 	case BlockMethodStates:
 		for _, segmentList := range segmentLists {
@@ -341,7 +342,8 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 				return segmentList.BlockMethodStates[i].StartEpoch > segmentList.BlockMethodStates[j].StartEpoch
 			})
 
-			aggLists = aggListsFromSegmentState(segmentList.BlockMethodStates, segmentList.skip, segmentList.limit, segmentList.Cols, skipTag, limitTag)
+			innerAggLists := aggListsFromSegmentState(segmentList.BlockMethodStates, segmentList.skip, segmentList.limit, segmentList.Cols, skipTag, limitTag)
+			aggLists = append(aggLists, innerAggLists...)
 		}
 	case BlockHeaderMethodStates:
 		for _, segmentList := range segmentLists {
