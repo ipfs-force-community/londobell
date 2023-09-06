@@ -33,4 +33,5 @@ type MinersInfoRes struct {
 	States                 interface{}
 	Multiaddrs             interface{}
 	PeerID                 interface{}
+	UnprovenSectorCount    uint64
 }
