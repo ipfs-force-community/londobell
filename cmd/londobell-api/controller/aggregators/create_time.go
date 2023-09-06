@@ -132,103 +132,133 @@ func GetCreateTime(c *gin.Context) {
 			c.JSON(http.StatusOK, res)
 			return
 		}
-	case builtin.IsStorageMinerActor(actor.Code):
-		// CreateMiner
-		req.MethodName = "CreateMiner"
-		//req.To = sbuiltin.StoragePowerActorAddr.String()[1:]
-		//req.Method = 2
-	case builtin.IsEvmActor(actor.Code):
-		// CreateExternal
-		req.MethodName = "CreateExternal"
-		//req.To = sbuiltin.EthereumAddressManagerActorAddr.String()[1:]
-		//req.Method = 4
+	// case builtin.IsStorageMinerActor(actor.Code):
+	// CreateMiner
+	// req.MethodName = "CreateMiner"
+	//req.To = sbuiltin.StoragePowerActorAddr.String()[1:]
+	//req.Method = 2
+	// case builtin.IsEvmActor(actor.Code):
+	// CreateExternal
+	// req.MethodName = "CreateExternal"
+	//req.To = sbuiltin.EthereumAddressManagerActorAddr.String()[1:]
+	//req.Method = 4
 	default:
 		// Exec
-		req.MethodName = "Exec"
+		// req.MethodName = "Exec"
 		//req.To = sbuiltin.InitActorAddr.String()[1:]
 		//req.Method = 2
+		// CreateMsgTimeAggregator := `
+		// [
+		// 	{
+		// 		$match: {
+		// 			"ActorID": ctx.Addr,
+		// 			"IsBlock": true,
+		// 		}
+		// 	},
+		// 	{
+		// 		$sort: {
+		// 			"Epoch": 1  // 创建表理论上含有ActorID的doc只有一个
+		// 		}
+		// 	},
+		// 	{
+		// 		$limit: 1
+		// 	},
+		// 	{
+		// 		$project: {
+		// 			_id: 0,
+		// 			Epoch: "$Epoch"
+		// 		}
+		// 	}
+		// ]
+		// `
+
+		pipe, err := util.Parse(model.Ctx{Addr: req.Addr}, timeOfCreateAggregator)
+
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+		countUtils, err := multiquery.GetColsOnly(&multiquery.DBStateManager)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		var createTimeRes model.TimeOfTraceRes
+
+		// multi dbs query
+		{
+			multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "CreateMessage")
+			if err != nil {
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
+				return
+			}
+
+			if len(multiResult) == 0 {
+				c.JSON(http.StatusOK, res)
+				return
+			}
+
+			raw := multiResult[0]
+			rawByte, err := json.Marshal(raw)
+			if err != nil {
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
+				return
+			}
+
+			err = json.Unmarshal(rawByte, &createTimeRes)
+			if err != nil {
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
+				return
+			}
+		}
+
+		res.Data = createTimeRes
+		c.JSON(http.StatusOK, res)
 	}
 
-	ID, err := api.StateLookupID(ctx, addr, types.EmptyTSK)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
+	// ID, err := api.StateLookupID(ctx, addr, types.EmptyTSK)
+	// if err != nil {
+	// 	alog.Error(err)
+	// 	util.ReturnOnErr(c, err)
+	// 	return
+	// }
 
-	idStr := ID.String()[1:]
+	// idStr := ID.String()[1:]
+	// if builtin.IsEvmActor(actor.Code) {
+	// 	id, err := address.IDFromAddress(ID)
+	// 	if err != nil {
+	// 		alog.Error(err)
+	// 		util.ReturnOnErr(c, err)
+	// 		return
+	// 	}
 
-	var pipe interface{}
-	if builtin.IsEvmActor(actor.Code) {
-		id, err := address.IDFromAddress(ID)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
+	// 	pipe, err = util.Parse(model.Ctx{ID: id, IDStr: idStr, MethodName: req.MethodName}, string(createMessageAggregator))
+	// 	if err != nil {
+	// 		alog.Error(err)
+	// 		util.ReturnOnErr(c, err)
+	// 		return
+	// 	}
+	// } else {
+	// 	robust, err := GetRobustByID(ctx, api, ID, actor)
+	// 	if err != nil {
+	// 		alog.Error(err)
+	// 		util.ReturnOnErr(c, err)
+	// 		return
+	// 	}
 
-		pipe, err = util.Parse(model.Ctx{ID: id, IDStr: idStr, MethodName: req.MethodName}, string(createMessageAggregator))
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-	} else {
-		robust, err := GetRobustByID(ctx, api, ID, actor)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
+	// 	req.Addr = robust
+	// 	pipe, err = util.Parse(model.Ctx{Addr: req.Addr, IDStr: idStr, MethodName: req.MethodName}, string(createTimeAggregator))
+	// 	if err != nil {
+	// 		alog.Error(err)
+	// 		util.ReturnOnErr(c, err)
+	// 		return
+	// 	}
+	// }
 
-		req.Addr = robust
-		pipe, err = util.Parse(model.Ctx{Addr: req.Addr, IDStr: idStr, MethodName: req.MethodName}, string(createTimeAggregator))
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-	}
-
-	countUtils, err := multiquery.GetColsOnly(&multiquery.DBStateManager)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	var createTimeRes model.TimeOfTraceRes
-
-	// multi dbs query
-	{
-		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "ExecTrace")
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		if len(multiResult) == 0 {
-			c.JSON(http.StatusOK, res)
-			return
-		}
-
-		raw := multiResult[0]
-		rawByte, err := json.Marshal(raw)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		err = json.Unmarshal(rawByte, &createTimeRes)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-	}
-
-	res.Data = createTimeRes
-	c.JSON(http.StatusOK, res)
 }

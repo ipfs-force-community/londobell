@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/gin-gonic/gin"
@@ -18,9 +19,51 @@ import (
 )
 
 var (
-	CreateMessageCol = "CreateMessage"
-	ActorMessageCol  = "ActorMessage"
-	ActorMsgCountKey = "ActorMsgCount"
+	CreateMessageCol            = "CreateMessage"
+	ActorMessageCol             = "ActorMessage"
+	ActorMsgCountKey            = "ActorMsgCount"
+	MessagesForCreateAggregator = `
+	// CreateMessage
+	// ms ActorID_1_IsBlock_1_Epoch_1
+	[
+		{
+			$match: {
+				"ActorID": ctx.Addr,
+				"IsBlock": true,
+			}
+		},
+		{
+			$sort: {
+				Epoch: -1
+			}
+		},
+		{
+			$skip: ctx.Skip
+		},		
+		{
+			$limit: ctx.Limit
+		},
+		{
+			$project: {
+				_id: 0,
+				Cid: {
+					$cond: {
+						if:{
+							$eq:["$SignedCid", null]
+						}, then: "$Cid",
+						else: "$SignedCid"
+					}
+				},
+				Epoch: "$Epoch",
+				From: "$From",
+				To: "$To",
+				Value: "$Value",
+				ExitCode: "$ExitCode",
+				Method: "$MethodName",
+			}
+		}
+	]	
+	`
 )
 
 func GetMessagesForActor(c *gin.Context) {
@@ -72,7 +115,7 @@ func GetMessagesForActor(c *gin.Context) {
 		return
 	}
 
-	// update limit && reqIndex
+	// update limit && reqIndex actor数据不足reqIndex
 	limit, indexReq = updateStartLimit(indexReq, limit, int64(len(messagesForActor)), totalCount)
 
 	// search In create col
@@ -94,6 +137,8 @@ func getActorMsgs(ctx context.Context, indexReq, limit, count int64, req model.C
 		messagesForActor []model.MessageForActor
 		countUtils       []multiquery.CountUtil
 		err              error
+		multiResult      []primitive.M
+		pipe             interface{}
 	)
 	colName := ctx.Value(multiquery.TableKey).(string)
 	countUtils, err = multiquery.GetTotalCountForActorMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
@@ -104,9 +149,26 @@ func getActorMsgs(ctx context.Context, indexReq, limit, count int64, req model.C
 		count += countUtil.ActorStates
 	}
 
+	// 检测越界(主要防止双表越界)
+	if count <= indexReq {
+		return messagesForActor, count, err
+	}
+
+	if colName == CreateMessageCol {
+
+		pipe, err = util.Parse(model.Ctx{Addr: req.Addr, Limit: limit, Skip: indexReq}, monitor.GetMessagesForCreateAggregator())
+
+		if err != nil {
+			return messagesForActor, count, err
+		}
+		multiResult, err = multiquery.MultiTraversalQuery(ctx, pipe, countUtils, colName)
+	} else {
+		multiResult, err = multiquery.MultiBiSearch(ctx, indexReq, limit, countUtils, actorMessageNoSkip,
+			monitor.GetCountOfMessageForActorAggregator(), req, colName, multiquery.ActorStates)
+	}
+
 	// multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, limit, multiquery.ActorStates, countUtils, messagesForActorAggregator, req, colName)
-	multiResult, err := multiquery.MultiBiSearch(ctx, indexReq, limit, countUtils, actorMessageNoSkip,
-		monitor.GetCountOfMessageForActorAggregator(), req, colName, multiquery.ActorStates)
+
 	if err != nil {
 		return messagesForActor, count, err
 	}
@@ -130,7 +192,15 @@ func getActorMsgs(ctx context.Context, indexReq, limit, count int64, req model.C
 
 // 多表查询,更新reqLimit*req.Index Limit
 func updateStartLimit(start, limit, lastResultsLen, lastCount int64) (int64, int64) {
+
+	// start,limit 为create msg结果的左右边界
+	if start < lastCount {
+		start = 0
+	} else {
+		start -= lastCount
+	}
+
 	limit -= lastResultsLen
-	start -= lastCount
+
 	return limit, start
 }

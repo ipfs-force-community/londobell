@@ -8,17 +8,16 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"golang.org/x/exp/slices"
 
-	rmodel "github.com/ipfs-force-community/londobell/racailum/segment/model"
-
-	pool_monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
-
+	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
+	rmodel "github.com/ipfs-force-community/londobell/racailum/segment/model"
 )
 
 func GetActorMessagesByMethodName(c *gin.Context) {
@@ -48,6 +47,21 @@ func GetActorMessagesByMethodName(c *gin.Context) {
 		return
 	}
 
+	// CreateMiner, CreateExternal, Exec, ConstructorMethod只差create msg表
+	if slices.Contains(rmodel.CreateMethods, req.MethodName) && req.MethodName != rmodel.Exec {
+		creatCtx := context.WithValue(ctx, multiquery.TableKey, CreateMessageCol)
+		totalCount, createMessages, err = getActorMsgsByMethodName(creatCtx, indexReq, limit, totalCount, req, curEpoch)
+
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+		res.Data = model.MessagesByMethodNameRes{TotalCount: totalCount, MessagesByMethodName: createMessages}
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
 	// 倒序,先从 actor col查询
 	actorCtx := context.WithValue(ctx, multiquery.TableKey, ActorMessageCol)
 	totalCount, messagesByMethodName, err = getActorMsgsByMethodName(actorCtx, indexReq, req.Limit, totalCount, req, curEpoch)
@@ -67,7 +81,7 @@ func GetActorMessagesByMethodName(c *gin.Context) {
 	limit, indexReq = updateStartLimit(indexReq, limit, int64(len(messagesByMethodName)), totalCount)
 
 	// search in create msg
-	if slices.Contains(rmodel.CreateMethods, req.MethodName) {
+	if req.MethodName == rmodel.Exec {
 		creatCtx := context.WithValue(ctx, multiquery.TableKey, CreateMessageCol)
 		totalCount, createMessages, err = getActorMsgsByMethodName(creatCtx, indexReq, limit, totalCount, req, curEpoch)
 
@@ -88,6 +102,8 @@ func getActorMsgsByMethodName(ctx context.Context, indexReq, limit, count int64,
 		messagesByMethodName []model.MessageByMethodName
 		err                  error
 		countUtils           []multiquery.CountUtil
+		multiResult          []primitive.M
+		pipe                 interface{}
 	)
 
 	countUtils, err = multiquery.GetTotalCountForActorMsgByMethodName(ctx, req.Addr, req.MethodName, &multiquery.DBStateManager, curEpoch)
@@ -98,10 +114,22 @@ func getActorMsgsByMethodName(ctx context.Context, indexReq, limit, count int64,
 	for _, countUtil := range countUtils {
 		count += countUtil.ActorMethodStates
 	}
-
+	// 检测越界(主要防止双表越界)
+	if count <= indexReq {
+		return count, messagesByMethodName, err
+	}
 	colName := ctx.Value(multiquery.TableKey).(string)
-	multiResult, err := multiquery.MultiBiSearch(ctx, indexReq, limit, countUtils, pool_monitor.GetActorMessagesByMethodNameNoskipAggregator(),
-		pool_monitor.GetCountOfActorMessagesByMethodNameAggregator(), req, colName, multiquery.ActorMethodStates)
+	if colName == CreateMessageCol {
+		pipe, err = util.Parse(model.Ctx{Addr: req.Addr, MethodName: req.MethodName, Limit: req.Limit, Skip: indexReq}, monitor.GetCreateMessagesByMethodNameAggregator())
+		if err != nil {
+			return count, messagesByMethodName, err
+		}
+		multiResult, err = multiquery.MultiTraversalQuery(ctx, pipe, countUtils, colName)
+	} else {
+
+		multiResult, err = multiquery.MultiBiSearch(ctx, indexReq, req.Limit, countUtils, monitor.GetActorMessagesByMethodNameNoskipAggregator(),
+			monitor.GetCountOfActorMessagesByMethodNameAggregator(), req, colName, multiquery.ActorMethodStates)
+	}
 
 	// multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorMethodStates, countUtils, actorMessagesByMethodNameAggregator, req, ctx.Value(multiquery.TableKey).(string))
 	if err != nil {

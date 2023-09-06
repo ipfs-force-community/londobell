@@ -31,6 +31,7 @@ var (
 	messagesForActorAggregator              []byte //nolint
 	transferMessagesAggregator              []byte //nolint
 	timeOfTraceAggregator                   []byte
+	timeOfCreateAggregator                  []byte
 	createTimeAggregator                    []byte
 	createMessageAggregator                 []byte
 	gasCostForSectorAggregator              []byte
@@ -123,6 +124,7 @@ func InitAggregators() {
 	messagesForActorAggregator = monitor.GetMessagesForActorAggregator()
 	transferMessagesAggregator = monitor.GetTransferMessagesAggregator()
 	timeOfTraceAggregator = monitor.GetTimeOfTraceAggregator()
+	timeOfCreateAggregator = monitor.GetTimeOfCreateAggregator()
 	createTimeAggregator = monitor.GetCreateTimeAggregator()
 	createMessageAggregator = monitor.GetCreateMessageAggregator()
 	gasCostForSectorAggregator = monitor.GetGasCostForSectorAggregator()
