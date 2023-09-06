@@ -259,7 +259,11 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 				totalCount += bs.Count
 			}
 		case BlockMethodStates:
-			totalCount = countlist.BlockMethodStates
+			for _, bms := range countlist.BlockMethodStates {
+				totalCount += bms.Count
+			}
+		case BlockHeaderMethodStates:
+			totalCount = countlist.BlockHeaderMethodStates
 		case ActorStates:
 			totalCount = countlist.ActorStates
 		case ActorMethodStates:
@@ -325,42 +329,21 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 	switch ptype {
 	case BlockStates:
 		for _, segmentList := range segmentLists {
-			skip, limit := segmentList.skip, segmentList.limit
-			requestTotalCount := skip + limit
-
 			sort.Slice(segmentList.BlockStates, func(i, j int) bool {
 				return segmentList.BlockStates[i].StartEpoch > segmentList.BlockStates[j].StartEpoch
 			})
 
-			for _, bs := range segmentList.BlockStates {
-				count := bs.Count
-
-				agg := &aggUtil{start: int64(bs.StartEpoch), end: int64(bs.EndEpoch), cols: segmentList.Cols}
-				skipflag := skipTag(skip, count)
-				limitflag := limitTag(requestTotalCount, count)
-				if skipflag && limitflag {
-					agg.skip = skip
-					agg.limit = limit
-					aggLists = append(aggLists, agg)
-					break
-				}
-				if skipflag && !limitflag {
-					agg.skip = skip
-					agg.limit = limit
-					aggLists = append(aggLists, agg)
-					skip = 0
-					limit = requestTotalCount - count
-					requestTotalCount = requestTotalCount - count // skip 1, limit 5  tmp 8
-					continue
-				}
-				if !skipflag {
-					skip = skip - count
-					requestTotalCount = skip + limit
-					continue
-				}
-			}
+			aggLists = aggListsFromSegmentState(segmentList.BlockStates, segmentList.skip, segmentList.limit, segmentList.Cols, skipTag, limitTag)
 		}
 	case BlockMethodStates:
+		for _, segmentList := range segmentLists {
+			sort.Slice(segmentList.BlockMethodStates, func(i, j int) bool {
+				return segmentList.BlockMethodStates[i].StartEpoch > segmentList.BlockMethodStates[j].StartEpoch
+			})
+
+			aggLists = aggListsFromSegmentState(segmentList.BlockMethodStates, segmentList.skip, segmentList.limit, segmentList.Cols, skipTag, limitTag)
+		}
+	case BlockHeaderMethodStates:
 		for _, segmentList := range segmentLists {
 			aggLists = append(aggLists, &aggUtil{
 				start: segmentList.start,
@@ -368,7 +351,7 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 				skip:  segmentList.skip,
 				limit: segmentList.limit,
 				cols:  segmentList.Cols,
-				count: segmentList.BlockMethodStates,
+				count: segmentList.BlockHeaderMethodStates,
 			})
 		}
 	case ActorStates:
@@ -471,43 +454,6 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 				count: segmentList.TipSetStates,
 			})
 		}
-
-		//for _, segmentList := range segmentLists {
-		//	skip, limit := segmentList.skip, segmentList.limit
-		//	requestTotalCount := skip + limit
-		//
-		//	sort.Slice(segmentList.DealActorStates, func(i, j int) bool {
-		//		return segmentList.DealActorStates[i].StartDealID > segmentList.DealActorStates[j].StartDealID
-		//	})
-		//
-		//	for _, das := range segmentList.DealActorStates {
-		//		count := das.Count
-		//
-		//		agg := &aggUtil{start: int64(das.StartDealID), end: int64(das.EndDealID), cols: segmentList.Cols}
-		//		skipflag := skipTag(skip, count)
-		//		limitflag := limitTag(requestTotalCount, count)
-		//		if skipflag && limitflag {
-		//			agg.skip = skip
-		//			agg.limit = limit
-		//			aggLists = append(aggLists, agg)
-		//			break
-		//		}
-		//		if skipflag && !limitflag {
-		//			agg.skip = skip
-		//			agg.limit = limit
-		//			aggLists = append(aggLists, agg)
-		//			skip = 0
-		//			limit = requestTotalCount - count
-		//			requestTotalCount = requestTotalCount - count // skip 1, limit 5  tmp 8
-		//			continue
-		//		}
-		//		if !skipflag {
-		//			skip = skip - count
-		//			requestTotalCount = skip + limit
-		//			continue
-		//		}
-		//	}
-		//}
 	default:
 		return nil, fmt.Errorf("invalid type of paging: %v", ptype)
 	}
@@ -571,6 +517,40 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 	}
 
 	return result, nil
+}
+
+func aggListsFromSegmentState(segmentStates []smodel.SegmentState, skip, limit int64, cols common.Collections, skipTag func(int64, int64) bool, limitTag func(int64, int64) bool) []*aggUtil {
+	requestTotalCount := skip + limit
+	aggLists := make([]*aggUtil, 0)
+	for _, ss := range segmentStates {
+		count := ss.Count
+
+		agg := &aggUtil{start: int64(ss.StartEpoch), end: int64(ss.EndEpoch), cols: cols}
+		skipflag := skipTag(skip, count)
+		limitflag := limitTag(requestTotalCount, count)
+		if skipflag && limitflag {
+			agg.skip = skip
+			agg.limit = limit
+			aggLists = append(aggLists, agg)
+			break
+		}
+		if skipflag && !limitflag {
+			agg.skip = skip
+			agg.limit = limit
+			aggLists = append(aggLists, agg)
+			skip = 0
+			limit = requestTotalCount - count
+			requestTotalCount = requestTotalCount - count
+			continue
+		}
+		if !skipflag {
+			skip = skip - count
+			requestTotalCount = skip + limit
+			continue
+		}
+	}
+
+	return aggLists
 }
 
 // MultiRangeQuery 根据epoch范围定位到某些库查询
