@@ -796,6 +796,8 @@ func MultiBiSearch(ctx context.Context, indexReq, limitReq int64, countUtils []C
 			tmp = countUtils[i].ActorMethodStates
 		case MinedStates:
 			tmp = countUtils[i].MinedStates
+		case ActorTransferStates:
+			tmp = countUtils[i].ActorTransferStates
 		default:
 			return nil, fmt.Errorf("not support bi search")
 		}
@@ -828,6 +830,8 @@ func MultiBiSearch(ctx context.Context, indexReq, limitReq int64, countUtils []C
 				tmp = countUtils[i].ActorMethodStates
 			case MinedStates:
 				tmp = countUtils[i].MinedStates
+			case ActorTransferStates:
+				tmp = countUtils[i].ActorTransferStates
 			default:
 				return nil, fmt.Errorf("not support bi search")
 			}
@@ -881,7 +885,7 @@ func BiSearch(ctx context.Context, targetSum int64, countUtil CountUtil, countAg
 
 func CommonCount(ctx context.Context, col *mongo.Collection, req model.CommonReq, countAgg []byte, st, ed int64) (int64, error) {
 	pipe, err := util.Parse(model.Ctx{StartEpoch: st, EndEpoch: ed, Addr: req.Addr, Sort: -1,
-		Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, To: req.To, Addrs: req.Addrs}, string(countAgg))
+		Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, To: req.To, Addrs: req.Addrs, TransferType: req.TransferType}, string(countAgg))
 	if err != nil {
 		return 0, err
 	}
@@ -909,7 +913,7 @@ func GetDetail(ctx context.Context, end, limit int64, countUtil CountUtil, aggre
 		}
 	}
 	pipe, err := util.Parse(model.Ctx{StartEpoch: countUtil.Start, EndEpoch: end, Addr: req.Addr, Sort: -1, Limit: limit,
-		Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, To: req.To, Addrs: req.Addrs}, string(aggregator))
+		Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, To: req.To, Addrs: req.Addrs, TransferType: req.TransferType}, string(aggregator))
 	if err != nil {
 		log.Errorf("get detail parse pipe failed: %w", err)
 		return nil, err
