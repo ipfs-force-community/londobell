@@ -36,11 +36,11 @@ var CurrentInterval int64 = 5000
 type SplitTask struct {
 	ID primitive.ObjectID `bson:"_id"`
 	// task start ExecTrace id
-	Start string
+	Start abi.ChainEpoch
 	// current task  ExecTrace id
-	Current string
+	Current abi.ChainEpoch
 	// task end ExecTrace id
-	End string
+	End abi.ChainEpoch
 
 	Status bool
 }
@@ -168,12 +168,12 @@ var splitTraceCmd = &cli.Command{
 			Required: true,
 			Usage:    "name of database",
 		},
-		&cli.StringFlag{
+		&cli.Int64Flag{
 			Name:     "start",
 			Required: false,
 			Usage:    "id of start",
 		},
-		&cli.StringFlag{
+		&cli.Int64Flag{
 			Name:     "end",
 			Required: false,
 			Usage:    "id of end",
@@ -203,10 +203,10 @@ var splitTraceCmd = &cli.Command{
 		taskCol := db.Collection("SplitTask")
 		createCol := db.Collection(cmsg.CollectionName())
 
-		splitTask.Start = cctx.String("start")
-		splitTask.End = cctx.String("end")
+		splitTask.Start = abi.ChainEpoch(cctx.Int64("start"))
+		splitTask.End = abi.ChainEpoch(cctx.Int64("end"))
 		reRun = cctx.Bool("reRun")
-		if reRun && (splitTask.Start+splitTask.End != "") {
+		if reRun && (splitTask.Start+splitTask.End != 0) {
 			log.Fatal("reRun cannot be used together with start or end")
 		}
 		splitTask.Status = false
@@ -241,23 +241,45 @@ func initTasks(ctx context.Context, taskCol, traceCol *mongo.Collection, st Spli
 		}
 	} else {
 		// if start not set,use ExecTrace collection latest id
-		if st.Start == "" {
-			st.Start = getLatestTraceID(ctx, traceCol)
+		if st.Start == 0 {
+			st.Start, st.End = getRangeEpoch(ctx, traceCol)
 		}
-		st.ID = primitive.NewObjectID()
-		_, err = taskCol.InsertOne(ctx, st)
-		if err != nil {
-			log.Fatal(err)
+		results = splitTaskByRange(st)
+
+		for _, res := range results {
+			res.ID = primitive.NewObjectID()
+			_, err = taskCol.InsertOne(ctx, res)
+			if err != nil {
+				log.Fatal(err)
+			}
+			results = append(results, res)
 		}
-		results = append(results, st)
+
 	}
 
 	return results, nil
 }
 
+func splitTaskByRange(st SplitTask) []SplitTask {
+	var results []SplitTask
+	var Range abi.ChainEpoch = 10000
+	for start, end := st.Start, st.End; start < end; start += Range {
+		var task SplitTask
+		task.Start = start
+		if task.Start+Range < st.End {
+			task.End = task.Start + Range
+		} else {
+			task.End = st.End
+		}
+		results = append(results, task)
+	}
+	return results
+}
+
 // get ExecTrace collection latest id
-func getLatestTraceID(ctx context.Context, traceCol *mongo.Collection) string {
+func getRangeEpoch(ctx context.Context, traceCol *mongo.Collection) (abi.ChainEpoch, abi.ChainEpoch) {
 	var execTrace TraceMsg
+	var start, end abi.ChainEpoch
 	opts := options.FindOne()
 	opts.SetSort(bson.D{{Key: "_id", Value: -1}})
 	// read ExecTrace table
@@ -267,7 +289,19 @@ func getLatestTraceID(ctx context.Context, traceCol *mongo.Collection) string {
 		log.Fatal(err)
 	}
 	log.Info("get latest trace id :", execTrace.ID)
-	return execTrace.ID
+
+	start = execTrace.Epoch
+	opts = options.FindOne()
+	opts.SetSort(bson.D{{Key: "_id", Value: 1}})
+	// read ExecTrace table
+	result = traceCol.FindOne(ctx, bson.M{}, opts)
+	err = result.Decode(&execTrace)
+	if err != nil {
+		log.Fatal(err)
+	}
+	end = execTrace.Epoch
+
+	return start, end
 }
 
 func (sp SplitTask) updateStart(ctx context.Context, taskCol *mongo.Collection) error {
@@ -306,7 +340,7 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 	opts := options.Find()
 	opts.SetSort(bson.D{{Key: "_id", Value: -1}})
 
-	if sp.Current == "" {
+	if sp.Current == 0 {
 		sp.Current = sp.Start
 	}
 	minID := sp.End     // 结束 ID
@@ -314,7 +348,7 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 	log.Infof("split task start: %s,current: %s,end: %s", sp.Start, sp.Current, sp.End)
 	start := time.Now()
 	// 构建查询过滤器
-	filter := bson.M{"_id": bson.M{"$gte": minID, "$lte": maxID}, "Msg.MethodName": bson.M{"$in": model.CreateMethods}}
+	filter := bson.M{"Epoch": bson.M{"$gte": minID, "$lte": maxID}, "Msg.MethodName": bson.M{"$in": model.CreateMethods}}
 
 	cursor, err := TraceCol.Find(ctx, filter, opts)
 	if err != nil {
@@ -322,9 +356,8 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 		return err
 	}
 	defer cursor.Close(ctx)
-	countOptions := options.Count().SetHint("_id_")
 
-	if TotalCount, err = TraceCol.CountDocuments(ctx, filter, countOptions); err != nil {
+	if TotalCount, err = TraceCol.CountDocuments(ctx, filter); err != nil {
 		log.Error(err)
 		return err
 	}
@@ -361,7 +394,7 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 
 		ProcessedCount++
 		if ProcessedCount%CurrentInterval == 0 {
-			sp.Current = execTrace.ID
+			sp.Current = execTrace.Epoch
 			err := sp.updateCurrent(ctx, taskCol)
 			if err != nil {
 				log.Error(err)
@@ -369,8 +402,8 @@ func (sp SplitTask) run(ctx context.Context, taskCol, TraceCol, createCol *mongo
 			}
 		}
 	}
-	sp.End = execTrace.ID
-	sp.Current = execTrace.ID
+	sp.End = execTrace.Epoch
+	sp.Current = execTrace.Epoch
 	err = sp.updateCurrent(ctx, taskCol)
 	if err != nil {
 		log.Error(err)
