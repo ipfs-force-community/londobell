@@ -18,7 +18,6 @@ import (
 
 	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/builtin"
-	sminer "github.com/filecoin-project/go-state-types/builtin/v10/miner"
 	"github.com/filecoin-project/lotus/api/v0api"
 	cbg "github.com/whyrusleeping/cbor-gen"
 
@@ -45,6 +44,8 @@ func main() {
 		Commands: []*cli.Command{
 			alertCmd,
 			queryCmd,
+			extendSectorCmd,
+			extendClaimCmd,
 		},
 		EnableBashCompletion: true,
 	}
@@ -138,6 +139,10 @@ var alertCmd = &cli.Command{
 			select {
 			case <-tick.C:
 				sectors, err := api.StateMinerSectors(ctx, miner, nil, types.EmptyTSK)
+				if err != nil {
+					return err
+				}
+
 				expiringSectors := make([]*lminer.SectorOnChainInfo, 0)
 				expiringClaims := make(map[verifregtypes.ClaimId]verifregtypes.Claim, 0)
 				for _, sector := range sectors {
@@ -195,8 +200,6 @@ var alertCmd = &cli.Command{
 				log.Infof("ctx done!!")
 			}
 		}
-
-		return nil
 	},
 }
 
@@ -363,12 +366,12 @@ var extendSectorCmd = &cli.Command{
 		}
 		defer closer()
 
-		sectorsWithClaimsJson := cctx.String("sectors-with-claims")
+		sectorsWithClaimsJSON := cctx.String("sectors-with-claims")
 		var (
 			sectorClaims []miner.SectorClaim
 		)
-		if len(sectorsWithClaimsJson) > 0 {
-			sectorClaims, err = ParseSectorClaims(sectorsWithClaimsJson)
+		if len(sectorsWithClaimsJSON) > 0 {
+			sectorClaims, err = ParseSectorClaims(sectorsWithClaimsJSON)
 			if err != nil {
 				return err
 			}
@@ -521,7 +524,7 @@ var extendClaimCmd = &cli.Command{
 
 		fromAddr := cctx.String("from")
 		providerAddr := cctx.String("provider")
-		claimId := cctx.Int64("claimid")
+		claimID := cctx.Int64("claimid")
 		termMax := cctx.Int64("termmax")
 		tipsetKey := cctx.String("tipset")
 
@@ -558,7 +561,7 @@ var extendClaimCmd = &cli.Command{
 		terms := make([]verifregtypes.ClaimTerm, 0)
 		terms = append(terms, verifregtypes.ClaimTerm{
 			Provider: abi.ActorID(providerID),
-			ClaimId:  verifregtypes.ClaimId(claimId),
+			ClaimId:  verifregtypes.ClaimId(claimID),
 			TermMax:  abi.ChainEpoch(termMax),
 		})
 
@@ -594,89 +597,85 @@ func GetCurEpoch() abi.ChainEpoch {
 	return abi.ChainEpoch((time.Now().Unix() - BaseTime.Unix()) / 30)
 }
 
-// 续期程序
-// todo: log凑行数； 各种合理化的参数设置
-func ExtendExpiringSector(ctx context.Context, api v0api.FullNode, from, miner address.Address, feecap abi.TokenAmount, sectors []*lminer.SectorOnChainInfo, newExpiration abi.ChainEpoch) error {
-	actor, err := api.StateGetActor(ctx, from, types.EmptyTSK)
-	if err != nil {
-		return err
-	}
-
-	// method、params 分epoch讨论
-
-	var params *sminer.ExtendSectorExpirationParams
-	extensions := make([]sminer.ExpirationExtension, 0)
-	//store := adt.WrapStore(ctx, cbor.NewCborStore(blockstore.NewAPIBlockstore(api)))
-
-	locationMap := make(map[uint64]map[uint64]bitfield.BitField)
-	for _, sector := range sectors {
-		location, err := api.StateSectorPartition(ctx, miner, sector.SectorNumber, types.EmptyTSK)
-		if err != nil {
-			return err
-		}
-
-		if _, ok := locationMap[location.Deadline]; !ok {
-			locationMap[location.Deadline] = make(map[uint64]bitfield.BitField)
-			locationMap[location.Deadline][location.Partition] = bitfield.NewFromSet([]uint64{uint64(sector.SectorNumber)})
-		} else {
-			merge, err := bitfield.MergeBitFields(locationMap[location.Deadline][location.Partition], bitfield.NewFromSet([]uint64{uint64(sector.SectorNumber)}))
-			if err != nil {
-				return err
-			}
-
-			locationMap[location.Deadline][location.Partition] = merge
-		}
-	}
-
-	for deadline, partitionMap := range locationMap {
-		for partition, sectors := range partitionMap {
-			extensions = append(extensions, sminer.ExpirationExtension{
-				Deadline:      deadline,
-				Partition:     partition,
-				Sectors:       sectors,
-				NewExpiration: newExpiration,
-			})
-		}
-	}
-
-	params = &sminer.ExtendSectorExpirationParams{
-		Extensions: extensions,
-	}
-
-	paramsByte, err := SerializeParams(params)
-	if err != nil {
-		return err
-	}
-
-	msg := types.Message{
-		From:       from,
-		To:         miner,
-		Value:      types.NewInt(0),
-		Nonce:      actor.Nonce,
-		GasLimit:   1000000,
-		GasFeeCap:  feecap,
-		GasPremium: abi.NewTokenAmount(5),
-		Method:     builtin.MethodsMiner.ExtendSectorExpiration2,
-		Params:     paramsByte,
-	}
-
-	smsg, err := api.WalletSignMessage(ctx, msg.From, &msg)
-	if err != nil {
-		return err
-	}
-
-	cid, err := api.MpoolPush(ctx, smsg)
-	if err != nil {
-		return err
-	}
-
-	log.Infof("extend sector cid: %v", cid)
-	return nil
-}
-
-func ExtendClaim() {
-
-}
+//// 续期程序
+//// todo: log凑行数； 各种合理化的参数设置
+//func ExtendExpiringSector(ctx context.Context, api v0api.FullNode, from, miner address.Address, feecap abi.TokenAmount, sectors []*lminer.SectorOnChainInfo, newExpiration abi.ChainEpoch) error {
+//	actor, err := api.StateGetActor(ctx, from, types.EmptyTSK)
+//	if err != nil {
+//		return err
+//	}
+//
+//	// method、params 分epoch讨论
+//
+//	var params *sminer.ExtendSectorExpirationParams
+//	extensions := make([]sminer.ExpirationExtension, 0)
+//	//store := adt.WrapStore(ctx, cbor.NewCborStore(blockstore.NewAPIBlockstore(api)))
+//
+//	locationMap := make(map[uint64]map[uint64]bitfield.BitField)
+//	for _, sector := range sectors {
+//		location, err := api.StateSectorPartition(ctx, miner, sector.SectorNumber, types.EmptyTSK)
+//		if err != nil {
+//			return err
+//		}
+//
+//		if _, ok := locationMap[location.Deadline]; !ok {
+//			locationMap[location.Deadline] = make(map[uint64]bitfield.BitField)
+//			locationMap[location.Deadline][location.Partition] = bitfield.NewFromSet([]uint64{uint64(sector.SectorNumber)})
+//		} else {
+//			merge, err := bitfield.MergeBitFields(locationMap[location.Deadline][location.Partition], bitfield.NewFromSet([]uint64{uint64(sector.SectorNumber)}))
+//			if err != nil {
+//				return err
+//			}
+//
+//			locationMap[location.Deadline][location.Partition] = merge
+//		}
+//	}
+//
+//	for deadline, partitionMap := range locationMap {
+//		for partition, sectors := range partitionMap {
+//			extensions = append(extensions, sminer.ExpirationExtension{
+//				Deadline:      deadline,
+//				Partition:     partition,
+//				Sectors:       sectors,
+//				NewExpiration: newExpiration,
+//			})
+//		}
+//	}
+//
+//	params = &sminer.ExtendSectorExpirationParams{
+//		Extensions: extensions,
+//	}
+//
+//	paramsByte, err := SerializeParams(params)
+//	if err != nil {
+//		return err
+//	}
+//
+//	msg := types.Message{
+//		From:       from,
+//		To:         miner,
+//		Value:      types.NewInt(0),
+//		Nonce:      actor.Nonce,
+//		GasLimit:   1000000,
+//		GasFeeCap:  feecap,
+//		GasPremium: abi.NewTokenAmount(5),
+//		Method:     builtin.MethodsMiner.ExtendSectorExpiration2,
+//		Params:     paramsByte,
+//	}
+//
+//	smsg, err := api.WalletSignMessage(ctx, msg.From, &msg)
+//	if err != nil {
+//		return err
+//	}
+//
+//	cid, err := api.MpoolPush(ctx, smsg)
+//	if err != nil {
+//		return err
+//	}
+//
+//	log.Infof("extend sector cid: %v", cid)
+//	return nil
+//}
 
 func SerializeParams(i cbg.CBORMarshaler) ([]byte, error) {
 	buf := new(bytes.Buffer)
@@ -754,7 +753,8 @@ func PushMessage(ctx context.Context, api v0api.FullNode, msg *types.Message) (c
 func BuildMessage(from, to address.Address, value abi.TokenAmount, nonce uint64, gasLimit int64, gasFeeCap, gasPremium abi.TokenAmount, method abi.MethodNum, params []byte, helper bool) types.Message {
 	// todo: 专业性建议合理化参数
 	if helper {
-
+		// todo
+		fmt.Println("todo")
 	}
 
 	msg := types.Message{
