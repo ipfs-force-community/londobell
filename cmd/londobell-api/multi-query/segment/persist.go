@@ -7,17 +7,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
-
-	"github.com/ipfs-force-community/londobell/lib/limiter"
-
-	"go.uber.org/zap"
-
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment/model"
-
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.uber.org/zap"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment/model"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/lib/limiter"
 )
 
 type AddUpState struct {
@@ -45,69 +43,175 @@ func (a *AddUpState) UpdateState(state State) {
 	a.State = state
 }
 
+func (a *AddUpState) UpdateDBState(dbState *model.DBState) {
+	a.lk.Lock()
+	defer a.lk.Unlock()
+
+	a.State.dbState = dbState
+}
+
+func (a *AddUpState) UpdateBlockStates(blockStates []model.SegmentState) {
+	a.lk.Lock()
+	defer a.lk.Unlock()
+
+	a.State.blockStates = blockStates
+}
+
+func (a *AddUpState) UpdateBlockMethodStates(blockMethodStates []model.SegmentState) {
+	a.lk.Lock()
+	defer a.lk.Unlock()
+
+	a.State.blockMethodStates = blockMethodStates
+}
+
 type PersistState struct {
-	Dsn       string
-	Start     int64
-	End       int64
-	Count     int64
-	NextStart int64
+	Dsn        string
+	Start      int64
+	End        int64
+	Count      int64
+	NextStart  int64
+	MethodName string
 }
 
 // 累加
-func (s *Segment) AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, nextEndEpoch int64, addUpState *AddUpState, cols common.Collections) error {
-	rlog := log.With("AddUp", "BlockState")
-
-	state := addUpState.GetState()
+func (s *Segment) AddUpDBState(ctx context.Context, log *zap.SugaredLogger, nextEndEpoch int64, state *State, addUpState *AddUpState, cols common.Collections) error {
+	rlog := log.With("AddUp", "DBState")
 
 	dbState := state.GetDBState()
-	blockStates := state.GetBlockStates()
-
-	newBlockStates := make([]model.SegmentState, 0)
-
+	dbState.EndEpoch = abi.ChainEpoch(nextEndEpoch)
 	startEpoch, dsn, interval, dType := int64(dbState.StartEpoch), dbState.Dsn, dbState.Interval, dbState.DType
 
 	starttime := time.Now()
+	var err error
 	defer func() {
-		rlog.Infof("addup BlockState successfully between %v and %v, elapsed: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String())
+		if err != nil {
+			rlog.Infof("addup DBState failed between %v and %v, elapsed: %v, err: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String(), err)
+		} else {
+			rlog.Infof("addup DBState successfully between %v and %v, elapsed: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String())
+		}
 	}()
 
-	sort.Slice(blockStates, func(i, j int) bool {
-		return blockStates[i].StartEpoch > blockStates[j].StartEpoch
+	err = s.db.FindOneAndUpdate(ctx, "DBState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v", dsn, dbState.StartEpoch)}, {Key: "Dsn", Value: dsn}, {Key: "StartEpoch", Value: dbState.StartEpoch}, {Key: "DType", Value: dType}, {Key: "Interval", Value: interval}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndEpoch", Value: dbState.EndEpoch}}}})
+	if err != nil {
+		return fmt.Errorf("update dbstate failed: %w", err)
+	}
+
+	// refresh cache dbstate
+	newDBState := *dbState
+	newDBState.EndEpoch = abi.ChainEpoch(nextEndEpoch)
+	addUpState.UpdateDBState(&newDBState)
+
+	return nil
+}
+
+func (s *Segment) AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, nextEndEpoch int64, state *State, addUpState *AddUpState, cols common.Collections) error {
+	rlog := log.With("AddUp", "BlockState")
+
+	dbState := state.GetDBState()
+	startEpoch := int64(dbState.StartEpoch)
+
+	starttime := time.Now()
+	defer func() {
+		rlog.Infof("addup BlockState done between %v and %v, elapsed: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String())
+	}()
+
+	blockStates := state.GetBlockStates()
+	newBlockStates, err := s.AddUpSegment(ctx, rlog, blockStates, state, nextEndEpoch, cols, "", common.BlockStates)
+	if err != nil {
+		rlog.Errorf("AddUpSegment failed: %v", err)
+		return err
+	}
+
+	// refresh cache blockStates
+	addUpState.UpdateBlockStates(newBlockStates)
+
+	return nil
+}
+
+func (s *Segment) AddUpBlockMethodStates(ctx context.Context, log *zap.SugaredLogger, nextEndEpoch int64, state *State, addUpState *AddUpState, cols common.Collections) error {
+	rlog := log.With("AddUp", "BlockMethodStates")
+
+	dbState := state.GetDBState()
+	startEpoch := int64(dbState.StartEpoch)
+
+	starttime := time.Now()
+	defer func() {
+		rlog.Infof("addup BlockState done between %v and %v, elapsed: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String())
+	}()
+
+	allNewBlockMethodStates := make([]model.SegmentState, 0)
+	for _, method := range util.AllMethodList {
+		// todo: 是否并发; 根据方法灵活选择internal
+
+		if method == "Other" {
+			method = ""
+		}
+		blockMethodStates := state.GetBlockMethodStates(method)
+		newBlockMethodStates, err := s.AddUpSegment(ctx, rlog, blockMethodStates, state, nextEndEpoch, cols, method, common.BlockMethodStates)
+		if err != nil {
+			rlog.Errorf("AddUpSegment failed: %v", err)
+			return err
+		}
+
+		allNewBlockMethodStates = append(allNewBlockMethodStates, newBlockMethodStates...)
+	}
+
+	// refresh cache blockMethodStates
+	addUpState.UpdateBlockStates(allNewBlockMethodStates)
+
+	return nil
+}
+
+func (s *Segment) AddUpSegment(ctx context.Context, log *zap.SugaredLogger, segmentState []model.SegmentState, state *State, nextEndEpoch int64, cols common.Collections, methodName string, segmentType common.SegmentType) ([]model.SegmentState, error) {
+	rlog := log.With("AddUp", "Segment")
+
+	dbState := state.GetDBState()
+	startEpoch, dsn, interval := int64(dbState.StartEpoch), dbState.Dsn, dbState.Interval
+
+	starttime := time.Now()
+	defer func() {
+		rlog.Infof("addup segment state done between %v and %v, elapsed: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String())
+	}()
+
+	sort.Slice(segmentState, func(i, j int) bool {
+		return segmentState[i].StartEpoch > segmentState[j].StartEpoch
 	})
 
 	var endEpoch int64
-	if len(blockStates) == 0 {
+	if len(segmentState) == 0 {
 		endEpoch = startEpoch
 	} else {
-		endEpoch = int64(blockStates[0].EndEpoch)
+		endEpoch = int64(segmentState[0].EndEpoch)
 	}
 
 	if nextEndEpoch <= endEpoch {
 		rlog.Infof("skip for nextEndEpoch %v <= endEpoch %v", nextEndEpoch, endEpoch)
-		return nil
+		return nil, nil
 	}
 
 	var (
-		todoBlockStates   = make([]PersistState, 0)
+		todoSegmentStates = make([]PersistState, 0)
 		initialBlockState PersistState
 		initialEpoch      int64
 	)
 
-	length := len(blockStates)
+	newSegmentStates := make([]model.SegmentState, 0)
+
+	length := len(segmentState)
 	if length == 0 {
 		initialEpoch = startEpoch
-		initialBlockState = PersistState{Dsn: dsn, Start: startEpoch, NextStart: startEpoch}
+		initialBlockState = PersistState{Dsn: dsn, Start: startEpoch, NextStart: startEpoch, MethodName: methodName}
 	} else {
-		start, end, count := int64(blockStates[0].StartEpoch), int64(blockStates[0].EndEpoch), blockStates[0].Count
+		start, end, count := int64(segmentState[0].StartEpoch), int64(segmentState[0].EndEpoch), segmentState[0].Count
 		if end-start == interval {
 			// new next blockState
 			initialEpoch = end
-			initialBlockState = PersistState{Dsn: dsn, Start: end, NextStart: end}
-			newBlockStates = blockStates[:]
+			initialBlockState = PersistState{Dsn: dsn, Start: end, NextStart: end, MethodName: methodName}
+			newSegmentStates = segmentState[:]
 		} else {
 			initialEpoch = start
-			initialBlockState = PersistState{Dsn: dsn, Start: start, Count: count, NextStart: end}
-			newBlockStates = blockStates[1:]
+			initialBlockState = PersistState{Dsn: dsn, Start: start, Count: count, NextStart: end, MethodName: methodName}
+			newSegmentStates = segmentState[1:]
 		}
 	}
 
@@ -120,10 +224,10 @@ func (s *Segment) AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, n
 
 		if first {
 			initialBlockState.End = end
-			todoBlockStates = append(todoBlockStates, initialBlockState)
+			todoSegmentStates = append(todoSegmentStates, initialBlockState)
 			first = false
 		} else {
-			todoBlockStates = append(todoBlockStates, PersistState{Dsn: dsn, Start: initialEpoch, End: end, NextStart: initialEpoch})
+			todoSegmentStates = append(todoSegmentStates, PersistState{Dsn: dsn, Start: initialEpoch, End: end, NextStart: initialEpoch, MethodName: methodName})
 		}
 
 		initialEpoch = end
@@ -133,8 +237,8 @@ func (s *Segment) AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, n
 	var lk sync.Mutex
 
 	var ewg multierror.Group
-	for _, todoBlockState := range todoBlockStates {
-		todoBlockState := todoBlockState
+	for _, todoSegmentState := range todoSegmentStates {
+		todoSegmentState := todoSegmentState
 		ewg.Go(func() error {
 			if !lim.Acquire(ctx) {
 				return nil
@@ -145,31 +249,50 @@ func (s *Segment) AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, n
 			}()
 
 			starttime := time.Now()
-			start, end, dsn, nextStart := todoBlockState.Start, todoBlockState.End, todoBlockState.Dsn, todoBlockState.NextStart
+			start, end, dsn, nextStart, methodName := todoSegmentState.Start, todoSegmentState.End, todoSegmentState.Dsn, todoSegmentState.NextStart, todoSegmentState.MethodName
 			defer func() {
-				rlog.Infof("addup BlockMsgsCount successfully between %v and %v, count: %v, elapsed: %v", start, end, todoBlockState.Count, time.Now().Sub(starttime).String())
+				rlog.Infof("addup segment successfully between %v and %v, count: %v, elapsed: %v", start, end, todoSegmentState.Count, time.Now().Sub(starttime).String())
 			}()
-
-			blockFilter := bson.D{{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: nextStart}}}, {Key: "Epoch", Value: bson.D{{Key: "$lt", Value: end}}}, {Key: "IsBlock", Value: true}}
 
 			for _, col := range cols.Cols {
 				if col != nil && col.Name() == "ExecTrace" {
-					count, err := col.CountDocuments(ctx, blockFilter)
-					if err != nil {
-						return fmt.Errorf("count for block messages failed: %w", err)
+					switch segmentType {
+					case common.BlockStates:
+						blockFilter := bson.D{{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: nextStart}}}, {Key: "Epoch", Value: bson.D{{Key: "$lt", Value: end}}}, {Key: "IsBlock", Value: true}}
+						count, err := col.CountDocuments(ctx, blockFilter)
+						if err != nil {
+							return fmt.Errorf("count for block messages failed: %w", err)
+						}
+
+						todoSegmentState.Count += count
+
+						err = s.db.FindOneAndUpdate(ctx, "BlockState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v", dsn, start)}, {Key: "Dsn", Value: dsn}, {Key: "StartEpoch", Value: start}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndEpoch", Value: end}, {Key: "Count", Value: todoSegmentState.Count}}}})
+						if err != nil {
+							return fmt.Errorf("update blockstate failed: %w", err)
+						}
+
+						lk.Lock()
+						newSegmentStates = append(newSegmentStates, model.SegmentState{ID: fmt.Sprintf("%v-%v", dsn, start), Dsn: dsn, StartEpoch: abi.ChainEpoch(start), EndEpoch: abi.ChainEpoch(end), Count: todoSegmentState.Count})
+						lk.Unlock()
+					case common.BlockMethodStates:
+						blockMethodFilter := bson.D{{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: nextStart}}}, {Key: "Epoch", Value: bson.D{{Key: "$lt", Value: end}}}, {Key: "IsBlock", Value: true}, {Key: "Msg.MethodName", Value: methodName}}
+						count, err := col.CountDocuments(ctx, blockMethodFilter)
+						if err != nil {
+							return fmt.Errorf("count for blockmethod messages failed: %w", err)
+						}
+
+						todoSegmentState.Count += count
+
+						// todo: "" method的_id是否正常
+						err = s.db.FindOneAndUpdate(ctx, "BlockMethodState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v-%v", dsn, start, methodName)}, {Key: "Dsn", Value: dsn}, {Key: "StartEpoch", Value: start}, {Key: "MethodName", Value: methodName}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndEpoch", Value: end}, {Key: "Count", Value: todoSegmentState.Count}}}})
+						if err != nil {
+							return fmt.Errorf("update blockstate failed: %w", err)
+						}
+
+						lk.Lock()
+						newSegmentStates = append(newSegmentStates, model.SegmentState{ID: fmt.Sprintf("%v-%v-%v", dsn, start, methodName), Dsn: dsn, StartEpoch: abi.ChainEpoch(start), EndEpoch: abi.ChainEpoch(end), Count: todoSegmentState.Count, MethodName: methodName})
+						lk.Unlock()
 					}
-
-					todoBlockState.Count += count
-
-					// todo: 测试插入成功
-					err = s.db.FindOneAndUpdate(ctx, "BlockState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v", dsn, start)}, {Key: "Dsn", Value: dsn}, {Key: "StartEpoch", Value: start}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndEpoch", Value: end}, {Key: "Count", Value: todoBlockState.Count}}}})
-					if err != nil {
-						return fmt.Errorf("update blockstate failed: %w", err)
-					}
-
-					lk.Lock()
-					newBlockStates = append(newBlockStates, model.SegmentState{ID: fmt.Sprintf("%v-%v", dsn, start), Dsn: dsn, StartEpoch: abi.ChainEpoch(start), EndEpoch: abi.ChainEpoch(end), Count: todoBlockState.Count})
-					lk.Unlock()
 
 					return nil
 				}
@@ -180,362 +303,12 @@ func (s *Segment) AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, n
 	}
 
 	if err := ewg.Wait(); err != nil {
-		return err
+		rlog.Infof("addup segment state failed between %v and %v, elapsed: %v, err: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String(), err)
+		return nil, err
 	}
 
-	dbState.EndEpoch = abi.ChainEpoch(nextEndEpoch)
-	err := s.db.FindOneAndUpdate(ctx, "DBState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v", dsn, dbState.StartEpoch)}, {Key: "Dsn", Value: dsn}, {Key: "StartEpoch", Value: dbState.StartEpoch}, {Key: "DType", Value: dType}, {Key: "Interval", Value: interval}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndEpoch", Value: dbState.EndEpoch}}}})
-	if err != nil {
-		return fmt.Errorf("update dbstate failed: %w", err)
-	}
-
-	state.SetDBState(dbState)
-
-	if err := state.SetBlockStates(newBlockStates); err != nil {
-		return err
-	}
-
-	addUpState.UpdateState(state)
-
-	return nil
+	return newSegmentStates, nil
 }
-
-//func (s *Segment) AddUpDealState(ctx context.Context, log *zap.SugaredLogger, nextDealID int64, addUpState *AddUpState, cols common.Collections) error {
-//	rlog := log.With("AddUp", "DealState")
-//
-//	state := addUpState.GetState()
-//
-//	dealState := state.GetDealState()
-//
-//	newDealStates := make([]model.DealState, 0)
-//
-//	startDealID, dsn, interval, endDealID, count, dType := dealState.StartDealID, dealState.Dsn, dealState.Interval, dealState.EndDealID, dealState.Count, dealState.DType
-//
-//	starttime := time.Now()
-//	defer func() {
-//		rlog.Infof("addup DealActorState successfully between %v and %v, elapsed: %v", startDealID, nextDealID, time.Now().Sub(starttime).String())
-//	}()
-//
-//	if uint64(nextDealID) <= endDealID {
-//		rlog.Infof("skip for nextDealID %v <= endDealID %v", nextDealID, endDealID)
-//		return nil
-//	}
-//
-//	var (
-//		todoDealStates   = make([]PersistState, 0)
-//		initialDealState PersistState
-//		initialDealID    int64
-//	)
-//
-//	if interval == model.NoneInterval {
-//		todoDealStates = append(todoDealStates, PersistState{Dsn: dsn, Start: int64(startDealID), End: nextDealID, NextStart: int64(endDealID), Count: count})
-//	} else {
-//		if int64(endDealID-startDealID) == interval {
-//			initialDealID = int64(endDealID)
-//			initialDealState = PersistState{Dsn: dsn, Start: int64(endDealID), NextStart: int64(endDealID)}
-//		} else {
-//			initialDealID = int64(startDealID)
-//			initialDealState = PersistState{Dsn: dsn, Start: int64(startDealID), Count: dealState.Count, NextStart: int64(endDealID)}
-//		}
-//
-//		first := true
-//		for initialDealID < nextDealID {
-//			end := initialDealID + interval
-//			if end > nextDealID {
-//				end = nextDealID
-//			}
-//
-//			if first {
-//				initialDealState.End = end
-//				todoDealStates = append(todoDealStates, initialDealState)
-//				first = false
-//			} else {
-//				todoDealStates = append(todoDealStates, PersistState{Dsn: dsn, Start: initialDealID, End: end, NextStart: initialDealID})
-//			}
-//
-//			initialDealID = end
-//		}
-//	}
-//
-//	lim := limiter.New(s.opts.BatchInsertLimit)
-//	var lk sync.Mutex
-//
-//	var ewg multierror.Group
-//	for _, todoDealState := range todoDealStates {
-//		todoDealState := todoDealState
-//		ewg.Go(func() error {
-//			if !lim.Acquire(ctx) {
-//				return nil
-//			}
-//
-//			defer func() {
-//				lim.Release(ctx)
-//			}()
-//
-//			starttime := time.Now()
-//			start, end, dsn, nextStart := todoDealState.Start, todoDealState.End, todoDealState.Dsn, todoDealState.NextStart
-//			defer func() {
-//				rlog.Infof("addup DealActorState successfully between %v and %v, count: %v, elapsed: %v", start, end, todoDealState.Count, time.Now().Sub(starttime).String())
-//			}()
-//
-//			var res []struct {
-//				_id struct {
-//					Provider string
-//					Client   string
-//				}
-//				Count int64
-//			}
-//
-//			pipe, err := util.Parse(model.Ctx{Start: nextStart, End: end}, dealActorJS)
-//			if err != nil {
-//				return err
-//			}
-//
-//			for _, col := range cols.Cols {
-//				if col != nil && col.Name() == "DealProposal" {
-//					count := int64(0)
-//					cur, err := col.Aggregate(ctx, pipe)
-//					if err != nil {
-//						return err
-//					}
-//
-//					if err := cur.All(ctx, res); err != nil {
-//						return err
-//					}
-//
-//					todoDealState.Count += count
-//
-//					err = s.db.FindOneAndUpdate(ctx, "DealState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v", dsn, start)}, {Key: "Dsn", Value: dsn}, {Key: "StartDealID", Value: start}, {Key: "DType", Value: dType}, {Key: "Interval", Value: interval}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndDealID", Value: end}, {Key: "Count", Value: todoDealState.Count}}}})
-//					if err != nil {
-//						return fmt.Errorf("update dealActorState failed: %w", err)
-//					}
-//
-//					lk.Lock()
-//					newDealStates = append(newDealStates, model.DealState{ID: fmt.Sprintf("%v-%v", dsn, start), DType: dealState.DType, Interval: interval, StartDealID: uint64(start), EndDealID: uint64(end), Count: todoDealState.Count})
-//					lk.Unlock()
-//
-//					return nil
-//				}
-//			}
-//
-//			return fmt.Errorf("no DealProposal collections")
-//		})
-//	}
-//
-//	if err := ewg.Wait(); err != nil {
-//		return err
-//	}
-//
-//	dealState.EndDealID = uint64(nextDealID)
-//	err := s.db.FindOneAndUpdate(ctx, "DealState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v", dsn, dealState.StartDealID)}, {Key: "Dsn", Value: dsn}, {Key: "StartDealID", Value: dealState.StartDealID}, {Key: "DType", Value: dealState.DType}, {Key: "Interval", Value: dealState.Interval}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndDealID", Value: dealState.EndDealID}}}})
-//	if err != nil {
-//		return fmt.Errorf("update dbstate failed: %w", err)
-//	}
-//
-//	state.SetDealState(dealState)
-//
-//	if err := state.SetDealState(newDealStates); err != nil {
-//		return err
-//	}
-//
-//	addUpState.UpdateState(state)
-//
-//	return nil
-//}
-
-// DealActorState 需读取所有actor的dealcount，消耗内存较大，且目前看来无速度优化续期
-//func (s *Segment) AddUpDealActorState(ctx context.Context, log *zap.SugaredLogger, nextDealID int64, addUpState *AddUpState, cols common.Collections) error {
-//	rlog := log.With("AddUp", "DealActorState")
-//
-//	state := addUpState.GetState()
-//
-//	dealState := state.GetDealState()
-//	allDealActorStates := state.GetAllDealActorStates()
-//
-//	newDealActorStates := make([]model.SegmentDealState, 0)
-//
-//	startDealID, dsn, interval := dealState.StartDealID, dealState.Dsn, dealState.Interval
-//
-//	starttime := time.Now()
-//	defer func() {
-//		rlog.Infof("addup DealActorState successfully between %v and %v, elapsed: %v", startDealID, nextDealID, time.Now().Sub(starttime).String())
-//	}()
-//
-//	sort.Slice(allDealActorStates, func(i, j int) bool {
-//		return allDealActorStates[i].StartDealID > allDealActorStates[j].StartDealID
-//	})
-//
-//	var endDealID uint64
-//	if len(allDealActorStates) == 0 {
-//		endDealID = startDealID
-//	} else {
-//		endDealID = allDealActorStates[0].EndDealID
-//	}
-//
-//	if uint64(nextDealID) <= endDealID {
-//		rlog.Infof("skip for nextDealID %v <= endDealID %v", nextDealID, endDealID)
-//		return nil
-//	}
-//
-//	var (
-//		todoDealActorStates   = make([]model.SegmentDealState, 0)
-//		initialDealActorState model.SegmentDealState
-//		initialDealID         uint64
-//	)
-//
-//	length := len(allDealActorStates)
-//	if length == 0 {
-//		initialDealID = startDealID
-//		initialDealActorState = model.SegmentDealState{Dsn: dsn, StartDealID: startDealID}
-//	} else {
-//		start, end, count := allDealActorStates[0].StartDealID, allDealActorStates[0].EndDealID, allDealActorStates[0].Count
-//		if int64(end-start) == interval {
-//			// new next dealActorState
-//			initialDealID = end
-//			initialDealActorState = model.SegmentDealState{Dsn: dsn, StartDealID: end}
-//			newDealActorStates = allDealActorStates[:]
-//		} else if int64(end-start) < interval || interval == model.NoneInterval {
-//			initialDealID = start
-//			initialDealActorState = model.SegmentDealState{Dsn: dsn, StartDealID: start, Count: count}
-//			newDealActorStates = allDealActorStates[1:]
-//		}
-//	}
-//
-//	if interval == model.NoneInterval {
-//		initialDealActorState.EndDealID = uint64(nextDealID)
-//		todoDealActorStates = append(todoDealActorStates, initialDealActorState)
-//	} else {
-//		first := true
-//		for initialDealID < uint64(nextDealID) {
-//			end := initialDealID + uint64(interval)
-//			if end > uint64(nextDealID) {
-//				end = uint64(nextDealID)
-//			}
-//
-//			if first {
-//				initialDealActorState.EndDealID = end
-//				todoDealActorStates = append(todoDealActorStates, initialDealActorState)
-//				first = false
-//			} else {
-//				todoDealActorStates = append(todoDealActorStates, model.SegmentDealState{Dsn: dsn, StartDealID: initialDealID, EndDealID: end})
-//			}
-//
-//			initialDealID = end
-//		}
-//	}
-//
-//	newDealActorStates = append(newDealActorStates, todoDealActorStates...)
-//	lim := limiter.New(s.opts.BatchInsertLimit)
-//
-//	var ewg multierror.Group
-//	for _, todoDealActorState := range todoDealActorStates {
-//		todoDealActorState := todoDealActorState
-//		ewg.Go(func() error {
-//			if !lim.Acquire(ctx) {
-//				return nil
-//			}
-//
-//			defer func() {
-//				lim.Release(ctx)
-//			}()
-//
-//			starttime := time.Now()
-//			start, end, dsn := todoDealActorState.StartDealID, todoDealActorState.EndDealID, todoDealActorState.Dsn
-//			defer func() {
-//				rlog.Infof("addup DealActorState successfully between %v and %v, count: %v, elapsed: %v", start, end, todoDealActorState.Count, time.Now().Sub(starttime).String())
-//			}()
-//
-//			var res []struct {
-//				_id struct {
-//					Provider string
-//					Client   string
-//				}
-//				Count int64
-//			}
-//
-//			pipe, err := util.Parse(model.Ctx{Start: int64(start), End: int64(end)}, monitor.GetCountForDealsByProviderAndClientAggregator())
-//			if err != nil {
-//				return err
-//			}
-//
-//			api := fullnode.API.GetAppropriateAPI()
-//			for _, col := range cols.Cols {
-//				if col != nil && col.Name() == "DealProposal" {
-//					count := int64(0)
-//					cur, err := col.Aggregate(ctx, pipe)
-//					if err != nil {
-//						return err
-//					}
-//
-//					if err := cur.All(ctx, res); err != nil {
-//						return err
-//					}
-//
-//					dealCountMap := make(map[string]int64)
-//					for _, r := range res {
-//						provider, err := address.NewFromString(buildnet.NetPrefix + r._id.Provider)
-//						if err != nil {
-//							return err
-//						}
-//
-//						providerID, err := api.StateLookupID(ctx, provider, types.EmptyTSK)
-//						if err != nil {
-//							return err
-//						}
-//
-//						client, err := address.NewFromString(buildnet.NetPrefix + r._id.Client)
-//						if err != nil {
-//							return err
-//						}
-//
-//						clientID, err := api.StateLookupID(ctx, client, types.EmptyTSK)
-//						if err != nil {
-//							return err
-//						}
-//
-//						dealCountMap[providerID.String()[1:]] += r.Count
-//						dealCountMap[clientID.String()[1:]] += r.Count
-//					}
-//
-//					for actorID, count := range dealCountMap {
-//						todoDealActorState.ActorID
-//					}
-//
-//					todoDealActorState.Count += count
-//
-//					err = s.db.FindOneAndUpdate(ctx, "DealActorState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v", dsn, start)}, {Key: "Dsn", Value: dsn}, {Key: "StartDealID", Value: start}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndDealID", Value: todoDealActorState.EndDealID}, {Key: "Count", Value: todoDealActorState.Count}}}})
-//					if err != nil {
-//						return fmt.Errorf("update dealActorState failed: %w", err)
-//					}
-//
-//					return nil
-//				}
-//			}
-//
-//			return fmt.Errorf("no DealProposal collections")
-//		})
-//	}
-//
-//	if err := ewg.Wait(); err != nil {
-//		return err
-//	}
-//
-//	dealState.EndDealID = uint64(nextDealID)
-//	err := s.db.FindOneAndUpdate(ctx, "DealState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v", dsn, dealState.StartDealID)}, {Key: "Dsn", Value: dsn}, {Key: "StartDealID", Value: dealState.StartDealID}, {Key: "DType", Value: dealState.DType}, {Key: "Interval", Value: dealState.Interval}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndDealID", Value: dealState.EndDealID}}}})
-//	if err != nil {
-//		return fmt.Errorf("update dbstate failed: %w", err)
-//	}
-//
-//	state.SetDealState(dealState)
-//
-//	if err := state.SetDealActorStates(newDealActorStates); err != nil {
-//		return err
-//	}
-//
-//	addUpState.UpdateState(state)
-//
-//	return nil
-//}
 
 func (s *Segment) GetState(ctx context.Context, dsn string) (*State, bool, error) {
 	dbState, found, err := s.GetDBState(ctx, dsn)

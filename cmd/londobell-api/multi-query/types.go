@@ -10,10 +10,12 @@ import (
 )
 
 type Ptype int
+type CtxKey string
 
 const (
 	BlockStates Ptype = iota
 	BlockMethodStates
+	BlockHeaderMethodStates
 	ActorStates
 	ActorMethodStates
 	ActorTransferStates
@@ -24,6 +26,9 @@ const (
 	DealActorStates
 	TipSetStates
 )
+
+// use for context
+var TableKey CtxKey = "tableName"
 
 type CountUtil struct {
 	Start int64
@@ -36,7 +41,8 @@ type CountUtil struct {
 	BlockStates []smodel.SegmentState
 
 	// 暂时不对其他state分段
-	BlockMethodStates         int64
+	BlockMethodStates         []smodel.SegmentState
+	BlockHeaderMethodStates   int64
 	ActorStates               int64
 	ActorMethodStates         int64
 	ActorTransferStates       int64
@@ -60,7 +66,8 @@ type segmentUtil struct {
 	BlockStates []smodel.SegmentState
 
 	// 暂时不对其他state分段
-	BlockMethodStates         int64
+	BlockMethodStates         []smodel.SegmentState
+	BlockHeaderMethodStates   int64
 	ActorStates               int64
 	ActorMethodStates         int64
 	ActorTransferStates       int64

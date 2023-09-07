@@ -31,6 +31,7 @@ var (
 	messagesForActorAggregator              []byte //nolint
 	transferMessagesAggregator              []byte //nolint
 	timeOfTraceAggregator                   []byte
+	timeOfCreateAggregator                  []byte
 	createTimeAggregator                    []byte
 	createMessageAggregator                 []byte
 	gasCostForSectorAggregator              []byte
@@ -75,6 +76,10 @@ var (
 
 	actorMessageNoSkip []byte
 	//countActorMessage  []byte //nolint
+
+	transferMsgsFroActorNoSkipAggregator           []byte
+	transferTypeForActorNoSkipAggregator           []byte
+	transferSendAndReceiveForActorNoSkipAggregator []byte
 )
 
 type Methodlist struct {
@@ -123,6 +128,7 @@ func InitAggregators() {
 	messagesForActorAggregator = monitor.GetMessagesForActorAggregator()
 	transferMessagesAggregator = monitor.GetTransferMessagesAggregator()
 	timeOfTraceAggregator = monitor.GetTimeOfTraceAggregator()
+	timeOfCreateAggregator = monitor.GetTimeOfCreateAggregator()
 	createTimeAggregator = monitor.GetCreateTimeAggregator()
 	createMessageAggregator = monitor.GetCreateMessageAggregator()
 	gasCostForSectorAggregator = monitor.GetGasCostForSectorAggregator()
@@ -166,4 +172,7 @@ func InitAggregators() {
 	tipsetsListAggregator = monitor.GetTipsetsListAggregator()
 
 	actorMessageNoSkip = monitor.GetMessagesForActorNoSkip()
+	transferMsgsFroActorNoSkipAggregator = monitor.GetTransferMsgsFroActorNoSkipAggregator()
+	transferTypeForActorNoSkipAggregator = monitor.GetTransferTypeForActorNoSkipAggregator()
+	transferSendAndReceiveForActorNoSkipAggregator = monitor.GetTransferSendAndReceiveForActorNoSkipAggregator()
 }

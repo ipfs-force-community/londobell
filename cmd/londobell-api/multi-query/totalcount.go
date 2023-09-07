@@ -7,16 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
-
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/hashicorp/go-multierror"
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 	logging "github.com/ipfs/go-log/v2"
 	"go.mongodb.org/mongo-driver/bson"
@@ -25,6 +20,8 @@ import (
 	"github.com/ipfs-force-community/londobell/buildnet"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment"
 	smodel "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
@@ -40,7 +37,7 @@ var (
 
 var (
 	addupOnce sync.Once
-	addupes   = make([]func(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, addup bool) error, 0)
+	addupes   = make([]func(ctx context.Context, log *zap.SugaredLogger, state *segment.State, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, nextEndEpoch int64) error, 0)
 
 	AllMethods     = make(map[string]int64, 0)
 	alk            sync.RWMutex
@@ -49,7 +46,7 @@ var (
 
 func init() {
 	addupOnce.Do(func() {
-		addupes = append(addupes, AddUpBlockState /* AddUpDealActorState */)
+		addupes = append(addupes, AddUpBlockState, AddUpBlockMethodStates /* AddUpDealActorState */)
 	})
 }
 
@@ -137,12 +134,19 @@ func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbs
 	newState := *state // todo: 指针get出来是否会导致原来错误
 	addUpState := segment.NewAddUpState(newState)
 
+	finalHeight, err := GetFinalHeight(ctx, cols)
+	if err != nil {
+		return err
+	}
+	nextEndEpoch := int64(finalHeight + 1)
+
 	var ewg multierror.Group
+	// only persist segment, don't change state
 	for i := range addupes {
 		i := i
 		addup := addupes[i]
 		ewg.Go(func() error {
-			if err := addup(ctx, log, addUpState, cols, dbsm.Segment, true); err != nil {
+			if err := addup(ctx, log, state, addUpState, cols, dbsm.Segment, nextEndEpoch); err != nil {
 				return err
 			}
 
@@ -155,6 +159,13 @@ func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbs
 		return err
 	}
 
+	// persist dbstate
+	if err := AddUpDBState(ctx, log, state, addUpState, cols, dbsm.Segment, nextEndEpoch); err != nil {
+		log.Errorf("AddUpDBState faild for nextEndEpoch: %v", nextEndEpoch)
+		return err
+	}
+
+	// refresh cache
 	newState = addUpState.GetState()
 	dbsm.DBStateCache.SetState(dsn, &newState)
 
@@ -163,19 +174,16 @@ func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbs
 	return nil
 }
 
-func AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, addup bool) error {
-	state := addUpState.GetState()
-	nextEndEpoch := int64(state.GetEndEpoch())
-	if addup {
-		finalHeight, err := GetFinalHeight(ctx, cols)
-		if err != nil {
-			return err
-		}
+func AddUpDBState(ctx context.Context, log *zap.SugaredLogger, state *segment.State, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, nextEndEpoch int64) error {
+	return seg.AddUpDBState(ctx, log, nextEndEpoch, state, addUpState, cols)
+}
 
-		nextEndEpoch = int64(finalHeight + 1)
-	}
+func AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, state *segment.State, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, nextEndEpoch int64) error {
+	return seg.AddUpBlockState(ctx, log, nextEndEpoch, state, addUpState, cols)
+}
 
-	return seg.AddUpBlockState(ctx, log, nextEndEpoch, addUpState, cols)
+func AddUpBlockMethodStates(ctx context.Context, log *zap.SugaredLogger, state *segment.State, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, nextEndEpoch int64) error {
+	return seg.AddUpBlockMethodStates(ctx, log, nextEndEpoch, state, addUpState, cols)
 }
 
 //func AddUpDealActorState(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment) error {
@@ -386,7 +394,7 @@ func GetTotalCountForBlockMsgsByMethodName(ctx context.Context, methodName strin
 	return countUtils, nil
 }
 
-//count_of_actormessages_by_methodname.js
+// count_of_actormessages_by_methodname.js
 func GetTotalCountForActorMsgByMethodName(ctx context.Context, actorID, methodName string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForActorMsgByMethodName")
 
@@ -510,7 +518,7 @@ func GetTotalCountForActorEvents(ctx context.Context, actor string, dbsm *DataBa
 	return countUtils, nil
 }
 
-//出块列表 BlockHeader查，现在就是这样
+// 出块列表 BlockHeader查，现在就是这样
 func GetTotalCountForMinedMsgsMap(ctx context.Context, minerID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForMinedMsgsMap")
 
@@ -522,7 +530,7 @@ func GetTotalCountForMinedMsgsMap(ctx context.Context, minerID string, dbsm *Dat
 	return countUtils, nil
 }
 
-//count_of_largeamount_transfers.js
+// count_of_largeamount_transfers.js
 func GetTotalCountForTransfersForLargeAmount(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForActorMsgs")
 
@@ -1139,27 +1147,27 @@ func refreshTotalCountForActorDeals(ctx context.Context, state *segment.State, c
 func refreshTotalCountForBlockMsgsByMethodName(ctx context.Context, state *segment.State, cols common.Collections, countUtils *[]CountUtil, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
-		count, err := GetBlockMethodStates(ctx, state, cols, methodName)
+		blockMethodStates, err := DBStateManager.GetBlockMethodStates(ctx, state.GetDSN(), methodName)
 		if err != nil {
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: count})
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: blockMethodStates})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
 		state.SetStartEpoch(*tmpStartEpoch)
 		state.SetEndEpoch(curEpoch + 1)
 
-		count, err := GetBlockMethodStates(ctx, state, cols, methodName)
+		blockMethodStates, err := GetBlockMethodStates(ctx, state, cols, methodName)
 		if err != nil {
 			return err
 		}
 
-		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: count})
+		*countUtils = append(*countUtils, CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, BlockMethodStates: blockMethodStates})
 		return nil
 	case smodel.Cold:
-		count, err := GetBlockMethodStates(ctx, state, cols, methodName)
+		count, err := DBStateManager.GetBlockMethodStates(ctx, state.GetDSN(), methodName)
 		if err != nil {
 			return err
 		}
@@ -1651,7 +1659,7 @@ func GetBlockStates(ctx context.Context, state *segment.State, cols common.Colle
 	return nil, fmt.Errorf("no ExecTrace collection")
 }
 
-func GetBlockMethodStates(ctx context.Context, state *segment.State, cols common.Collections, methodName string) (int64, error) {
+func GetBlockMethodStates(ctx context.Context, state *segment.State, cols common.Collections, methodName string) ([]smodel.SegmentState, error) {
 	rlog := log.With("query", "GetBlockMethodStates")
 
 	start := time.Now()
@@ -1661,14 +1669,14 @@ func GetBlockMethodStates(ctx context.Context, state *segment.State, cols common
 	}()
 
 	if endEpoch <= startEpoch {
-		return 0, nil
+		return nil, nil
 	}
 
 	var countRes []model.CountRes
 	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), MethodName: methodName}, string(monitor.GetCountOfBlockMessagesByMethodNameAggregator()))
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
-		return 0, err
+		return nil, err
 	}
 
 	tableName := "ExecTrace"
@@ -1677,26 +1685,31 @@ func GetBlockMethodStates(ctx context.Context, state *segment.State, cols common
 			cur, err := col.Aggregate(ctx, pipe)
 			if err != nil {
 				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
-				return 0, err
+				return nil, err
 			}
 
 			err = cur.All(ctx, &countRes)
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
-				return 0, err
+				return nil, err
 			}
 
 			if len(countRes) == 0 {
-				return 0, nil
+				return nil, nil
 			}
 
-			return countRes[0].Count, nil
+			return []smodel.SegmentState{smodel.SegmentState{
+				Dsn:        state.GetDSN(),
+				StartEpoch: startEpoch,
+				EndEpoch:   endEpoch,
+				Count:      countRes[0].Count,
+			}}, nil
 		}
 	}
 
 	// log.Warnf
 
-	return 0, fmt.Errorf("no ExecTrace collection")
+	return nil, fmt.Errorf("no ExecTrace collection")
 }
 
 // todo: 第二轮优化
@@ -1758,7 +1771,7 @@ func GetActorStates(ctx context.Context, state *segment.State, cols common.Colle
 		return 0, err
 	}
 
-	tableName := "ActorMessage"
+	tableName := ctx.Value(TableKey).(string)
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == tableName {
 			cur, err := col.Aggregate(ctx, pipe) // todo
@@ -1805,7 +1818,7 @@ func GetActorMethodStates(ctx context.Context, state *segment.State, cols common
 		return 0, err
 	}
 
-	tableName := "ActorMessage"
+	tableName := ctx.Value(TableKey).(string)
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == tableName {
 			cur, err := col.Aggregate(ctx, pipe) //, options.Aggregate().SetAllowDiskUse(true)

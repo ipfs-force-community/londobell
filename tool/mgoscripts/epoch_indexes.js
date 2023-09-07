@@ -9,7 +9,8 @@ db.ActorBalance.createIndex({"Addresses":1,"Code":1}, {"sparse": true});
 db.ActorEvent.createIndex({"ActorID":1,"Epoch":1,"LogIndex":1}, {"sparse": true});
 
 db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"MethodName":1,"Epoch":1}, {"sparse": true});
-db.ActorMessage.createIndex({"ActorID":1,"ExitCode":1,"Value":1,"TransferType":1,"Epoch":1}, {"sparse": true});
+db.ActorMessage.createIndex({"ActorID":1,"ExitCode":1,"TransferType":1,"Epoch":1}, {"sparse": true});
+db.ActorMessage.createIndex({"ActorID":1,"ExitCode":1,"Value":1,"Epoch":1}, {"sparse": true});
 
 db.ActorState.createIndex({"Epoch":1,"Code":1,"Addr":1}, {"sparse": true});
 
@@ -42,6 +43,12 @@ db.Claims.createIndex({"Epoch":1,"Provider":1}, {"sparse": true});
 db.Claims.createIndex({"Epoch":1,"Client":1}, {"sparse": true});
 db.Claims.createIndex({"Epoch":1,"Provider":1,"ClaimID":1}, {"sparse": true});
 db.Claims.createIndex({"Epoch":1,"Client":1,"ClaimID":1}, {"sparse": true});
+
+db.CreateMessage.createIndex({"IsBlock":1,"Epoch":1}, {"sparse": true});
+db.CreateMessage.createIndex({"Method":1}, {"sparse": true});
+db.CreateMessage.createIndex({"Cid":1,"Epoch":1}, {"sparse": true});
+db.CreateMessage.createIndex({"ActorID":1}, {"sparse": true});
+db.CreateMessage.createIndex({"Caller":1}, {"sparse": true});
 
 db.DatacapAllowances.createIndex({"Owner":1}, {"sparse": true});
 db.DatacapAllowances.createIndex({"Epoch":1,"Owner":1}, {"sparse": true});

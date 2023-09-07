@@ -179,6 +179,24 @@
 }
 ```
 
+### CreateMessage
+
+```
+{
+	"ActorID": "address.Address",
+	"Caller": "address.Address",
+	"Cid": "cid.Cid",
+	"Epoch": "abi.ChainEpoch",
+	"From": "address.Address",
+	"IsBlock": "bool",
+	"MethodName": "string",
+	"SignedCid": "cid.Cid",
+	"To": "address.Address",
+	"Value": "big.Int",
+	"_id": "string"
+}
+```
+
 ### DatacapAllowances
 
 ```

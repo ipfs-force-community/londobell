@@ -90,11 +90,11 @@ func GetBlockHeaderMessagesByMethodName(c *gin.Context) {
 
 		for i := range countUtils {
 			if epoch >= countUtils[i].Start && epoch < countUtils[i].End {
-				countUtils[i].BlockMethodStates = count // todo: state再议
+				countUtils[i].BlockHeaderMethodStates = count // todo: state再议
 			}
 		}
 
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.BlockMethodStates, countUtils, blockHeaderMessagesByMethodNameAggregator, req, "BlockMessage")
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.BlockHeaderMethodStates, countUtils, blockHeaderMessagesByMethodNameAggregator, req, "BlockMessage")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
