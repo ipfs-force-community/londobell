@@ -1,6 +1,7 @@
 package model
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"strings"
@@ -85,9 +86,11 @@ func NewCreateMessage(epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.To
 		} else {
 			return nil, fmt.Errorf("get constructor caller err,id: %s", am.ID)
 		}
-	} else if methodName == CreateExternal || methodName == CreateMiner {
+	} else if methodName == CreateExternal || methodName == CreateMiner || methodName == Exec {
 		if len(raw.MsgRct.Return) > 0 && returnObj != nil {
-
+			if err := returnObj.UnmarshalCBOR(bytes.NewReader(raw.MsgRct.Return)); err != nil {
+				return nil, fmt.Errorf("unmarshal return: %w", err)
+			}
 			addr, err := parse(methodName, returnObj)
 			if err != nil {
 				return nil, err
