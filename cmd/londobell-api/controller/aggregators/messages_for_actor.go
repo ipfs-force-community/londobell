@@ -128,7 +128,7 @@ func GetMessagesForActor(c *gin.Context) {
 		return
 	}
 
-	res.Data = model.MessagesForActorRes{TotalCount: totalCount, MessagesForActor: append(messagesForCreate, messagesForActor...)}
+	res.Data = model.MessagesForActorRes{TotalCount: totalCount, MessagesForActor: append(messagesForActor, messagesForCreate...)}
 	c.JSON(http.StatusOK, res)
 }
 
