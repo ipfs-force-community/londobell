@@ -110,7 +110,7 @@ func GetMessagesForActor(c *gin.Context) {
 	}
 
 	if limit <= int64(len(messagesForActor)) {
-		res.Data = model.MessagesForActorRes{TotalCount: req.Limit, MessagesForActor: messagesForActor[:req.Limit]}
+		res.Data = model.MessagesForActorRes{TotalCount: totalCount, MessagesForActor: messagesForActor[:req.Limit]}
 		c.JSON(http.StatusOK, res)
 		return
 	}
