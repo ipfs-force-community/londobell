@@ -12,11 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/go-state-types/builtin/v11/miner"
+	"github.com/filecoin-project/go-state-types/big"
+
+	"github.com/filecoin-project/go-state-types/builtin/v9/miner"
 
 	"github.com/ipfs/go-cid"
 
-	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/lotus/api/v0api"
 	cbg "github.com/whyrusleeping/cbor-gen"
@@ -319,34 +320,35 @@ var extendSectorCmd = &cli.Command{
 			Name:     "miner",
 			Required: true,
 		},
-		// todo: 多个deadline
-		&cli.Uint64Flag{
-			Name:     "deadline",
-			Required: true,
-		},
-		&cli.Uint64Flag{
-			Name:     "partition",
-			Required: true,
-		},
-		&cli.Uint64SliceFlag{
-			Name:     "sectors",
-			Required: true,
-		},
-		&cli.Int64Flag{
-			Name:     "new-expiration",
-			Required: true,
-			// 建议
-		},
+		//// todo: 多个deadline
+		//&cli.Uint64Flag{
+		//	Name:     "deadline",
+		//	Required: true,
+		//},
+		//&cli.Uint64Flag{
+		//	Name:     "partition",
+		//	Required: true,
+		//},
+		//&cli.Uint64SliceFlag{
+		//	Name:     "sectors",
+		//	Required: true,
+		//},
+		//&cli.Int64Flag{
+		//	Name:     "new-expiration",
+		//	Required: true,
+		//	// 建议
+		//},
 		&cli.StringFlag{
-			Name:  "sectors-with-claims",
-			Usage: "json to store SectorsWithClaims, e.g.: ",
+			Name:  "extensions",
+			Usage: "json to store params of extend sectors, e.g.: ",
+			// new expirations of alerting sectors are decided by user
 			// 建议
 		},
-		&cli.BoolFlag{
-			Name:  "new",
-			Usage: "ExtendSectorExpiration or ExtendSectorExpiration2",
-			// 建议
-		},
+		//&cli.BoolFlag{
+		//	Name:  "new",
+		//	Usage: "ExtendSectorExpiration or ExtendSectorExpiration2",
+		//	// 建议
+		//},
 	},
 	Action: func(cctx *cli.Context) error {
 		// query sector or claim for miner
@@ -365,17 +367,6 @@ var extendSectorCmd = &cli.Command{
 			return err
 		}
 		defer closer()
-
-		sectorsWithClaimsJSON := cctx.String("sectors-with-claims")
-		var (
-			sectorClaims []miner.SectorClaim
-		)
-		if len(sectorsWithClaimsJSON) > 0 {
-			sectorClaims, err = ParseSectorClaims(sectorsWithClaimsJSON)
-			if err != nil {
-				return err
-			}
-		}
 
 		fromAddr := cctx.String("from")
 		toAddr := cctx.String("to")
@@ -403,30 +394,36 @@ var extendSectorCmd = &cli.Command{
 
 		nonce := actor.Nonce
 
-		deadline := cctx.Uint64("deadline")
-		partition := cctx.Uint64("partition")
-		sectornos := cctx.Uint64Slice("sectors")
-		newExpiration := cctx.Int64("new-expiration")
-		new := cctx.Bool("new")
+		extensions := cctx.String("extensions")
+		extendSectorExpiration2Params, err := ParseSectorExtensions(extensions)
+		if err != nil {
+			return err
+		}
 
-		sectors := bitfield.NewFromSet(sectornos)
+		// choose extend sector method intelligently
+		commitLegacy, err := IsExtendCommitLegacy(ctx, extendSectorExpiration2Params, to, api, ts)
+		if err != nil {
+			return err
+		}
 
-		var method abi.MethodNum
-		// todo: 智能选择方法
-		var paramsByte []byte
-		if !new {
+		var (
+			method     abi.MethodNum
+			paramsByte []byte
+		)
+		if commitLegacy {
 			method = builtin.MethodsMiner.ExtendSectorExpiration
 
-			var params *miner.ExtendSectorExpirationParams
 			extensions := make([]miner.ExpirationExtension, 0)
-			extensions = append(extensions, miner.ExpirationExtension{
-				Deadline:      deadline,
-				Partition:     partition,
-				Sectors:       sectors,
-				NewExpiration: abi.ChainEpoch(newExpiration),
-			})
+			for _, ex2 := range extendSectorExpiration2Params.Extensions {
+				extensions = append(extensions, miner.ExpirationExtension{
+					Deadline:      ex2.Deadline,
+					Partition:     ex2.Partition,
+					Sectors:       ex2.Sectors,
+					NewExpiration: ex2.NewExpiration,
+				})
+			}
 
-			params = &miner.ExtendSectorExpirationParams{
+			params := &miner.ExtendSectorExpirationParams{
 				Extensions: extensions,
 			}
 
@@ -437,27 +434,19 @@ var extendSectorCmd = &cli.Command{
 		} else {
 			method = builtin.MethodsMiner.ExtendSectorExpiration2
 
-			var params *miner.ExtendSectorExpiration2Params
-			extensions := make([]miner.ExpirationExtension2, 0)
-			extensions = append(extensions, miner.ExpirationExtension2{
-				Deadline:          deadline,
-				Partition:         partition,
-				Sectors:           sectors,
-				SectorsWithClaims: sectorClaims,
-				NewExpiration:     abi.ChainEpoch(newExpiration),
-			})
-
-			params = &miner.ExtendSectorExpiration2Params{
-				Extensions: extensions,
-			}
-
-			paramsByte, err = SerializeParams(params)
+			// add sectorclaims intelligently
+			err = FillSectorsWithClaims(ctx, &extendSectorExpiration2Params, to, api, ts)
 			if err != nil {
 				return err
 			}
 
+			paramsByte, err = SerializeParams(&extendSectorExpiration2Params)
+			if err != nil {
+				return err
+			}
 		}
 
+		// todo: 智能构建消息
 		msg := BuildMessage(from, to, types.NewInt(0), nonce, 1000000, abi.NewTokenAmount(1000000), abi.NewTokenAmount(5), method, paramsByte, false)
 
 		mcid, err := PushMessage(ctx, api, &msg)
@@ -735,6 +724,170 @@ func ParseSectorClaims(path string) ([]miner.SectorClaim, error) {
 
 	return sectorClaims, nil
 }
+
+// todo: bitfiled json怎么传入
+type ExtendExpirationsInner struct {
+	Extensions []miner.ExpirationExtension
+	Claims     []miner.SectorClaim
+}
+
+func ParseSectorExtensions(path string) (miner.ExtendSectorExpiration2Params, error) {
+	file, err := os.Open(path)
+	defer file.Close() //nolint:staticcheck
+	if err != nil {
+		return miner.ExtendSectorExpiration2Params{}, err
+	}
+
+	bytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return miner.ExtendSectorExpiration2Params{}, err
+	}
+
+	// todo: 兼容其他版本
+	var extendSectorExpiration2Params miner.ExtendSectorExpiration2Params
+	err = json.Unmarshal(bytes, &extendSectorExpiration2Params)
+	if err != nil {
+		return miner.ExtendSectorExpiration2Params{}, err
+	}
+
+	return extendSectorExpiration2Params, nil
+}
+
+func IsExtendCommitLegacy(ctx context.Context, extendSectorExpiration2Params miner.ExtendSectorExpiration2Params, miner address.Address, api v0api.FullNode, tipset *types.TipSet) (bool, error) {
+	var commitLegacy = true
+	for _, extension := range extendSectorExpiration2Params.Extensions {
+		err := extension.Sectors.ForEach(func(u uint64) error {
+			if commitLegacy == false {
+				return nil
+			}
+
+			sectorInfo, err := api.StateSectorGetInfo(ctx, miner, abi.SectorNumber(u), tipset.Key())
+			if err != nil {
+				return err
+			}
+
+			if sectorInfo.SimpleQAPower && (sectorInfo.VerifiedDealWeight.GreaterThan(big.NewInt(0)) || sectorInfo.DealWeight.GreaterThanEqual(big.NewInt(0))) {
+				commitLegacy = false
+				return nil
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return commitLegacy, err
+		}
+	}
+
+	return commitLegacy, nil
+}
+
+var failedFillSectorsWithClaims = fmt.Errorf("failed fill sectors with claims")
+
+// 选择deadline-partion中sector的哪些claims被maintain或drop 能drop就drop了，不能就报错
+// todo: 或者可以帮用户选择合适的new_expiration?
+func FillSectorsWithClaims(ctx context.Context, extendSectorExpiration2Params *miner.ExtendSectorExpiration2Params, provider address.Address, api v0api.FullNode, tipset *types.TipSet) error {
+	failed := false
+
+	claimsForSectorsMap, err := ClaimsForSectors(ctx, provider, api, tipset)
+	if err != nil {
+		return err
+	}
+
+	extensions := extendSectorExpiration2Params.Extensions
+	for i, ex2 := range extensions {
+		if failed {
+			return failedFillSectorsWithClaims
+		}
+
+		newExpiration := ex2.NewExpiration
+		sectorsWithClaims := make([]miner.SectorClaim, 0)
+		err := ex2.Sectors.ForEach(func(u uint64) error {
+			if failed {
+				return failedFillSectorsWithClaims
+			}
+
+			// claim和sector绑定
+			claims := claimsForSectorsMap[abi.SectorNumber(u)]
+
+			maintainClaims, dropClaims := MaintainAndDropClaims(newExpiration, claims)
+			if len(dropClaims) > 0 {
+				sectorInfo, err := api.StateSectorGetInfo(ctx, provider, abi.SectorNumber(u), tipset.Key())
+				if err != nil {
+					return err
+				}
+
+				canDropClaims := CanDropClaims(sectorInfo.Expiration, tipset.Height())
+				if !canDropClaims {
+					// 警告new_expiration太大 或 先续期claims
+					log.Warnf("claims is not allowed to drop for expiration(%v)-curEpoch(%v) <= verifregtypes.EndOfLifeClaimDropPeriod(30d), new expiration %v is too high than claim.term_start + claim.term_max, dropClaims: %v", sectorInfo.Expiration, tipset.Key(), newExpiration, dropClaims)
+					failed = true
+				}
+			}
+
+			if failed {
+				return failedFillSectorsWithClaims
+			}
+
+			sectorsWithClaims = append(sectorsWithClaims, miner.SectorClaim{
+				SectorNumber:   abi.SectorNumber(u),
+				MaintainClaims: maintainClaims,
+				DropClaims:     dropClaims,
+			})
+
+			return nil
+		})
+
+		if err != nil {
+			return err
+		}
+
+		extendSectorExpiration2Params.Extensions[i].SectorsWithClaims = sectorsWithClaims
+	}
+
+	return nil
+}
+
+func ClaimsForSectors(ctx context.Context, provider address.Address, api v0api.FullNode, tipset *types.TipSet) (map[abi.SectorNumber]map[verifregtypes.ClaimId]verifregtypes.Claim, error) {
+	claimsForSectorsMap := make(map[abi.SectorNumber]map[verifregtypes.ClaimId]verifregtypes.Claim)
+	claims, err := api.StateGetClaims(ctx, provider, tipset.Key())
+	if err != nil {
+		return nil, err
+	}
+
+	for id, claim := range claims {
+		if _, ok := claimsForSectorsMap[claim.Sector]; !ok {
+			claimMap := make(map[verifregtypes.ClaimId]verifregtypes.Claim)
+			claimMap[id] = claim
+			claimsForSectorsMap[claim.Sector] = claimMap
+		} else {
+			claimsForSectorsMap[claim.Sector][id] = claim
+		}
+	}
+
+	return claimsForSectorsMap, nil
+}
+
+// maintain要求: decl.new_expiration <= claim.term_start + claim.term_max
+// drop要求: sector.expiration - curr_epoch <= policy.end_of_life_claim_drop_period
+func MaintainAndDropClaims(newExpiration abi.ChainEpoch, claims map[verifregtypes.ClaimId]verifregtypes.Claim) ([]verifregtypes.ClaimId, []verifregtypes.ClaimId) {
+	maintainClaims, dropClaims := make([]verifregtypes.ClaimId, 0), make([]verifregtypes.ClaimId, 0)
+	for id, claim := range claims {
+		if newExpiration > claim.TermStart+claim.TermMax {
+			dropClaims = append(dropClaims, id)
+		} else {
+			maintainClaims = append(maintainClaims, id)
+		}
+	}
+
+	return maintainClaims, dropClaims
+}
+
+func CanDropClaims(expiration, curEpoch abi.ChainEpoch) bool {
+	return expiration-curEpoch <= verifregtypes.EndOfLifeClaimDropPeriod
+}
+
+// claim 要在sector续期前续期，如果强烈不续claim就drop
 
 func PushMessage(ctx context.Context, api v0api.FullNode, msg *types.Message) (cid.Cid, error) {
 	smsg, err := api.WalletSignMessage(ctx, msg.From, msg)
