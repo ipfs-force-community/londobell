@@ -1118,6 +1118,7 @@ func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	for h := ts.Parent.Height() + 1; h <= ts.Height(); h++ {
 		if ctx.Opts.StateRegular.Interval > 0 && h%ctx.Opts.StateRegular.Interval == 0 || common.IsZeroHour(true, h) {
 			extractEvenNullTipSet = true
+			height = h
 			break
 		}
 	}
