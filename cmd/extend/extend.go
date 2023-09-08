@@ -47,6 +47,7 @@ func main() {
 			queryCmd,
 			extendSectorCmd,
 			extendClaimCmd,
+			// replace extend
 		},
 		EnableBashCompletion: true,
 	}
@@ -483,14 +484,10 @@ var extendClaimCmd = &cli.Command{
 			Name:     "provider",
 			Required: true,
 		},
-		// todo: 多个deadline
-		&cli.Int64Flag{
-			Name:     "claimid",
+		&cli.StringFlag{
+			Name:     "claimTerm",
 			Required: true,
-		},
-		&cli.Int64Flag{
-			Name:     "termmax",
-			Required: true,
+			Usage:    "json of ClaimTerm",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -513,9 +510,8 @@ var extendClaimCmd = &cli.Command{
 
 		fromAddr := cctx.String("from")
 		providerAddr := cctx.String("provider")
-		claimID := cctx.Int64("claimid")
-		termMax := cctx.Int64("termmax")
 		tipsetKey := cctx.String("tipset")
+		claimTermJSON := cctx.String("claimTerm")
 
 		ts, err := NewStringForTipSet(ctx, tipsetKey, api)
 		if err != nil {
@@ -539,7 +535,7 @@ var extendClaimCmd = &cli.Command{
 
 		nonce := actor.Nonce
 
-		providerID, err := address.IDFromAddress(provider)
+		claimTerms, err := ParseClaimTerm(claimTermJSON)
 		if err != nil {
 			return err
 		}
@@ -547,15 +543,8 @@ var extendClaimCmd = &cli.Command{
 		method := builtin.MethodsVerifiedRegistry.ExtendClaimTerms
 
 		var params *verifregtypes.ExtendClaimTermsParams
-		terms := make([]verifregtypes.ClaimTerm, 0)
-		terms = append(terms, verifregtypes.ClaimTerm{
-			Provider: abi.ActorID(providerID),
-			ClaimId:  verifregtypes.ClaimId(claimID),
-			TermMax:  abi.ChainEpoch(termMax),
-		})
-
 		params = &verifregtypes.ExtendClaimTermsParams{
-			Terms: terms,
+			Terms: claimTerms,
 		}
 
 		paramsByte, err := SerializeParams(params)
@@ -748,6 +737,27 @@ func ParseSectorExtensions(path string) (miner.ExtendSectorExpiration2Params, er
 	return extendSectorExpiration2Params, nil
 }
 
+func ParseClaimTerm(path string) ([]verifregtypes.ClaimTerm, error) {
+	file, err := os.Open(path)
+	defer file.Close() //nolint:staticcheck
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	claimTerms := make([]verifregtypes.ClaimTerm, 0)
+	err = json.Unmarshal(bytes, &claimTerms)
+	if err != nil {
+		return nil, err
+	}
+
+	return claimTerms, nil
+}
+
 func IsExtendCommitLegacy(ctx context.Context, extendSectorExpiration2Params miner.ExtendSectorExpiration2Params, miner address.Address, api v0api.FullNode, tipset *types.TipSet) (bool, error) {
 	var commitLegacy = true
 	for _, extension := range extendSectorExpiration2Params.Extensions {
@@ -898,8 +908,12 @@ func PushMessage(ctx context.Context, api v0api.FullNode, msg *types.Message) (c
 	return mcid, nil
 }
 
+// todo: 专业性建议合理化参数
+// gaslimit, gasfeecap, gaspremium,
+// gaslimit和gasused相关
+// gasfeecap和basefee相关
+// gaspremium和其他用户给的gaspremium相关，允许replace
 func BuildMessage(from, to address.Address, value abi.TokenAmount, nonce uint64, gasLimit int64, gasFeeCap, gasPremium abi.TokenAmount, method abi.MethodNum, params []byte, helper bool) types.Message {
-	// todo: 专业性建议合理化参数
 	if helper {
 		// todo
 		fmt.Println("todo")
@@ -908,7 +922,7 @@ func BuildMessage(from, to address.Address, value abi.TokenAmount, nonce uint64,
 	msg := types.Message{
 		From:       from,
 		To:         to,
-		Value:      types.NewInt(0),
+		Value:      value,
 		Nonce:      nonce,
 		GasLimit:   gasLimit,
 		GasFeeCap:  gasFeeCap,
