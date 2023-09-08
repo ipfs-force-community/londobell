@@ -703,34 +703,29 @@ func NewStringForTipSet(ctx context.Context, tipsetKeyStr string, api v0api.Full
 	return ts, nil
 }
 
-func ParseSectorClaims(path string) ([]miner.SectorClaim, error) {
-	file, err := os.Open(path)
-	defer file.Close() //nolint:staticcheck
-	if err != nil {
-		return nil, err
-	}
-
-	bytes, err := ioutil.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-
-	// todo: 兼容其他版本
-	var sectorClaims []miner.SectorClaim
-	err = json.Unmarshal(bytes, &sectorClaims)
-	if err != nil {
-		return nil, err
-	}
-
-	return sectorClaims, nil
-}
+//func ParseSectorClaims(path string) ([]miner.SectorClaim, error) {
+//	file, err := os.Open(path)
+//	defer file.Close() //nolint:staticcheck
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	bytes, err := ioutil.ReadAll(file)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	// todo: 兼容其他版本
+//	var sectorClaims []miner.SectorClaim
+//	err = json.Unmarshal(bytes, &sectorClaims)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return sectorClaims, nil
+//}
 
 // todo: bitfiled json怎么传入
-type ExtendExpirationsInner struct {
-	Extensions []miner.ExpirationExtension
-	Claims     []miner.SectorClaim
-}
-
 func ParseSectorExtensions(path string) (miner.ExtendSectorExpiration2Params, error) {
 	file, err := os.Open(path)
 	defer file.Close() //nolint:staticcheck
@@ -782,7 +777,7 @@ func IsExtendCommitLegacy(ctx context.Context, extendSectorExpiration2Params min
 	return commitLegacy, nil
 }
 
-var failedFillSectorsWithClaims = fmt.Errorf("failed fill sectors with claims")
+var errFailedFillSectorsWithClaims = fmt.Errorf("failed fill sectors with claims")
 
 // 选择deadline-partion中sector的哪些claims被maintain或drop 能drop就drop了，不能就报错
 // todo: 或者可以帮用户选择合适的new_expiration?
@@ -797,14 +792,14 @@ func FillSectorsWithClaims(ctx context.Context, extendSectorExpiration2Params *m
 	extensions := extendSectorExpiration2Params.Extensions
 	for i, ex2 := range extensions {
 		if failed {
-			return failedFillSectorsWithClaims
+			return errFailedFillSectorsWithClaims
 		}
 
 		newExpiration := ex2.NewExpiration
 		sectorsWithClaims := make([]miner.SectorClaim, 0)
 		err := ex2.Sectors.ForEach(func(u uint64) error {
 			if failed {
-				return failedFillSectorsWithClaims
+				return errFailedFillSectorsWithClaims
 			}
 
 			// claim和sector绑定
@@ -826,7 +821,7 @@ func FillSectorsWithClaims(ctx context.Context, extendSectorExpiration2Params *m
 			}
 
 			if failed {
-				return failedFillSectorsWithClaims
+				return errFailedFillSectorsWithClaims
 			}
 
 			sectorsWithClaims = append(sectorsWithClaims, miner.SectorClaim{
