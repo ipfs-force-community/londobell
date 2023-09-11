@@ -34,6 +34,7 @@ func main() {
 			offlineCmd,
 			fixActorMessageCmd,
 			splitTraceCmd,
+			completeTransferTypeCmd,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{
