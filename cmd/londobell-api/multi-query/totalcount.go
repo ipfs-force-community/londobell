@@ -1162,9 +1162,10 @@ func refreshTotalCountForActorDeals(ctx context.Context, state *segment.State, c
 			return err
 		}
 
-		state.SetDealState(smodel.DealState{StartDealID: startDealID, EndDealID: endDealID})
+		tmpState := *state
+		tmpState.SetDealState(smodel.DealState{StartDealID: startDealID, EndDealID: endDealID})
 
-		count, err := GetDealActorStates(ctx, state, cols, actorID)
+		count, err := GetDealActorStates(ctx, &tmpState, cols, actorID)
 		if err != nil {
 			return err
 		}
