@@ -7,10 +7,12 @@ import (
 	"net/http"
 
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
@@ -82,7 +84,7 @@ func GetMessagesForActor(c *gin.Context) {
 	curEpoch := common.GetCurEpoch()
 	totalCount := int64(0)
 
-	actorID, err := GetIDByAddr(ctx, req.Addr)
+	actorID, err := common2.GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -157,13 +159,12 @@ func getActorMsgs(ctx context.Context, indexReq, limit, count int64, req model.C
 	if colName == CreateMessageCol {
 
 		pipe, err = util.Parse(model.Ctx{Addr: req.Addr, Limit: limit, Skip: indexReq}, monitor.GetMessagesForCreateAggregator())
-
 		if err != nil {
 			return messagesForActor, count, err
 		}
 		multiResult, err = multiquery.MultiTraversalQuery(ctx, pipe, countUtils, colName)
 	} else {
-		multiResult, err = multiquery.MultiBiSearch(ctx, indexReq, limit, countUtils, actorMessageNoSkip,
+		multiResult, err = multiquery.MultiBiSearch(ctx, indexReq, limit, countUtils, common2.ActorMessageNoSkip,
 			monitor.GetCountOfMessageForActorAggregator(), req, colName, multiquery.ActorStates)
 	}
 

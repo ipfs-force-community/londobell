@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 
 	"context"
@@ -40,7 +42,7 @@ func GetMinedByMinerForRange(c *gin.Context) {
 	}
 
 	api := fullnode.API.GetAppropriateAPI()
-	addrs, err := GetAllAddrs(ctx, req.Addr, api)
+	addrs, err := common2.GetAllAddrs(ctx, req.Addr, api)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -53,7 +55,7 @@ func GetMinedByMinerForRange(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, minedByMinerRangeAggregator, req, "BlockHeader")
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, common2.MinedByMinerRangeAggregator, req, "BlockHeader")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

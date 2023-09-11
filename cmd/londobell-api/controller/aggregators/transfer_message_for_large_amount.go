@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -48,7 +50,7 @@ func GetTransferMessageForLargeAmount(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.LargeAmountTransferStates, countUtils, transferMessageForLargeAmountAggregator, req, "Message") //todo: ExecTrace
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.LargeAmountTransferStates, countUtils, common2.TransferMessageForLargeAmountAggregator, req, "Message") //todo: ExecTrace
 		if err != nil {
 			alog.Error(err)
 			alog.Error(err)

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -13,6 +15,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -40,7 +43,7 @@ func GetActorMessagesByMethodName(c *gin.Context) {
 	indexReq := req.Limit * req.Index
 	curEpoch := common.GetCurEpoch()
 
-	req.Addr, err = GetIDByAddr(ctx, req.Addr)
+	req.Addr, err = common2.GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

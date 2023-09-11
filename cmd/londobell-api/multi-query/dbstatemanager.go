@@ -585,11 +585,13 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		actorEventCodeCol := database.Collection("ActorEvent")
 		actorAddressCol := database.Collection("ActorAddress")
 		createMessageCol := database.Collection("CreateMessage")
+		changedSectorCol := database.Collection("ChangedSector")
+		changedClaimCol := database.Collection("ChangedClaim")
+		changedDealStateCol := database.Collection("ChangedDealState")
 
 		cols := make([]*mongo.Collection, 0)
-
-		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol)
-
+		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol,
+			changedSectorCol, changedClaimCol, changedDealStateCol)
 		dbsm.UpdateDBCollectionsMap(db.Url(), config2.Collections{DB: database, Cols: cols})
 	}
 
@@ -695,9 +697,13 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 	actorEventCodeCol := database.Collection("ActorEvent")
 	actorAddressCol := database.Collection("ActorAddress")
 	createMessageCol := database.Collection("CreateMessage")
+	changedSectorCol := database.Collection("ChangedSector")
+	changedClaimCol := database.Collection("ChangedClaim")
+	changedDealStateCol := database.Collection("ChangedDealState")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol)
+	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol,
+		changedSectorCol, changedClaimCol, newDealProposalCol, changedDealStateCol)
 
 	return config2.Collections{DB: database, Cols: cols}, nil
 }

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -34,7 +36,7 @@ func GetChildTransfersForMessage(c *gin.Context) {
 		return
 	}
 
-	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(childTransfersForMessageAggregator))
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(common.ChildTransfersForMessageAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

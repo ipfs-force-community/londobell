@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/gin-gonic/gin"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -34,7 +37,7 @@ func GetLatestTipSet(c *gin.Context) {
 	}
 
 	var latestTipSetRes []model.TipSetRes
-	pipe, err := util.Parse(model.Ctx{}, string(latestTipSetAggregator))
+	pipe, err := util.Parse(model.Ctx{}, string(common.LatestTipSetAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

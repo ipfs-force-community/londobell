@@ -11,8 +11,9 @@ import (
 )
 
 type ActorReq struct {
-	ActorID string `json:"actorId"`
-	Epoch   int64  `json:"epoch"`
+	ActorID string   `json:"actorId"`
+	Epoch   int64    `json:"epoch"`
+	Addrs   []string `json:"addrs"`
 }
 
 type ActorRes struct {

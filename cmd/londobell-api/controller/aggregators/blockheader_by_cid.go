@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -34,7 +36,7 @@ func GetBlockHeaderByCid(c *gin.Context) {
 		return
 	}
 
-	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(blockHeaderByCidAggregator))
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(common.BlockHeaderByCidAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

@@ -9,6 +9,20 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model/gastracker"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model/stats"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model/contract"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model/transaction"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model/account"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model/block"
+
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model/miner"
+
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/dep"
 
 	"github.com/dtynn/dix"
@@ -22,6 +36,8 @@ import (
 	"github.com/ipfs-force-community/londobell/api"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators"
+	caccount "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/account"
+	cminer "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/miner"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -168,7 +184,7 @@ func Run(cctx *cli.Context, adapter bool) error {
 		mlog := log.With("server", "multi-query")
 		go multiquery.PeriodicRefreshDataBaseState(cctx.Context, mlog, &multiquery.DBStateManager)
 
-		aggregators.InitAggregators()
+		common.InitAggregators()
 		RegisterAggregatorsApi(router)
 
 		httpStoper, errCh := serveHTTP(fmt.Sprintf(":%s", cctx.String("port")), router)
@@ -238,6 +254,9 @@ func RegisterAdapterApi(router *gin.Engine) {
 		group.POST("/changed_actors", adapter.GetStateChaingedActors)
 		group.POST("/version", adapter.GetVersion)
 		group.POST("/initcode_for_evm", adapter.GetInitCodeForEvm)
+		group.POST("/balance_at_market", adapter.GetBalanceAtMarket)
+		group.POST("/active_sectors", adapter.GetActiveSectors)
+		//group.POST("/sector_expiration", adapter.GetSectorExpiration)
 	}
 }
 
@@ -310,7 +329,79 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/events_for_message", aggregators.GetEventsForMessage)
 		group.POST("/events_for_epochrange", aggregators.GetEventsForEpochRange)
 		group.POST("/tipsets_list", aggregators.GetTipSetsList)
+	}
 
+	minergroup := router.Group("/aggregators/miner").Use()
+	{
+		minergroup.POST("/periodblockrewards", cminer.GetPeriodBlockRewards)
+		minergroup.POST("/periodwincounts", cminer.GetPeriodWinCounts)
+		minergroup.POST("/periodgascost", cminer.GetPeriodGasCosts)
+		minergroup.POST("/periodgascostforpublishdeals", cminer.GetPeriodGasCostsForPublishDeals)
+		minergroup.POST("/periodpunishments", cminer.GetPeriodPunishments)
+		//minergroup.POST("/periodsectorsdiff", cminer.GetPeriodSectorsDiff) // 分库有问题
+		//minergroup.POST("/periodpledgediff", cminer.GetPeriodPledgeDiff)   // 分库有问题
+		minergroup.POST("/sectorhealthhistory", cminer.GetSectorHealthHistory)
+		minergroup.POST("/pledgehistory", cminer.GetPledgeHistory)
+		minergroup.POST("/periodexpirations", cminer.GetPeriodSectorExpirations)
+		minergroup.POST("/qapowerhistory", cminer.GetQAPowerHistory)
+
+		minergroup.POST("/hourlysectorhealthlist", miner.NewMockSectorHealthRes().GetMockResponse)
+		minergroup.POST("/hourlypledgelist", miner.NewMockPledgeRes().GetMockResponse)
+		minergroup.POST("/livesectorlist", nil)
+		minergroup.POST("/sectorclaims", miner.NewMockClaimRes().GetMockResponse)
+		minergroup.POST("/periodclaimexpiration", miner.NewMockClaimRes().GetMockResponse)
+		minergroup.POST("/expiredclaims", miner.NewMockClaimRes().GetMockResponse)
+		minergroup.POST("/sectordetail", nil)
+		minergroup.POST("/claimdetail", miner.NewMockClaimRes().GetMockResponse)
+	}
+
+	accountgroup := router.Group("/aggregators/account").Use()
+	{
+		accountgroup.POST("/balancehistory", account.NewMockBalanceRes().GetMockResponse)
+		accountgroup.POST("/balancelist", account.NewMockBalanceListRes().GetMockResponse)
+		accountgroup.POST("/messagelist", account.NewMockMessageListRes().GetMockResponse)
+		accountgroup.POST("/messagelistimplicit", account.NewMockMessageListRes().GetMockResponse)
+		accountgroup.POST("/transferlist", account.NewMockBriefMessageListRes().GetMockResponse)
+		//accountgroup.POST("/transferobjectlist", account.NewMockBriefMessageListRes().GetMockResponse)
+		accountgroup.POST("/periodbill", caccount.GetPeriodBill)
+	}
+
+	blockgroup := router.Group("/aggregators/block").Use()
+	{
+		blockgroup.POST("/tipsethistory", block.NewMockTipSetRes().GetMockResponse)
+		blockgroup.POST("/tipsetlist", block.NewMockTipSetListRes().GetMockResponse)
+		blockgroup.POST("/blockdetail", block.NewMockBlockHeaderRes().GetMockResponse)
+		blockgroup.POST("/blockreward", block.NewMockBlockRewardRes().GetMockResponse)
+		blockgroup.POST("/packedmessages", account.NewMockMessageListRes().GetMockResponse)
+		blockgroup.POST("/blkcountlist", block.NewMockBlockCountListRes().GetMockResponse)
+	}
+
+	contractgroup := router.Group("/aggregators/contract").Use()
+	{
+		contractgroup.POST("/initcode", contract.NewMockInitCodeRes().GetMockResponse)
+		contractgroup.POST("/creation", contract.NewMockCreationRes().GetMockResponse)
+		contractgroup.POST("/eventlist", contract.NewMockEventListRes().GetMockResponse)
+	}
+
+	transactiongroup := router.Group("/aggregators/transaction").Use()
+	{
+		transactiongroup.POST("/messagedetail", account.NewMockMessageRes().GetMockResponse)
+		transactiongroup.POST("/messageinternals", account.NewMockMessageListRes().GetMockResponse)
+		transactiongroup.POST("/messagelist", account.NewMockMessageListRes().GetMockResponse)
+		transactiongroup.POST("/txbymethodlist", account.NewMockBriefMessageListRes().GetMockResponse)
+		transactiongroup.POST("/getreceipt", account.NewMockMessageListRes().GetMockResponse)
+		transactiongroup.POST("/txhash", transaction.NewMockTxHashRes().GetMockResponse)
+	}
+
+	statsgroup := router.Group("/aggregators/stats").Use()
+	{
+		statsgroup.POST("/activeminers", stats.NewMockActiveMinerRes().GetMockResponse)
+		statsgroup.POST("/newactors", stats.NewMockNewActorRes().GetMockResponse)
+	}
+
+	gastrackergroup := router.Group("/aggregators/gastracker").Use()
+	{
+		gastrackergroup.POST("averagegascostlist", gastracker.NewMockAverageGasCostListRes().GetMockResponse)
 	}
 }
 

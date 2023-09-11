@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
@@ -52,7 +54,7 @@ func GetTraceForMessage(c *gin.Context) {
 		return
 	}
 
-	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(traceForMessageAggregator))
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(common.TraceForMessageAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -123,7 +125,7 @@ var actorSet = NewActorSet()
 func (s *ActorSet) ParseParamsAndReturnsReadable(ctx context.Context, trace *model.TraceForMessageRes) error {
 	code := cid.Undef
 
-	toActorID, err := GetIDByAddr(ctx, trace.To)
+	toActorID, err := common.GetIDByAddr(ctx, trace.To)
 	if err != nil {
 		return err
 	}

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -32,7 +34,7 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 
 	curEpoch := common.GetCurEpoch()
 
-	req.Addr, err = GetIDByAddr(ctx, req.Addr)
+	req.Addr, err = common2.GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -52,7 +54,7 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 	}
 
 	api := fullnode.API.GetAppropriateAPI()
-	addrs, err := GetAllAddrs(ctx, req.Addr, api)
+	addrs, err := common2.GetAllAddrs(ctx, req.Addr, api)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

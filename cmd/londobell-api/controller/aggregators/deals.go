@@ -1,21 +1,20 @@
 package aggregators
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
 
-	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
-
-	"context"
-
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 
+	common3 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
 )
@@ -56,7 +55,7 @@ func GetDeals(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQueryForDeal(ctx, req.Index, req.Limit, multiquery.DealState, countUtils, dealsAggregator, req, "NewDealProposal")
+		multiResult, err := multiquery.MultiPagingQueryForDeal(ctx, req.Index, req.Limit, multiquery.DealState, countUtils, common3.DealsAggregator, req, "NewDealProposal")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
@@ -89,9 +88,9 @@ func GetDeals(c *gin.Context) {
 }
 
 func GetTotalCountForAllDeals(ctx context.Context, cols common2.Collections, epoch abi.ChainEpoch) (int64, error) {
-	DLock.RLock()
-	count, ok := AllDealCountMap[epoch]
-	DLock.RUnlock()
+	common3.DLock.RLock()
+	count, ok := common3.AllDealCountMap[epoch]
+	common3.DLock.RUnlock()
 
 	if ok {
 		return count, nil
@@ -107,9 +106,9 @@ func GetTotalCountForAllDeals(ctx context.Context, cols common2.Collections, epo
 				return 0, err
 			}
 
-			DLock.Lock()
-			AllDealCountMap[epoch] = count
-			DLock.Unlock()
+			common3.DLock.Lock()
+			common3.AllDealCountMap[epoch] = count
+			common3.DLock.Unlock()
 
 			return count, nil
 		}

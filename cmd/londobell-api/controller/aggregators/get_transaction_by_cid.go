@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	cid2 "github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
@@ -28,7 +30,7 @@ func GetTransactionByCid(c *gin.Context) {
 		return
 	}
 
-	traceForMessageRes, err := GetTraceByCid(ctx, req.Cid)
+	traceForMessageRes, err := common.GetTraceByCid(ctx, req.Cid)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -43,7 +45,7 @@ func GetTransactionByCid(c *gin.Context) {
 
 	trace := traceForMessageRes[0]
 
-	msg, err := GetMessageByTrace(trace)
+	msg, err := common.GetMessageByTrace(trace)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -57,7 +59,7 @@ func GetTransactionByCid(c *gin.Context) {
 		return
 	}
 
-	txIndex, err := GetTransactionIndexBySeq(trace.Seq)
+	txIndex, err := common.GetTransactionIndexBySeq(trace.Seq)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -66,7 +68,7 @@ func GetTransactionByCid(c *gin.Context) {
 
 	api := fullnode.API.GetAppropriateAPI()
 
-	tx, err := newEthTxFromMessageLookup(ctx, trace.Epoch, msg, cid, txIndex, api)
+	tx, err := common.NewEthTxFromMessageLookup(ctx, trace.Epoch, msg, cid, txIndex, api)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

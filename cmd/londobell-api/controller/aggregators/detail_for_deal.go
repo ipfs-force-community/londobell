@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -34,7 +36,7 @@ func GetDetailForDeal(c *gin.Context) {
 		return
 	}
 
-	pipe, err := util.Parse(model.Ctx{ID: req.ID}, string(detailForDealAggregator))
+	pipe, err := util.Parse(model.Ctx{ID: req.ID}, string(common.DetailForDealAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

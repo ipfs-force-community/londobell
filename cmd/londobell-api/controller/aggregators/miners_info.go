@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/ipfs-force-community/londobell/common"
 
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
@@ -43,7 +45,7 @@ func GetMinersInfo(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, minersInfoAggregator, req, "MinerSectorHealth")
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, common2.MinersInfoAggregator, req, "MinerSectorHealth")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

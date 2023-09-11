@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -35,14 +37,14 @@ func GetLatestTimeOfTrace(c *gin.Context) {
 		return
 	}
 
-	req.Addr, err = GetIDByAddr(ctx, req.Addr)
+	req.Addr, err = common.GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	pipe, err := util.Parse(model.Ctx{StartEpoch: 0, EndEpoch: math.MaxInt64, Addr: req.Addr, Sort: -1}, string(timeOfTraceAggregator))
+	pipe, err := util.Parse(model.Ctx{StartEpoch: 0, EndEpoch: math.MaxInt64, Addr: req.Addr, Sort: -1}, string(common.TimeOfTraceAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

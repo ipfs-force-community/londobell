@@ -8,14 +8,13 @@ import (
 
 	monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
-	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
-
-	"github.com/ipfs-force-community/londobell/common"
-
 	"github.com/gin-gonic/gin"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
+	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 func GetTransferMessages(c *gin.Context) {
@@ -34,7 +33,7 @@ func GetTransferMessages(c *gin.Context) {
 
 	curEpoch := common.GetCurEpoch()
 
-	req.Addr, err = GetIDByAddr(ctx, req.Addr)
+	req.Addr, err = common2.GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -56,7 +55,7 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferMsgsFroActorNoSkipAggregator
+		pipe = common2.TransferMsgsFroActorNoSkipAggregator
 		countAgg = monitor.GetCountOfTransfersForActor2Aggregator()
 	case "blockreward":
 		req.TransferType = "Blockreward"
@@ -67,7 +66,7 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferTypeForActorNoSkipAggregator
+		pipe = common2.TransferTypeForActorNoSkipAggregator
 		countAgg = monitor.GetCountOfTransferBlockRewardForActorAggregator()
 	case "burn":
 		req.TransferType = "Burn"
@@ -78,7 +77,7 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferTypeForActorNoSkipAggregator
+		pipe = common2.TransferTypeForActorNoSkipAggregator
 		countAgg = monitor.GetCountOfTransferBurnForActorAggregator()
 	case "transfer":
 		countUtils, err = multiquery.GetTotalCountForActorTransferSendAndReceiveMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
@@ -88,7 +87,7 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferSendAndReceiveForActorNoSkipAggregator
+		pipe = common2.TransferSendAndReceiveForActorNoSkipAggregator
 		countAgg = monitor.GetCountOfTransferSendAndReceiveForActorAggregator()
 	case "send":
 		req.TransferType = "Send"
@@ -99,7 +98,7 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferTypeForActorNoSkipAggregator
+		pipe = common2.TransferTypeForActorNoSkipAggregator
 		countAgg = monitor.GetCountOfTransferSendForActorAggregator()
 	case "receive":
 		req.TransferType = "Receive"
@@ -110,7 +109,7 @@ func GetTransferMessages(c *gin.Context) {
 			return
 		}
 
-		pipe = transferTypeForActorNoSkipAggregator
+		pipe = common2.TransferTypeForActorNoSkipAggregator
 		countAgg = monitor.GetCountOfTransferReceiveForActorAggregator()
 	default:
 		err = fmt.Errorf("invalid transfer type: %v", req.TransferType)
