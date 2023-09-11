@@ -49,6 +49,7 @@ func NewBlockHeader(minerID address.Address, raw *types.BlockHeader) (*BlockHead
 func (bh *BlockHeader) Indexes() [][]string {
 	return [][]string{
 		[]string{blockHeaderEpochField, "Miner"},
+		[]string{"Miner", blockHeaderEpochField},
 	}
 }
 
