@@ -20,7 +20,7 @@ var (
 	log = logging.Logger("adapter")
 )
 
-func newEthHashFromSignedMessage(ctx context.Context, smsg *types.SignedMessage, sa v0api.FullNode) (ethtypes.EthHash, error) {
+func NewEthHashFromSignedMessage(ctx context.Context, smsg *types.SignedMessage, sa v0api.FullNode) (ethtypes.EthHash, error) {
 	var tx ethtypes.EthTx
 	var err error
 

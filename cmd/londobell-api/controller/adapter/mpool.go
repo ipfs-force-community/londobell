@@ -66,14 +66,14 @@ func GetPendingMessages(c *gin.Context) {
 
 		for _, msg := range msgs {
 			if msg.Cid().Equals(mcid) || msg.Message.Cid().Equals(mcid) {
-				methodName, err := getMethodName(ctx, alog, api, msg, ts)
+				methodName, err := GetMethodName(ctx, alog, api, msg, ts)
 				if err != nil && err != util.ErrNotFound {
 					alog.Error(err)
 					util.ReturnOnErr(c, err)
 					return
 				}
 
-				hash, err := newEthHashFromSignedMessage(ctx, msg, api)
+				hash, err := NewEthHashFromSignedMessage(ctx, msg, api)
 				if err != nil {
 					alog.Error(fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid()))
 					util.ReturnOnErr(c, err)
@@ -99,14 +99,14 @@ func GetPendingMessages(c *gin.Context) {
 			i := i
 			msg := msgs[i]
 			g.Go(func() error {
-				hash, err := newEthHashFromSignedMessage(ctx, msg, api)
+				hash, err := NewEthHashFromSignedMessage(ctx, msg, api)
 				if err != nil {
 					alog.Error(fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid()))
 					return err
 				}
 
 				if req.Hash == hash.String() {
-					methodName, err := getMethodName(ctx, alog, api, msg, ts)
+					methodName, err := GetMethodName(ctx, alog, api, msg, ts)
 					if err != nil && err != util.ErrNotFound {
 						alog.Error(err)
 						return err
@@ -143,7 +143,7 @@ func GetPendingMessages(c *gin.Context) {
 	for i := range msgs {
 		msg := msgs[i]
 		g.Go(func() error {
-			methodName, err := getMethodName(ctx, alog, api, msg, ts)
+			methodName, err := GetMethodName(ctx, alog, api, msg, ts)
 			if err != nil && err != util.ErrNotFound {
 				return err
 			}
@@ -151,7 +151,7 @@ func GetPendingMessages(c *gin.Context) {
 			// todo: InvokeEVM和其他未定义方法区分开??
 			// filter by methodName
 			if req.MethodName != "" && methodName == req.MethodName {
-				hash, err := newEthHashFromSignedMessage(ctx, msg, api)
+				hash, err := NewEthHashFromSignedMessage(ctx, msg, api)
 				if err != nil {
 					return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid())
 				}
@@ -165,7 +165,7 @@ func GetPendingMessages(c *gin.Context) {
 			}
 
 			if req.MethodName == "" {
-				hash, err := newEthHashFromSignedMessage(ctx, msg, api)
+				hash, err := NewEthHashFromSignedMessage(ctx, msg, api)
 				if err != nil {
 					return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid())
 				}
@@ -216,7 +216,7 @@ func GetPendingMessages(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-func getMethodName(ctx context.Context, log *zap.SugaredLogger, api v0api.FullNode, msg *types.SignedMessage, ts *types.TipSet) (string, error) {
+func GetMethodName(ctx context.Context, log *zap.SugaredLogger, api v0api.FullNode, msg *types.SignedMessage, ts *types.TipSet) (string, error) {
 	if msg.Message.Method == abi.MethodNum(0) {
 		return "Send", nil
 	}
