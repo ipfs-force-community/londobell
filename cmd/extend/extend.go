@@ -9,29 +9,28 @@ import (
 	"net/http"
 	"net/smtp"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/go-state-types/big"
-
-	"github.com/filecoin-project/go-state-types/builtin/v9/miner"
-
-	"github.com/ipfs/go-cid"
-
-	"github.com/filecoin-project/go-state-types/builtin"
-	"github.com/filecoin-project/lotus/api/v0api"
-	cbg "github.com/whyrusleeping/cbor-gen"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/builtin/v9/miner"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
+	"github.com/filecoin-project/lotus/api/v0api"
 	lminer "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	"github.com/filecoin-project/lotus/chain/messagepool"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/node/config"
+	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
-
-	"github.com/ipfs-force-community/londobell/common"
+	cbg "github.com/whyrusleeping/cbor-gen"
+	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("extend")
@@ -47,7 +46,8 @@ func main() {
 			queryCmd,
 			extendSectorCmd,
 			extendClaimCmd,
-			// replace extend
+			replaceCmd,
+			mpoolFindCmd,
 		},
 		EnableBashCompletion: true,
 	}
@@ -60,72 +60,87 @@ func main() {
 	}
 }
 
+// alertCmd alert for expiring sectors and claims
 var alertCmd = &cli.Command{
 	Name: "alert",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
+			Name:     "api-url",
+			Required: true,
+			Usage:    "address for api, e.g.: ws://127.0.0.1:1234/rpc/v0",
+		},
+		&cli.StringFlag{
+			Name:  "token",
+			Usage: "token for api",
+		},
+		&cli.StringFlag{
 			Name:     "miner",
 			Required: true,
+			Usage:    "miner to monitor to alert",
 		},
 		&cli.Int64Flag{
 			Name:  "dead-duration",
 			Value: 12,
-		},
-		&cli.StringFlag{
-			Name:     "api-url",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name: "token",
+			Usage: "max interval between the expiration epoch and the current epoch",
 		},
 		&cli.DurationFlag{
 			Name:  "tick",
-			Usage: "--tick 1d",
+			Usage: "time interval for alert, 24 * time.Hour default, e.ge:  --tick 1d",
 		},
 		&cli.StringFlag{
-			Name:  "from-email",
-			Usage: "发送邮箱地址",
+			Name:     "from-email",
+			Required: true,
+			Usage:    "email to send alert messqage",
 		},
 		&cli.StringFlag{
-			Name:  "smtp-code",
-			Usage: "发送邮箱授权码",
+			Name:     "smtp-code",
+			Required: true,
+			Usage:    "authorization code of from email",
 		},
 		&cli.StringFlag{
-			Name:  "to-email",
-			Usage: "邮箱地址",
+			Name:     "to-email",
+			Required: true,
+			Usage:    "email to receive alert message",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		// 到期报警程序 for循环定时拉sectorinfo
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
+		token := cctx.String("token")
+		url := cctx.String("api-url")
+
+		from := cctx.String("from-email")
+		password := cctx.String("smtp-code")
+		to := cctx.String("to")
+
+		minerStr := cctx.String("miner")
+
+		deadDuration := cctx.Int64("dead-duration")
 
 		// email config
 		smtpHost := "smtp.qq.com"
 		smtpPort := 587
-		from := cctx.String("from-email")
-		password := cctx.String("smtp-code")
-		to := cctx.String("to")
 		auth := smtp.PlainAuth("", from, password, smtpHost)
 		subject := "expiring sectors and claims alert"
 
-		miner, err := address.NewFromString(cctx.String("miner"))
-		if err != nil {
-			return err
-		}
-
 		var requestHeader http.Header
-		token := cctx.String("token")
-		url := cctx.String("api-url")
 		if token != "" {
 			requestHeader = http.Header{"Authorization": []string{"Bearer " + token}}
 		}
 
 		api, closer, err := client.NewFullNodeRPCV0(ctx, url, requestHeader)
 		if err != nil {
+			log.Errorf("new fullnode %v failed: %v", url, err)
 			return err
 		}
 		defer closer()
+
+		miner, err := address.NewFromString(minerStr)
+		if err != nil {
+			log.Errorf("new miner %v failed: %v", minerStr, err)
+			return err
+		}
 
 		var duration time.Duration
 		if !cctx.IsSet("tick") {
@@ -142,39 +157,40 @@ var alertCmd = &cli.Command{
 			case <-tick.C:
 				sectors, err := api.StateMinerSectors(ctx, miner, nil, types.EmptyTSK)
 				if err != nil {
+					log.Errorf("get sectors for miner %v failed: %v", miner, err)
 					return err
 				}
 
 				expiringSectors := make([]*lminer.SectorOnChainInfo, 0)
 				expiringClaims := make(map[verifregtypes.ClaimId]verifregtypes.Claim, 0)
 				for _, sector := range sectors {
-					if sector.SectorNumber == 10091 {
-						fmt.Println(sector.Expiration, GetCurEpoch())
-					}
-					if sector.Expiration > GetCurEpoch() && sector.Expiration-GetCurEpoch() < abi.ChainEpoch(cctx.Int64("dead-duration")) {
+					if sector.Expiration > GetCurEpoch() && sector.Expiration-GetCurEpoch() < abi.ChainEpoch(deadDuration) {
 						expiringSectors = append(expiringSectors, sector)
 					}
 				}
 
 				outExpiringSectors, err := json.MarshalIndent(expiringSectors, "", "  ")
 				if err != nil {
+					log.Errorf("marshal expiringSectors failed: %v", err)
 					return err
 				}
 
 				claimMap, err := api.StateGetClaims(ctx, miner, types.EmptyTSK)
 				if err != nil {
+					log.Errorf("get claims for miner %v failed: %v", miner, err)
 					return err
 				}
 
 				for id, claim := range claimMap {
-					// 已过期的也可以再续期
-					if claim.TermStart+claim.TermMax > GetCurEpoch() && claim.TermStart+claim.TermMax-GetCurEpoch() < abi.ChainEpoch(cctx.Int64("dead-duration")) || claim.TermStart+claim.TermMax <= common.GetCurEpoch() {
+					// expired claims can also be renewed
+					if claim.TermStart+claim.TermMax > GetCurEpoch() && claim.TermStart+claim.TermMax-GetCurEpoch() < abi.ChainEpoch(deadDuration) || claim.TermStart+claim.TermMax <= GetCurEpoch() {
 						expiringClaims[id] = claim
 					}
 				}
 
 				outExpiringClaims, err := json.MarshalIndent(expiringClaims, "", "  ")
 				if err != nil {
+					log.Errorf("marshal expiringClaims failed: %v", err)
 					return err
 				}
 
@@ -194,33 +210,40 @@ var alertCmd = &cli.Command{
 
 				err = smtp.SendMail(smtpHost+":"+fmt.Sprint(smtpPort), auth, from, []string{to}, message)
 				if err != nil {
-					log.Fatal(err)
+					log.Errorf("send mail failed: %v, from: %v, to: %v, auth: %v", err, from, to, auth)
+					continue
 				}
 
 				log.Info("Email sent successfully!")
 			case <-ctx.Done():
 				log.Infof("ctx done!!")
+				return nil
 			}
 		}
 	},
 }
 
+// queryCmd query sector or claim info specified
 var queryCmd = &cli.Command{
 	Name: "query",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:     "miner",
-			Required: true,
-		},
-		&cli.StringFlag{
 			Name:     "api-url",
 			Required: true,
+			Usage:    "address for api, e.g.: ws://127.0.0.1:1234/rpc/v0",
 		},
 		&cli.StringFlag{
-			Name: "token",
+			Name:  "token",
+			Usage: "token for api",
+		},
+		&cli.StringFlag{
+			Name:     "miner",
+			Required: true,
+			Usage:    "miner of sector or claim to query",
 		},
 		&cli.Int64Flag{
-			Name: "number",
+			Name:  "number",
+			Usage: "number of sector or claim to query",
 		},
 		&cli.StringFlag{
 			Name:  "tipset",
@@ -228,7 +251,7 @@ var queryCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "type",
-			Usage: "sector or claim",
+			Usage: "query type, sector or claim",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -236,42 +259,50 @@ var queryCmd = &cli.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		var requestHeader http.Header
 		token := cctx.String("token")
 		url := cctx.String("api-url")
+
+		number := cctx.Int64("number")
+		tipsetKey := cctx.String("tipset")
+		minerStr := cctx.String("miner")
+
+		qtype := cctx.String("type")
+
+		var requestHeader http.Header
 		if token != "" {
 			requestHeader = http.Header{"Authorization": []string{"Bearer " + token}}
 		}
 
 		api, closer, err := client.NewFullNodeRPCV0(ctx, url, requestHeader)
 		if err != nil {
+			log.Errorf("new fullnode %v failed: %v", url, err)
 			return err
 		}
 		defer closer()
 
-		number := cctx.Int64("number")
-		tipsetKey := cctx.String("tipset")
 		ts, err := NewStringForTipSet(ctx, tipsetKey, api)
 		if err != nil {
+			log.Errorf("new tipset failed: %v, tipsetKey: %v", err, tipsetKey)
 			return err
 		}
 
-		miner, err := address.NewFromString(cctx.String("miner"))
+		miner, err := address.NewFromString(minerStr)
 		if err != nil {
-			log.Errorf("miner %v is invalid for query sector or claim: %v", cctx.String("miner"), err)
+			log.Errorf("miner %v is invalid for query sector or claim: %v", minerStr, err)
 			return err
 		}
 
-		qtype := cctx.String("type")
 		switch qtype {
 		case "sector":
 			sectorInfo, err := api.StateSectorGetInfo(ctx, miner, abi.SectorNumber(number), ts.Key())
 			if err != nil {
+				log.Errorf("get sector info of sectornumber %v for miner %v failed: %v", abi.SectorNumber(number), miner, err)
 				return err
 			}
 
 			formatSectorInfo, err := json.MarshalIndent(sectorInfo, "", "  ")
 			if err != nil {
+				log.Errorf("marshal sectorInfo failed: %v, err")
 				return err
 			}
 
@@ -279,11 +310,13 @@ var queryCmd = &cli.Command{
 		case "claim":
 			claim, err := api.StateGetClaim(ctx, miner, verifregtypes.ClaimId(number), ts.Key())
 			if err != nil {
+				log.Errorf("get claim of number %v for miner %v failed: %v", verifregtypes.ClaimId(number), miner, err)
 				return err
 			}
 
 			formatClaim, err := json.MarshalIndent(claim, "", "  ")
 			if err != nil {
+				log.Errorf("marshal claim failed: %v", err)
 				return err
 			}
 
@@ -296,17 +329,18 @@ var queryCmd = &cli.Command{
 	},
 }
 
-// todo: 合理化地续期， 提供建议; 自动续期
-// api写权限
+// extendSectorCmd extend sectors according to the params given or intelligent suggestion, need write permission for api
 var extendSectorCmd = &cli.Command{
 	Name: "extend-sector",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "api-url",
 			Required: true,
+			Usage:    "address for api, e.g.: ws://127.0.0.1:1234/rpc/v0",
 		},
 		&cli.StringFlag{
-			Name: "token",
+			Name:  "token",
+			Usage: "token for api",
 		},
 		&cli.StringFlag{
 			Name:  "tipset",
@@ -320,90 +354,98 @@ var extendSectorCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:     "miner",
 			Required: true,
+			Usage:    "miner for sectors extended",
 		},
-		//// todo: 多个deadline
-		//&cli.Uint64Flag{
-		//	Name:     "deadline",
-		//	Required: true,
-		//},
-		//&cli.Uint64Flag{
-		//	Name:     "partition",
-		//	Required: true,
-		//},
-		//&cli.Uint64SliceFlag{
-		//	Name:     "sectors",
-		//	Required: true,
-		//},
-		//&cli.Int64Flag{
-		//	Name:     "new-expiration",
-		//	Required: true,
-		//	// 建议
-		//},
 		&cli.StringFlag{
 			Name:  "extensions",
 			Usage: "json to store params of extend sectors, e.g.: ",
 			// new expirations of alerting sectors are decided by user
 			// 建议
 		},
-		//&cli.BoolFlag{
-		//	Name:  "new",
-		//	Usage: "ExtendSectorExpiration or ExtendSectorExpiration2",
-		//	// 建议
-		//},
+		&cli.Uint64Flag{
+			Name:  "value",
+			Usage: "value for new message (attoFIL/GasUnit)",
+		},
+		&cli.Int64Flag{
+			Name:  "gas-limit",
+			Usage: "gas limit for new message (GasUnit)",
+		},
+		&cli.Int64Flag{
+			Name:  "gas-feecap",
+			Usage: "gas feecap for new message (burn and pay to miner, attoFIL/GasUnit)",
+		},
+		&cli.Int64Flag{
+			Name:  "gas-premium",
+			Usage: "gas price for new message (pay to miner, attoFIL/GasUnit)",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		// query sector or claim for miner
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		var requestHeader http.Header
 		token := cctx.String("token")
 		url := cctx.String("api-url")
+
+		fromAddr := cctx.String("from")
+		toAddr := cctx.String("to")
+		tipsetKey := cctx.String("tipset")
+
+		extensions := cctx.String("extensions")
+
+		value := cctx.Uint64("value")
+		gasLimit := cctx.Int64("gas-limit")
+		gasFeeCap := cctx.Int64("gas-feecap")
+		gasPremium := cctx.Int64("gas-premium")
+
+		var requestHeader http.Header
 		if token != "" {
 			requestHeader = http.Header{"Authorization": []string{"Bearer " + token}}
 		}
 
 		api, closer, err := client.NewFullNodeRPCV0(ctx, url, requestHeader)
 		if err != nil {
+			log.Errorf("new fullnode %v failed: %v", url, err)
 			return err
 		}
 		defer closer()
 
-		fromAddr := cctx.String("from")
-		toAddr := cctx.String("to")
-		tipsetKey := cctx.String("tipset")
-
 		ts, err := NewStringForTipSet(ctx, tipsetKey, api)
 		if err != nil {
+			log.Errorf("new tipset failed: %v, tipsetKey: %v", err, tipsetKey)
 			return err
 		}
 
 		from, err := address.NewFromString(fromAddr)
 		if err != nil {
+			log.Errorf("new from address %v failed: %v", fromAddr, err)
 			return err
 		}
 
 		to, err := address.NewFromString(toAddr)
 		if err != nil {
+			log.Errorf("new to address %v failed: %v", toAddr, err)
 			return err
 		}
 
 		actor, err := api.StateGetActor(ctx, from, ts.Key())
 		if err != nil {
+			log.Errorf("get actor %v at ts %v failed: %v", from, ts.Key(), err)
 			return err
 		}
 
 		nonce := actor.Nonce
 
-		extensions := cctx.String("extensions")
 		extendSectorExpiration2Params, err := ParseSectorExtensions(extensions)
 		if err != nil {
+			log.Errorf("parse sector extensions %v failed: %v", extensions, err)
 			return err
 		}
 
 		// choose extend sector method intelligently
 		commitLegacy, err := IsExtendCommitLegacy(ctx, extendSectorExpiration2Params, to, api, ts)
 		if err != nil {
+			log.Errorf("adjust extend method failed: %v", err)
 			return err
 		}
 
@@ -430,6 +472,7 @@ var extendSectorCmd = &cli.Command{
 
 			paramsByte, err = SerializeParams(params)
 			if err != nil {
+				log.Errorf("serialize params %v failed: %v", params, err)
 				return err
 			}
 		} else {
@@ -438,20 +481,32 @@ var extendSectorCmd = &cli.Command{
 			// add sectorclaims intelligently
 			err = FillSectorsWithClaims(ctx, &extendSectorExpiration2Params, to, api, ts)
 			if err != nil {
+				log.Errorf("fill sectorclaims for sectors failed: %v", err)
 				return err
 			}
 
 			paramsByte, err = SerializeParams(&extendSectorExpiration2Params)
 			if err != nil {
+				log.Errorf("serialize params %v failed: %v", extendSectorExpiration2Params, err)
 				return err
 			}
 		}
 
-		// todo: 智能构建消息
-		msg := BuildMessage(from, to, types.NewInt(0), nonce, 1000000, abi.NewTokenAmount(1000000), abi.NewTokenAmount(5), method, paramsByte, false)
+		helper := false
+		if gasLimit == 0 || gasFeeCap == 0 || gasPremium == 0 {
+			helper = true
+		}
 
-		mcid, err := PushMessage(ctx, api, &msg)
+		// support custom message & intelligently help evaluate message gas parameters
+		msg, err := BuildMessage(ctx, api, ts, from, to, types.NewInt(value), nonce, gasLimit, abi.NewTokenAmount(gasFeeCap), abi.NewTokenAmount(gasPremium), method, paramsByte, helper)
 		if err != nil {
+			log.Errorf("build message failed: %v", err)
+			return err
+		}
+
+		mcid, err := PushMessage(ctx, api, msg)
+		if err != nil {
+			log.Errorf("put message %+v failed: %v", *msg, err)
 			return err
 		}
 
@@ -461,15 +516,18 @@ var extendSectorCmd = &cli.Command{
 	},
 }
 
+// extendClaimCmd extend claims according to the params given or intelligent suggestion, need write permission for api
 var extendClaimCmd = &cli.Command{
 	Name: "extend-claim",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "api-url",
 			Required: true,
+			Usage:    "address for api, e.g.: ws://127.0.0.1:1234/rpc/v0",
 		},
 		&cli.StringFlag{
-			Name: "token",
+			Name:  "token",
+			Usage: "token for api",
 		},
 		&cli.StringFlag{
 			Name:  "tipset",
@@ -483,11 +541,28 @@ var extendClaimCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:     "provider",
 			Required: true,
+			Usage:    "provider for claims extended",
 		},
 		&cli.StringFlag{
 			Name:     "claimTerm",
 			Required: true,
-			Usage:    "json of ClaimTerm",
+			Usage:    "json of ClaimTerm, Set term_max as large as possible",
+		},
+		&cli.Uint64Flag{
+			Name:  "value",
+			Usage: "value for new message (attoFIL/GasUnit)",
+		},
+		&cli.Int64Flag{
+			Name:  "gas-limit",
+			Usage: "gas limit for new message (GasUnit)",
+		},
+		&cli.Int64Flag{
+			Name:  "gas-feecap",
+			Usage: "gas feecap for new message (burn and pay to miner, attoFIL/GasUnit)",
+		},
+		&cli.Int64Flag{
+			Name:  "gas-premium",
+			Usage: "gas price for new message (pay to miner, attoFIL/GasUnit)",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -495,41 +570,53 @@ var extendClaimCmd = &cli.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		var requestHeader http.Header
 		token := cctx.String("token")
 		url := cctx.String("api-url")
+
+		fromAddr := cctx.String("from")
+		providerAddr := cctx.String("provider")
+		tipsetKey := cctx.String("tipset")
+
+		claimTermJSON := cctx.String("claimTerm")
+
+		value := cctx.Uint64("value")
+		gasLimit := cctx.Int64("gas-limit")
+		gasFeeCap := cctx.Int64("gas-feecap")
+		gasPremium := cctx.Int64("gas-premium")
+
+		var requestHeader http.Header
 		if token != "" {
 			requestHeader = http.Header{"Authorization": []string{"Bearer " + token}}
 		}
 
 		api, closer, err := client.NewFullNodeRPCV0(ctx, url, requestHeader)
 		if err != nil {
+			log.Errorf("new fullnode %v failed: %v", url, err)
 			return err
 		}
 		defer closer()
 
-		fromAddr := cctx.String("from")
-		providerAddr := cctx.String("provider")
-		tipsetKey := cctx.String("tipset")
-		claimTermJSON := cctx.String("claimTerm")
-
 		ts, err := NewStringForTipSet(ctx, tipsetKey, api)
 		if err != nil {
+			log.Errorf("new tipset failed: %v, tipsetKey: %v", err, tipsetKey)
 			return err
 		}
 
 		from, err := address.NewFromString(fromAddr)
 		if err != nil {
+			log.Errorf("new from address %v failed: %v", fromAddr, err)
 			return err
 		}
 
 		provider, err := address.NewFromString(providerAddr)
 		if err != nil {
+			log.Errorf("new provider address %v failed: %v", providerAddr, err)
 			return err
 		}
 
 		actor, err := api.StateGetActor(ctx, from, ts.Key())
 		if err != nil {
+			log.Errorf("get actor %v at ts %v failed: %v", from, ts.Key(), err)
 			return err
 		}
 
@@ -537,6 +624,7 @@ var extendClaimCmd = &cli.Command{
 
 		claimTerms, err := ParseClaimTerm(claimTermJSON)
 		if err != nil {
+			log.Errorf("parse claim term %v failed: %v", claimTermJSON, err)
 			return err
 		}
 
@@ -549,13 +637,25 @@ var extendClaimCmd = &cli.Command{
 
 		paramsByte, err := SerializeParams(params)
 		if err != nil {
+			log.Errorf("serialize params %v failed: %v", params, err)
 			return err
 		}
 
-		msg := BuildMessage(from, provider, types.NewInt(0), nonce, 1000000, abi.NewTokenAmount(1000000), abi.NewTokenAmount(5), method, paramsByte, false)
+		helper := false
+		if gasLimit == 0 || gasFeeCap == 0 || gasPremium == 0 {
+			helper = true
+		}
 
-		mcid, err := PushMessage(ctx, api, &msg)
+		// support custom message & intelligently help evaluate message gas parameters
+		msg, err := BuildMessage(ctx, api, ts, from, provider, types.NewInt(value), nonce, gasLimit, abi.NewTokenAmount(gasFeeCap), abi.NewTokenAmount(gasPremium), method, paramsByte, helper)
 		if err != nil {
+			log.Errorf("build message failed: %v", err)
+			return err
+		}
+
+		mcid, err := PushMessage(ctx, api, msg)
+		if err != nil {
+			log.Errorf("put message %+v failed: %v", *msg, err)
 			return err
 		}
 
@@ -565,8 +665,284 @@ var extendClaimCmd = &cli.Command{
 	},
 }
 
+// replaceCmd replace a message in the mempool
+var replaceCmd = &cli.Command{
+	Name:  "replace",
+	Usage: "replace extend message in the mpool to be packed early",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "api-url",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name: "token",
+		},
+		&cli.StringFlag{
+			Name:  "gas-feecap",
+			Usage: "gas feecap for new message (burn and pay to miner, attoFIL/GasUnit)",
+		},
+		&cli.StringFlag{
+			Name:  "gas-premium",
+			Usage: "gas price for new message (pay to miner, attoFIL/GasUnit)",
+		},
+		&cli.Int64Flag{
+			Name:  "gas-limit",
+			Usage: "gas limit for new message (GasUnit)",
+		},
+		&cli.BoolFlag{
+			Name:  "auto",
+			Usage: "automatically reprice the specified message",
+		},
+		&cli.StringFlag{
+			Name:  "fee-limit",
+			Usage: "Spend up to X FIL for this message in units of FIL. Previously when flag was `max-fee` units were in attoFIL. Applicable for auto mode",
+		},
+	},
+	ArgsUsage: "<from> <nonce> | <message-cid>",
+	Action: func(cctx *cli.Context) error {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		token := cctx.String("token")
+		url := cctx.String("api-url")
+
+		var requestHeader http.Header
+		if token != "" {
+			requestHeader = http.Header{"Authorization": []string{"Bearer " + token}}
+		}
+
+		api, closer, err := client.NewFullNodeRPCV0(ctx, url, requestHeader)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		var from address.Address
+		var nonce uint64
+		switch cctx.NArg() {
+		case 1:
+			mcid, err := cid.Decode(cctx.Args().First())
+			if err != nil {
+				return err
+			}
+
+			msg, err := api.ChainGetMessage(ctx, mcid)
+			if err != nil {
+				return xerrors.Errorf("could not find referenced message: %w", err)
+			}
+
+			from = msg.From
+			nonce = msg.Nonce
+		case 2:
+			arg0 := cctx.Args().Get(0)
+			f, err := address.NewFromString(arg0)
+			if err != nil {
+				return err
+			}
+
+			n, err := strconv.ParseUint(cctx.Args().Get(1), 10, 64)
+			if err != nil {
+				return err
+			}
+
+			from = f
+			nonce = n
+		default:
+			return cli.ShowCommandHelp(cctx, cctx.Command.Name)
+		}
+
+		ts, err := api.ChainHead(ctx)
+		if err != nil {
+			return xerrors.Errorf("getting chain head: %w", err)
+		}
+
+		pending, err := api.MpoolPending(ctx, ts.Key())
+		if err != nil {
+			return err
+		}
+
+		var found *types.SignedMessage
+		for _, p := range pending {
+			if p.Message.From == from && p.Message.Nonce == nonce {
+				found = p
+				break
+			}
+		}
+
+		if found == nil {
+			return xerrors.Errorf("no pending message found from %s with nonce %d", from, nonce)
+		}
+
+		msg := found.Message
+
+		if cctx.Bool("auto") {
+			cfg, err := api.MpoolGetConfig(ctx)
+			if err != nil {
+				return xerrors.Errorf("failed to lookup the message pool config: %w", err)
+			}
+
+			defaultRBF := messagepool.ComputeRBF(msg.GasPremium, cfg.ReplaceByFeeRatio)
+
+			var mss *lapi.MessageSendSpec
+			if cctx.IsSet("fee-limit") {
+				maxFee, err := types.ParseFIL(cctx.String("fee-limit"))
+				if err != nil {
+					return xerrors.Errorf("parsing max-spend: %w", err)
+				}
+				mss = &lapi.MessageSendSpec{
+					MaxFee: abi.TokenAmount(maxFee),
+				}
+			}
+
+			// msg.GasLimit = 0 // TODO: need to fix the way we estimate gas limits to account for the messages already being in the mempool
+			msg.GasFeeCap = abi.NewTokenAmount(0)
+			msg.GasPremium = abi.NewTokenAmount(0)
+			retm, err := api.GasEstimateMessageGas(ctx, &msg, mss, types.EmptyTSK)
+			if err != nil {
+				return xerrors.Errorf("failed to estimate gas values: %w", err)
+			}
+
+			msg.GasPremium = big.Max(retm.GasPremium, defaultRBF)
+			msg.GasFeeCap = big.Max(retm.GasFeeCap, msg.GasPremium)
+
+			mff := func() (abi.TokenAmount, error) {
+				return abi.TokenAmount(config.DefaultDefaultMaxFee), nil
+			}
+
+			messagepool.CapGasFee(mff, &msg, mss)
+		} else {
+			if cctx.IsSet("gas-limit") {
+				msg.GasLimit = cctx.Int64("gas-limit")
+			}
+			msg.GasPremium, err = types.BigFromString(cctx.String("gas-premium"))
+			if err != nil {
+				return xerrors.Errorf("parsing gas-premium: %w", err)
+			}
+			// TODO: estimate fee cap here
+			msg.GasFeeCap, err = types.BigFromString(cctx.String("gas-feecap"))
+			if err != nil {
+				return xerrors.Errorf("parsing gas-feecap: %w", err)
+			}
+		}
+
+		smsg, err := api.WalletSignMessage(ctx, msg.From, &msg)
+		if err != nil {
+			return xerrors.Errorf("failed to sign message: %w", err)
+		}
+
+		cid, err := api.MpoolPush(ctx, smsg)
+		if err != nil {
+			return xerrors.Errorf("failed to push new message to mempool: %w", err)
+		}
+
+		log.Infof("new message cid: %v", cid)
+		return nil
+	},
+}
+
+// mpoolFindCmd find a message in the mempool
+var mpoolFindCmd = &cli.Command{
+	Name:  "find",
+	Usage: "find a message in the mempool",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "api-url",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name: "token",
+		},
+		&cli.StringFlag{
+			Name:  "from",
+			Usage: "search for messages with given 'from' address",
+		},
+		&cli.StringFlag{
+			Name:  "to",
+			Usage: "search for messages with given 'to' address",
+		},
+		&cli.Int64Flag{
+			Name:  "method",
+			Usage: "search for messages with given method",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		token := cctx.String("token")
+		url := cctx.String("api-url")
+
+		var requestHeader http.Header
+		if token != "" {
+			requestHeader = http.Header{"Authorization": []string{"Bearer " + token}}
+		}
+
+		api, closer, err := client.NewFullNodeRPCV0(ctx, url, requestHeader)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		pending, err := api.MpoolPending(ctx, types.EmptyTSK)
+		if err != nil {
+			return err
+		}
+
+		var toFilter, fromFilter address.Address
+		if cctx.IsSet("to") {
+			a, err := address.NewFromString(cctx.String("to"))
+			if err != nil {
+				return xerrors.Errorf("'to' address was invalid: %w", err)
+			}
+
+			toFilter = a
+		}
+
+		if cctx.IsSet("from") {
+			a, err := address.NewFromString(cctx.String("from"))
+			if err != nil {
+				return xerrors.Errorf("'from' address was invalid: %w", err)
+			}
+
+			fromFilter = a
+		}
+
+		var methodFilter *abi.MethodNum
+		if cctx.IsSet("method") {
+			m := abi.MethodNum(cctx.Int64("method"))
+			methodFilter = &m
+		}
+
+		var out []*types.SignedMessage
+		for _, m := range pending {
+			if toFilter != address.Undef && m.Message.To != toFilter {
+				continue
+			}
+
+			if fromFilter != address.Undef && m.Message.From != fromFilter {
+				continue
+			}
+
+			if methodFilter != nil && *methodFilter != m.Message.Method {
+				continue
+			}
+
+			out = append(out, m)
+		}
+
+		b, err := json.MarshalIndent(out, "", "  ")
+		if err != nil {
+			return err
+		}
+
+		log.Info(string(b))
+		return nil
+	},
+}
+
 const (
-	BeginTime = "2020-08-25T06:00:00+08:00" // mainnet高度0时的时间
+	// mainnet高度0时的时间
+	BeginTime = "2020-08-25T06:00:00+08:00"
 )
 
 var BaseTime, _ = time.Parse(time.RFC3339, BeginTime)
@@ -574,86 +950,6 @@ var BaseTime, _ = time.Parse(time.RFC3339, BeginTime)
 func GetCurEpoch() abi.ChainEpoch {
 	return abi.ChainEpoch((time.Now().Unix() - BaseTime.Unix()) / 30)
 }
-
-//// 续期程序
-//// todo: log凑行数； 各种合理化的参数设置
-//func ExtendExpiringSector(ctx context.Context, api v0api.FullNode, from, miner address.Address, feecap abi.TokenAmount, sectors []*lminer.SectorOnChainInfo, newExpiration abi.ChainEpoch) error {
-//	actor, err := api.StateGetActor(ctx, from, types.EmptyTSK)
-//	if err != nil {
-//		return err
-//	}
-//
-//	// method、params 分epoch讨论
-//
-//	var params *sminer.ExtendSectorExpirationParams
-//	extensions := make([]sminer.ExpirationExtension, 0)
-//	//store := adt.WrapStore(ctx, cbor.NewCborStore(blockstore.NewAPIBlockstore(api)))
-//
-//	locationMap := make(map[uint64]map[uint64]bitfield.BitField)
-//	for _, sector := range sectors {
-//		location, err := api.StateSectorPartition(ctx, miner, sector.SectorNumber, types.EmptyTSK)
-//		if err != nil {
-//			return err
-//		}
-//
-//		if _, ok := locationMap[location.Deadline]; !ok {
-//			locationMap[location.Deadline] = make(map[uint64]bitfield.BitField)
-//			locationMap[location.Deadline][location.Partition] = bitfield.NewFromSet([]uint64{uint64(sector.SectorNumber)})
-//		} else {
-//			merge, err := bitfield.MergeBitFields(locationMap[location.Deadline][location.Partition], bitfield.NewFromSet([]uint64{uint64(sector.SectorNumber)}))
-//			if err != nil {
-//				return err
-//			}
-//
-//			locationMap[location.Deadline][location.Partition] = merge
-//		}
-//	}
-//
-//	for deadline, partitionMap := range locationMap {
-//		for partition, sectors := range partitionMap {
-//			extensions = append(extensions, sminer.ExpirationExtension{
-//				Deadline:      deadline,
-//				Partition:     partition,
-//				Sectors:       sectors,
-//				NewExpiration: newExpiration,
-//			})
-//		}
-//	}
-//
-//	params = &sminer.ExtendSectorExpirationParams{
-//		Extensions: extensions,
-//	}
-//
-//	paramsByte, err := SerializeParams(params)
-//	if err != nil {
-//		return err
-//	}
-//
-//	msg := types.Message{
-//		From:       from,
-//		To:         miner,
-//		Value:      types.NewInt(0),
-//		Nonce:      actor.Nonce,
-//		GasLimit:   1000000,
-//		GasFeeCap:  feecap,
-//		GasPremium: abi.NewTokenAmount(5),
-//		Method:     builtin.MethodsMiner.ExtendSectorExpiration2,
-//		Params:     paramsByte,
-//	}
-//
-//	smsg, err := api.WalletSignMessage(ctx, msg.From, &msg)
-//	if err != nil {
-//		return err
-//	}
-//
-//	cid, err := api.MpoolPush(ctx, smsg)
-//	if err != nil {
-//		return err
-//	}
-//
-//	log.Infof("extend sector cid: %v", cid)
-//	return nil
-//}
 
 func SerializeParams(i cbg.CBORMarshaler) ([]byte, error) {
 	buf := new(bytes.Buffer)
@@ -691,28 +987,6 @@ func NewStringForTipSet(ctx context.Context, tipsetKeyStr string, api v0api.Full
 
 	return ts, nil
 }
-
-//func ParseSectorClaims(path string) ([]miner.SectorClaim, error) {
-//	file, err := os.Open(path)
-//	defer file.Close() //nolint:staticcheck
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	bytes, err := ioutil.ReadAll(file)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	// todo: 兼容其他版本
-//	var sectorClaims []miner.SectorClaim
-//	err = json.Unmarshal(bytes, &sectorClaims)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return sectorClaims, nil
-//}
 
 // todo: bitfiled json怎么传入
 func ParseSectorExtensions(path string) (miner.ExtendSectorExpiration2Params, error) {
@@ -758,6 +1032,7 @@ func ParseClaimTerm(path string) ([]verifregtypes.ClaimTerm, error) {
 	return claimTerms, nil
 }
 
+// IsExtendCommitLegacy return whether to use legacy extend method
 func IsExtendCommitLegacy(ctx context.Context, extendSectorExpiration2Params miner.ExtendSectorExpiration2Params, miner address.Address, api v0api.FullNode, tipset *types.TipSet) (bool, error) {
 	var commitLegacy = true
 	for _, extension := range extendSectorExpiration2Params.Extensions {
@@ -789,8 +1064,8 @@ func IsExtendCommitLegacy(ctx context.Context, extendSectorExpiration2Params min
 
 var errFailedFillSectorsWithClaims = fmt.Errorf("failed fill sectors with claims")
 
-// 选择deadline-partion中sector的哪些claims被maintain或drop 能drop就drop了，不能就报错
 // todo: 或者可以帮用户选择合适的new_expiration?
+// FillSectorsWithClaims fill sectorclaim for sectors extended, include claimids maintained or dropped. Failed if there are claims needed to be dropped but cannot be dropped
 func FillSectorsWithClaims(ctx context.Context, extendSectorExpiration2Params *miner.ExtendSectorExpiration2Params, provider address.Address, api v0api.FullNode, tipset *types.TipSet) error {
 	failed := false
 
@@ -812,7 +1087,7 @@ func FillSectorsWithClaims(ctx context.Context, extendSectorExpiration2Params *m
 				return errFailedFillSectorsWithClaims
 			}
 
-			// claim和sector绑定
+			// bind claim and sector
 			claims := claimsForSectorsMap[abi.SectorNumber(u)]
 
 			maintainClaims, dropClaims := MaintainAndDropClaims(newExpiration, claims)
@@ -824,7 +1099,7 @@ func FillSectorsWithClaims(ctx context.Context, extendSectorExpiration2Params *m
 
 				canDropClaims := CanDropClaims(sectorInfo.Expiration, tipset.Height())
 				if !canDropClaims {
-					// 警告new_expiration太大 或 先续期claims
+					// new_expiration is too large or extend claims first
 					log.Warnf("claims is not allowed to drop for expiration(%v)-curEpoch(%v) <= verifregtypes.EndOfLifeClaimDropPeriod(30d), new expiration %v is too high than claim.term_start + claim.term_max, dropClaims: %v", sectorInfo.Expiration, tipset.Key(), newExpiration, dropClaims)
 					failed = true
 				}
@@ -853,6 +1128,7 @@ func FillSectorsWithClaims(ctx context.Context, extendSectorExpiration2Params *m
 	return nil
 }
 
+// ClaimsForSectors bind sector and corresponding claims
 func ClaimsForSectors(ctx context.Context, provider address.Address, api v0api.FullNode, tipset *types.TipSet) (map[abi.SectorNumber]map[verifregtypes.ClaimId]verifregtypes.Claim, error) {
 	claimsForSectorsMap := make(map[abi.SectorNumber]map[verifregtypes.ClaimId]verifregtypes.Claim)
 	claims, err := api.StateGetClaims(ctx, provider, tipset.Key())
@@ -873,8 +1149,8 @@ func ClaimsForSectors(ctx context.Context, provider address.Address, api v0api.F
 	return claimsForSectorsMap, nil
 }
 
-// maintain要求: decl.new_expiration <= claim.term_start + claim.term_max
-// drop要求: sector.expiration - curr_epoch <= policy.end_of_life_claim_drop_period
+// maintain: decl.new_expiration <= claim.term_start + claim.term_max
+// drop: sector.expiration - curr_epoch <= policy.end_of_life_claim_drop_period
 func MaintainAndDropClaims(newExpiration abi.ChainEpoch, claims map[verifregtypes.ClaimId]verifregtypes.Claim) ([]verifregtypes.ClaimId, []verifregtypes.ClaimId) {
 	maintainClaims, dropClaims := make([]verifregtypes.ClaimId, 0), make([]verifregtypes.ClaimId, 0)
 	for id, claim := range claims {
@@ -888,12 +1164,56 @@ func MaintainAndDropClaims(newExpiration abi.ChainEpoch, claims map[verifregtype
 	return maintainClaims, dropClaims
 }
 
+// CanDropClaims return whether claims of sector can be dropped
 func CanDropClaims(expiration, curEpoch abi.ChainEpoch) bool {
 	return expiration-curEpoch <= verifregtypes.EndOfLifeClaimDropPeriod
 }
 
-// claim 要在sector续期前续期，如果强烈不续claim就drop
+// todo: 专业性建议合理化参数
+// gaslimit, gasfeecap, gaspremium,
+// gaslimit和gasused相关
+// gasfeecap和basefee相关，大点就行，差距比gasPremium大
+// gaspremium和其他用户给的gaspremium相关，允许replace
+func BuildMessage(ctx context.Context, api v0api.FullNode, ts *types.TipSet, from, to address.Address, value abi.TokenAmount, nonce uint64, gasLimit int64, gasFeeCap, gasPremium abi.TokenAmount, method abi.MethodNum, params []byte, helper bool) (*types.Message, error) {
+	if helper {
+		// estimate gasLimit、gasFeeCap、gasPremium
+		msg := &types.Message{
+			Version:    0,
+			To:         to,
+			From:       from,
+			Nonce:      nonce,
+			Value:      value,
+			GasLimit:   0,
+			GasFeeCap:  abi.NewTokenAmount(0),
+			GasPremium: abi.NewTokenAmount(0),
+			Method:     method,
+			Params:     params,
+		}
 
+		retm, err := api.GasEstimateMessageGas(ctx, msg, nil, ts.Key())
+		if err != nil {
+			return nil, err
+		}
+
+		return retm, nil
+	}
+
+	msg := &types.Message{
+		From:       from,
+		To:         to,
+		Value:      value,
+		Nonce:      nonce,
+		GasLimit:   gasLimit,
+		GasFeeCap:  gasFeeCap,
+		GasPremium: gasPremium,
+		Method:     method,
+		Params:     params,
+	}
+
+	return msg, nil
+}
+
+// PushMessage send message to chain
 func PushMessage(ctx context.Context, api v0api.FullNode, msg *types.Message) (cid.Cid, error) {
 	smsg, err := api.WalletSignMessage(ctx, msg.From, msg)
 	if err != nil {
@@ -906,30 +1226,4 @@ func PushMessage(ctx context.Context, api v0api.FullNode, msg *types.Message) (c
 	}
 
 	return mcid, nil
-}
-
-// todo: 专业性建议合理化参数
-// gaslimit, gasfeecap, gaspremium,
-// gaslimit和gasused相关
-// gasfeecap和basefee相关
-// gaspremium和其他用户给的gaspremium相关，允许replace
-func BuildMessage(from, to address.Address, value abi.TokenAmount, nonce uint64, gasLimit int64, gasFeeCap, gasPremium abi.TokenAmount, method abi.MethodNum, params []byte, helper bool) types.Message {
-	if helper {
-		// todo
-		fmt.Println("todo")
-	}
-
-	msg := types.Message{
-		From:       from,
-		To:         to,
-		Value:      value,
-		Nonce:      nonce,
-		GasLimit:   gasLimit,
-		GasFeeCap:  gasFeeCap,
-		GasPremium: gasPremium,
-		Method:     method,
-		Params:     params,
-	}
-
-	return msg
 }
