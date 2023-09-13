@@ -1070,14 +1070,14 @@ var CheckUnprovenCmd = &cli.Command{
 
 		act, err := api.StateGetActor(ctx, addr, ts.Key())
 		if err != nil {
-			return fmt.Errorf("handleSealFailed(%d): temp error: %+v", err)
+			return fmt.Errorf("loading state error: %+v", err)
 		}
 
 		stor := store.ActorStore(ctx, blockstore.NewAPIBlockstore(api))
 
 		state, err := lminer.Load(stor, act)
 		if err != nil {
-			return fmt.Errorf("handleSealFailed(%d): temp error: loading miner state: %+v", err)
+			return fmt.Errorf("loading miner state: %+v", err)
 		}
 
 		type sector struct {
@@ -1153,7 +1153,7 @@ var DrawRewardData = &cli.Command{
 				}
 				if s[j].Expiration < abi.ChainEpoch(day*2880)+ts.Height() && s[j].VerifiedDealWeight.Equals(big.Zero()) {
 					if s[j].SealProof == 8 {
-						cnt[int(s[j].Expiration-ts.Height())/2880] += 1
+						cnt[int(s[j].Expiration-ts.Height())/2880]++
 					} else {
 						cnt[int(s[j].Expiration-ts.Height())/2880] += 2
 					}
@@ -1413,9 +1413,9 @@ func EpochToTime(h abi.ChainEpoch) time.Time {
 	return BaseTime.Add(time.Duration(int64(h)*30) * time.Second)
 }
 
-func TimeToEpoch(t time.Time) abi.ChainEpoch {
-	return abi.ChainEpoch(t.Sub(BaseTime).Seconds()) / 30
-}
+//func TimeToEpoch(t time.Time) abi.ChainEpoch {
+//	return abi.ChainEpoch(t.Sub(BaseTime).Seconds()) / 30
+//}
 
 func SerializeParams(i cbg.CBORMarshaler) ([]byte, error) {
 	buf := new(bytes.Buffer)
@@ -1510,8 +1510,10 @@ func ParseSectorExtensions(ctx context.Context, path string, maddr address.Addre
 
 			sp, err := api.StateSectorPartition(ctx, maddr, abi.SectorNumber(sector), ts.Key())
 			if err != nil {
-
+				log.Errorf("get sector %v location failed: %v", sector, err)
+				return nil, err
 			}
+
 			if _, ok := locationMap[sp.Deadline]; !ok {
 				locationMap[sp.Deadline] = make(map[uint64][]uint64)
 				locationMap[sp.Deadline][sp.Partition] = []uint64{sector}
@@ -1528,12 +1530,19 @@ func ParseSectorExtensions(ctx context.Context, path string, maddr address.Addre
 			}
 
 			if helper {
-				maxNewExpiration := MaxNewExpiration(ts.Height(), sectorInfo)
+				maxNewExpiration, err := MaxNewExpiration(ts.Height(), sectorInfo)
+				if err != nil {
+					return nil, err
+				}
 				newExpirations = append(newExpirations, maxNewExpiration)
 			} else {
-				isValidNewExpiration := IsValidNewExpiration(ts.Height(), extension.NewExpiration, sectorInfo)
+				isValidNewExpiration, err := IsValidNewExpiration(ts.Height(), extension.NewExpiration, sectorInfo)
 				if !isValidNewExpiration {
 					return nil, fmt.Errorf("specified new expiration %v for sector %v is invalid", extension.NewExpiration, sector)
+				}
+
+				if err != nil {
+					return nil, err
 				}
 			}
 		}
@@ -1564,17 +1573,22 @@ func ParseSectorExtensions(ctx context.Context, path string, maddr address.Addre
 	return extendSectorExpiration2Params, nil
 }
 
-func MaxNewExpiration(curEpoch abi.ChainEpoch, sectorInfo *miner.SectorOnChainInfo) abi.ChainEpoch {
+func MaxNewExpiration(curEpoch abi.ChainEpoch, sectorInfo *miner.SectorOnChainInfo) (abi.ChainEpoch, error) {
 	maxLifetime, err := builtin.SealProofSectorMaximumLifetime(sectorInfo.SealProof)
 	if err != nil {
-
+		return 0, err
 	}
 
-	return abi.ChainEpoch(math.Min(float64(curEpoch+miner.MaxSectorExpirationExtension), float64(sectorInfo.Activation+maxLifetime)))
+	return abi.ChainEpoch(math.Min(float64(curEpoch+miner.MaxSectorExpirationExtension), float64(sectorInfo.Activation+maxLifetime))), nil
 }
 
-func IsValidNewExpiration(curEpoch, newExpiration abi.ChainEpoch, sectorInfo *miner.SectorOnChainInfo) bool {
-	return newExpiration <= MaxNewExpiration(curEpoch, sectorInfo)
+func IsValidNewExpiration(curEpoch, newExpiration abi.ChainEpoch, sectorInfo *miner.SectorOnChainInfo) (bool, error) {
+	maxNewExpiration, err := MaxNewExpiration(curEpoch, sectorInfo)
+	if err != nil {
+		return false, err
+	}
+
+	return newExpiration <= maxNewExpiration, nil
 }
 
 func ParseSectorsString(s string) ([]uint64, error) {
@@ -1991,19 +2005,19 @@ func BaselinePowerFromPrev(prevEpochBaselinePower abi.StoragePower) abi.StorageP
 // These numbers are estimates of the onchain constants.  They are good for initializing state in
 // devnets and testing but will not match the on chain values exactly which depend on storage onboarding
 // and upgrade epoch history. They are in units of attoFIL, 10^-18 FIL
-var DefaultSimpleTotal = big.Mul(big.NewInt(330e6), big.NewInt(1e18))   // 330M
-var DefaultBaselineTotal = big.Mul(big.NewInt(770e6), big.NewInt(1e18)) // 770M
+var DefaultSimpleTotal = big.Mul(big.NewInt(330e6), big.NewInt(1e18))   // nolint: varcheck,deadcode
+var DefaultBaselineTotal = big.Mul(big.NewInt(770e6), big.NewInt(1e18)) // nolint: varcheck,deadcode
 type Spacetime = big.Int
 
 // 36.266260308195979333 FIL
 // https://www.wolframalpha.com/input/?i=IntegerPart%5B330%2C000%2C000+*+%281+-+Exp%5B-Log%5B2%5D+%2F+%286+*+%281+year+%2F+30+seconds%29%29%5D%29+*+10%5E18%5D
 const InitialRewardPositionEstimateStr = "36266260308195979333"
 
-var InitialRewardPositionEstimate = big.MustFromString(InitialRewardPositionEstimateStr)
+var InitialRewardPositionEstimate = big.MustFromString(InitialRewardPositionEstimateStr) // nolint: varcheck,deadcode
 
 // -1.0982489*10^-7 FIL per epoch.  Change of simple minted tokens between epochs 0 and 1
 // https://www.wolframalpha.com/input/?i=IntegerPart%5B%28Exp%5B-Log%5B2%5D+%2F+%286+*+%281+year+%2F+30+seconds%29%29%5D+-+1%29+*+10%5E18%5D
-var InitialRewardVelocityEstimate = abi.NewTokenAmount(-109897758509)
+var InitialRewardVelocityEstimate = abi.NewTokenAmount(-109897758509) // nolint: varcheck,deadcode
 
 type State struct {
 	// CumsumBaseline is a target CumsumRealized needs to reach for EffectiveNetworkTime to increase
@@ -2058,28 +2072,28 @@ func (st *PowerState) updateSmoothedEstimate(delta abi.ChainEpoch) {
 	st.ThisEpochQAPowerSmoothed = filterQAPower.NextEstimate(st.ThisEpochQualityAdjPower, delta)
 }
 
-func ConstructState(currRealizedPower abi.StoragePower) *State {
-	st := &State{
-		CumsumBaseline:         big.Zero(),
-		CumsumRealized:         big.Zero(),
-		EffectiveNetworkTime:   0,
-		EffectiveBaselinePower: BaselineInitialValue,
-
-		ThisEpochReward:        big.Zero(),
-		ThisEpochBaselinePower: InitBaselinePower(),
-		Epoch:                  -1,
-
-		ThisEpochRewardSmoothed: smoothing.NewEstimate(InitialRewardPositionEstimate, InitialRewardVelocityEstimate),
-		TotalStoragePowerReward: big.Zero(),
-
-		SimpleTotal:   DefaultSimpleTotal,
-		BaselineTotal: DefaultBaselineTotal,
-	}
-
-	st.updateToNextEpochWithReward(currRealizedPower)
-
-	return st
-}
+//func ConstructState(currRealizedPower abi.StoragePower) *State {
+//	st := &State{
+//		CumsumBaseline:         big.Zero(),
+//		CumsumRealized:         big.Zero(),
+//		EffectiveNetworkTime:   0,
+//		EffectiveBaselinePower: BaselineInitialValue,
+//
+//		ThisEpochReward:        big.Zero(),
+//		ThisEpochBaselinePower: InitBaselinePower(),
+//		Epoch:                  -1,
+//
+//		ThisEpochRewardSmoothed: smoothing.NewEstimate(InitialRewardPositionEstimate, InitialRewardVelocityEstimate),
+//		TotalStoragePowerReward: big.Zero(),
+//
+//		SimpleTotal:   DefaultSimpleTotal,
+//		BaselineTotal: DefaultBaselineTotal,
+//	}
+//
+//	st.updateToNextEpochWithReward(currRealizedPower)
+//
+//	return st
+//}
 
 // Takes in current realized power and updates internal state
 // Used for update of internal state during null rounds
@@ -2111,7 +2125,7 @@ func (st *State) updateSmoothedEstimates(delta abi.ChainEpoch) {
 	st.ThisEpochRewardSmoothed = filterReward.NextEstimate(st.ThisEpochReward, delta)
 }
 
-var bad string = `861959
+var bad = `861959
 936780
 826279
 851390
