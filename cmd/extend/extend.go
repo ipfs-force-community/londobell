@@ -475,54 +475,31 @@ var extendSectorCmd = &cli.Command{
 			return err
 		}
 
-		// choose extend sector method intelligently
-		commitLegacy, err := IsExtendCommitLegacy(ctx, *extendSectorExpiration2Params, to, api, ts)
-		if err != nil {
-			log.Errorf("adjust extend method failed: %v", err)
-			return err
-		}
+		//// choose extend sector method intelligently
+		//commitLegacy, err := IsExtendCommitLegacy(ctx, *extendSectorExpiration2Params, to, api, ts)
+		//if err != nil {
+		//	log.Errorf("adjust extend method failed: %v", err)
+		//	return err
+		//}
 
 		var (
 			method     abi.MethodNum
 			paramsByte []byte
 		)
-		if commitLegacy {
-			method = builtin.MethodsMiner.ExtendSectorExpiration
 
-			extensions := make([]miner.ExpirationExtension, 0)
-			for _, ex2 := range extendSectorExpiration2Params.Extensions {
-				extensions = append(extensions, miner.ExpirationExtension{
-					Deadline:      ex2.Deadline,
-					Partition:     ex2.Partition,
-					Sectors:       ex2.Sectors,
-					NewExpiration: ex2.NewExpiration,
-				})
-			}
+		method = builtin.MethodsMiner.ExtendSectorExpiration2
 
-			params := &miner.ExtendSectorExpirationParams{
-				Extensions: extensions,
-			}
+		// add sectorclaims intelligently
+		err = FillSectorsWithClaims(ctx, extendSectorExpiration2Params, to, api, ts)
+		if err != nil {
+			log.Errorf("fill sectorclaims for sectors failed: %v", err)
+			return err
+		}
 
-			paramsByte, err = SerializeParams(params)
-			if err != nil {
-				log.Errorf("serialize params %v failed: %v", params, err)
-				return err
-			}
-		} else {
-			method = builtin.MethodsMiner.ExtendSectorExpiration2
-
-			// add sectorclaims intelligently
-			err = FillSectorsWithClaims(ctx, extendSectorExpiration2Params, to, api, ts)
-			if err != nil {
-				log.Errorf("fill sectorclaims for sectors failed: %v", err)
-				return err
-			}
-
-			paramsByte, err = SerializeParams(extendSectorExpiration2Params)
-			if err != nil {
-				log.Errorf("serialize params %v failed: %v", extendSectorExpiration2Params, err)
-				return err
-			}
+		paramsByte, err = SerializeParams(extendSectorExpiration2Params)
+		if err != nil {
+			log.Errorf("serialize params %v failed: %v", extendSectorExpiration2Params, err)
+			return err
 		}
 
 		helpeMessage := false
@@ -1502,6 +1479,7 @@ func ParseSectorExtensions(ctx context.Context, path string, maddr address.Addre
 		}
 
 		newExpirations := make([]abi.ChainEpoch, 0, len(sectors))
+		sectorInfos := make([]*miner.SectorOnChainInfo, 0, len(sectors))
 		for _, sector := range sectors {
 			if _, ok := seenSectors[sector]; ok {
 				log.Warnf("duplicated sector %v", sector)
@@ -1529,29 +1507,34 @@ func ParseSectorExtensions(ctx context.Context, path string, maddr address.Addre
 				return nil, err
 			}
 
+			sectorInfos = append(sectorInfos, sectorInfo)
 			if helper {
 				maxNewExpiration, err := MaxNewExpiration(ts.Height(), sectorInfo)
 				if err != nil {
 					return nil, err
 				}
 				newExpirations = append(newExpirations, maxNewExpiration)
-			} else {
-				isValidNewExpiration, err := IsValidNewExpiration(ts.Height(), extension.NewExpiration, sectorInfo)
-				if !isValidNewExpiration {
-					return nil, fmt.Errorf("specified new expiration %v for sector %v is invalid", extension.NewExpiration, sector)
-				}
-
-				if err != nil {
-					return nil, err
-				}
 			}
 		}
 
-		sort.Slice(newExpirations, func(i, j int) bool {
-			return newExpirations[i] < newExpirations[j]
-		})
+		if helper {
+			sort.Slice(newExpirations, func(i, j int) bool {
+				return newExpirations[i] < newExpirations[j]
+			})
 
-		extension.NewExpiration = newExpirations[0]
+			extension.NewExpiration = newExpirations[0]
+		}
+
+		for _, sectorInfo := range sectorInfos {
+			isValidNewExpiration, err := IsValidNewExpiration(ts.Height(), extension.NewExpiration, sectorInfo)
+			if !isValidNewExpiration {
+				return nil, fmt.Errorf("specified new expiration %v for sector %v is invalid", extension.NewExpiration, sectorInfo.SectorNumber)
+			}
+
+			if err != nil {
+				return nil, err
+			}
+		}
 
 		for deadline, location := range locationMap {
 			for partition, ss := range location {
@@ -1573,6 +1556,9 @@ func ParseSectorExtensions(ctx context.Context, path string, maddr address.Addre
 	return extendSectorExpiration2Params, nil
 }
 
+// expiration - activation >= miner.MinSectorExpiration
+// expiration <= curEpoch + miner.MaxSectorExpirationExtension
+// expiration - activation <= maxLifetime
 func MaxNewExpiration(curEpoch abi.ChainEpoch, sectorInfo *miner.SectorOnChainInfo) (abi.ChainEpoch, error) {
 	maxLifetime, err := builtin.SealProofSectorMaximumLifetime(sectorInfo.SealProof)
 	if err != nil {
@@ -1588,7 +1574,7 @@ func IsValidNewExpiration(curEpoch, newExpiration abi.ChainEpoch, sectorInfo *mi
 		return false, err
 	}
 
-	return newExpiration <= maxNewExpiration, nil
+	return newExpiration <= maxNewExpiration && newExpiration-sectorInfo.Activation >= miner.MinSectorExpiration, nil
 }
 
 func ParseSectorsString(s string) ([]uint64, error) {
@@ -1663,35 +1649,36 @@ func ParseClaimTerm(path string, helper bool) ([]verifregtypes.ClaimTerm, error)
 	return claimTerms, nil
 }
 
-// IsExtendCommitLegacy return whether to use legacy extend method
-func IsExtendCommitLegacy(ctx context.Context, extendSectorExpiration2Params miner.ExtendSectorExpiration2Params, miner address.Address, api v0api.FullNode, tipset *types.TipSet) (bool, error) {
-	var commitLegacy = true
-	for _, extension := range extendSectorExpiration2Params.Extensions {
-		err := extension.Sectors.ForEach(func(u uint64) error {
-			if commitLegacy == false {
-				return nil
-			}
-
-			sectorInfo, err := api.StateSectorGetInfo(ctx, miner, abi.SectorNumber(u), tipset.Key())
-			if err != nil {
-				return err
-			}
-
-			if sectorInfo.SimpleQAPower && (sectorInfo.VerifiedDealWeight.GreaterThan(big.NewInt(0)) || sectorInfo.DealWeight.GreaterThanEqual(big.NewInt(0))) {
-				commitLegacy = false
-				return nil
-			}
-
-			return nil
-		})
-
-		if err != nil {
-			return commitLegacy, err
-		}
-	}
-
-	return commitLegacy, nil
-}
+//// deprecated: use ExtendSectorExpiration2 for all
+//// IsExtendCommitLegacy return whether to use legacy extend method
+//func IsExtendCommitLegacy(ctx context.Context, extendSectorExpiration2Params miner.ExtendSectorExpiration2Params, miner address.Address, api v0api.FullNode, tipset *types.TipSet) (bool, error) {
+//	var commitLegacy = true
+//	for _, extension := range extendSectorExpiration2Params.Extensions {
+//		err := extension.Sectors.ForEach(func(u uint64) error {
+//			if commitLegacy == false {
+//				return nil
+//			}
+//
+//			sectorInfo, err := api.StateSectorGetInfo(ctx, miner, abi.SectorNumber(u), tipset.Key())
+//			if err != nil {
+//				return err
+//			}
+//
+//			if sectorInfo.SimpleQAPower && (sectorInfo.VerifiedDealWeight.GreaterThan(big.NewInt(0)) || sectorInfo.DealWeight.GreaterThanEqual(big.NewInt(0))) {
+//				commitLegacy = false
+//				return nil
+//			}
+//
+//			return nil
+//		})
+//
+//		if err != nil {
+//			return commitLegacy, err
+//		}
+//	}
+//
+//	return commitLegacy, nil
+//}
 
 var errFailedFillSectorsWithClaims = fmt.Errorf("failed fill sectors with claims")
 
@@ -1718,7 +1705,10 @@ func FillSectorsWithClaims(ctx context.Context, extendSectorExpiration2Params *m
 			}
 
 			// bind claim and sector
-			claims := claimsForSectorsMap[abi.SectorNumber(u)]
+			claims, ok := claimsForSectorsMap[abi.SectorNumber(u)]
+			if !ok {
+				return nil
+			}
 
 			maintainClaims, dropClaims := MaintainAndDropClaims(newExpiration, claims)
 			if len(dropClaims) > 0 {
