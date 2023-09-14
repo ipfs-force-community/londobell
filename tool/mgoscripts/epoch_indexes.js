@@ -26,6 +26,7 @@ db.Allocations.createIndex({"Epoch":1,"Client":1,"AllocationID":1}, {"sparse": t
 db.Allocations.createIndex({"Epoch":1,"Provider":1,"AllocationID":1}, {"sparse": true});
 
 db.BlockHeader.createIndex({"Epoch":1,"Miner":1}, {"sparse": true});
+db.BlockHeader.createIndex({"Miner":1,"Epoch":1}, {"sparse": true});
 
 db.BlockMessage.createIndex({"Epoch":1,"_id":1}, {"sparse": true});
 db.BlockMessage.createIndex({"Epoch":1,"Messages":1}, {"sparse": true});
