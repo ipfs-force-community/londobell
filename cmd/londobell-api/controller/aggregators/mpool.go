@@ -103,8 +103,13 @@ func GetMpool(c *gin.Context) {
 
 		// 如果msg不在数据库中且不在unStoredMsgs,且在链上能查到,则作为pending消息返回;
 		if len(multiResult) == 0 {
-			alog.Warnf("mcid: %s dont exist in db nor unStoredMsgs", mcid)
-			msg, _ := api.ChainGetMessage(ctx, mcid)
+			alog.Warnf("mcid: %s dont exist in db nor unStoredMsgs,epoch : %d", mcid, head.Height())
+			msg, err := api.ChainGetMessage(ctx, mcid)
+			if err != nil {
+				alog.Error(fmt.Errorf("ChainGetMessage failed: %v, smsg: %v", err, mcid))
+				util.ReturnOnErr(c, err)
+				return
+			}
 			var smsg = new(types.SignedMessage)
 			if msg != nil {
 				smsg.Message = *msg
@@ -114,7 +119,6 @@ func GetMpool(c *gin.Context) {
 					util.ReturnOnErr(c, err)
 					return
 				}
-
 				hash, err := adapter.NewEthHashFromSignedMessage(ctx, smsg, api)
 				if err != nil {
 					alog.Error(fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid()))
@@ -130,6 +134,8 @@ func GetMpool(c *gin.Context) {
 					return
 				}
 
+			} else {
+				log.Warnf("mcid: %s not exist in chain", mcid)
 			}
 
 		}
