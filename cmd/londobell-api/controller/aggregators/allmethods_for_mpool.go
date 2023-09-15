@@ -1,4 +1,4 @@
-package adapter
+package aggregators
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/go-multierror"
-
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -29,14 +29,8 @@ func GetAllMethodsForPendingMessages(c *gin.Context) {
 
 	api := fullnode.API.GetAppropriateAPI()
 
-	ts, err := api.ChainHead(ctx)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
+	unStoredMsgs, _, err := getUnStoredMsgs(ctx, api)
 
-	msgs, err := api.MpoolPending(ctx, ts.Key())
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -48,21 +42,23 @@ func GetAllMethodsForPendingMessages(c *gin.Context) {
 		g          multierror.Group
 		mutex      sync.Mutex
 	)
+	for cur, msgs := range unStoredMsgs {
+		for i := range msgs {
+			cur := cur
+			msg := msgs[i]
+			g.Go(func() error {
+				methodName, err := adapter.GetMethodName(ctx, alog, api, msg, cur)
+				if err != nil && err != util.ErrNotFound {
+					return err
+				}
 
-	for i := range msgs {
-		msg := msgs[i]
-		g.Go(func() error {
-			methodName, err := GetMethodName(ctx, alog, api, msg, ts)
-			if err != nil && err != util.ErrNotFound {
-				return err
-			}
+				mutex.Lock()
+				allMethods[methodName]++
+				mutex.Unlock()
 
-			mutex.Lock()
-			allMethods[methodName]++
-			mutex.Unlock()
-
-			return nil
-		})
+				return nil
+			})
+		}
 	}
 
 	if err := g.Wait(); err != nil {
