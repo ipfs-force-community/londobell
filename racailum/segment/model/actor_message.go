@@ -71,6 +71,7 @@ func (am *ActorMessage) Indexes() [][]string {
 		[]string{"ActorID", "IsBlock", "MethodName", actorMessageEpochField},
 		[]string{"ActorID", "ExitCode", "TransferType", actorMessageEpochField},
 		[]string{"ActorID", "ExitCode", "Value", actorMessageEpochField},
+		[]string{"IsBlock", "Type", actorMessageEpochField},
 	}
 }
 

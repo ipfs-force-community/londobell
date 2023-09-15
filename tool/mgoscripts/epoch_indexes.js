@@ -11,6 +11,7 @@ db.ActorEvent.createIndex({"ActorID":1,"Epoch":1,"LogIndex":1}, {"sparse": true}
 db.ActorMessage.createIndex({"ActorID":1,"IsBlock":1,"MethodName":1,"Epoch":1}, {"sparse": true});
 db.ActorMessage.createIndex({"ActorID":1,"ExitCode":1,"TransferType":1,"Epoch":1}, {"sparse": true});
 db.ActorMessage.createIndex({"ActorID":1,"ExitCode":1,"Value":1,"Epoch":1}, {"sparse": true});
+db.ActorMessage.createIndex({"IsBlock":1,"Type":1,"Epoch":1}, {"sparse": true});
 
 db.ActorState.createIndex({"Epoch":1,"Code":1,"Addr":1}, {"sparse": true});
 
@@ -25,6 +26,7 @@ db.Allocations.createIndex({"Epoch":1,"Client":1,"AllocationID":1}, {"sparse": t
 db.Allocations.createIndex({"Epoch":1,"Provider":1,"AllocationID":1}, {"sparse": true});
 
 db.BlockHeader.createIndex({"Epoch":1,"Miner":1}, {"sparse": true});
+db.BlockHeader.createIndex({"Miner":1,"Epoch":1}, {"sparse": true});
 
 db.BlockMessage.createIndex({"Epoch":1,"_id":1}, {"sparse": true});
 db.BlockMessage.createIndex({"Epoch":1,"Messages":1}, {"sparse": true});
