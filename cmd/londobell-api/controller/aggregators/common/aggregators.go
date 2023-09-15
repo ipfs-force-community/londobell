@@ -94,6 +94,7 @@ var (
 	MinerSectorDetailAggregator                  []byte
 	AccountPeriodTransferAggregator              []byte
 	AccountPeriodGasCostAggregator               []byte
+	BlockMessagesFroEpochRangeAggregator         []byte
 )
 
 type Methodlist struct {
@@ -205,4 +206,5 @@ func InitAggregators() {
 	MinerSectorDetailAggregator = monitor.GetMinerSectorDetailAggregator()
 	AccountPeriodTransferAggregator = monitor.GetAccountPeriodTransferAggregator()
 	AccountPeriodGasCostAggregator = monitor.GetAccountPeriodGasCostAggregator()
+	BlockMessagesFroEpochRangeAggregator = monitor.GetBlockMessagesFroEpochRangeAggregator()
 }
