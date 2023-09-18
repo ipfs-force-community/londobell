@@ -35,6 +35,7 @@ func main() {
 			fixActorMessageCmd,
 			splitTraceCmd,
 			completeTransferTypeCmd,
+			updateFILCmd,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{
