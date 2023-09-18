@@ -50,7 +50,7 @@ func GetTransferMessageForLargeAmount(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.LargeAmountTransferStates, countUtils, common2.TransferMessageForLargeAmountAggregator, req, "Message") //todo: ExecTrace
+		multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.LargeAmountTransferStates, countUtils, common2.TransferMessageForLargeAmountAggregator, req, "ExecTrace") //todo: ExecTrace
 		if err != nil {
 			alog.Error(err)
 			alog.Error(err)

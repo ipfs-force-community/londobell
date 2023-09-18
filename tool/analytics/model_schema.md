@@ -343,6 +343,7 @@
 	},
 	"Epoch": "abi.ChainEpoch",
 	"Error": "string",
+	"FIL": "int64",
 	"GasCost": {
 		"BaseFeeBurn": "big.Int",
 		"GasUsed": "big.Int",

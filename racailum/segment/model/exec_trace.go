@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/filecoin-project/go-address"
@@ -69,6 +70,7 @@ func NewExecTrace(
 
 	me.Msg.MethodName = meth
 	me.SeqIndex = make([][]int, len(seq))
+	me.FIL = CalculateFILValue(me.Msg.Value.String())
 	for i := range seq {
 		me.SeqIndex[i] = seq[:i+1]
 	}
@@ -121,8 +123,8 @@ type ExecTrace struct {
 	Epoch     abi.ChainEpoch `mir:"-"`
 	Seq       []int          `mir:"-"`
 	Depth     int            `mir:"-"`
-
-	Ver string `mir:"-"`
+	FIL       int64
+	Ver       string `mir:"-"`
 
 	Msg struct {
 		From       address.Address
@@ -155,9 +157,9 @@ func (et *ExecTrace) Indexes() [][]string {
 		[]string{execTraceEpochField, "Msg.To", "Seq"},
 		[]string{"Cid"},
 		[]string{"SignedCid"},
-
 		[]string{"Depth", execTraceEpochField},
 		[]string{"Depth", "Msg.MethodName", execTraceEpochField},
+		[]string{"FIL"},
 	}
 }
 
@@ -213,4 +215,19 @@ func (eg *ExecGas) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool)
 
 func (eg *ExecGas) IsMutable() bool {
 	return false
+}
+
+// 计算 "FIL" 字段的值
+func CalculateFILValue(value string) int64 {
+	// 如果 "value" 字段长度大于18，截取前 len-18 个字符并转化为 int64
+	if len(value) > 18 {
+		prefix := value[:len(value)-18]
+		FILValue, err := strconv.ParseInt(prefix, 10, 64)
+		if err != nil {
+			return 0 // 处理错误情况
+		}
+		return FILValue
+	}
+
+	return 0 // 如果长度不足18，返回0
 }
