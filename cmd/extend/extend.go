@@ -15,11 +15,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filecoin-project/lotus/lib/lotuslog"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin"
+	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
 	smath "github.com/filecoin-project/go-state-types/builtin/v11/util/math"
 	"github.com/filecoin-project/go-state-types/builtin/v9/miner"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
@@ -49,6 +52,7 @@ var log = logging.Logger("extend")
 
 // todo: params参数推荐 unproven alert
 func main() {
+	lotuslog.SetupLogLevels()
 	logging.SetLogLevel("vm", "ERROR")
 
 	app := &cli.App{
@@ -129,7 +133,7 @@ var alertCmd = &cli.Command{
 
 		from := cctx.String("from-email")
 		password := cctx.String("smtp-code")
-		to := cctx.String("to")
+		to := cctx.String("to-email")
 
 		minerStr := cctx.String("miner")
 
@@ -175,7 +179,7 @@ var alertCmd = &cli.Command{
 				sectors, err := api.StateMinerSectors(ctx, miner, nil, types.EmptyTSK)
 				if err != nil {
 					log.Errorf("get sectors for miner %v failed: %v", miner, err)
-					return err
+					continue
 				}
 
 				expiringSectors := make([]*lminer.SectorOnChainInfo, 0)
@@ -189,13 +193,13 @@ var alertCmd = &cli.Command{
 				outExpiringSectors, err := json.MarshalIndent(expiringSectors, "", "  ")
 				if err != nil {
 					log.Errorf("marshal expiringSectors failed: %v", err)
-					return err
+					continue
 				}
 
 				claimMap, err := api.StateGetClaims(ctx, miner, types.EmptyTSK)
 				if err != nil {
 					log.Errorf("get claims for miner %v failed: %v", miner, err)
-					return err
+					continue
 				}
 
 				for id, claim := range claimMap {
@@ -208,7 +212,7 @@ var alertCmd = &cli.Command{
 				outExpiringClaims, err := json.MarshalIndent(expiringClaims, "", "  ")
 				if err != nil {
 					log.Errorf("marshal expiringClaims failed: %v", err)
-					return err
+					continue
 				}
 
 				// send email
@@ -218,6 +222,7 @@ var alertCmd = &cli.Command{
 				}
 				if len(expiringClaims) > 0 {
 					body += fmt.Sprintf("expiring claims: %+v", string(outExpiringClaims))
+					log.Infof("expiring claims: %+v", string(outExpiringClaims))
 				}
 				message := []byte("To: " + to + "\r\n" +
 					"From: " + from + "\r\n" +
@@ -231,7 +236,7 @@ var alertCmd = &cli.Command{
 					continue
 				}
 
-				log.Info("Email sent successfully!")
+				log.Infof("Email sent successfully!")
 			case <-ctx.Done():
 				log.Infof("ctx done!!")
 				return nil
@@ -323,7 +328,7 @@ var queryCmd = &cli.Command{
 				return err
 			}
 
-			log.Infof("sectorInfo of %v for %v: %+v", miner, number, formatSectorInfo)
+			log.Infof("sectorInfo of %v for %v:\n %+v", miner, number, string(formatSectorInfo))
 		case "claim":
 			claim, err := api.StateGetClaim(ctx, miner, verifregtypes.ClaimId(number), ts.Key())
 			if err != nil {
@@ -337,7 +342,7 @@ var queryCmd = &cli.Command{
 				return err
 			}
 
-			log.Infof("claim of %v for %v: %+v", miner, number, formatClaim)
+			log.Infof("claim of %v for %v:\n %+v", number, miner, string(formatClaim))
 		default:
 			return fmt.Errorf("invalid query type: %v", qtype)
 		}
@@ -382,6 +387,7 @@ var extendSectorCmd = &cli.Command{
 		&cli.BoolFlag{
 			Name:  "help_expiration",
 			Usage: "allow empty new expiration, system will fill max new expiration for you if true",
+			Value: true,
 		},
 		&cli.Uint64Flag{
 			Name:  "value",
@@ -419,7 +425,7 @@ var extendSectorCmd = &cli.Command{
 		url := cctx.String("api-url")
 
 		fromAddr := cctx.String("from")
-		toAddr := cctx.String("to")
+		toAddr := cctx.String("miner")
 		tipsetKey := cctx.String("tipset")
 
 		path := cctx.String("path")
@@ -568,19 +574,13 @@ var extendClaimCmd = &cli.Command{
 			Usage:    "message of from",
 		},
 		&cli.StringFlag{
-			Name:     "provider",
-			Required: true,
-			Usage:    "provider for claims extended",
-		},
-		&cli.StringFlag{
 			Name:     "path",
 			Required: true,
 			Usage:    "json of ClaimTerm, Set term_max as large as possible",
 		},
 		&cli.BoolFlag{
-			Name:     "help_expiration",
-			Required: true,
-			Usage:    "allow empty new expiration, system will fill max new expiration for you if true",
+			Name:  "help_expiration",
+			Usage: "allow empty new expiration, system will fill max new expiration for you if true",
 		},
 		&cli.Uint64Flag{
 			Name:  "value",
@@ -618,12 +618,10 @@ var extendClaimCmd = &cli.Command{
 		url := cctx.String("api-url")
 
 		fromAddr := cctx.String("from")
-		providerAddr := cctx.String("provider")
 		tipsetKey := cctx.String("tipset")
 
 		path := cctx.String("path")
 		helpExpiration := cctx.Bool("help_expiration")
-
 		value := cctx.Uint64("value")
 		gasLimit := cctx.Int64("gas-limit")
 		gasFeeCap := cctx.Int64("gas-feecap")
@@ -653,12 +651,6 @@ var extendClaimCmd = &cli.Command{
 			return err
 		}
 
-		provider, err := address.NewFromString(providerAddr)
-		if err != nil {
-			log.Errorf("new provider address %v failed: %v", providerAddr, err)
-			return err
-		}
-
 		actor, err := api.StateGetActor(ctx, from, ts.Key())
 		if err != nil {
 			log.Errorf("get actor %v at ts %v failed: %v", from, ts.Key(), err)
@@ -667,13 +659,14 @@ var extendClaimCmd = &cli.Command{
 
 		nonce := actor.Nonce
 
-		claimTerms, err := ParseClaimTerm(path, helpExpiration)
+		claimTerms, err := ParseClaimTerm(ctx, from, path, api, helpExpiration)
 		if err != nil {
 			log.Errorf("parse claim term %v failed: %v", path, err)
 			return err
 		}
 
 		method := builtin.MethodsVerifiedRegistry.ExtendClaimTerms
+		to := sbuiltin.VerifiedRegistryActorAddr
 
 		var params *verifregtypes.ExtendClaimTermsParams
 		params = &verifregtypes.ExtendClaimTermsParams{
@@ -692,13 +685,13 @@ var extendClaimCmd = &cli.Command{
 		}
 
 		// support custom message & intelligently help evaluate message gas parameters
-		msg, err := BuildMessage(ctx, api, ts, from, provider, types.NewInt(value), nonce, gasLimit, abi.NewTokenAmount(gasFeeCap), abi.NewTokenAmount(gasPremium), method, paramsByte, helpMessage)
+		msg, err := BuildMessage(ctx, api, ts, from, to, types.NewInt(value), nonce, gasLimit, abi.NewTokenAmount(gasFeeCap), abi.NewTokenAmount(gasPremium), method, paramsByte, helpMessage)
 		if err != nil {
 			log.Errorf("build message failed: %v", err)
 			return err
 		}
 
-		log.Infof("extend claim message will be sent by %s for %s", msg.From.String(), msg.To.String())
+		log.Infof("extend claim message will be sent by %s to %s", msg.From.String(), msg.To.String())
 		log.Infof("extend gas params, value: %v, gaslimit: %v, gasfeecap: %v, gaspremium: %v", msg.Value, msg.GasLimit, msg.GasFeeCap, msg.GasPremium)
 		log.Infof("there are %v groups of claims will be extended: ", len(params.Terms))
 		log.Infof("provider\tclaimId\tterm_max\t")
@@ -1522,13 +1515,15 @@ func ParseSectorExtensions(ctx context.Context, path string, maddr address.Addre
 				return newExpirations[i] < newExpirations[j]
 			})
 
-			extension.NewExpiration = newExpirations[0]
+			if extension.NewExpiration == 0 {
+				extension.NewExpiration = newExpirations[0]
+			}
 		}
 
 		for _, sectorInfo := range sectorInfos {
 			isValidNewExpiration, err := IsValidNewExpiration(ts.Height(), extension.NewExpiration, sectorInfo)
 			if !isValidNewExpiration {
-				return nil, fmt.Errorf("specified new expiration %v for sector %v is invalid", extension.NewExpiration, sectorInfo.SectorNumber)
+				return nil, fmt.Errorf("specified new expiration %v for sector %v is invalid, sectorInfo: %+v", extension.NewExpiration, sectorInfo.SectorNumber, sectorInfo)
 			}
 
 			if err != nil {
@@ -1581,17 +1576,7 @@ func ParseSectorsString(s string) ([]uint64, error) {
 	ss := strings.Split(s, ",")
 	res := []uint64{}
 	parse := func(sx string) error {
-		sx = strings.TrimSpace(sx)
-		a, err := strconv.ParseUint(sx, 10, 64)
-		if err != nil {
-			return fmt.Errorf("secots string invalid %w", err)
-		}
-		res = append(res, a)
-		return nil
-	}
-
-	if strings.Contains(s, "-") {
-		parse = func(sx string) error {
+		if strings.Contains(sx, "-") {
 			sxs := strings.Split(sx, "-")
 			if len(sxs) != 2 {
 				return fmt.Errorf("secots string invalid")
@@ -1606,11 +1591,19 @@ func ParseSectorsString(s string) ([]uint64, error) {
 			if err != nil {
 				return err
 			}
-			for i := start; i < end; i++ {
+			for i := start; i <= end; i++ {
 				res = append(res, i)
 			}
 			return nil
 		}
+
+		sx = strings.TrimSpace(sx)
+		a, err := strconv.ParseUint(sx, 10, 64)
+		if err != nil {
+			return fmt.Errorf("secots string invalid %w", err)
+		}
+		res = append(res, a)
+		return nil
 	}
 
 	for i := range ss {
@@ -1622,7 +1615,7 @@ func ParseSectorsString(s string) ([]uint64, error) {
 	return res, nil
 }
 
-func ParseClaimTerm(path string, helper bool) ([]verifregtypes.ClaimTerm, error) {
+func ParseClaimTerm(ctx context.Context, from address.Address, path string, api v0api.FullNode, helper bool) ([]verifregtypes.ClaimTerm, error) {
 	file, err := os.Open(path)
 	defer file.Close() //nolint:staticcheck
 	if err != nil {
@@ -1640,13 +1633,50 @@ func ParseClaimTerm(path string, helper bool) ([]verifregtypes.ClaimTerm, error)
 		return nil, err
 	}
 
-	if helper {
-		for _, claimTerm := range claimTerms {
+	for _, claimTerm := range claimTerms {
+		// adjust claimTerm is invalid
+		provider, err := address.NewIDAddress(uint64(claimTerm.Provider))
+		if err != nil {
+			return nil, err
+		}
+
+		claim, err := api.StateGetClaim(ctx, provider, claimTerm.ClaimId, types.EmptyTSK)
+		if err != nil {
+			return nil, err
+		}
+
+		if claim == nil {
+			return nil, fmt.Errorf("claim %v not found for provider %v", claimTerm.ClaimId, claimTerm.Provider)
+		}
+
+		fromAddr, err := api.StateLookupID(ctx, from, types.EmptyTSK)
+		if err != nil {
+			return nil, err
+		}
+
+		fromID, err := address.IDFromAddress(fromAddr)
+		if err != nil {
+			return nil, err
+		}
+
+		if uint64(claim.Client) != fromID {
+			return nil, fmt.Errorf("client %v of claim %v is not equal fromID %v", claim.Client, claimTerm.ClaimId, fromID)
+		}
+
+		if helper {
 			claimTerm.TermMax = verifregtypes.MaximumVerifiedAllocationTerm
+		} else {
+			if !IsValidTermMax(*claim, claimTerm.TermMax) {
+				return nil, fmt.Errorf("new term_max %v is invalid for claim %v: %+v", claimTerm.TermMax, claimTerm.ClaimId, claim)
+			}
 		}
 	}
 
 	return claimTerms, nil
+}
+
+func IsValidTermMax(claim verifregtypes.Claim, newTermMax abi.ChainEpoch) bool {
+	return newTermMax <= verifregtypes.MaximumVerifiedAllocationTerm && newTermMax >= claim.TermMax
 }
 
 //// deprecated: use ExtendSectorExpiration2 for all
@@ -1720,7 +1750,7 @@ func FillSectorsWithClaims(ctx context.Context, extendSectorExpiration2Params *m
 				canDropClaims := CanDropClaims(sectorInfo.Expiration, tipset.Height())
 				if !canDropClaims {
 					// new_expiration is too large or extend claims first
-					log.Warnf("claims is not allowed to drop for expiration(%v)-curEpoch(%v) <= verifregtypes.EndOfLifeClaimDropPeriod(30d), new expiration %v is too high than claim.term_start + claim.term_max, dropClaims: %v", sectorInfo.Expiration, tipset.Key(), newExpiration, dropClaims)
+					log.Errorf("claims is not allowed to drop because of expiration(%v)-curEpoch(%v) > verifregtypes.EndOfLifeClaimDropPeriod(30d) for sector %v, new expiration %v is too high than claim.term_start + claim.term_max, dropClaims: %v", sectorInfo.Expiration, tipset.Height(), u, newExpiration, dropClaims)
 					failed = true
 				}
 			}
