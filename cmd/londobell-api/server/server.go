@@ -331,6 +331,8 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/tipsets_list", aggregators.GetTipSetsList)
 		group.POST("/mpool", aggregators.GetMpool)
 		group.POST("/allmethods_for_mpool", aggregators.GetAllMethodsForPendingMessages)
+		group.POST("/blockmessages_for_epochrange", aggregators.GetBlockMessagesForEpochRange)
+
 	}
 
 	minergroup := router.Group("/aggregators/miner").Use()

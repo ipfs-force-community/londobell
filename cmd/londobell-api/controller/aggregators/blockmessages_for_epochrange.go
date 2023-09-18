@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	pool_monitor "github.com/ipfs-force-community/londobell-aggregators/pool-monitor"
 
 	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -15,11 +14,11 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 )
 
-func GetBlockHeadersByMiner(c *gin.Context) {
+func GetBlockMessagesForEpochRange(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	alog := log.With("method", "GetBlockHeadersByMiner")
+	alog := log.With("method", "GetBlockMessagesForEpochRange")
 	req := model.CommonReq{}
 	res := model.CommonRes{Code: model.Success}
 	err := c.BindJSON(&req)
@@ -31,33 +30,18 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 
 	curEpoch := common.GetCurEpoch()
 
-	req.Addr, err = common2.GetIDByAddr(ctx, req.Addr)
+	countUtils, err := multiquery.GetEpochRange(ctx, &multiquery.DBStateManager, curEpoch)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	countUtils, err := multiquery.GetTotalCountForMinedMsgsMap(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	totalCount := int64(0)
-	for _, countUtil := range countUtils {
-		totalCount += countUtil.MinedStates
-	}
-
-	var blockHeadersByMiner []model.BlockHeader
+	var blockMessages []*model.BlockMessages
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiBiSearch(ctx, req.Index*req.Limit, req.Limit, countUtils, pool_monitor.GetBlockHeadersByMinerNoSkipAggregator(),
-			pool_monitor.GetMinedCountForMinersAggregator(), req, "BlockHeader", multiquery.MinedStates)
-		//multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.MinedStates, countUtils, blockHeadersByMinerAggregator, req, "BlockHeader")
+		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, common2.BlockMessagesFroEpochRangeAggregator, req, "BlockMessage")
 		if err != nil {
-			//alog.Error(err)
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
@@ -76,7 +60,7 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 			return
 		}
 
-		err = json.Unmarshal(rawByte, &blockHeadersByMiner)
+		err = json.Unmarshal(rawByte, &blockMessages)
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
@@ -84,6 +68,6 @@ func GetBlockHeadersByMiner(c *gin.Context) {
 		}
 	}
 
-	res.Data = model.BlockHeaderRes{TotalCount: totalCount, BlockHeaders: blockHeadersByMiner}
+	res.Data = blockMessages
 	c.JSON(http.StatusOK, res)
 }

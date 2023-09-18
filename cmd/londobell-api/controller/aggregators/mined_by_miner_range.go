@@ -1,17 +1,13 @@
 package aggregators
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
-	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
-
-	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
-
-	"context"
-
 	"github.com/gin-gonic/gin"
 
+	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
@@ -41,15 +37,12 @@ func GetMinedByMinerForRange(c *gin.Context) {
 		return
 	}
 
-	api := fullnode.API.GetAppropriateAPI()
-	addrs, err := common2.GetAllAddrs(ctx, req.Addr, api)
+	req.Addr, err = common2.GetIDByAddr(ctx, req.Addr)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
-
-	req.Addrs = addrs
 
 	var minerByMinerForRangeRes []model.MinedByMinerForRangeRes
 
