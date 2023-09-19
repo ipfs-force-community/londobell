@@ -21,6 +21,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
 	config2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment"
 	smodel "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment/model"
@@ -959,121 +960,6 @@ func (dbsm *DataBaseStateManager) GetBoundaryForDB(ctx context.Context, cols con
 	}
 }
 
-//func (dbsm *DataBaseStateManager) GetDealRangeForDB(ctx context.Context, cols config2.Collections, dbType smodel.DType) (DealRange, error) {
-//	cfg := dbsm.GetCfg()
-//	countUtils := make([]CountUtil, 0)
-//	for _, cold := range cfg.Colds {
-//		if cold.IsInvalidDB() {
-//			continue
-//		}
-//
-//		state, found, err := dbsm.GetState(ctx, cold.Url())
-//		if err != nil {
-//			return DealRange{}, fmt.Errorf("load dbState for cold %v failed", cold.Url())
-//		}
-//
-//		if !found {
-//			return DealRange{}, fmt.Errorf("state of dsn %v not found, please run cfgUpdateCmd firstly", cold.Url())
-//		}
-//
-//		countUtils = append(countUtils, CountUtil{Start: int64(state.GetDealStartID()), End: int64(state.GetDealEndID())})
-//	}
-//
-//	// 逆序排序
-//	sort.Slice(countUtils, func(i, j int) bool {
-//		return countUtils[i].End > countUtils[j].End
-//	})
-//
-//	startEpoch, err := GetStartEpochForDeal(ctx, cols)
-//	if err != nil {
-//		return DealRange{}, err
-//	}
-//
-//	startDealID, err := GetStartDealID(ctx, cols, startEpoch)
-//	if err != nil {
-//		return DealRange{}, err
-//	}
-//
-//	endDealID, err := GetEndDealID(ctx, cols, startEpoch)
-//	if err != nil {
-//		return DealRange{}, err
-//	}
-//
-//	switch dbType {
-//	case smodel.Formal:
-//		if len(countUtils) != 0 {
-//			latestEndDealID := uint64(countUtils[0].End)
-//			if startDealID <= latestEndDealID {
-//				startDealID = latestEndDealID
-//			}
-//		}
-//
-//		return DealRange{
-//			Start: startDealID,
-//			End:   endDealID,
-//		}, nil
-//
-//	case smodel.Cold:
-//		// 添加上下边界
-//		minStartDealID := int64(0)
-//		if len(countUtils) > 0 {
-//			minStartDealID = countUtils[len(countUtils)-1].Start
-//		}
-//
-//		if !cfg.Formal.IsInvalidDB() {
-//			formalState, found, err := dbsm.GetState(ctx, cfg.Formal.Url())
-//			if err != nil {
-//				return DealRange{}, fmt.Errorf("load dbState for formal %v failed", cfg.Formal.Url())
-//			}
-//
-//			if !found {
-//				return DealRange{}, fmt.Errorf("state of dsn %v not found", cfg.Formal.Url())
-//			}
-//
-//			countUtils = append(countUtils, CountUtil{Start: int64(formalState.GetDealStartID()), End: math.MaxInt64})
-//			// 逆序排序
-//			sort.Slice(countUtils, func(i, j int) bool {
-//				return countUtils[i].End > countUtils[j].End
-//			})
-//		}
-//
-//		countUtils = append(countUtils, CountUtil{Start: 0, End: minStartDealID}, CountUtil{Start: math.MaxInt64, End: math.MaxInt64})
-//		sort.Slice(countUtils, func(i, j int) bool {
-//			return countUtils[i].Start > countUtils[j].Start
-//		})
-//
-//		// 找出不连续的段
-//		discontinuousSegment := make([]CountUtil, 0)
-//		for i := 1; i < len(countUtils); i++ {
-//			if countUtils[i-1].Start != countUtils[i].End {
-//				discontinuousSegment = append(discontinuousSegment, CountUtil{
-//					Start: countUtils[i].End,
-//					End:   countUtils[i-1].Start,
-//				})
-//			}
-//		}
-//
-//		sort.Slice(discontinuousSegment, func(i, j int) bool {
-//			return discontinuousSegment[i].End > discontinuousSegment[j].End
-//		})
-//
-//		for _, seg := range discontinuousSegment {
-//			start := uint64(math.Max(float64(startDealID), float64(seg.Start)))
-//			end := uint64(math.Min(float64(endDealID), float64(seg.End)))
-//			if start >= end {
-//				continue
-//			}
-//
-//			return DealRange{Start: start, End: end}, nil
-//		}
-//
-//		return DealRange{}, fmt.Errorf("no needed DealRange")
-//
-//	default:
-//		return DealRange{}, fmt.Errorf("invalid db type: %v", dbType)
-//	}
-//}
-
 func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, newDB config2.DB, dbType smodel.DType, interval int64) error {
 	flog := log.With("FirstSetDataBaseState", newDB)
 
@@ -1096,8 +982,7 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 		return err
 	}
 
-	newState := *state
-	addUpState := segment.NewAddUpState(newState)
+	addUpState := segment.NewAddUpState(*state)
 
 	if dbType == smodel.Formal || dbType == smodel.Cold {
 		nextEndEpoch := int64(state.GetEndEpoch())
@@ -1130,28 +1015,103 @@ func (dbsm *DataBaseStateManager) FirstSetDataBaseState(ctx context.Context, new
 	return nil
 }
 
-//func RefreshDataBaseState(ctx context.Context, dbState *DataBaseState, cols Collections) error {
-//	if err := RefreshBlockMsgs(ctx, dbState, cols); err != nil {
-//		return err
-//	}
-//	if err := RefreshBlockMsgsByMethodName(ctx, dbState, cols); err != nil {
-//		return err
-//	}
-//	if err := RefreshActorMsgsByMethodName(ctx, dbState, cols); err != nil {
-//		return err
-//	}
-//	if err := RefreshActorMsgs(ctx, dbState, cols); err != nil {
-//		return err
-//	}
-//	if err := RefreshActorTransferMsgs(ctx, dbState, cols); err != nil {
-//		return err
-//	}
-//	if err := RefreshMinedMsgsMaps(ctx, dbState, cols); err != nil {
-//		return err
-//	}
-//	if err := RefreshTransfersForLargeAmount(ctx, dbState, cols); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}
+// todo: update addupstate
+func (dbsm *DataBaseStateManager) UpdateAllState(ctx context.Context, nextEndEpoch int64, state *segment.State, addUpState *segment.AddUpState, cols common.Collections) error {
+	dlog := log.With("UpdateAllState", nextEndEpoch)
+
+	var ewg multierror.Group
+	for i := range addupes {
+		i := i
+		addup := addupes[i]
+		ewg.Go(func() error {
+			if err := addup(ctx, dlog, state, addUpState, cols, dbsm.Segment, nextEndEpoch); err != nil {
+				return err
+			}
+
+			return nil
+		})
+	}
+
+	if err := ewg.Wait(); err != nil {
+		log.Errorf("RefreshFormalDataBaseState failed: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (dbsm *DataBaseStateManager) UpdateBlockState(ctx context.Context, nextEndEpoch int64, state *segment.State, addUpState *segment.AddUpState, cols common.Collections) error {
+	dlog := log.With("UpdateBlockState", nextEndEpoch)
+
+	err := dbsm.Segment.AddUpBlockState(ctx, dlog, nextEndEpoch, state, addUpState, cols)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dbsm *DataBaseStateManager) UpdateBlockMethodState(ctx context.Context, nextEndEpoch int64, state *segment.State, addUpState *segment.AddUpState, cols common.Collections) error {
+	dlog := log.With("UpdateBlockMethodState", nextEndEpoch)
+
+	err := dbsm.Segment.AddUpBlockMethodStates(ctx, dlog, nextEndEpoch, state, addUpState, cols)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dbsm *DataBaseStateManager) DeleteAllState(ctx context.Context, db config2.DB) error {
+	dlog := log.With("DeleteAllState", db)
+
+	err := dbsm.Segment.DeleteDBState(ctx, dlog, db.Url())
+	if err != nil {
+		return err
+	}
+
+	err = dbsm.Segment.DeleteBlockState(ctx, dlog, db.Url())
+	if err != nil {
+		return err
+	}
+
+	err = dbsm.Segment.DeleteBlockMethodState(ctx, dlog, db.Url())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dbsm *DataBaseStateManager) DeleteDBState(ctx context.Context, db config2.DB) error {
+	dlog := log.With("DeleteDBState", db)
+
+	err := dbsm.Segment.DeleteDBState(ctx, dlog, db.Url())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dbsm *DataBaseStateManager) DeleteBlockState(ctx context.Context, db config2.DB) error {
+	dlog := log.With("DeleteBlockState", db)
+
+	err := dbsm.Segment.DeleteBlockState(ctx, dlog, db.Url())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dbsm *DataBaseStateManager) DeleteBlockMethodState(ctx context.Context, db config2.DB) error {
+	dlog := log.With("DeleteBlockMethodState", db)
+
+	err := dbsm.Segment.DeleteBlockMethodState(ctx, dlog, db.Url())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
