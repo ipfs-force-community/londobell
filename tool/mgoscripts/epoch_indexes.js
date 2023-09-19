@@ -84,6 +84,7 @@ db.ExecTrace.createIndex({"Cid":1}, {"sparse": true});
 db.ExecTrace.createIndex({"SignedCid":1}, {"sparse": true});
 db.ExecTrace.createIndex({"Depth":1,"Epoch":1}, {"sparse": true});
 db.ExecTrace.createIndex({"Depth":1,"Msg.MethodName":1,"Epoch":1}, {"sparse": true});
+db.ExecTrace.createIndex({"FIL":1}, {"sparse": true});
 
 db.ExplicitMessage.createIndex({"Epoch":1}, {"sparse": true});
 db.ExplicitMessage.createIndex({"MethodName":1,"Epoch":1}, {"sparse": true});
