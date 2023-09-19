@@ -100,9 +100,12 @@ func updateFIL(ctx context.Context, col *mongo.Collection) {
 		log.Fatal(err)
 	}
 	defer cur.Close(context.TODO())
-
+	current := 0
 	for cur.Next(context.TODO()) {
 		var doc Document
+		if current/10000 == 0 {
+			log.Infof(" %d field updated", current)
+		}
 		err := cur.Decode(&doc)
 		if err != nil {
 			log.Fatal(err)
@@ -120,5 +123,6 @@ func updateFIL(ctx context.Context, col *mongo.Collection) {
 		if err != nil {
 			log.Fatal(err)
 		}
+		current++
 	}
 }
