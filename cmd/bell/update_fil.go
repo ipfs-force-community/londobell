@@ -68,8 +68,9 @@ var updateFILCmd = &cli.Command{
 		// set env
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-
-		client, err := mongo.Connect(ctx, options.Client().ApplyURI(cctx.String("dsn")))
+		dsn := cctx.String("dsn")
+		log.Infof("update fil,dsn: %s", dsn)
+		client, err := mongo.Connect(ctx, options.Client().ApplyURI(dsn))
 		if err != nil {
 			log.Error(err)
 			return err
@@ -91,20 +92,49 @@ type Msg struct {
 	Value string
 }
 
+func FILExist(ctx context.Context, col *mongo.Collection) bool {
+	var err error
+	// 要检查的字段名
+	fieldName := "FIL"
+
+	// 创建一个查询以检查字段是否存在
+	filter := bson.M{
+		fieldName: bson.M{"$exists": true},
+	}
+
+	// 使用 FindOne 查询以检查字段是否存在
+	var result bson.M
+	err = col.FindOne(ctx, filter).Decode(&result)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			log.Infof("field FIL dont exist")
+		} else {
+			log.Error(err)
+
+		}
+		return false
+	}
+	return true
+
+}
+
 func updateFIL(ctx context.Context, col *mongo.Collection) {
 	// 设置MongoDB连接
-
+	filter := bson.M{}
+	if FILExist(ctx, col) {
+		filter = bson.M{"FIL": bson.M{"$eq": nil}}
+	}
 	// 查询需要更新的文档
-	cur, err := col.Find(ctx, bson.M{})
+	cur, err := col.Find(ctx, filter)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cur.Close(context.TODO())
+	defer cur.Close(ctx)
 	current := 0
-	for cur.Next(context.TODO()) {
+	for cur.Next(ctx) {
 		var doc Document
-		if current/10000 == 0 {
-			log.Infof(" %d field updated", current)
+		if current%10000 == 0 {
+			log.Infof(" current field : %d", current)
 		}
 		err := cur.Decode(&doc)
 		if err != nil {
@@ -116,13 +146,14 @@ func updateFIL(ctx context.Context, col *mongo.Collection) {
 
 		// 更新文档中的 "FIL" 字段
 		_, err = col.UpdateOne(
-			context.TODO(),
+			ctx,
 			bson.M{"_id": doc.ID}, // 根据文档的唯一标识符进行更新
 			bson.M{"$set": bson.M{"FIL": filValue}},
 		)
 		if err != nil {
-			log.Fatal(err)
+			log.Error(err)
 		}
 		current++
 	}
+	log.Infof("update fil done,%d field updated", current)
 }
