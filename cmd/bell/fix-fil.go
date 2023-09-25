@@ -38,7 +38,7 @@ var fixFILCmd = &cli.Command{
 
 		db := client.Database(cctx.String("name"))
 		col := db.Collection("ExecTrace")
-		updateFIL(ctx, col)
+		fixFIL(ctx, col)
 		return nil
 	},
 }
