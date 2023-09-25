@@ -36,6 +36,7 @@ func main() {
 			splitTraceCmd,
 			completeTransferTypeCmd,
 			updateFILCmd,
+			fixFILCmd,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{
