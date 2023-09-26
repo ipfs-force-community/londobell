@@ -28,6 +28,7 @@ type ChildTransfersForMessageRes struct {
 	ReturnsBson  primitive.Binary
 	MethodNum    uint64
 	Actor        string
+	Error        string
 }
 
 type Message struct {

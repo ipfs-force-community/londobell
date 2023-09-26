@@ -21,6 +21,7 @@ type ChildCallsForMessageRes struct {
 	GasLimit     int64
 	GasFeeCap    string
 	GasPremium   string
+	Error        string
 }
 
 type InnerCall struct {
