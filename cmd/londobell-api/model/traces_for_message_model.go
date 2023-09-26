@@ -30,6 +30,7 @@ type TraceForMessageRes struct {
 	ParamsBson   primitive.Binary
 	ReturnsBson  primitive.Binary
 	Actor        string
+	Error        string
 }
 
 type TraceForMessageSimplifyRes struct {
