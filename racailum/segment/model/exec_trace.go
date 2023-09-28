@@ -2,7 +2,6 @@ package model
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil/mcodec"
 	"github.com/ipfs-force-community/londobell/lib/mir"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 )
 
 func init() {
@@ -42,15 +42,14 @@ var (
 
 // NewExecTrace converts raw exec trace struct to ExecTrace*
 func NewExecTrace(
-	ctx context.Context,
-	dal common.DAL,
+	ctx *extract.Ctx,
 	mcid cid.Cid,
 	signedCid cid.Cid,
 	epoch abi.ChainEpoch,
 	seq []int,
 	raw *common.ExecutionTraceCompact,
 	returnObj cbor.Er,
-	cost *api.MsgGasCost, meth string, isBlock bool,
+	cost *api.MsgGasCost, meth string, isBlock bool, IDCidMap map[string][2]cid.Cid,
 ) (*ExecTrace, *ExecGas, error) {
 	me := &ExecTrace{
 		Cid:          mcid,
@@ -63,7 +62,7 @@ func NewExecTrace(
 		GasCost:      cost,
 		IsBlock:      isBlock,
 	}
-
+	elog := ctx.L.With("NewExecTrace", mcid)
 	if err := mir.Mirror(me, raw); err != nil {
 		return nil, nil, fmt.Errorf("mirroring message exec: %w", err)
 	}
@@ -84,7 +83,10 @@ func NewExecTrace(
 	}
 
 	me.genID()
-
+	err := me.genRootids(IDCidMap)
+	if err != nil {
+		elog.Warn(err)
+	}
 	//var mg *ExecGas
 	//
 	//if len(raw.GasCharges) > 0 {
@@ -146,8 +148,10 @@ type ExecTrace struct {
 		Return ExecTraceReturn
 	} `mir:"-"`
 
-	GasCost *api.MsgGasCost `mir:"-"`
-	IsBlock bool
+	GasCost       *api.MsgGasCost `mir:"-"`
+	RootCid       cid.Cid         `mir:"-"`
+	RootSignedCid cid.Cid         `mir:"-"`
+	IsBlock       bool
 }
 
 // Indexes impl common.Indexed
@@ -189,6 +193,18 @@ func (et *ExecTrace) genID() {
 	}
 
 	et.ID = fmt.Sprintf("%d-%s", et.Epoch, strings.Join(seqStrs, "-"))
+}
+
+// get root Cid SignedCid
+func (et *ExecTrace) genRootids(m map[string][2]cid.Cid) error {
+	subs := strings.Split(et.ID, "-")
+	if len(subs) < 2 {
+		return fmt.Errorf("getRootids Split length err: %s", et.ID)
+	}
+	rootID := subs[0] + "-" + subs[1]
+	et.RootCid = m[rootID][0]
+	et.RootSignedCid = m[rootID][1]
+	return nil
 }
 
 // ExecGas stores gas charges in another collection

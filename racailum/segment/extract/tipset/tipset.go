@@ -390,6 +390,8 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	etraces := make([]persistExecTrace, 0, len(invocs)*4)
 	callerAddrMap := make(map[string]address.Address)
+	// [2]cid.Cid Cid,SingedCid
+	IDCidMap := make(map[string][2]cid.Cid)
 	gasTraceNames := map[string]struct{}{}
 
 	for i := range invocs {
@@ -532,13 +534,15 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 		if ctx.Opts.EnabelExtract.EnableExtractExecTrace {
 			isBlock := IsBlock(p.seq, msg.From)
-			met, _, err := model.NewExecTrace(ctx.C, ctx.D, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock)
+			met, _, err := model.NewExecTrace(ctx, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock, IDCidMap)
 			if err != nil {
 				elog.Warnw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
 				tracecnt++
 				// update callerAddrMap
 				callerAddrMap[met.ID] = met.Msg.From
+				IDCidMap[met.ID] = [2]cid.Cid{met.Cid, met.SignedCid}
+				elog.Debug(IDCidMap)
 				res.Docs = append(res.Docs, met)
 				//if meg != nil && len(meg.Charges) > 0 {
 				//	res.Docs = append(res.Docs, meg)
