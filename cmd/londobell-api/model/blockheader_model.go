@@ -9,6 +9,10 @@ type BlockHeader struct {
 	ElectionProof interface{}
 	Ticket        interface{}
 	MessageCount  int
+	Timestamp     int64
+	Parents       []string
+	FirstSeen     int64
+	ParentWeight  string
 }
 
 type BlockHeaderRes struct {
