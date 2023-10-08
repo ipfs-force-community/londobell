@@ -111,17 +111,35 @@
 
 ```
 {
+	"BLSAggregate": {
+		"Data": "[]uint8",
+		"Type": "crypto.SigType"
+	},
+	"BeaconEntries": "[]types.BeaconEntry",
+	"BlockSig": {
+		"Data": "[]uint8",
+		"Type": "crypto.SigType"
+	},
 	"ElectionProof": {
 		"VRFProof": "[]uint8",
 		"WinCount": "int64"
 	},
 	"Epoch": "abi.ChainEpoch",
+	"FirstSeen": "int64",
+	"ForkSignaling": "uint64",
 	"MessageCount": "int",
 	"Messages": "cid.Cid",
 	"Miner": "address.Address",
+	"ParentBaseFee": "big.Int",
+	"ParentMessageReceipts": "cid.Cid",
+	"ParentStateRoot": "cid.Cid",
+	"ParentWeight": "big.Int",
+	"Parents": "[]cid.Cid",
 	"Ticket": {
 		"VRFProof": "[]uint8"
 	},
+	"Timestamp": "uint64",
+	"WinPoStProof": "[]proof.PoStProof",
 	"_id": "cid.Cid"
 }
 ```
@@ -368,6 +386,8 @@
 		"GasUsed": "int64",
 		"Return": "[]uint8"
 	},
+	"RootCid": "cid.Cid",
+	"RootSignedCid": "cid.Cid",
 	"Seq": "[]int",
 	"SeqIndex": "[][]int",
 	"SignedCid": "cid.Cid",

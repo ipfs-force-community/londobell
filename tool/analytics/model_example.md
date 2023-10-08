@@ -521,6 +521,35 @@
 
 ```
 {
+	"BLSAggregate": {
+		"Data": {
+			"$binary": {
+				"base64": "SGVsbG8=",
+				"subType": "00"
+			}
+		},
+		"Type": 0
+	},
+	"BeaconEntries": [
+		{
+			"Data": {
+				"$binary": {
+					"base64": "SGVsbG8=",
+					"subType": "00"
+				}
+			},
+			"Round": 0
+		}
+	],
+	"BlockSig": {
+		"Data": {
+			"$binary": {
+				"base64": "SGVsbG8=",
+				"subType": "00"
+			}
+		},
+		"Type": 0
+	},
 	"ElectionProof": {
 		"VRFProof": {
 			"$binary": {
@@ -531,9 +560,18 @@
 		"WinCount": 0
 	},
 	"Epoch": 0,
+	"FirstSeen": 0,
+	"ForkSignaling": 0,
 	"MessageCount": 0,
 	"Messages": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 	"Miner": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
+	"ParentBaseFee": "1073741824",
+	"ParentMessageReceipts": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"ParentStateRoot": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"ParentWeight": "1024",
+	"Parents": [
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	],
 	"Ticket": {
 		"VRFProof": {
 			"$binary": {
@@ -542,6 +580,18 @@
 			}
 		}
 	},
+	"Timestamp": 0,
+	"WinPoStProof": [
+		{
+			"PoStProof": 0,
+			"ProofBytes": {
+				"$binary": {
+					"base64": "SGVsbG8=",
+					"subType": "00"
+				}
+			}
+		}
+	],
 	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
@@ -570,7 +620,7 @@
 {
 	"ActorID": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 	"Address": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
-	"Balance": "1024",
+	"Balance": "340282591298641078465964189926313473653",
 	"Code": "",
 	"Epoch": 0,
 	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
@@ -586,8 +636,8 @@
 {
 	"Addr": "073366",
 	"Detail": {
-		"QualityAdjPower": "340282591298641078465964189926313473653",
-		"RawBytePower": "1073741824"
+		"QualityAdjPower": "1073741824",
+		"RawBytePower": "1024"
 	},
 	"Epoch": 0,
 	"Path": [
@@ -603,8 +653,8 @@
 {
 	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
-		"QualityAdjPower": "1073741824",
-		"RawBytePower": "1024",
+		"QualityAdjPower": "1024",
+		"RawBytePower": "340282591298641078465964189926313473653",
 		"WindowPoStProofType": 0
 	},
 	"Epoch": 0,
@@ -621,8 +671,8 @@
 {
 	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
-		"QualityAdjPower": "1024",
-		"RawBytePower": "340282591298641078465964189926313473653",
+		"QualityAdjPower": "340282591298641078465964189926313473653",
+		"RawBytePower": "1073741824",
 		"WindowPoStProofType": 0
 	},
 	"Epoch": 0,
@@ -639,8 +689,8 @@
 {
 	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 	"Detail": {
-		"QualityAdjPower": "340282591298641078465964189926313473653",
-		"RawBytePower": "1073741824",
+		"QualityAdjPower": "1073741824",
+		"RawBytePower": "1024",
 		"SealProofType": 0
 	},
 	"Epoch": 0,
@@ -657,8 +707,8 @@
 {
 	"Addr": "073366",
 	"Detail": {
-		"QualityAdjPower": "1073741824",
-		"RawBytePower": "1024",
+		"QualityAdjPower": "1024",
+		"RawBytePower": "340282591298641078465964189926313473653",
 		"WindowPoStProofType": 0
 	},
 	"Epoch": 0,
@@ -675,8 +725,8 @@
 {
 	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
-		"QualityAdjPower": "1024",
-		"RawBytePower": "340282591298641078465964189926313473653",
+		"QualityAdjPower": "340282591298641078465964189926313473653",
+		"RawBytePower": "1073741824",
 		"WindowPoStProofType": 0
 	},
 	"Epoch": 0,
@@ -693,8 +743,8 @@
 {
 	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
-		"QualityAdjPower": "340282591298641078465964189926313473653",
-		"RawBytePower": "1073741824",
+		"QualityAdjPower": "1073741824",
+		"RawBytePower": "1024",
 		"WindowPoStProofType": 0
 	},
 	"Epoch": 0,
@@ -711,8 +761,8 @@
 {
 	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 	"Detail": {
-		"QualityAdjPower": "1073741824",
-		"RawBytePower": "1024",
+		"QualityAdjPower": "1024",
+		"RawBytePower": "340282591298641078465964189926313473653",
 		"WindowPoStProofType": 0
 	},
 	"Epoch": 0,
@@ -729,8 +779,8 @@
 {
 	"Addr": "073366",
 	"Detail": {
-		"QualityAdjPower": "1024",
-		"RawBytePower": "340282591298641078465964189926313473653",
+		"QualityAdjPower": "340282591298641078465964189926313473653",
+		"RawBytePower": "1073741824",
 		"WindowPoStProofType": 0
 	},
 	"Epoch": 0,
@@ -747,8 +797,8 @@
 {
 	"Addr": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"Detail": {
-		"QualityAdjPower": "340282591298641078465964189926313473653",
-		"RawBytePower": "1073741824",
+		"QualityAdjPower": "1073741824",
+		"RawBytePower": "1024",
 		"WindowPoStProofType": 0
 	},
 	"Epoch": 0,
@@ -765,8 +815,8 @@
 {
 	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
-		"QualityAdjPower": "1073741824",
-		"RawBytePower": "1024",
+		"QualityAdjPower": "1024",
+		"RawBytePower": "340282591298641078465964189926313473653",
 		"WindowPoStProofType": 0
 	},
 	"Epoch": 0,
@@ -832,7 +882,7 @@
 	"MethodName": "",
 	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 	"To": "073366",
-	"Value": "340282591298641078465964189926313473653",
+	"Value": "1073741824",
 	"_id": ""
 }
 ```
@@ -844,7 +894,7 @@
 
 ```
 {
-	"Amount": "1024",
+	"Amount": "340282591298641078465964189926313473653",
 	"Epoch": 0,
 	"Operator": 0,
 	"Owner": 0,
@@ -856,7 +906,7 @@
 
 ```
 {
-	"Amount": "1073741824",
+	"Amount": "1024",
 	"Epoch": 0,
 	"Operator": 0,
 	"Owner": 0,
@@ -871,7 +921,7 @@
 
 ```
 {
-	"Amount": "340282591298641078465964189926313473653",
+	"Amount": "1073741824",
 	"Epoch": 0,
 	"Owner": 0,
 	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
@@ -882,7 +932,7 @@
 
 ```
 {
-	"Amount": "1024",
+	"Amount": "340282591298641078465964189926313473653",
 	"Epoch": 0,
 	"Owner": 0,
 	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
@@ -897,7 +947,7 @@
 ```
 {
 	"Client": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
-	"ClientCollateral": "1024",
+	"ClientCollateral": "340282591298641078465964189926313473653",
 	"ClientID": "073366",
 	"EndEpoch": 0,
 	"Epoch": 0,
@@ -905,10 +955,10 @@
 	"PieceCID": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 	"PieceSize": 0,
 	"Provider": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
-	"ProviderCollateral": "340282591298641078465964189926313473653",
+	"ProviderCollateral": "1073741824",
 	"ProviderID": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 	"StartEpoch": 0,
-	"StoragePricePerEpoch": "1073741824",
+	"StoragePricePerEpoch": "1024",
 	"VerifiedDeal": false,
 	"_id": 0
 }
@@ -955,19 +1005,19 @@
 	},
 	"Detail": {
 		"Regular": {
-			"ClientCollateral": "1024",
+			"ClientCollateral": "340282591298641078465964189926313473653",
 			"Clients": 0,
 			"Count": 0,
-			"PieceSize": "1073741824",
-			"ProviderCollateral": "340282591298641078465964189926313473653",
+			"PieceSize": "1024",
+			"ProviderCollateral": "1073741824",
 			"Providers": 0
 		},
 		"Verified": {
-			"ClientCollateral": "1024",
+			"ClientCollateral": "340282591298641078465964189926313473653",
 			"Clients": 0,
 			"Count": 0,
-			"PieceSize": "1073741824",
-			"ProviderCollateral": "340282591298641078465964189926313473653",
+			"PieceSize": "1024",
+			"ProviderCollateral": "1073741824",
 			"Providers": 0
 		}
 	}
@@ -1068,14 +1118,14 @@
 	"Error": "",
 	"FIL": 0,
 	"GasCost": {
-		"BaseFeeBurn": "1024",
-		"GasUsed": "340282591298641078465964189926313473653",
+		"BaseFeeBurn": "340282591298641078465964189926313473653",
+		"GasUsed": "1073741824",
 		"Message": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-		"MinerPenalty": "340282591298641078465964189926313473653",
-		"MinerTip": "1024",
-		"OverEstimationBurn": "1073741824",
-		"Refund": "1073741824",
-		"TotalCost": "340282591298641078465964189926313473653"
+		"MinerPenalty": "1073741824",
+		"MinerTip": "340282591298641078465964189926313473653",
+		"OverEstimationBurn": "1024",
+		"Refund": "1024",
+		"TotalCost": "1073741824"
 	},
 	"IsBlock": false,
 	"Msg": {
@@ -1083,7 +1133,7 @@
 		"Method": 2,
 		"MethodName": "",
 		"To": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
-		"Value": "1073741824"
+		"Value": "1024"
 	},
 	"MsgRct": {
 		"EventsRoot": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
@@ -1096,6 +1146,8 @@
 			}
 		}
 	},
+	"RootCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"RootSignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 	"Seq": [
 		0
 	],
@@ -1123,8 +1175,8 @@
 	"From": "073366",
 	"MethodName": "",
 	"To": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
-	"Value": "1024",
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"Value": "340282591298641078465964189926313473653",
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -1136,12 +1188,12 @@
 ```
 {
 	"CirculatingSupply": {
-		"FilBurnt": "1024",
-		"FilCirculating": "340282591298641078465964189926313473653",
-		"FilLocked": "1073741824",
-		"FilMined": "340282591298641078465964189926313473653",
-		"FilReserveDisbursed": "1024",
-		"FilVested": "1073741824"
+		"FilBurnt": "340282591298641078465964189926313473653",
+		"FilCirculating": "1073741824",
+		"FilLocked": "1024",
+		"FilMined": "1073741824",
+		"FilReserveDisbursed": "340282591298641078465964189926313473653",
+		"FilVested": "1024"
 	},
 	"_id": 0
 }
@@ -1155,7 +1207,7 @@
 ```
 {
 	"Cids": [
-		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	],
 	"_id": 0
 }
@@ -1171,24 +1223,24 @@
 	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
 		"ClientUnLockCollateralInFuture": [
-			"340282591298641078465964189926313473653"
-		],
-		"ClientUnlockStorageFeeInFuture": [
 			"1073741824"
 		],
-		"ProviderUnLockCollateralInFuture": [
+		"ClientUnlockStorageFeeInFuture": [
 			"1024"
 		],
-		"TotalClientLockedCollateral": "340282591298641078465964189926313473653",
-		"TotalClientStorageFee": "1073741824",
-		"TotalLocked": "1073741824",
-		"TotalProviderLockedCollateral": "1024"
+		"ProviderUnLockCollateralInFuture": [
+			"340282591298641078465964189926313473653"
+		],
+		"TotalClientLockedCollateral": "1073741824",
+		"TotalClientStorageFee": "1024",
+		"TotalLocked": "1024",
+		"TotalProviderLockedCollateral": "340282591298641078465964189926313473653"
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -1214,12 +1266,12 @@
 			"ReplaceSectorPartition": 0,
 			"SealProof": 0,
 			"SealRandEpoch": 0,
-			"SealedCID": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+			"SealedCID": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 			"SectorNumber": 0
 		}
 	},
-	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"SignedCid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -1242,12 +1294,12 @@
 			"ReplaceSectorPartition": 0,
 			"SealProof": 0,
 			"SealRandEpoch": 0,
-			"SealedCID": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+			"SealedCID": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 			"SectorNumber": 0
 		}
 	},
-	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"SignedCid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -1268,11 +1320,11 @@
 				}
 			},
 			"To": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
-			"Value": "340282591298641078465964189926313473653"
+			"Value": "1073741824"
 		}
 	},
-	"SignedCid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -1293,11 +1345,11 @@
 				}
 			},
 			"To": "073366",
-			"Value": "1024"
+			"Value": "340282591298641078465964189926313473653"
 		}
 	},
-	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -1311,14 +1363,14 @@
 	"DealIDs": [
 		0
 	],
-	"DealWeight": "1073741824",
+	"DealWeight": "1024",
 	"Epoch": 0,
-	"InitialPledge": "1024",
+	"InitialPledge": "340282591298641078465964189926313473653",
 	"Miner": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
-	"QAPower": "1073741824",
+	"QAPower": "1024",
 	"SealProof": 0,
 	"SectorNumber": 0,
-	"VerifiedDealWeight": "340282591298641078465964189926313473653",
+	"VerifiedDealWeight": "1073741824",
 	"_id": ""
 }
 ```
@@ -1332,32 +1384,32 @@
 {
 	"Addr": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"Detail": {
-		"FeeDebt": "1073741824",
-		"InitialPledge": "340282591298641078465964189926313473653",
-		"LockedFunds": "1024",
+		"FeeDebt": "1024",
+		"InitialPledge": "1073741824",
+		"LockedFunds": "340282591298641078465964189926313473653",
 		"PledgeRelease": [
-			"1073741824"
-		],
-		"PreCommitDeposits": "340282591298641078465964189926313473653",
-		"VestInFuture": [
 			"1024"
+		],
+		"PreCommitDeposits": "1073741824",
+		"VestInFuture": [
+			"340282591298641078465964189926313473653"
 		]
 	},
 	"Epoch": 0,
 	"Info": {
-		"AvailableBalance": "1024",
-		"Balance": "340282591298641078465964189926313473653",
+		"AvailableBalance": "340282591298641078465964189926313473653",
+		"Balance": "1073741824",
 		"Beneficiary": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 		"BeneficiaryTerm": {
 			"Expiration": 0,
-			"Quota": "340282591298641078465964189926313473653",
-			"UsedQuota": "1024"
+			"Quota": "1073741824",
+			"UsedQuota": "340282591298641078465964189926313473653"
 		},
 		"ConsensusFaultElapsed": 0,
 		"ControlAddresses": [
 			"1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq"
 		],
-		"FeeDebt": "1073741824",
+		"FeeDebt": "1024",
 		"Multiaddrs": [
 			{
 				"$binary": {
@@ -1378,7 +1430,7 @@
 			"ApprovedByNominee": false,
 			"NewBeneficiary": "073366",
 			"NewExpiration": 0,
-			"NewQuota": "1073741824"
+			"NewQuota": "1024"
 		},
 		"PendingOwnerAddress": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 		"PendingWorkerKey": {
@@ -1393,9 +1445,9 @@
 		"Worker": "073366"
 	},
 	"Path": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -1410,15 +1462,15 @@
 	"DealIDs": [
 		0
 	],
-	"DealWeight": "340282591298641078465964189926313473653",
+	"DealWeight": "1073741824",
 	"Epoch": 0,
 	"Expiration": 0,
-	"InitialPledge": "1073741824",
+	"InitialPledge": "1024",
 	"Miner": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"SectorNumber": 0,
 	"SimpleQaPower": false,
 	"Terminated": false,
-	"VerifiedDealWeight": "1024",
+	"VerifiedDealWeight": "340282591298641078465964189926313473653",
 	"_id": ""
 }
 ```
@@ -1438,10 +1490,10 @@
 				"DealCount": 0,
 				"LowerBound": 0,
 				"SectorCount": 0,
-				"TotalDealWeight": "340282591298641078465964189926313473653",
-				"TotalInitialPledge": "1073741824",
-				"TotalV1InitialPledge": "340282591298641078465964189926313473653",
-				"TotalVerifiedDealWeight": "1024",
+				"TotalDealWeight": "1073741824",
+				"TotalInitialPledge": "1024",
+				"TotalV1InitialPledge": "1073741824",
+				"TotalVerifiedDealWeight": "340282591298641078465964189926313473653",
 				"UpperBound": 0,
 				"V1SectorCount": 0
 			}
@@ -1449,9 +1501,9 @@
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
-	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 }
 ```
 
@@ -1464,19 +1516,19 @@
 {
 	"Addr": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
 	"Detail": {
-		"ExpectedDayReward": "1024",
-		"InitialConsensusPledge": "340282591298641078465964189926313473653",
-		"InitialPledge": "1073741824",
-		"InitialStoragePledge": "1024",
-		"Mined": "1024",
-		"ProjectionOfFaultFee": "340282591298641078465964189926313473653",
-		"ProjectionOfInitialPledge": "1073741824"
+		"ExpectedDayReward": "340282591298641078465964189926313473653",
+		"InitialConsensusPledge": "1073741824",
+		"InitialPledge": "1024",
+		"InitialStoragePledge": "340282591298641078465964189926313473653",
+		"Mined": "340282591298641078465964189926313473653",
+		"ProjectionOfFaultFee": "1073741824",
+		"ProjectionOfInitialPledge": "1024"
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	],
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
@@ -1489,17 +1541,17 @@
 {
 	"Addr": "073366",
 	"Detail": {
-		"Locked": "1073741824",
+		"Locked": "1024",
 		"VestInFuture": [
-			"1024"
+			"340282591298641078465964189926313473653"
 		],
-		"Vested": "340282591298641078465964189926313473653"
+		"Vested": "1073741824"
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -1511,18 +1563,18 @@
 ```
 {
 	"Client": "3unasom6mrmop7ycuunetpovwp645f4wyquqsrc5nwakg3cnxyse4ibgpcyiq3ebhitknz6zmocoi6qq6lvla",
-	"ClientCollateral": "1024",
+	"ClientCollateral": "340282591298641078465964189926313473653",
 	"ClientID": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 	"EndEpoch": 0,
 	"Epoch": 0,
 	"Label": {},
-	"PieceCID": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"PieceCID": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 	"PieceSize": 0,
 	"Provider": "073366",
-	"ProviderCollateral": "340282591298641078465964189926313473653",
+	"ProviderCollateral": "1073741824",
 	"ProviderID": "1if5yzf6lkmpbd5jmysolhquqwekryxqdna637hq",
 	"StartEpoch": 0,
-	"StoragePricePerEpoch": "1073741824",
+	"StoragePricePerEpoch": "1024",
 	"VerifiedDeal": false,
 	"_id": 0
 }
@@ -1548,13 +1600,13 @@
 		},
 		"To": "2hhfann7xa3lay6pybsw5liunztjkkcuwptgtp5q",
 		"TxnID": 0,
-		"Value": "1073741824"
+		"Value": "1024"
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
-	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
 ```
 
@@ -1566,7 +1618,7 @@
 ```
 {
 	"Client": 0,
-	"Data": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"Data": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 	"Epoch": 0,
 	"Provider": 0,
 	"Sector": 0,
@@ -1586,7 +1638,7 @@
 ```
 {
 	"Cids": [
-		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
+		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 	],
 	"_id": 0
 }
@@ -1599,15 +1651,15 @@
 
 ```
 {
-	"BaseFee": "1024",
+	"BaseFee": "340282591298641078465964189926313473653",
 	"ChildEpoch": 0,
 	"Cids": [
-		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+		"bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 	],
 	"MinTimestamp": 0,
-	"Receipts": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
-	"State": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
-	"Weight": "340282591298641078465964189926313473653",
+	"Receipts": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
+	"State": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
+	"Weight": "1073741824",
 	"_id": 0
 }
 ```
@@ -1621,14 +1673,14 @@
 {
 	"Addr": "073366",
 	"Detail": {
-		"Cap": "1073741824",
+		"Cap": "1024",
 		"Type": ""
 	},
 	"Epoch": 0,
 	"Path": [
-		"bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
+		"bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
 	],
-	"_id": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw"
+	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
 ```
 
