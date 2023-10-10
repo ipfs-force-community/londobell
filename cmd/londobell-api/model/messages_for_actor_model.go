@@ -4,6 +4,7 @@ import "github.com/filecoin-project/go-state-types/abi"
 
 type MessageForActor struct {
 	Cid      string
+	RootCid  string
 	Epoch    abi.ChainEpoch
 	From     string
 	To       string

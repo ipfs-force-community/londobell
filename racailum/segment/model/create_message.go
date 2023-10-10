@@ -17,6 +17,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
@@ -42,26 +43,28 @@ func init() {
 
 // CreateMessage records messages for create
 type CreateMessage struct {
-	ID         string         `mir:"-" bson:"_id"`
-	Epoch      abi.ChainEpoch `mir:"-"`
-	Cid        cid.Cid
-	SignedCid  cid.Cid
-	Value      abi.TokenAmount // int64
-	MethodName string
-	From       address.Address
-	To         address.Address
-	IsBlock    bool            // 是否是块消息
-	Caller     address.Address //constructor caller address
-	ActorID    address.Address //CreateExternal created
+	ID            string         `mir:"-" bson:"_id"`
+	Epoch         abi.ChainEpoch `mir:"-"`
+	Cid           cid.Cid
+	SignedCid     cid.Cid
+	Value         abi.TokenAmount // int64
+	MethodName    string
+	From          address.Address
+	To            address.Address
+	IsBlock       bool            // 是否是块消息
+	Caller        address.Address //constructor caller address
+	ActorID       address.Address //CreateExternal created
+	RootCid       cid.Cid         `mir:"-"`
+	RootSignedCid cid.Cid         `mir:"-"`
 }
 
 func IsOkCreateMessage(methodName string, exitCode int64) bool {
 	return slices.Contains(CreateMethods, methodName) && exitCode == 0
 }
 
-func NewCreateMessage(epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, from, to address.Address, isBlock bool, seq []int, callerMap map[string]address.Address, returnObj cbor.Er, raw *common.ExecutionTraceCompact) (*CreateMessage, error) {
-
-	am := &CreateMessage{
+func NewCreateMessage(ctx *extract.Ctx, epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, from, to address.Address, isBlock bool, seq []int, callerMap map[string]address.Address, returnObj cbor.Er, raw *common.ExecutionTraceCompact, IDCidMap map[string][2]cid.Cid) (*CreateMessage, error) {
+	elog := ctx.L.With("NewCreateMessage", cid)
+	cm := &CreateMessage{
 		Epoch:      epoch,
 		Cid:        cid,
 		SignedCid:  signedCid,
@@ -71,20 +74,24 @@ func NewCreateMessage(epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.To
 		To:         to,
 		IsBlock:    isBlock,
 	}
-	am.genID(epoch, seq)
+	cm.genID(epoch, seq)
+	err := cm.genRootids(IDCidMap)
+	if err != nil {
+		elog.Warn(err)
+	}
 	if methodName == ConstructorMethod {
-		parts := strings.Split(am.ID, "-")
+		parts := strings.Split(cm.ID, "-")
 
 		// Take the first two segments
 		if len(parts) >= 2 {
 			callerID := parts[0] + "-" + parts[1]
 			if caller, ok := callerMap[callerID]; ok {
-				am.Caller = caller
+				cm.Caller = caller
 			} else {
 				return nil, fmt.Errorf("no caller in callerAddrMap")
 			}
 		} else {
-			return nil, fmt.Errorf("get constructor caller err,id: %s", am.ID)
+			return nil, fmt.Errorf("get constructor caller err,id: %s", cm.ID)
 		}
 	} else if methodName == CreateExternal || methodName == CreateMiner || methodName == Exec {
 		if len(raw.MsgRct.Return) > 0 && returnObj != nil {
@@ -95,11 +102,11 @@ func NewCreateMessage(epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.To
 			if err != nil {
 				return nil, err
 			}
-			am.ActorID = addr
+			cm.ActorID = addr
 		}
 	}
 
-	return am, nil
+	return cm, nil
 }
 
 func CompareStructPointers(a interface{}, b interface{}) bool {
@@ -199,7 +206,7 @@ func parse(methodName string, obj interface{}) (address.Address, error) {
 }
 
 // Indexes impl common.Indexed
-func (am *CreateMessage) Indexes() [][]string {
+func (cm *CreateMessage) Indexes() [][]string {
 	return [][]string{
 		{"IsBlock", createMessageEpochField},
 		{"Method"},
@@ -210,29 +217,44 @@ func (am *CreateMessage) Indexes() [][]string {
 }
 
 // CollectionName impl common.Document
-func (am *CreateMessage) CollectionName() string {
+func (cm *CreateMessage) CollectionName() string {
 	return createMessageColName
 }
 
 // EpochField impl common.Document
-func (am *CreateMessage) EpochField() *string {
+func (cm *CreateMessage) EpochField() *string {
 	return &createMessageEpochField
 }
 
 // ResetPolicy impl common.Document
-func (am *CreateMessage) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
+func (cm *CreateMessage) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bool) {
 	return rangedFilter(createMessageEpochField, lower, upper), true
 }
 
-func (am *CreateMessage) genID(epoch abi.ChainEpoch, seq []int) {
+func (cm *CreateMessage) genID(epoch abi.ChainEpoch, seq []int) {
 	seqStrs := make([]string, 0, len(seq))
 	for i := range seq {
 		seqStrs = append(seqStrs, fmt.Sprintf("%05d", seq[i]))
 	}
 
-	am.ID = fmt.Sprintf("%d-%s", epoch, strings.Join(seqStrs, "-"))
+	cm.ID = fmt.Sprintf("%d-%s", epoch, strings.Join(seqStrs, "-"))
 }
 
-func (am *CreateMessage) IsMutable() bool {
+func (cm *CreateMessage) IsMutable() bool {
 	return false
+}
+
+// get root Cid SignedCid
+func (cm *CreateMessage) genRootids(m map[string][2]cid.Cid) error {
+	if cm.IsBlock {
+		return nil
+	}
+	subs := strings.Split(cm.ID, "-")
+	if len(subs) < 2 {
+		return fmt.Errorf("getRootids Split length err: %s", cm.ID)
+	}
+	rootID := subs[0] + "-" + subs[1]
+	cm.RootCid = m[rootID][0]
+	cm.RootSignedCid = m[rootID][1]
+	return nil
 }

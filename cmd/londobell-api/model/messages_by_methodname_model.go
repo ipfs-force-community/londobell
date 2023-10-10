@@ -7,6 +7,7 @@ import (
 
 type MessageByMethodName struct {
 	SignedCid string
+	RootCid   string
 	Epoch     abi.ChainEpoch
 	From      string
 	To        string
