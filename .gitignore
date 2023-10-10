@@ -12,3 +12,4 @@ testdb/LOCK
 
 /lotus-api-adapter
 /londobell-api-aggregators
+*.DS_Store
