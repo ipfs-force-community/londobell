@@ -10,6 +10,7 @@ import (
 	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 )
 
 var (
@@ -28,22 +29,25 @@ const (
 
 // ActorMessage records messages for actor
 type ActorMessage struct {
-	ID           string `mir:"-" bson:"_id"`
-	ActorID      address.Address
-	Epoch        abi.ChainEpoch `mir:"-"`
-	Cid          cid.Cid
-	SignedCid    cid.Cid
-	Value        abi.TokenAmount // int64
-	MethodName   string
-	ExitCode     exitcode.ExitCode
-	Type         string // "from" or "to"
-	From         address.Address
-	To           address.Address
-	IsBlock      bool   // 是否是块消息
-	TransferType string // "Blockreward", "Burn", "Send", "Receive"
+	ID            string `mir:"-" bson:"_id"`
+	ActorID       address.Address
+	Epoch         abi.ChainEpoch `mir:"-"`
+	Cid           cid.Cid
+	SignedCid     cid.Cid
+	Value         abi.TokenAmount // int64
+	MethodName    string
+	ExitCode      exitcode.ExitCode
+	Type          string // "from" or "to"
+	From          address.Address
+	To            address.Address
+	IsBlock       bool    // 是否是块消息
+	TransferType  string  // "Blockreward", "Burn", "Send", "Receive"
+	RootCid       cid.Cid `mir:"-"`
+	RootSignedCid cid.Cid `mir:"-"`
 }
 
-func NewActorMessage(actorID address.Address, epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, mtype string, from, to address.Address, isBlock bool, seq []int, transferType string) (*ActorMessage, error) {
+func NewActorMessage(ctx *extract.Ctx, actorID address.Address, epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, mtype string, from, to address.Address, isBlock bool, seq []int, transferType string, IDCidMap map[string][2]cid.Cid) (*ActorMessage, error) {
+	elog := ctx.L.With("NewActorMessage", cid)
 	am := &ActorMessage{
 		ActorID:      actorID,
 		Epoch:        epoch,
@@ -60,7 +64,10 @@ func NewActorMessage(actorID address.Address, epoch abi.ChainEpoch, cid, signedC
 	}
 
 	am.genID(epoch, mtype, seq)
-
+	err := am.genRootids(IDCidMap)
+	if err != nil {
+		elog.Warn(err)
+	}
 	return am, nil
 }
 
@@ -101,4 +108,19 @@ func (am *ActorMessage) genID(epoch abi.ChainEpoch, mtype string, seq []int) {
 
 func (am *ActorMessage) IsMutable() bool {
 	return false
+}
+
+// get root Cid SignedCid
+func (am *ActorMessage) genRootids(m map[string][2]cid.Cid) error {
+	if am.IsBlock {
+		return nil
+	}
+	subs := strings.Split(am.ID, "-")
+	if len(subs) < 2 {
+		return fmt.Errorf("getRootids Split length err: %s", am.ID)
+	}
+	rootID := subs[0] + "-" + subs[1]
+	am.RootCid = m[rootID][0]
+	am.RootSignedCid = m[rootID][1]
+	return nil
 }
