@@ -249,11 +249,10 @@ func (cm *CreateMessage) genRootids(m map[string][2]cid.Cid) error {
 	if cm.IsBlock {
 		return nil
 	}
-	subs := strings.Split(cm.ID, "-")
-	if len(subs) < 2 {
-		return fmt.Errorf("getRootids Split length err: %s", cm.ID)
+	rootID, err := GetRootID(cm.ID)
+	if err != nil {
+		return err
 	}
-	rootID := subs[0] + "-" + subs[1]
 	cm.RootCid = m[rootID][0]
 	cm.RootSignedCid = m[rootID][1]
 	return nil

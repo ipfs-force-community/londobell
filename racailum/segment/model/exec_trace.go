@@ -200,11 +200,10 @@ func (et *ExecTrace) genRootids(m map[string][2]cid.Cid) error {
 	if et.IsBlock {
 		return nil
 	}
-	subs := strings.Split(et.ID, "-")
-	if len(subs) < 2 {
-		return fmt.Errorf("getRootids Split length err: %s", et.ID)
+	rootID, err := GetRootID(et.ID)
+	if err != nil {
+		return err
 	}
-	rootID := subs[0] + "-" + subs[1]
 	et.RootCid = m[rootID][0]
 	et.RootSignedCid = m[rootID][1]
 	return nil

@@ -40,3 +40,13 @@ func extractEpochFieldName(doc interface{}) string {
 
 	return field.Name
 }
+
+// 获取父消息在mongo中的_id
+func GetRootID(child string) (string, error) {
+	subs := strings.Split(child, "-")
+	if len(subs) < 2 {
+		return "", fmt.Errorf("getRootids Split length err: %s", child)
+	}
+	rootID := subs[0] + "-" + subs[1]
+	return rootID, nil
+}

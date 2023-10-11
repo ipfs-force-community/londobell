@@ -115,11 +115,11 @@ func (am *ActorMessage) genRootids(m map[string][2]cid.Cid) error {
 	if am.IsBlock {
 		return nil
 	}
-	subs := strings.Split(am.ID, "-")
-	if len(subs) < 2 {
-		return fmt.Errorf("getRootids Split length err: %s", am.ID)
+
+	rootID, err := GetRootID(am.ID)
+	if err != nil {
+		return err
 	}
-	rootID := subs[0] + "-" + subs[1]
 	am.RootCid = m[rootID][0]
 	am.RootSignedCid = m[rootID][1]
 	return nil
