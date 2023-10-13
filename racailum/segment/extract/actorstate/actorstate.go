@@ -91,6 +91,9 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 
 	if ok && len(exes) > 0 {
 		for ei := range exes {
+			elog := ctx.L.With("epoch", head.Epoch)
+			elog.Infof("%s extractState start", exes[ei].Name)
+			defer elog.Infof("%s extractState done", exes[ei].Name)
 			if !exes[ei].PreCheck(ctx, exes[ei].Name, head.Epoch) {
 				continue
 			}
@@ -99,6 +102,7 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 				return fmt.Errorf("extracting %s: %w", exes[ei].Name, err)
 			}
 		}
+
 	}
 
 	return nil
