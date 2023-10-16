@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -47,11 +49,24 @@ var (
 	log = logging.Logger("server")
 )
 
+// RequestLogger 请求日志中间件
+func RequestLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log.Info(c.Request.Header)
+		if c.Request.Method != http.MethodGet {
+			var buf bytes.Buffer
+			tee := io.TeeReader(c.Request.Body, &buf)
+			body, _ := io.ReadAll(tee)
+			c.Request.Body = io.NopCloser(&buf)
+			log.Info(string(body))
+		}
+		c.Next()
+	}
+}
+
 func Run(cctx *cli.Context, adapter bool) error {
 	router := gin.New()
-	router.Use(CrosHandler())
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
+	router.Use(CrosHandler(), RequestLogger(), gin.Recovery(), gin.Logger())
 	router.GET("/ping", Pong)
 
 	var (
