@@ -18,6 +18,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment"
 
 	"github.com/filecoin-project/lotus/chain/beacon"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
@@ -66,7 +67,7 @@ func StateManager() dix.Option {
 		dix.Override(new(journal.DisabledEvents), journal.EnvDisabledEvents),
 		dix.Override(new(store.WeightFunc), filcns.Weight),
 		dix.Override(new(*store.ChainStore), modules.ChainStore),
-		dix.Override(new(stmgr.Executor), filcns.NewTipSetExecutor),
+		dix.Override(new(stmgr.Executor), consensus.NewTipSetExecutor),
 		dix.Override(new(dtypes.DrandSchedule), modules.BuiltinDrandConfig),
 		dix.Override(new(dtypes.AfterGenesisSet), modules.SetGenesis),
 		dix.Override(new(beacon.Schedule), modules.RandomSchedule),

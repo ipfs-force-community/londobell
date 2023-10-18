@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/ipfs-force-community/londobell/common"
@@ -61,7 +62,7 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 		}
 	}
 
-	state, err := vm.DumpActorState(filcns.NewTipSetExecutor().NewActorRegistry(), actor, blkraw.RawData())
+	state, err := vm.DumpActorState(consensus.NewTipSetExecutor(filcns.RewardFunc).NewActorRegistry(), actor, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 

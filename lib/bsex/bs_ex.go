@@ -3,6 +3,7 @@ package bsex
 import (
 	"context"
 
+	bf "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-libipfs/blocks"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -42,10 +43,10 @@ type CachedBlockstore struct {
 	hasSg *singleflight.Group
 }
 
-func (cbs *CachedBlockstore) Get(ctx context.Context, c cid.Cid) (blocks.Block, error) {
+func (cbs *CachedBlockstore) Get(ctx context.Context, c cid.Cid) (bf.Block, error) {
 	metrics.RecordInc(context.Background(), metrics.CacheGetCnt)
 	if cached, has := cbs.cache.Get(c); has {
-		if b, ok := cached.(blocks.Block); ok {
+		if b, ok := cached.(bf.Block); ok {
 			return b, nil
 		}
 	}

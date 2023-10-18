@@ -23,7 +23,7 @@ import (
 
 	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
 	linit "github.com/filecoin-project/lotus/chain/actors/builtin/init"
-	"github.com/filecoin-project/lotus/chain/consensus/filcns"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/types"
 )
@@ -204,7 +204,7 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 		}, nil
 	}
 
-	vma := filcns.NewActorRegistry()
+	vma := consensus.NewActorRegistry()
 
 	//todo: realcode
 	mi, ok := vma.Methods[code][call.Method]

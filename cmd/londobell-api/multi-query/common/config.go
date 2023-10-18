@@ -78,7 +78,7 @@ func DefaultConfig() Config {
 }
 
 func WriteToConfig(cfgPath string, cfg Config) error {
-	content, err := config.ConfigUpdate(cfg, nil, false)
+	content, err := config.ConfigUpdate(cfg, nil, config.Commented(false))
 	if err != nil {
 		return fmt.Errorf("marshal default config: %w", err)
 	}

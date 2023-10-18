@@ -11,7 +11,7 @@ import (
 	"github.com/filecoin-project/lotus/api/client"
 	badgerbs "github.com/filecoin-project/lotus/blockstore/badger"
 	"github.com/filecoin-project/lotus/node/repo"
-
+	bf "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
@@ -55,7 +55,7 @@ func GenerateFullTree(ctx context.Context, root cid.Cid, sourceBs bstore.Blockst
 	bsvc := blockservice.New(sourceBs, offline.Exchange(sourceBs))
 	dag := merkledag.NewDAGService(bsvc)
 	seen := cid.NewSet()
-	res := make([]blocks.Block, 0)
+	res := make([]bf.Block, 0)
 	var statslk sync.Mutex
 
 	// walker: visit and save all child node from root node
