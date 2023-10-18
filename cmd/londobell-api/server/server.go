@@ -52,6 +52,7 @@ var (
 // RequestLogger 请求日志中间件
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		log.Info(c.Request.URL)
 		log.Info(c.Request.Header)
 		if c.Request.Method != http.MethodGet {
 			var buf bytes.Buffer
@@ -66,7 +67,7 @@ func RequestLogger() gin.HandlerFunc {
 
 func Run(cctx *cli.Context, adapter bool) error {
 	router := gin.New()
-	router.Use(CrosHandler(), RequestLogger(), gin.Recovery(), gin.Logger())
+	router.Use(CrosHandler(), gin.Logger(), RequestLogger(), gin.Recovery())
 	router.GET("/ping", Pong)
 
 	var (
