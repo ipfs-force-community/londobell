@@ -37,6 +37,7 @@ func main() {
 			completeTransferTypeCmd,
 			updateFILCmd,
 			updateRootCidCmd,
+			orphanDaemonCmd,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{

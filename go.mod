@@ -164,6 +164,7 @@ require (
 	github.com/hashicorp/go-hclog v1.2.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/raft v1.1.1 // indirect
 	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
