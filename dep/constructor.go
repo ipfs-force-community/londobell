@@ -173,7 +173,7 @@ func LoadRaConfig(rpath RepoPath) (racailum.Config, error) {
 	cfgPath := ConfigFilePath(rpath)
 	cfg := racailum.DefaultConfig()
 	opt := config.SetDefault(func() (interface{}, error) {
-		return cfg, nil
+		return &cfg, nil
 	})
 	_, err := config.FromFile(cfgPath, opt)
 	if err != nil {
