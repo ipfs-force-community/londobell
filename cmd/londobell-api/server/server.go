@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -47,11 +49,28 @@ var (
 	log = logging.Logger("server")
 )
 
+func RequestLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var body string
+		url := c.Request.URL
+		header := c.Request.Header
+		ip := c.ClientIP()
+
+		if c.Request.Method != http.MethodGet {
+			var buf bytes.Buffer
+			tee := io.TeeReader(c.Request.Body, &buf)
+			bodybuf, _ := io.ReadAll(tee)
+			c.Request.Body = io.NopCloser(&buf)
+			body = string(bodybuf)
+		}
+		log.Infof("get request,url: %s,ip: %s,body: %s,header: %s", url, ip, body, header)
+		c.Next()
+	}
+}
+
 func Run(cctx *cli.Context, adapter bool) error {
 	router := gin.New()
-	router.Use(CrosHandler())
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
+	router.Use(CrosHandler(), gin.Logger(), gin.Recovery(), RequestLogger())
 	router.GET("/ping", Pong)
 
 	var (
@@ -308,6 +327,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/transfer_messages", aggregators.GetTransferMessages)
 		group.POST("/transfer_message_for_largeAmount", aggregators.GetTransferMessageForLargeAmount)
 		group.POST("/blockheader", aggregators.GetBlockHeader)
+		group.POST("/incoming_blockheader", aggregators.GetIncomingBlockHeader)
 		group.POST("/blockheader_by_cid", aggregators.GetBlockHeaderByCid)
 		group.POST("/blockheaders_by_miner", aggregators.GetBlockHeadersByMiner) // 出块列表，出块奖励额外获取
 		//group.POST("/mined_by_miner_range", aggregators.GetMinedByMinerForRange)
