@@ -1,3 +1,17 @@
+/*
+--------------------------------------------------------------
+@File    :   orphan_daemon.go
+@Time    :   2023/10/19 13:55:16
+@Author  :   lsk
+@Version :   1.0
+@Desc    :
+--------------------------------------------------------------
+同步lotus孤块数据:
+https://github.com/filecoin-project/lotus/pull/632
+
+index: db.OrphanBlock.createIndex({"Epoch":1}, {"sparse": true});
+--------------------------------------------------------------
+*/
 package main
 
 import (
@@ -33,6 +47,7 @@ type OrphanBlock struct {
 	Ticket        *types.Ticket
 	FirstSeen     int64
 	Checked       bool
+	MessageCount  int
 }
 
 var orphanDaemonCmd = &cli.Command{
@@ -68,10 +83,17 @@ var orphanDaemonCmd = &cli.Command{
 
 		full, closer, err := client.NewFullNodeRPCV0(cctx.Context, cctx.String("api-url"), requestHeader)
 		if err != nil {
-			return nil
+			return err
 		}
 		defer closer()
-		go updateOrphanCol(cctx)
+
+		client, err := mongo.Connect(cctx.Context, options.Client().ApplyURI(cctx.String("dsn")))
+		if err != nil {
+			return err
+		}
+		db := client.Database(cctx.String("name"))
+		orphanCol := db.Collection("OrphanBlock")
+		go updateBlockInfo(cctx, db)
 	SYNCLOOP:
 		sub, err := full.SyncIncomingBlocks(ctx)
 		if err != nil {
@@ -82,14 +104,14 @@ var orphanDaemonCmd = &cli.Command{
 
 		for bh := range sub {
 			bCid := bh.Cid()
-			// var msgCount int
-			// bm, err := full.ChainGetBlockMessages(ctx, bCid)
-			// if err != nil {
-			// 	fmt.Println(err)
-			// } else {
+			var msgCount int
+			bm, err := full.ChainGetBlockMessages(ctx, bCid)
+			if err != nil {
+				log.Errorf("ChainGetBlockMessages err:%w", err)
+			} else {
 
-			// 	msgCount = len(bm.BlsMessages) + len(bm.SecpkMessages)
-			// }
+				msgCount = len(bm.BlsMessages) + len(bm.SecpkMessages)
+			}
 			// bh, err := model.NewBlockHeader(bh.Miner, bh)
 			if _, ok := b1sCache.Get(bCid); ok {
 				continue
@@ -97,14 +119,15 @@ var orphanDaemonCmd = &cli.Command{
 			log.Infof("get block: %s", bCid)
 			now := time.Now().Unix()
 			ob := &OrphanBlock{
-				ID:        bh.Cid(),
-				FirstSeen: now,
+				ID:           bh.Cid(),
+				FirstSeen:    now,
+				MessageCount: msgCount,
 			}
 			b1sCache.Add(bCid, now)
 			if err := mir.Mirror(ob, bh); err != nil {
 				log.Errorf("mirroring OrphanBlock: %w", err)
 			} else {
-				err := saveBlock(cctx, ob)
+				err := saveOrphanBlock(ctx, orphanCol, ob)
 				if err != nil {
 					// TODO 数据库出错,存入leveldb?或其它嵌入式数据库
 					log.Errorf("saveBlock failed: %w", err)
@@ -118,27 +141,22 @@ var orphanDaemonCmd = &cli.Command{
 	},
 }
 
-func saveBlock(cctx *cli.Context, ob *OrphanBlock) error {
-	ctx := cctx.Context
-	client, err := mongo.Connect(cctx.Context, options.Client().ApplyURI(cctx.String("dsn")))
-	if err != nil {
-		return err
-	}
-	db := client.Database(cctx.String("name"))
-	col := db.Collection("OrphanBlock")
-	_, err = col.InsertOne(ctx, ob)
+func saveOrphanBlock(ctx context.Context, orphanCol *mongo.Collection, ob *OrphanBlock) error {
+	_, err := orphanCol.InsertOne(ctx, ob)
 	return err
 }
 
-func updateOrphanCol(cctx *cli.Context) {
-	var interval int64
+// updateBlockInfo 更新OrphanBlock及BlockHeader
+//
+//	@param cctx
+//	@param db
+func updateBlockInfo(cctx *cli.Context, db *mongo.Database) {
+	var (
+		interval int64
+		err      error
+	)
 	type finalHeightRes struct {
-		Epoch int64
-	}
-	client, err := mongo.Connect(cctx.Context, options.Client().ApplyURI(cctx.String("dsn")))
-	if err != nil {
-		log.Errorf("mongo connect err: %w", err)
-		return
+		Epoch int64 `bson:"_id"`
 	}
 
 	if !cctx.IsSet("clean-interval") {
@@ -146,13 +164,15 @@ func updateOrphanCol(cctx *cli.Context) {
 	} else {
 		interval = cctx.Int64("clean-interval")
 	}
-	db := client.Database(cctx.String("name"))
+
 	orphanBlockCol := db.Collection("OrphanBlock")
 	blockHeaderCol := db.Collection("BlockHeader")
 	finalHeightCol := db.Collection("FinalHeight")
 	for {
 		// 等待interval个块,更新一次
-		time.Sleep(30 * time.Duration(interval) * time.Second)
+		sleep := 30 * time.Duration(interval) * time.Second
+		log.Infof("after %s updateBlockInfo ", sleep)
+		time.Sleep(sleep)
 		findOptions := options.FindOne()
 		findOptions.SetSort(bson.D{{Key: "_id", Value: -1}})
 
@@ -162,7 +182,7 @@ func updateOrphanCol(cctx *cli.Context) {
 			log.Errorf("get finalHeight err: %w", err)
 			continue
 		}
-
+		log.Infof("start updateBlockInfo endEpoch: %d", result.Epoch)
 		// Step 1: 查询 OrphanBlock Checked 为 false 的数据,限定Epoch<=FinalHeight
 		orphanBlockFilter := bson.M{
 			"Checked": false,
@@ -188,6 +208,7 @@ func updateOrphanCol(cctx *cli.Context) {
 
 			if blockHeaderResult.Err() == mongo.ErrNoDocuments {
 				// Step 4: 如果在 BlockHeader 中没有找到匹配的记录，说明为孤块,保留数据,更新Checked字段为true
+				log.Infof("confirm OrphanBlock: %s", orphanBlock.ID)
 				update := bson.M{"$set": bson.M{"Checked": true}}
 				_, err := orphanBlockCol.UpdateOne(context.Background(), IDFilter, update)
 				if err != nil {
@@ -198,6 +219,7 @@ func updateOrphanCol(cctx *cli.Context) {
 				log.Error("Error querying BlockHeader:", blockHeaderResult.Err())
 				continue
 			} else {
+				log.Infof("del chain block: %s,update blockHeader firstseen: %d", orphanBlock.ID, orphanBlock.FirstSeen)
 				// Step 5: 如果在 BlockHeader 中找到匹配的记录更新BlockHeader FirstSeen字段，之后删除 OrphanBlock 数据
 				update := bson.M{"$set": bson.M{"FirstSeen": orphanBlock.FirstSeen}}
 				_, err := blockHeaderCol.UpdateOne(context.Background(), IDFilter, update)
