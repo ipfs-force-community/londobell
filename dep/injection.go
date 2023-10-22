@@ -72,7 +72,7 @@ func StateManager() dix.Option {
 		dix.Override(new(dtypes.AfterGenesisSet), modules.SetGenesis),
 		dix.Override(new(beacon.Schedule), modules.RandomSchedule),
 		dix.Override(new(stmgr.UpgradeSchedule), modules.UpgradeSchedule),
-		dix.Override(new(datastore.Batching), datastore.NewMapDatastore()),
+		dix.Override(new(datastore.Batching), InMemMetadataDS),
 		// 需配合节点设置MsgIndex或DummyMsgIndex
 		// dix.Override(new(index.MsgIndex), modules.MsgIndex),
 		dix.Override(new(index.MsgIndex), modules.DummyMsgIndex),
