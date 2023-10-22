@@ -8,9 +8,9 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v11/eam"
-	vinit "github.com/filecoin-project/go-state-types/builtin/v11/init"
-	"github.com/filecoin-project/go-state-types/builtin/v11/power"
+	"github.com/filecoin-project/go-state-types/builtin/v12/eam"
+	vinit "github.com/filecoin-project/go-state-types/builtin/v12/init"
+	"github.com/filecoin-project/go-state-types/builtin/v12/power"
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/ipfs/go-cid"
