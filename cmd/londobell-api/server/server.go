@@ -329,6 +329,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/blockheader", aggregators.GetBlockHeader)
 		group.POST("/incoming_blockheader", aggregators.GetIncomingBlockHeader)
 		group.POST("/blockheader_by_cid", aggregators.GetBlockHeaderByCid)
+		group.POST("/incoming_blockheader_by_cid", aggregators.GetIncomingBlockHeaderByCid)
 		group.POST("/blockheaders_by_miner", aggregators.GetBlockHeadersByMiner) // 出块列表，出块奖励额外获取
 		//group.POST("/mined_by_miner_range", aggregators.GetMinedByMinerForRange)
 		group.POST("/blocks_for_message", aggregators.GetBlocksForMessage) // todo: epoch可不要，遍历查询即可
