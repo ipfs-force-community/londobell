@@ -2,17 +2,14 @@ package aggregators
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"net/http"
-
-	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
-	"github.com/ipfs-force-community/londobell/common"
 )
 
 func GetIncomingBlockHeader(c *gin.Context) {
@@ -29,46 +26,22 @@ func GetIncomingBlockHeader(c *gin.Context) {
 		return
 	}
 
-	curEpoch := common.GetCurEpoch()
-
-	countUtils, err := multiquery.GetEpochRange(ctx, &multiquery.DBStateManager, curEpoch)
+	blockHeaderRes, err := GetIncomingBlockForFormalDB(ctx)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	var blockHeaderRes []model.BlockHeader
-	// multi dbs query
-	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, common2.BlockHeaderAggregator, req, "OrphanBlock")
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		if len(multiResult) == 0 {
-			c.JSON(http.StatusOK, res)
-			return
-		}
-
-		raw := multiResult
-		rawByte, err := json.Marshal(raw)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		err = json.Unmarshal(rawByte, &blockHeaderRes)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-	}
-
 	res.Data = blockHeaderRes
 	c.JSON(http.StatusOK, res)
+}
+
+func GetIncomingBlockForFormalDB(ctx context.Context) ([]model.BlockHeader, error) {
+	cols, ok := multiquery.DBStateManager.GetDBCollections(multiquery.DBStateManager.GetFormalCfg().Url())
+	if !ok {
+		return nil, fmt.Errorf("url %v not found in DBCollectionsMap", multiquery.DBStateManager.GetFormalCfg().Url())
+	}
+
+	return multiquery.GetIncomingBlock(ctx, cols)
 }

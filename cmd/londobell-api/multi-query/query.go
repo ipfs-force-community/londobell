@@ -89,6 +89,29 @@ func GetStateFinalHeight(ctx context.Context, cols common.Collections) (abi.Chai
 	return 0, fmt.Errorf("no StateFinalHeight collection")
 }
 
+func GetIncomingBlock(ctx context.Context, cols common.Collections) ([]model.BlockHeader, error) {
+
+	pipe, err := util.Parse(model.Ctx{}, string(monitor.GetBlockHeaderAggregator()))
+	if err != nil {
+		return nil, err
+	}
+	var blockHeaderRes []model.BlockHeader
+	for _, col := range cols.Cols {
+		if col != nil && col.Name() == "OrphanBlock" {
+			cur, err := col.Aggregate(ctx, pipe)
+			if err != nil {
+				return nil, err
+			}
+
+			err = cur.All(ctx, &blockHeaderRes)
+
+			return blockHeaderRes, err
+		}
+	}
+
+	return blockHeaderRes, fmt.Errorf("no OrphanBlock collection")
+}
+
 func GetStartEpochForDeal(ctx context.Context, cols common.Collections) (int64, error) {
 	var res []struct {
 		Epoch int64
