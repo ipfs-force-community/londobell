@@ -10,6 +10,7 @@ type BlockHeader struct {
 	Ticket        interface{}
 	MessageCount  int
 	FirstSeen     int64
+	Parents       []string
 }
 
 type BlockHeaderRes struct {
