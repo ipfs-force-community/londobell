@@ -49,6 +49,7 @@ type OrphanBlock struct {
 	Checked       bool
 	MessageCount  int
 	Parents       []cid.Cid
+	ParentWeight  types.BigInt
 }
 
 var orphanDaemonCmd = &cli.Command{
