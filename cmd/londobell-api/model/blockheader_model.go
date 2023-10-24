@@ -11,6 +11,7 @@ type BlockHeader struct {
 	MessageCount  int
 	FirstSeen     int64
 	Parents       []string
+	ParentWeight  string
 }
 
 type BlockHeaderRes struct {
