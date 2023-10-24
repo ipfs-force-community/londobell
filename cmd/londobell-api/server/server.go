@@ -314,6 +314,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/latest_tipset", aggregators.GetLatestTipSet)
 		group.POST("/child_epoch", aggregators.GetChildEpoch)
 		group.POST("/tipset", aggregators.GetTipSet)
+		group.POST("/tipsets", aggregators.GetTipSets)
 		group.POST("/parent_tipset", aggregators.GetParentTipSet)
 		group.POST("/latest_time_of_trace", aggregators.GetLatestTimeOfTrace)
 		group.POST("/create_time", aggregators.GetCreateTime)
