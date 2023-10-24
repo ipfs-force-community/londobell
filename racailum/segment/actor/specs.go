@@ -39,6 +39,8 @@ import (
 	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
 
 	miner11 "github.com/filecoin-project/go-state-types/builtin/v11/miner"
+
+	miner12 "github.com/filecoin-project/go-state-types/builtin/v12/miner"
 )
 
 func init() {
@@ -69,6 +71,7 @@ var Specs = [][]builtin.RegistryEntry{
 	builtin.MakeRegistry(actorstypes.Version9),
 	builtin.MakeRegistry(actorstypes.Version10),
 	builtin.MakeRegistry(actorstypes.Version11),
+	builtin.MakeRegistry(actorstypes.Version12),
 }
 
 var WatchOuts = [][]interface{}{
@@ -115,5 +118,9 @@ var WatchOuts = [][]interface{}{
 	[]interface{}{
 		miner11.Deadline{},
 		miner11.Partition{},
+	},
+	[]interface{}{
+		miner12.Deadline{},
+		miner12.Partition{},
 	},
 }
