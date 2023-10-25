@@ -67,6 +67,23 @@ func (dbsm *DataBaseStateManager) GetState(ctx context.Context, dsn string) (*se
 	return state, true, nil
 }
 
+// 从数据库获取数据,刷新缓存
+func (dbsm *DataBaseStateManager) RefreshState(ctx context.Context, dsn string) (*segment.State, bool, error) {
+	state, found, err := dbsm.Segment.GetState(ctx, dsn)
+	if err != nil {
+		return nil, false, err
+	}
+	if !found {
+		// todo
+		return nil, false, nil
+	}
+
+	dbsm.DBStateCache.SetState(dsn, state)
+
+	return state, true, nil
+
+}
+
 func (dbsm *DataBaseStateManager) GetDBState(ctx context.Context, dsn string) (*smodel.DBState, bool, error) {
 	dbState, ok := dbsm.DBStateCache.GetDBState(dsn)
 	if !ok {
