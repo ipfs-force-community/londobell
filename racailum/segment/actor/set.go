@@ -123,7 +123,7 @@ type Set struct {
 }
 
 // LookupMethodInfo returns method info for the given message along with its parent if any
-func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common.StateManager, parent, call *types.Message) (MethodInfo, error) {
+func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common.StateManager, parent, call *types.MessageTrace) (MethodInfo, error) {
 	if call.Method == lbuiltin.MethodSend {
 		return MethodSend, nil
 	}

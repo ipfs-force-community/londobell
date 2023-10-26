@@ -309,18 +309,21 @@ func extractBlochHeaders(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 }
 
 type persistExecTrace struct {
-	seq    []int
-	parent *common.ExecutionTraceCompact
-	exec   *common.ExecutionTraceCompact
-	gas    *api.MsgGasCost
+	seq     []int
+	parent  *common.ExecutionTraceCompact
+	exec    *common.ExecutionTraceCompact
+	gas     *api.MsgGasCost
+	err     string
+	nonce   uint64
+	rootCid cid.Cid
 }
 
-func walkExecTrace(seq []int, exec *common.ExecutionTraceCompact, walkFn func([]int, *common.ExecutionTraceCompact, *common.ExecutionTraceCompact)) {
+func walkExecTrace(seq []int, err string, nonce uint64, rootCid cid.Cid, exec *common.ExecutionTraceCompact, walkFn func([]int, string, uint64, cid.Cid, *common.ExecutionTraceCompact, *common.ExecutionTraceCompact)) {
 	for i := range exec.Subcalls {
 		subcall := &exec.Subcalls[i]
 		subseq := append(seq, i)
-		walkFn(subseq, exec, subcall)
-		walkExecTrace(subseq, subcall, walkFn)
+		walkFn(subseq, err, nonce, rootCid, exec, subcall)
+		walkExecTrace(subseq, err, nonce, rootCid, subcall, walkFn)
 	}
 }
 
@@ -396,11 +399,16 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	for i := range invocs {
 		exec := &invocs[i].ExecutionTrace
+		err := invocs[i].Error
+		nonce := invocs[i].RawMsg.Nonce
 		etraces = append(etraces, persistExecTrace{
-			seq:    []int{i},
-			parent: nil,
-			exec:   exec,
-			gas:    &invocs[i].GasCost,
+			seq:     []int{i},
+			parent:  nil,
+			exec:    exec,
+			gas:     &invocs[i].GasCost,
+			err:     err,
+			nonce:   nonce,
+			rootCid: invocs[i].MsgCid,
 		})
 
 		for ni := range exec.GasCharges {
@@ -410,11 +418,14 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		walkExecTrace([]int{i}, exec, func(subseq []int, subparent, subexec *common.ExecutionTraceCompact) {
+		walkExecTrace([]int{i}, err, nonce, invocs[i].MsgCid, exec, func(subseq []int, err string, nonce uint64, rootCid cid.Cid, subparent, subexec *common.ExecutionTraceCompact) {
 			etraces = append(etraces, persistExecTrace{
-				seq:    copyIndexes(subseq),
-				parent: subparent,
-				exec:   subexec,
+				seq:     copyIndexes(subseq),
+				parent:  subparent,
+				exec:    subexec,
+				err:     err,
+				nonce:   nonce,
+				rootCid: rootCid,
 			})
 
 			for ni := range subexec.GasCharges {
@@ -487,10 +498,12 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	dupmsgs := map[cid.Cid]struct{}{}
 
 	for i := range etraces {
+		var mcid cid.Cid
 		p := etraces[i]
+		deepth := len(p.seq)
 		msg := &p.exec.Msg
 
-		var parentMsg *types.Message
+		var parentMsg *types.MessageTrace
 		if p.parent != nil {
 			parentMsg = &p.parent.Msg
 		}
@@ -504,10 +517,12 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			elog.Warnf("%s", err)
 		}
 
-		mcid := msg.Cid()
+		if deepth == 1 {
+			mcid = p.rootCid
+		}
 		var signedCid cid.Cid
 
-		key := msg.From.String() + "-" + strconv.FormatUint(msg.Nonce, 10)
+		key := msg.From.String() + "-" + strconv.FormatUint(p.nonce, 10)
 		if cmsg, ok := allmsgsMap[key]; ok {
 			smsg, ok := cmsg.(*types.SignedMessage)
 			if ok {
