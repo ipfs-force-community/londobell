@@ -50,18 +50,7 @@ type DataBaseStateManager struct {
 func (dbsm *DataBaseStateManager) GetState(ctx context.Context, dsn string) (*segment.State, bool, error) {
 	state, ok := dbsm.DBStateCache.GetState(dsn)
 	if !ok {
-		state, found, err := dbsm.Segment.GetState(ctx, dsn)
-		if err != nil {
-			return nil, false, err
-		}
-		if !found {
-			// todo
-			return nil, false, nil
-		}
-
-		dbsm.DBStateCache.SetState(dsn, state)
-
-		return state, true, nil
+		return dbsm.RefreshState(ctx, dsn)
 	}
 
 	return state, true, nil
