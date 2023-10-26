@@ -318,6 +318,10 @@ type persistExecTrace struct {
 	rootCid cid.Cid
 }
 
+func (p persistExecTrace) info() string {
+	return fmt.Sprintf("rootcid: %s,from: %s,to: %s", p.rootCid, p.exec.Msg.From, p.parent.Msg.To)
+}
+
 func walkExecTrace(seq []int, err string, nonce uint64, rootCid cid.Cid, exec *common.ExecutionTraceCompact, walkFn func([]int, string, uint64, cid.Cid, *common.ExecutionTraceCompact, *common.ExecutionTraceCompact)) {
 	for i := range exec.Subcalls {
 		subcall := &exec.Subcalls[i]
@@ -418,7 +422,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		walkExecTrace([]int{i}, err, nonce, invocs[i].MsgCid, exec, func(subseq []int, err string, nonce uint64, rootCid cid.Cid, subparent, subexec *common.ExecutionTraceCompact) {
+		walkExecTrace([]int{i}, err, nonce, cid.Cid{}, exec, func(subseq []int, err string, nonce uint64, rootCid cid.Cid, subparent, subexec *common.ExecutionTraceCompact) {
 			etraces = append(etraces, persistExecTrace{
 				seq:     copyIndexes(subseq),
 				parent:  subparent,
@@ -568,53 +572,53 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		if ctx.Opts.EnabelExtract.EnableExtractEventsRoot || ctx.Opts.EnabelExtract.EnableExtractActorEvent {
-			if p.exec != nil && p.exec.MsgRct.Version() == types.MessageReceiptV1 {
-				eventsRoot := p.exec.MsgRct.EventsRoot
-				if eventsRoot != nil {
-					events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
-					if err != nil {
-						return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
-					}
+		// if ctx.Opts.EnabelExtract.EnableExtractEventsRoot || ctx.Opts.EnabelExtract.EnableExtractActorEvent {
+		// 	if p.exec != nil && p.exec.MsgRct.Version() == types.MessageReceiptV1 {
+		// 		eventsRoot := p.exec.MsgRct.EventsRoot
+		// 		if eventsRoot != nil {
+		// 			events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
+		// 			if err != nil {
+		// 				return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
+		// 			}
 
-					if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
-						etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
-						if err != nil {
-							elog.Warnw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
-						} else {
-							res.Docs = append(res.Docs, etm)
-							etcnt++
-						}
-					}
+		// 			if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
+		// 				etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
+		// 				if err != nil {
+		// 					elog.Warnw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+		// 				} else {
+		// 					res.Docs = append(res.Docs, etm)
+		// 					etcnt++
+		// 				}
+		// 			}
 
-					if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
-						for i, evt := range events {
-							actorID, err := address.NewIDAddress(uint64(evt.Emitter))
-							if err != nil {
-								return fmt.Errorf("failed to create ID address: %w", err)
-							}
+		// 			if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
+		// 				for i, evt := range events {
+		// 					actorID, err := address.NewIDAddress(uint64(evt.Emitter))
+		// 					if err != nil {
+		// 						return fmt.Errorf("failed to create ID address: %w", err)
+		// 					}
 
-							data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
-							if !ok {
-								// not an eth event.
-								elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
-								//continue //todo
-							}
+		// 					data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
+		// 					if !ok {
+		// 						// not an eth event.
+		// 						elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
+		// 						//continue //todo
+		// 					}
 
-							logIndex := uint64(i)
-							removed := false
-							aet, err := model.NewActorEvent(actorID, ts.Height(), mcid, signedCid, topics, data, logIndex, removed, p.seq)
-							if err != nil {
-								elog.Warnw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
-							} else {
-								aecnt++
-								res.Docs = append(res.Docs, aet)
-							}
-						}
-					}
-				}
-			}
-		}
+		// 					logIndex := uint64(i)
+		// 					removed := false
+		// 					aet, err := model.NewActorEvent(actorID, ts.Height(), mcid, signedCid, topics, data, logIndex, removed, p.seq)
+		// 					if err != nil {
+		// 						elog.Warnw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+		// 					} else {
+		// 						aecnt++
+		// 						res.Docs = append(res.Docs, aet)
+		// 					}
+		// 				}
+		// 			}
+		// 		}
+		// 	}
+		// }
 
 		if ctx.Opts.EnabelExtract.EnableExtractActorMessage {
 			isBlock := IsBlock(p.seq, msg.From)
@@ -686,7 +690,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				var params evm.ConstructorParams
 				param := bytes.NewReader(p.exec.Msg.Params)
 				if err := params.UnmarshalCBOR(param); err != nil {
-					return fmt.Errorf("UnmarshalCBOR return value failed: %w, msg: %v", err, p.exec.Msg.Cid())
+					return fmt.Errorf("UnmarshalCBOR return value failed: %w, msg: %s", err, p.info())
 				}
 
 				eit := model.NewEvmInitCode(p.exec.Msg.To, hex.EncodeToString(params.Initcode), ts.Height())
@@ -749,14 +753,14 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				case builtintypes.MethodsMiner.ProveCommitSector:
 					var params miner.ProveCommitSectorParams // todo
 					if err := params.UnmarshalCBOR(bytes.NewReader(p.exec.Msg.Params)); err != nil {
-						return fmt.Errorf("unmarshal ProveCommitSectorParams for %v failed: %v", p.exec.Msg.Cid(), err)
+						return fmt.Errorf("unmarshal ProveCommitSectorParams for %s failed: %v", p.info(), err)
 					}
 
 					sectorNumbers.Set(uint64(params.SectorNumber))
 				case builtintypes.MethodsMiner.ProveCommitAggregate:
 					var params miner.ProveCommitAggregateParams
 					if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-						return fmt.Errorf("unmarshal ProveCommitAggregateParams for %v failed: %v", msg.Cid(), err)
+						return fmt.Errorf("unmarshal ProveCommitAggregateParams for %s failed: %v", p.info(), err)
 					}
 
 					sectorNumbers = params.SectorNumbers
@@ -821,7 +825,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					if p.exec.Msg.Method == builtintypes.MethodsMiner.ExtendSectorExpiration {
 						var params miner.ExtendSectorExpirationParams
 						if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-							return fmt.Errorf("unmarshal ExtendSectorExpirationParams for %v failed: %v", msg.Cid(), err)
+							return fmt.Errorf("unmarshal ExtendSectorExpirationParams for %s failed: %v", p.info(), err)
 						}
 
 						for _, extension := range params.Extensions {
@@ -830,7 +834,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					} else if p.exec.Msg.Method == builtintypes.MethodsMiner.ExtendSectorExpiration2 {
 						var params miner.ExtendSectorExpiration2Params
 						if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-							return fmt.Errorf("unmarshal ExtendSectorExpiration2Params for %v failed: %v", msg.Cid(), err)
+							return fmt.Errorf("unmarshal ExtendSectorExpiration2Params for %s failed: %v", p.info(), err)
 						}
 
 						for _, extension := range params.Extensions {
@@ -864,20 +868,20 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					var params miner.ProveReplicaUpdatesParams
 
 					if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-						return fmt.Errorf("unmarshal ProveReplicaUpdatesParams for %v failed: %v", msg.Cid(), err)
+						return fmt.Errorf("unmarshal ProveReplicaUpdatesParams for %s failed: %v", p.info(), err)
 					}
 
 					if err := succeededSectors.UnmarshalCBOR(bytes.NewReader(p.exec.MsgRct.Return)); err != nil {
-						return fmt.Errorf("unmarshal ProveReplicaUpdates returns for %v failed: %v", msg.Cid(), err)
+						return fmt.Errorf("unmarshal ProveReplicaUpdates returns for %s failed: %v", p.info(), err)
 					}
 				} else {
 					var params miner.ProveReplicaUpdatesParams2
 					if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-						return fmt.Errorf("unmarshal ProveReplicaUpdatesParams2 for %v failed: %v", msg.Cid(), err)
+						return fmt.Errorf("unmarshal ProveReplicaUpdatesParams2 for %s failed: %v", p.info(), err)
 					}
 
 					if err := succeededSectors.UnmarshalCBOR(bytes.NewReader(p.exec.MsgRct.Return)); err != nil {
-						return fmt.Errorf("unmarshal ProveReplicaUpdates2 returns for %v failed: %v", msg.Cid(), err)
+						return fmt.Errorf("unmarshal ProveReplicaUpdates2 returns for %s failed: %v", p.info(), err)
 					}
 				}
 
@@ -945,7 +949,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			if ctx.Opts.EnabelExtract.EnableExtractMinerSector && p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") && p.exec.Msg.Method == builtintypes.MethodsMiner.TerminateSectors {
 				var params miner.TerminateSectorsParams
 				if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-					return fmt.Errorf("unmarshal TerminateSectorsParams for %v failed: %v", msg.Cid(), err)
+					return fmt.Errorf("unmarshal TerminateSectorsParams for %s failed: %v", p.info(), err)
 				}
 
 				var terminateSectors = bitfield.New()
@@ -984,7 +988,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			if ctx.Opts.EnabelExtract.EnableExtractSectorClaim && p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "verifiedregistry") && (p.exec.Msg.Method == builtintypes.MethodsVerifiedRegistry.ExtendClaimTerms || p.exec.Msg.Method == builtintypes.MethodsVerifiedRegistry.ExtendClaimTermsExported) {
 				var params sverifreg.ExtendClaimTermsParams
 				if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-					return fmt.Errorf("unmarshal ExtendClaimTermsParams for %v failed: %v", msg.Cid(), err)
+					return fmt.Errorf("unmarshal ExtendClaimTermsParams for %s failed: %v", p.info(), err)
 				}
 
 				for _, term := range params.Terms {
