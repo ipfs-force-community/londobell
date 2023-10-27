@@ -313,7 +313,7 @@ type persistExecTrace struct {
 	parent  *common.ExecutionTraceCompact
 	exec    *common.ExecutionTraceCompact
 	gas     *api.MsgGasCost
-	err     string
+	errMsg  string
 	nonce   uint64
 	rootCid cid.Cid
 }
@@ -322,12 +322,12 @@ func (p persistExecTrace) info() string {
 	return fmt.Sprintf("rootcid: %s,from: %s,to: %s", p.rootCid, p.exec.Msg.From, p.parent.Msg.To)
 }
 
-func walkExecTrace(seq []int, err string, nonce uint64, rootCid cid.Cid, exec *common.ExecutionTraceCompact, walkFn func([]int, string, uint64, cid.Cid, *common.ExecutionTraceCompact, *common.ExecutionTraceCompact)) {
+func walkExecTrace(seq []int, errMsg string, nonce uint64, rootCid cid.Cid, exec *common.ExecutionTraceCompact, walkFn func([]int, string, uint64, cid.Cid, *common.ExecutionTraceCompact, *common.ExecutionTraceCompact)) {
 	for i := range exec.Subcalls {
 		subcall := &exec.Subcalls[i]
 		subseq := append(seq, i)
-		walkFn(subseq, err, nonce, rootCid, exec, subcall)
-		walkExecTrace(subseq, err, nonce, rootCid, subcall, walkFn)
+		walkFn(subseq, errMsg, nonce, rootCid, exec, subcall)
+		walkExecTrace(subseq, errMsg, nonce, rootCid, subcall, walkFn)
 	}
 }
 
@@ -403,14 +403,14 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	for i := range invocs {
 		exec := &invocs[i].ExecutionTrace
-		err := invocs[i].Error
+		errMsg := invocs[i].Error
 		nonce := invocs[i].RawMsg.Nonce
 		etraces = append(etraces, persistExecTrace{
 			seq:     []int{i},
 			parent:  nil,
 			exec:    exec,
 			gas:     &invocs[i].GasCost,
-			err:     err,
+			errMsg:  errMsg,
 			nonce:   nonce,
 			rootCid: invocs[i].MsgCid,
 		})
@@ -422,12 +422,12 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		walkExecTrace([]int{i}, err, nonce, cid.Cid{}, exec, func(subseq []int, err string, nonce uint64, rootCid cid.Cid, subparent, subexec *common.ExecutionTraceCompact) {
+		walkExecTrace([]int{i}, "", nonce, cid.Cid{}, exec, func(subseq []int, errMsg string, nonce uint64, rootCid cid.Cid, subparent, subexec *common.ExecutionTraceCompact) {
 			etraces = append(etraces, persistExecTrace{
 				seq:     copyIndexes(subseq),
 				parent:  subparent,
 				exec:    subexec,
-				err:     err,
+				errMsg:  errMsg,
 				nonce:   nonce,
 				rootCid: rootCid,
 			})
