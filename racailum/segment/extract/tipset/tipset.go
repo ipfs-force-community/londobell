@@ -457,12 +457,20 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	}
 
 	allmsgsMap := make(map[string]types.ChainMsg)
+	allmsgsCidMap := make(map[string]types.ChainMsg)
 	for _, msg := range allmsgs {
 		key := msg.VMMessage().From.String() + "-" + strconv.FormatUint(msg.VMMessage().Nonce, 10)
 		if _, ok := allmsgsMap[key]; ok {
 			continue
 		}
 		allmsgsMap[key] = msg
+
+		if v, ok := msg.(*types.SignedMessage); ok {
+			allmsgsCidMap[v.Cid().String()] = msg
+		} else {
+			allmsgsCidMap[msg.Cid().String()] = msg
+		}
+
 	}
 
 	av, err := actors.VersionForNetwork(ctx.D.GetNetworkVersion(ctx.C, ts.Height()))
@@ -504,8 +512,16 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	for i := range etraces {
 		var mcid cid.Cid
 		p := etraces[i]
-		deepth := len(p.seq)
+		depth := len(p.seq)
 		msg := &p.exec.Msg
+		if depth == 1 {
+			mcid = p.rootCid
+
+			if v, ok := allmsgsCidMap[mcid.String()]; ok {
+				msg.From = v.VMMessage().From
+				msg.To = v.VMMessage().To
+			}
+		}
 
 		var parentMsg *types.MessageTrace
 		if p.parent != nil {
@@ -521,9 +537,6 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			elog.Warnf("%s", err)
 		}
 
-		if deepth == 1 {
-			mcid = p.rootCid
-		}
 		var signedCid cid.Cid
 
 		key := msg.From.String() + "-" + strconv.FormatUint(p.nonce, 10)
