@@ -682,7 +682,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			isBlock := IsBlock(p.seq, msg.From)
 			method := mi.Method.Name
 			if model.IsOkCreateMessage(method, int64(p.exec.MsgRct.ExitCode)) {
-				cmsg, err := model.NewCreateMessage(ctx, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, p.exec.MsgRct.ExitCode, msg.From, msg.To, isBlock, p.seq, callerAddrMap, mi.ReturnObj(), p.exec, IDCidMap)
+				cmsg, err := model.NewCreateMessage(ctx, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, msg.From, msg.To, isBlock, p.seq, callerAddrMap, mi.ReturnObj(), p.exec, IDCidMap)
 
 				if err != nil {
 					elog.Warnw("convert to model.CreateMessage", "mcid", mcid, "signedCid", signedCid)

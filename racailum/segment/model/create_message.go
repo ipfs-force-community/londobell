@@ -12,7 +12,6 @@ import (
 	vinit "github.com/filecoin-project/go-state-types/builtin/v12/init"
 	"github.com/filecoin-project/go-state-types/builtin/v12/power"
 	"github.com/filecoin-project/go-state-types/cbor"
-	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/ipfs/go-cid"
 	"golang.org/x/exp/slices"
 
@@ -62,7 +61,7 @@ func IsOkCreateMessage(methodName string, exitCode int64) bool {
 	return slices.Contains(CreateMethods, methodName) && exitCode == 0
 }
 
-func NewCreateMessage(ctx *extract.Ctx, epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, exitcode exitcode.ExitCode, from, to address.Address, isBlock bool, seq []int, callerMap map[string]address.Address, returnObj cbor.Er, raw *common.ExecutionTraceCompact, IDCidMap map[string][2]cid.Cid) (*CreateMessage, error) {
+func NewCreateMessage(ctx *extract.Ctx, epoch abi.ChainEpoch, cid, signedCid cid.Cid, value abi.TokenAmount, methodName string, from, to address.Address, isBlock bool, seq []int, callerMap map[string]address.Address, returnObj cbor.Er, raw *common.ExecutionTraceCompact, IDCidMap map[string][2]cid.Cid) (*CreateMessage, error) {
 	elog := ctx.L.With("NewCreateMessage", cid)
 	cm := &CreateMessage{
 		Epoch:      epoch,
