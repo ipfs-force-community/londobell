@@ -309,13 +309,15 @@ func extractBlochHeaders(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 }
 
 type persistExecTrace struct {
-	seq     []int
-	parent  *common.ExecutionTraceCompact
-	exec    *common.ExecutionTraceCompact
-	gas     *api.MsgGasCost
-	errMsg  string
-	nonce   uint64
-	rootCid cid.Cid
+	seq        []int
+	parent     *common.ExecutionTraceCompact
+	exec       *common.ExecutionTraceCompact
+	gas        *api.MsgGasCost
+	errMsg     string
+	nonce      uint64
+	rootCid    cid.Cid
+	gasFeeCap  abi.TokenAmount
+	gasPremium abi.TokenAmount
 }
 
 func (p persistExecTrace) info() string {
@@ -406,13 +408,15 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		errMsg := invocs[i].Error
 		nonce := invocs[i].RawMsg.Nonce
 		etraces = append(etraces, persistExecTrace{
-			seq:     []int{i},
-			parent:  nil,
-			exec:    exec,
-			gas:     &invocs[i].GasCost,
-			errMsg:  errMsg,
-			nonce:   nonce,
-			rootCid: invocs[i].MsgCid,
+			seq:        []int{i},
+			parent:     nil,
+			exec:       exec,
+			gas:        &invocs[i].GasCost,
+			errMsg:     errMsg,
+			nonce:      nonce,
+			rootCid:    invocs[i].MsgCid,
+			gasFeeCap:  invocs[i].RawMsg.GasFeeCap,
+			gasPremium: invocs[i].RawMsg.GasPremium,
 		})
 
 		for ni := range exec.GasCharges {
@@ -521,6 +525,11 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				msg.From = v.VMMessage().From
 				msg.To = v.VMMessage().To
 			}
+		} else {
+			mcid, err = common.MsgTraceCid(&p.exec.Msg)
+			if err != nil {
+				elog.Warnf("MsgTraceCid err: %w", err)
+			}
 		}
 
 		var parentMsg *types.MessageTrace
@@ -553,7 +562,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 		if ctx.Opts.EnabelExtract.EnableExtractMessage {
 			if _, has := dupmsgs[mcid]; !has {
-				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height())
+				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height(), p.gasFeeCap, p.gasPremium)
 				if err != nil {
 					elog.Warnw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 				} else {

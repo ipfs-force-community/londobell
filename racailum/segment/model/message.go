@@ -37,10 +37,12 @@ type MessageDetail struct {
 
 // Message is the schema of *types.Message
 type Message struct {
-	Cid       cid.Cid             `bson:"_id"`
-	Message   *types.MessageTrace `bson:",inline"`
-	Detail    MessageDetail
-	SignedCid cid.Cid `bson:"SignedCid,omitempty"`
+	Cid        cid.Cid             `bson:"_id"`
+	Message    *types.MessageTrace `bson:",inline"`
+	Detail     MessageDetail
+	SignedCid  cid.Cid `bson:"SignedCid,omitempty"`
+	GasFeeCap  abi.TokenAmount
+	GasPremium abi.TokenAmount
 }
 
 // Indexes impl common.Indexed
@@ -75,11 +77,13 @@ func (m *Message) IsMutable() bool {
 }
 
 // NewMessage converts from *types.Message to *Message with required infomations
-func NewMessage(mcid, signedCid cid.Cid, raw *types.MessageTrace, act, meth string, params cbor.Er, epoch abi.ChainEpoch) (*Message, error) {
+func NewMessage(mcid, signedCid cid.Cid, raw *types.MessageTrace, act, meth string, params cbor.Er, epoch abi.ChainEpoch, gasFeeCap, gasPremium abi.TokenAmount) (*Message, error) {
 	msg := &Message{
-		Cid:       mcid,
-		Message:   raw,
-		SignedCid: signedCid,
+		Cid:        mcid,
+		Message:    raw,
+		SignedCid:  signedCid,
+		GasPremium: gasPremium,
+		GasFeeCap:  gasFeeCap,
 	}
 
 	msg.Detail.Actor = act

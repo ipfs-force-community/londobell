@@ -1,12 +1,14 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/chain/types"
 
@@ -93,4 +95,17 @@ func GetCurEpoch() abi.ChainEpoch {
 
 func AddAddressPrefix(addr string) string {
 	return buildnet.NetPrefix + addr
+}
+
+func MsgTraceCid(trace *types.MessageTrace) (cid.Cid, error) {
+	buf := new(bytes.Buffer)
+	if err := trace.MarshalCBOR(buf); err != nil {
+		return cid.Cid{}, err
+	}
+	data := buf.Bytes()
+	c, err := abi.CidBuilder.Sum(data)
+	if err != nil {
+		return cid.Cid{}, err
+	}
+	return c, nil
 }
