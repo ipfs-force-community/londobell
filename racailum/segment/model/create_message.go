@@ -109,37 +109,27 @@ func NewCreateMessage(ctx *extract.Ctx, epoch abi.ChainEpoch, cid, signedCid cid
 	return cm, nil
 }
 
-func CompareStructPointers(a interface{}, b interface{}) bool {
-	valueA := reflect.ValueOf(a)
-	valueB := reflect.ValueOf(b)
+func GetField(value interface{}, field string) (interface{}, error) {
 
-	if valueA.Kind() != reflect.Ptr || valueB.Kind() != reflect.Ptr {
-		return false
+	v := reflect.ValueOf(value)
+
+	if v.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("%s value is not pointer", field)
 	}
 
-	elemTypeA := valueA.Elem().Type()
-	elemTypeB := valueB.Elem().Type()
-	if elemTypeA.Kind() != reflect.Struct || elemTypeB.Kind() != reflect.Struct {
-		return false
+	v = reflect.Indirect(v)
+
+	if v.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("%s value is not pointer of struct", field)
 	}
 
-	if elemTypeA.String() != elemTypeB.String() {
-		return false
+	res := v.FieldByName(field)
+
+	if res.IsValid() {
+		return res.Interface(), nil
 	}
 
-	numFields := elemTypeA.NumField()
-
-	for i := 0; i < numFields; i++ {
-		fieldTypeA := elemTypeA.Field(i)
-		fieldTypeB := elemTypeB.Field(i)
-
-		if fieldTypeA.Name != fieldTypeB.Name || fieldTypeA.Type != fieldTypeB.Type {
-			return false
-		}
-
-	}
-
-	return true
+	return nil, fmt.Errorf("%s value is zero", field)
 }
 
 func parse(methodName string, obj interface{}) (address.Address, error) {
@@ -154,15 +144,19 @@ func parse(methodName string, obj interface{}) (address.Address, error) {
 		// if builtin version changed use the following logic
 		switch reflect.TypeOf(obj).String() {
 		case "*eam.CreateExternalReturn":
-			if CompareStructPointers(obj, &eam.CreateExternalReturn{}) {
-				addr, err := address.NewIDAddress(obj.(*eam.CreateExternalReturn).ActorID)
+			v, err := GetField(obj, "ActorID")
+			if err != nil {
+				return address.Address{}, err
+			}
+			if actorID, ok := v.(uint64); ok {
+				addr, err := address.NewIDAddress(actorID)
 				if err != nil {
-					return address.Address{}, fmt.Errorf("parse's convert addr err %w", err)
+					return address.Address{}, fmt.Errorf("parse CreateExternal convert addr err %w", err)
 				}
 				return addr, nil
 			}
 
-			return address.Address{}, fmt.Errorf("parse CreateExternal err type: %s", reflect.TypeOf(obj))
+			return address.Address{}, fmt.Errorf("parse CreateExternal actorID err, type: %s", reflect.TypeOf(v))
 
 		default:
 			return address.Address{}, fmt.Errorf("parse CreateExternal err type: %s", reflect.TypeOf(obj))
@@ -175,11 +169,15 @@ func parse(methodName string, obj interface{}) (address.Address, error) {
 		// if builtin version changed use the following logic
 		switch reflect.TypeOf(obj).String() {
 		case "*power.CreateMinerReturn":
-			if CompareStructPointers(obj, &power.CreateMinerReturn{}) {
-				return obj.(*power.CreateMinerReturn).IDAddress, nil
+			v, err := GetField(obj, "IDAddress")
+			if err != nil {
+				return address.Address{}, err
+			}
+			if addr, ok := v.(address.Address); ok {
+				return addr, nil
 			}
 
-			return address.Address{}, fmt.Errorf("parse CreateMiner err type: %s", reflect.TypeOf(obj))
+			return address.Address{}, fmt.Errorf("parse CreateMiner IDAddress, err type: %s", reflect.TypeOf(v))
 
 		default:
 			return address.Address{}, fmt.Errorf("CreateMiner err type: %s", reflect.TypeOf(obj))
@@ -192,11 +190,14 @@ func parse(methodName string, obj interface{}) (address.Address, error) {
 		// if builtin version changed use the following logic
 		switch reflect.TypeOf(obj).String() {
 		case "*init.ExecReturn":
-			if CompareStructPointers(obj, &vinit.ExecReturn{}) {
-				return obj.(*vinit.ExecReturn).IDAddress, nil
+			v, err := GetField(obj, "IDAddress")
+			if err != nil {
+				return address.Address{}, err
 			}
-
-			return address.Address{}, fmt.Errorf("parse Exec err type: %s", reflect.TypeOf(obj))
+			if addr, ok := v.(address.Address); ok {
+				return addr, nil
+			}
+			return address.Address{}, fmt.Errorf("parse Exec IDAddress, err type: %s", reflect.TypeOf(v))
 
 		default:
 			return address.Address{}, fmt.Errorf("Exec err type: %s", reflect.TypeOf(obj))
