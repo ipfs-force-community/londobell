@@ -309,27 +309,31 @@ func extractBlochHeaders(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 }
 
 type persistExecTrace struct {
-	seq        []int
-	parent     *common.ExecutionTraceCompact
-	exec       *common.ExecutionTraceCompact
-	gas        *api.MsgGasCost
-	errMsg     string
+	seq    []int
+	parent *common.ExecutionTraceCompact
+	exec   *common.ExecutionTraceCompact
+	gas    *api.MsgGasCost
+	errMsg string
+
+	// not internal msg fields
 	nonce      uint64
 	rootCid    cid.Cid
 	gasFeeCap  abi.TokenAmount
 	gasPremium abi.TokenAmount
+	eventRoot  *cid.Cid
+	rctVersion types.MessageReceiptVersion
 }
 
 func (p persistExecTrace) info() string {
 	return fmt.Sprintf("rootcid: %s,from: %s,to: %s", p.rootCid, p.exec.Msg.From, p.parent.Msg.To)
 }
 
-func walkExecTrace(seq []int, errMsg string, nonce uint64, rootCid cid.Cid, exec *common.ExecutionTraceCompact, walkFn func([]int, string, uint64, cid.Cid, *common.ExecutionTraceCompact, *common.ExecutionTraceCompact)) {
+func walkExecTrace(seq []int, exec *common.ExecutionTraceCompact, walkFn func([]int, *common.ExecutionTraceCompact, *common.ExecutionTraceCompact)) {
 	for i := range exec.Subcalls {
 		subcall := &exec.Subcalls[i]
 		subseq := append(seq, i)
-		walkFn(subseq, errMsg, nonce, rootCid, exec, subcall)
-		walkExecTrace(subseq, errMsg, nonce, rootCid, subcall, walkFn)
+		walkFn(subseq, exec, subcall)
+		walkExecTrace(subseq, subcall, walkFn)
 	}
 }
 
@@ -417,6 +421,8 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			rootCid:    invocs[i].MsgCid,
 			gasFeeCap:  invocs[i].RawMsg.GasFeeCap,
 			gasPremium: invocs[i].RawMsg.GasPremium,
+			eventRoot:  invocs[i].MsgRct.EventsRoot,
+			rctVersion: invocs[i].MsgRct.Version(),
 		})
 
 		for ni := range exec.GasCharges {
@@ -426,14 +432,13 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		walkExecTrace([]int{i}, "", nonce, cid.Cid{}, exec, func(subseq []int, errMsg string, nonce uint64, rootCid cid.Cid, subparent, subexec *common.ExecutionTraceCompact) {
+		walkExecTrace([]int{i}, exec, func(subseq []int, subparent, subexec *common.ExecutionTraceCompact) {
 			etraces = append(etraces, persistExecTrace{
-				seq:     copyIndexes(subseq),
-				parent:  subparent,
-				exec:    subexec,
-				errMsg:  errMsg,
-				nonce:   nonce,
-				rootCid: rootCid,
+				seq:    copyIndexes(subseq),
+				parent: subparent,
+				exec:   subexec,
+				errMsg: errMsg,
+				nonce:  nonce,
 			})
 
 			for ni := range subexec.GasCharges {
@@ -594,53 +599,53 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			}
 		}
 
-		// if ctx.Opts.EnabelExtract.EnableExtractEventsRoot || ctx.Opts.EnabelExtract.EnableExtractActorEvent {
-		// 	if p.exec != nil && p.exec.MsgRct.Version() == types.MessageReceiptV1 {
-		// 		eventsRoot := p.exec.MsgRct.EventsRoot
-		// 		if eventsRoot != nil {
-		// 			events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
-		// 			if err != nil {
-		// 				return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
-		// 			}
+		if ctx.Opts.EnabelExtract.EnableExtractEventsRoot || ctx.Opts.EnabelExtract.EnableExtractActorEvent {
+			if p.eventRoot != nil && p.rctVersion == types.MessageReceiptV1 {
+				eventsRoot := p.eventRoot
+				if eventsRoot != nil {
+					events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
+					if err != nil {
+						return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
+					}
 
-		// 			if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
-		// 				etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
-		// 				if err != nil {
-		// 					elog.Warnw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
-		// 				} else {
-		// 					res.Docs = append(res.Docs, etm)
-		// 					etcnt++
-		// 				}
-		// 			}
+					if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
+						etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
+						if err != nil {
+							elog.Warnw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+						} else {
+							res.Docs = append(res.Docs, etm)
+							etcnt++
+						}
+					}
 
-		// 			if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
-		// 				for i, evt := range events {
-		// 					actorID, err := address.NewIDAddress(uint64(evt.Emitter))
-		// 					if err != nil {
-		// 						return fmt.Errorf("failed to create ID address: %w", err)
-		// 					}
+					if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
+						for i, evt := range events {
+							actorID, err := address.NewIDAddress(uint64(evt.Emitter))
+							if err != nil {
+								return fmt.Errorf("failed to create ID address: %w", err)
+							}
 
-		// 					data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
-		// 					if !ok {
-		// 						// not an eth event.
-		// 						elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
-		// 						//continue //todo
-		// 					}
+							data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
+							if !ok {
+								// not an eth event.
+								elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
+								//continue //todo
+							}
 
-		// 					logIndex := uint64(i)
-		// 					removed := false
-		// 					aet, err := model.NewActorEvent(actorID, ts.Height(), mcid, signedCid, topics, data, logIndex, removed, p.seq)
-		// 					if err != nil {
-		// 						elog.Warnw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
-		// 					} else {
-		// 						aecnt++
-		// 						res.Docs = append(res.Docs, aet)
-		// 					}
-		// 				}
-		// 			}
-		// 		}
-		// 	}
-		// }
+							logIndex := uint64(i)
+							removed := false
+							aet, err := model.NewActorEvent(actorID, ts.Height(), mcid, signedCid, topics, data, logIndex, removed, p.seq)
+							if err != nil {
+								elog.Warnw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+							} else {
+								aecnt++
+								res.Docs = append(res.Docs, aet)
+							}
+						}
+					}
+				}
+			}
+		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractActorMessage {
 			isBlock := IsBlock(p.seq, msg.From)
