@@ -625,7 +625,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 							if !ok {
 								// not an eth event.
 								elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
-								//continue //todo
+								continue
 							}
 
 							logIndex := uint64(i)
