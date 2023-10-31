@@ -3,6 +3,7 @@ package actor
 import (
 	"reflect"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/cbor"
 
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -13,6 +14,17 @@ var MethodSend = MethodInfo{
 	Actor: "",
 	Method: vm.MethodMeta{
 		Name: "Send",
+	},
+}
+
+// from https://github.com/filecoin-project/builtin-actors
+var MARKET_NOTIFY_DEAL_METHOD abi.MethodNum = 4186741094
+
+// MethodSend is the method info for builtin.MethodSend
+var MarketNotifyDeal = MethodInfo{
+	Actor: "storagemarket",
+	Method: vm.MethodMeta{
+		Name: "MarketNotifyDeal",
 	},
 }
 

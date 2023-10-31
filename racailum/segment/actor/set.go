@@ -126,6 +126,8 @@ type Set struct {
 func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common.StateManager, parent, call *types.MessageTrace) (MethodInfo, error) {
 	if call.Method == lbuiltin.MethodSend {
 		return MethodSend, nil
+	} else if call.Method == MARKET_NOTIFY_DEAL_METHOD {
+		return MarketNotifyDeal, nil
 	}
 
 	code := cid.Undef
