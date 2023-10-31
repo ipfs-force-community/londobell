@@ -316,12 +316,10 @@ type persistExecTrace struct {
 	errMsg string
 
 	// not internal msg fields
-	nonce      uint64
-	rootCid    cid.Cid
-	gasFeeCap  abi.TokenAmount
-	gasPremium abi.TokenAmount
-	eventRoot  *cid.Cid
-	rctVersion types.MessageReceiptVersion
+	rootMsg    *types.Message
+	rootMsgRct *types.MessageReceipt
+
+	rootCid cid.Cid
 }
 
 func (p persistExecTrace) info() string {
@@ -410,19 +408,17 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	for i := range invocs {
 		exec := &invocs[i].ExecutionTrace
 		errMsg := invocs[i].Error
-		nonce := invocs[i].RawMsg.Nonce
+
 		etraces = append(etraces, persistExecTrace{
-			seq:        []int{i},
-			parent:     nil,
-			exec:       exec,
-			gas:        &invocs[i].GasCost,
-			errMsg:     errMsg,
-			nonce:      nonce,
+			seq:    []int{i},
+			parent: nil,
+			exec:   exec,
+			gas:    &invocs[i].GasCost,
+			errMsg: errMsg,
+
+			rootMsg:    invocs[i].RawMsg,
+			rootMsgRct: invocs[i].MsgRct,
 			rootCid:    invocs[i].MsgCid,
-			gasFeeCap:  invocs[i].RawMsg.GasFeeCap,
-			gasPremium: invocs[i].RawMsg.GasPremium,
-			eventRoot:  invocs[i].MsgRct.EventsRoot,
-			rctVersion: invocs[i].MsgRct.Version(),
 		})
 
 		for ni := range exec.GasCharges {
@@ -434,11 +430,11 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 		walkExecTrace([]int{i}, exec, func(subseq []int, subparent, subexec *common.ExecutionTraceCompact) {
 			etraces = append(etraces, persistExecTrace{
-				seq:    copyIndexes(subseq),
-				parent: subparent,
-				exec:   subexec,
-				errMsg: errMsg,
-				nonce:  nonce,
+				seq:        copyIndexes(subseq),
+				parent:     subparent,
+				exec:       subexec,
+				rootMsg:    invocs[i].RawMsg,
+				rootMsgRct: invocs[i].MsgRct,
 			})
 
 			for ni := range subexec.GasCharges {
@@ -553,7 +549,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 		var signedCid cid.Cid
 
-		key := msg.From.String() + "-" + strconv.FormatUint(p.nonce, 10)
+		key := msg.From.String() + "-" + strconv.FormatUint(p.rootMsg.Nonce, 10)
 		if cmsg, ok := allmsgsMap[key]; ok {
 			smsg, ok := cmsg.(*types.SignedMessage)
 			if ok {
@@ -567,7 +563,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 		if ctx.Opts.EnabelExtract.EnableExtractMessage {
 			if _, has := dupmsgs[mcid]; !has {
-				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height(), p.gasFeeCap, p.gasPremium)
+				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height(), p.rootMsg.GasFeeCap, p.rootMsg.GasPremium)
 				if err != nil {
 					elog.Warnw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 				} else {
@@ -580,7 +576,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 		if ctx.Opts.EnabelExtract.EnableExtractExecTrace {
 			isBlock := IsBlock(p.seq, msg.From)
-			met, _, err := model.NewExecTrace(ctx, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock, IDCidMap)
+			met, _, err := model.NewExecTrace(ctx, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock, IDCidMap, p.rootMsgRct)
 			if err != nil {
 				elog.Warnw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 			} else {
@@ -600,8 +596,8 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractEventsRoot || ctx.Opts.EnabelExtract.EnableExtractActorEvent {
-			if p.eventRoot != nil && p.rctVersion == types.MessageReceiptV1 {
-				eventsRoot := p.eventRoot
+			if p.rootMsgRct.EventsRoot != nil && p.rootMsgRct.Version() == types.MessageReceiptV1 {
+				eventsRoot := p.rootMsgRct.EventsRoot
 				if eventsRoot != nil {
 					events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
 					if err != nil {
