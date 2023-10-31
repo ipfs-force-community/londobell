@@ -50,21 +50,27 @@ type DataBaseStateManager struct {
 func (dbsm *DataBaseStateManager) GetState(ctx context.Context, dsn string) (*segment.State, bool, error) {
 	state, ok := dbsm.DBStateCache.GetState(dsn)
 	if !ok {
-		state, found, err := dbsm.Segment.GetState(ctx, dsn)
-		if err != nil {
-			return nil, false, err
-		}
-		if !found {
-			// todo
-			return nil, false, nil
-		}
-
-		dbsm.DBStateCache.SetState(dsn, state)
-
-		return state, true, nil
+		return dbsm.RefreshState(ctx, dsn)
 	}
 
 	return state, true, nil
+}
+
+// 从数据库获取数据,刷新缓存
+func (dbsm *DataBaseStateManager) RefreshState(ctx context.Context, dsn string) (*segment.State, bool, error) {
+	state, found, err := dbsm.Segment.GetState(ctx, dsn)
+	if err != nil {
+		return nil, false, err
+	}
+	if !found {
+		// todo
+		return nil, false, nil
+	}
+
+	dbsm.DBStateCache.SetState(dsn, state)
+
+	return state, true, nil
+
 }
 
 func (dbsm *DataBaseStateManager) GetDBState(ctx context.Context, dsn string) (*smodel.DBState, bool, error) {
@@ -578,6 +584,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		//messageBlockCol := database.Collection("MessageBlock")
 		blockMessageCol := database.Collection("BlockMessage")
 		blockHeaderCol := database.Collection("BlockHeader")
+		orphanBlockCol := database.Collection("OrphanBlock")
 		actorMessageCol := database.Collection("ActorMessage")
 		ethHashCol := database.Collection("EthHash")
 		eventsRootCol := database.Collection("EventsRoot")
@@ -592,7 +599,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 
 		cols := make([]*mongo.Collection, 0)
 		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol,
-			changedSectorCol, changedClaimCol, changedDealStateCol)
+			changedSectorCol, changedClaimCol, changedDealStateCol, orphanBlockCol)
 		dbsm.UpdateDBCollectionsMap(db.Url(), config2.Collections{DB: database, Cols: cols})
 	}
 
@@ -614,6 +621,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 	//messageBlockCol := database.Collection("MessageBlock")
 	blockMessageCol := database.Collection("BlockMessage")
 	blockHeaderCol := database.Collection("BlockHeader")
+	orphanBlockCol := database.Collection("OrphanBlock")
 	actorMessageCol := database.Collection("ActorMessage")
 	createMessageCol := database.Collection("CreateMessage")
 	ethHashCol := database.Collection("EthHash")
@@ -623,7 +631,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 	actorEventCodeCol := database.Collection("ActorEvent")
 
 	cols := make([]*mongo.Collection, 0)
-	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, createMessageCol)
+	cols = append(cols, traceCol, tipSetCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, createMessageCol, orphanBlockCol)
 	dbsm.UpdateDBCollectionsMap(tmp.Url(), config2.Collections{DB: database, Cols: cols})
 
 	return nil
@@ -690,6 +698,7 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 	//messageBlockCol := database.Collection("MessageBlock")
 	blockMessageCol := database.Collection("BlockMessage")
 	blockHeaderCol := database.Collection("BlockHeader")
+	orphanBlockCol := database.Collection("OrphanBlock")
 	actorMessageCol := database.Collection("ActorMessage")
 	ethHashCol := database.Collection("EthHash")
 	eventsRootCol := database.Collection("EventsRoot")
@@ -704,7 +713,7 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 
 	cols := make([]*mongo.Collection, 0)
 	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol,
-		changedSectorCol, changedClaimCol, newDealProposalCol, changedDealStateCol)
+		changedSectorCol, changedClaimCol, newDealProposalCol, changedDealStateCol, orphanBlockCol)
 
 	return config2.Collections{DB: database, Cols: cols}, nil
 }
