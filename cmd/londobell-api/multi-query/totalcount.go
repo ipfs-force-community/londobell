@@ -51,6 +51,8 @@ func init() {
 }
 
 func PeriodicRefreshDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbsm *DataBaseStateManager) {
+	// 2023-10-25 15:23:03 目前tmp与正式库重合的区块为213(3330379 - 3330166)
+	// 数据查询,会以缓存中的max epoch作为起始epoch从tmp库中查询,当前15分钟的设置能保证数据的完整
 	tick := time.NewTicker(15 * time.Minute)
 	defer tick.Stop()
 
@@ -117,7 +119,7 @@ func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbs
 	}
 
 	dsn := formal.Url()
-	state, found, err := dbsm.GetState(ctx, dsn)
+	state, found, err := dbsm.RefreshState(ctx, dsn)
 	if err != nil {
 		return err
 	}
