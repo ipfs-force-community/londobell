@@ -23,7 +23,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/hashicorp/golang-lru/v2/expirable"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ipfs-force-community/londobell/lib/mir"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
@@ -35,7 +35,7 @@ import (
 var (
 	defaultCleanInterval int64 = 500
 	// 节点第一次发现块时间
-	b1sCache = expirable.NewLRU[cid.Cid, int64](10000, nil, time.Hour*1)
+	b1sCache, _ = lru.New[cid.Cid, int64](10000)
 )
 
 type OrphanBlock struct {
