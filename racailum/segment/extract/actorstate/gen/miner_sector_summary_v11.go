@@ -26,6 +26,9 @@ func init() {
 	for d := (miner11.MinSectorExpiration / builtin11.EpochsInDay); d <= (miner11.MaxSectorExpirationExtension / builtin11.EpochsInDay); d += 180 {
 		summaryDaysV11 = append(summaryDaysV11, abi.ChainEpoch(d))
 	}
+	if (miner11.MaxSectorExpirationExtension / builtin11.EpochsInDay) > summaryDaysV11[len(summaryDaysV11)-1] {
+		summaryDaysV11 = append(summaryDaysV11, abi.ChainEpoch(miner11.MaxSectorExpirationExtension/builtin11.EpochsInDay))
+	}
 
 	reg.MustRegisterPreCheck("MinerSectorSummaryV11", func(ctx *extract.Ctx) bool {
 		return ctx.Opts.ZeroHourExtract.MinerSectorSummary

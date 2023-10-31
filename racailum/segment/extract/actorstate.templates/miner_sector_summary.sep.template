@@ -31,6 +31,9 @@ func init() {
 	for d := (miner{{ .Ver }}.MinSectorExpiration / builtin{{ .Ver }}.EpochsInDay); d <= (miner{{ .Ver }}.MaxSectorExpirationExtension / builtin{{ .Ver }}.EpochsInDay); d += 180 {
 		summaryDaysV{{ .Ver }} = append(summaryDaysV{{ .Ver }}, abi.ChainEpoch(d))
 	}
+	if (miner{{ .Ver }}.MaxSectorExpirationExtension / builtin{{ .Ver }}.EpochsInDay) > summaryDaysV{{ .Ver }}[len(summaryDaysV{{ .Ver }})-1] {
+		summaryDaysV{{ .Ver }} = append(summaryDaysV{{ .Ver }}, abi.ChainEpoch(miner{{ .Ver }}.MaxSectorExpirationExtension / builtin{{ .Ver }}.EpochsInDay))
+	}	
 
 	{{ if eq .Ver 0 -}}
 	schema.Register(

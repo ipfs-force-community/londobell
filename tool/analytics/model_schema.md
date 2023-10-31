@@ -370,7 +370,8 @@
 		"EventsRoot": "*cid.Cid",
 		"ExitCode": "exitcode.ExitCode",
 		"GasUsed": "int64",
-		"Return": "[]uint8"
+		"Return": "[]uint8",
+		"ReturnCodec": "uint64"
 	},
 	"RootCid": "cid.Cid",
 	"RootSignedCid": "cid.Cid",
@@ -452,6 +453,8 @@
 		"PackedHeight": "abi.ChainEpoch",
 		"Params": "model.MessageParams"
 	},
+	"GasFeeCap": "big.Int",
+	"GasPremium": "big.Int",
 	"SignedCid": "cid.Cid",
 	"_id": "cid.Cid"
 }
