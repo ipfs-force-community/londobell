@@ -519,7 +519,6 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		p := etraces[i]
 		depth := len(p.seq)
 		msg := &p.exec.Msg
-		isBlock := IsBlock(p.seq, msg.From)
 
 		if depth == 1 {
 			mcid = p.rootCid
@@ -562,6 +561,8 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				}
 			}
 		}
+
+		isBlock := IsBlock(p.seq, msg.From)
 
 		if ctx.Opts.EnabelExtract.EnableExtractMessage {
 			if _, has := dupmsgs[mcid]; !has {
@@ -650,9 +651,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractActorMessage {
-
 			storeMap := make(map[address.Address]string)
-
 			fromActorID, err := extract.LookupID(ctx, msg.From, ts.TipSet)
 			if err != nil {
 				elog.Warnf("lookup ID for %v at %v failed: %v", msg.From, ts.Height(), err)
@@ -686,7 +685,6 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractCreateMessage {
-
 			method := mi.Method.Name
 			if model.IsOkCreateMessage(method, int64(p.exec.MsgRct.ExitCode)) {
 				cmsg, err := model.NewCreateMessage(ctx, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, msg.From, msg.To, isBlock, p.seq, callerAddrMap, mi.ReturnObj(), p.exec, IDCidMap)
