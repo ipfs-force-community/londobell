@@ -1305,7 +1305,7 @@ func extractBlockMessage(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		if err != nil {
 			return fmt.Errorf("get messages for block %v failed: %v", blk.Cid().String(), err)
 		}
-
+		blockMessageMap[blk.Cid()] = []cid.Cid{}
 		for _, bmsg := range bms {
 			blockMessageMap[blk.Cid()] = append(blockMessageMap[blk.Cid()], bmsg.Cid())
 		}
