@@ -341,8 +341,8 @@ github.com/filecoin-project/go-storedcounter v0.1.0 h1:Mui6wSUBC+cQGHbDUBcO7rfh5
 github.com/filecoin-project/go-storedcounter v0.1.0/go.mod h1:4ceukaXi4vFURIoxYMfKzaRF5Xv/Pinh2oTnoxpv+z8=
 github.com/filecoin-project/kubo-api-client v0.0.1 h1:IR1b+sm+VYxSRvbgECVv9SbhIgygcXcSoN1Q7xsHDXg=
 github.com/filecoin-project/kubo-api-client v0.0.1/go.mod h1:c36PPMIVOkKfHDwDG5U05gUlPRY9wNuh/BePwo0e+6Y=
-github.com/filecoin-project/lotus v1.24.0-rc2 h1:hhaWKecBuOUs0LoT4OuHG2s5HJuWicvfu2Tjc8DSDfg=
-github.com/filecoin-project/lotus v1.24.0-rc2/go.mod h1:hKVsRPYzHjx8+8/hD+Yc3lRmLa6gTqGHLqJR8c9NEhg=
+github.com/filecoin-project/lotus v1.24.0-rc3 h1:94g1VeIEsgcUlXVGszazVUS/PnOLyS8lWk1zXFYA3vU=
+github.com/filecoin-project/lotus v1.24.0-rc3/go.mod h1:hKVsRPYzHjx8+8/hD+Yc3lRmLa6gTqGHLqJR8c9NEhg=
 github.com/filecoin-project/pubsub v1.0.0 h1:ZTmT27U07e54qV1mMiQo4HDr0buo8I1LDHBYLXlsNXM=
 github.com/filecoin-project/pubsub v1.0.0/go.mod h1:GkpB33CcUtUNrLPhJgfdy4FDx4OMNR9k+46DHx/Lqrg=
 github.com/filecoin-project/specs-actors v0.9.13/go.mod h1:TS1AW/7LbG+615j4NsjMK1qlpAwaFsG9w0V2tg2gSao=
@@ -632,7 +632,6 @@ github.com/hashicorp/go.net v0.0.1/go.mod h1:hjKkEWcCURg++eb33jQU7oqQcI9XDCnUzHA
 github.com/hashicorp/golang-lru v0.5.0/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
 github.com/hashicorp/golang-lru v0.5.1/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
 github.com/hashicorp/golang-lru v0.5.4/go.mod h1:iADmTwqILo4mZ8BN3D2Q6+9jd8WM5uGBxy+E8yxSoD4=
-
 github.com/hashicorp/golang-lru v0.6.0 h1:uL2shRDx7RTrOrTCUZEGP/wJUFiUI8QT6E7z5o8jga4=
 github.com/hashicorp/golang-lru v0.6.0/go.mod h1:iADmTwqILo4mZ8BN3D2Q6+9jd8WM5uGBxy+E8yxSoD4=
 github.com/hashicorp/golang-lru/v2 v2.0.2 h1:Dwmkdr5Nc/oBiXgJS3CDHNhJtIHkuZ3DZF5twqnfBdU=

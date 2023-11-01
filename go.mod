@@ -10,7 +10,7 @@ require (
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-jsonrpc v0.3.1
 	github.com/filecoin-project/go-state-types v0.12.5
-	github.com/filecoin-project/lotus v1.24.0-rc2
+	github.com/filecoin-project/lotus v1.24.0-rc3
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v3 v3.1.2
@@ -159,7 +159,7 @@ require (
 	github.com/hashicorp/go-hclog v1.3.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
-	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/hashicorp/raft v1.3.10 // indirect
 	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea // indirect
 	github.com/huin/goupnp v1.2.0 // indirect

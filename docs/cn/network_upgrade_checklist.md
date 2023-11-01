@@ -41,3 +41,22 @@ londobell-api随 Filecoin 网络升级的检查项清单
   - 代码结构调整
   - 函数签名变化
 - [ ] 尝试执行 `make build-aggregators`，并解决可能出现的编译器错误
+
+
+### Others
+当前没使用vendor模式,但是有些依赖lotus的代码进行了调整,需要在本地机器的go mod目录做响应的调整
+1. go/pkg/mod/github.com/filecoin-project/lotus@v1.24.0-rc2/chain/stmgr/execute.go:TipSetState
+注释以下代码:
+```go
+	// if st, rec, found := tryLookupTipsetState(ctx, sm.cs, ts); found {
+	// 	return st, rec, nil
+	// }
+```
+2. go/pkg/mod/github.com/filecoin-project/lotus@v1.24.0-rc3/build/params_mainnet.go:DrandSchedule
+```go
+var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
+	// 0:                  DrandIncentinet,
+	UpgradeSmokeHeight: DrandMainnet,
+}
+
+```
