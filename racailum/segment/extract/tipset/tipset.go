@@ -519,6 +519,8 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		p := etraces[i]
 		depth := len(p.seq)
 		msg := &p.exec.Msg
+		isBlock := IsBlock(p.seq, msg.From)
+
 		if depth == 1 {
 			mcid = p.rootCid
 
@@ -563,7 +565,11 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 		if ctx.Opts.EnabelExtract.EnableExtractMessage {
 			if _, has := dupmsgs[mcid]; !has {
-				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height(), p.rootMsg.GasFeeCap, p.rootMsg.GasPremium)
+				var nonce uint64
+				if depth == 1 {
+					nonce = p.rootMsg.Nonce
+				}
+				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height(), p.rootMsg.GasFeeCap, p.rootMsg.GasPremium, nonce, isBlock)
 				if err != nil {
 					elog.Warnw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 				} else {
@@ -575,7 +581,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractExecTrace {
-			isBlock := IsBlock(p.seq, msg.From)
+
 			met, _, err := model.NewExecTrace(ctx, mcid, signedCid, ts.Height(), p.seq, p.exec, mi.ReturnObj(), p.gas, mi.Method.Name, isBlock, IDCidMap, p.rootMsgRct)
 			if err != nil {
 				elog.Warnw("convert to model.MessageExec", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
@@ -644,7 +650,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractActorMessage {
-			isBlock := IsBlock(p.seq, msg.From)
+
 			storeMap := make(map[address.Address]string)
 
 			fromActorID, err := extract.LookupID(ctx, msg.From, ts.TipSet)
@@ -680,7 +686,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		}
 
 		if ctx.Opts.EnabelExtract.EnableExtractCreateMessage {
-			isBlock := IsBlock(p.seq, msg.From)
+
 			method := mi.Method.Name
 			if model.IsOkCreateMessage(method, int64(p.exec.MsgRct.ExitCode)) {
 				cmsg, err := model.NewCreateMessage(ctx, ts.Height(), mcid, signedCid, msg.Value, mi.Method.Name, msg.From, msg.To, isBlock, p.seq, callerAddrMap, mi.ReturnObj(), p.exec, IDCidMap)

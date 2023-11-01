@@ -39,6 +39,7 @@ type MessageDetail struct {
 type Message struct {
 	Cid        cid.Cid             `bson:"_id"`
 	Message    *types.MessageTrace `bson:",inline"`
+	Nonce      uint64
 	Detail     MessageDetail
 	SignedCid  cid.Cid `bson:"SignedCid,omitempty"`
 	GasFeeCap  abi.TokenAmount
@@ -77,13 +78,25 @@ func (m *Message) IsMutable() bool {
 }
 
 // NewMessage converts from *types.Message to *Message with required infomations
-func NewMessage(mcid, signedCid cid.Cid, raw *types.MessageTrace, act, meth string, params cbor.Er, epoch abi.ChainEpoch, gasFeeCap, gasPremium abi.TokenAmount) (*Message, error) {
-	msg := &Message{
-		Cid:        mcid,
-		Message:    raw,
-		SignedCid:  signedCid,
-		GasPremium: gasPremium,
-		GasFeeCap:  gasFeeCap,
+func NewMessage(mcid, signedCid cid.Cid, raw *types.MessageTrace, act, meth string, params cbor.Er, epoch abi.ChainEpoch, gasFeeCap, gasPremium abi.TokenAmount, nonce uint64, isBlock bool) (*Message, error) {
+	var msg *Message
+	if isBlock {
+		msg = &Message{
+			Cid:        mcid,
+			Message:    raw,
+			SignedCid:  signedCid,
+			GasPremium: gasPremium,
+			GasFeeCap:  gasFeeCap,
+			Nonce:      nonce,
+		}
+	} else {
+		msg = &Message{
+			Cid:        mcid,
+			Message:    raw,
+			SignedCid:  signedCid,
+			GasPremium: gasPremium,
+			GasFeeCap:  gasFeeCap,
+		}
 	}
 
 	msg.Detail.Actor = act
