@@ -455,6 +455,7 @@
 	},
 	"GasFeeCap": "big.Int",
 	"GasPremium": "big.Int",
+	"Nonce": "uint64",
 	"SignedCid": "cid.Cid",
 	"_id": "cid.Cid"
 }

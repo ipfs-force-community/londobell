@@ -1275,6 +1275,7 @@
 	},
 	"GasFeeCap": "1024",
 	"GasPremium": "1073741824",
+	"Nonce": 0,
 	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
@@ -1305,6 +1306,7 @@
 	},
 	"GasFeeCap": "340282591298641078465964189926313473653",
 	"GasPremium": "1024",
+	"Nonce": 0,
 	"SignedCid": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744",
 	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
@@ -1332,6 +1334,7 @@
 	},
 	"GasFeeCap": "340282591298641078465964189926313473653",
 	"GasPremium": "1024",
+	"Nonce": 0,
 	"SignedCid": "bafy2bzacedxrcswo7d56zgsxqljtv7evmg7cbfnmqoxsj7ltntxkxgcaxtmkw",
 	"_id": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq"
 }
@@ -1359,6 +1362,7 @@
 	},
 	"GasFeeCap": "340282591298641078465964189926313473653",
 	"GasPremium": "1024",
+	"Nonce": 0,
 	"SignedCid": "bafy2bzacecf7c2j3qvkfmiwgy3q5hbzjehwvc7t4w52zcdc3eup2m7kbj2swq",
 	"_id": "bafy2bzaced3ysajbgtt2gjc32hatke5fkddjpic22osxglbfukglsoh2dx744"
 }
