@@ -168,8 +168,12 @@ func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbs
 	}
 
 	// refresh cache
-	newState = addUpState.GetState()
-	dbsm.DBStateCache.SetState(dsn, &newState)
+	// newState = addUpState.GetState()
+	curState, _, err := dbsm.RefreshState(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	dbsm.DBStateCache.SetState(dsn, curState)
 
 	log.Infof("RefreshFormalDataBaseState successfully, dbState.EndEpoch: %v", newState.GetEndEpoch())
 
