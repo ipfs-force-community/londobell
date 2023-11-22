@@ -71,7 +71,7 @@ func FieldExist(ctx context.Context, col *mongo.Collection, fieldName string) bo
 	err = col.FindOne(ctx, filter).Decode(&result)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			log.Infof("field %s dont exist", fieldName)
+			log.Infof("%s field %s dont exist", col.Name(), fieldName)
 		} else {
 			log.Error(err)
 		}
