@@ -10,7 +10,7 @@ require (
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-jsonrpc v0.3.1
 	github.com/filecoin-project/go-state-types v0.12.5
-	github.com/filecoin-project/lotus v1.24.0-rc5
+	github.com/filecoin-project/lotus v1.24.0-rc6
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v3 v3.1.2
