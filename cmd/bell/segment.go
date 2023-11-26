@@ -50,6 +50,7 @@ var catchMinerInfoCmd = &cli.Command{
 		end := cctx.Int64("end")
 		result := make([]bson.M, 0)
 		for i := start; i < end; i += 2880 {
+			var wdpost, pre, prove, agg, preb float64
 			pipe, err := util.Parse(
 				model.Ctx{Start: i,
 					End:      i + 2880,
@@ -66,7 +67,81 @@ var catchMinerInfoCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
-			fmt.Println(result[0]["total_c"].(float64))
+			wdpost = result[0]["total_c"].(float64)
+
+			pipe, err = util.Parse(
+				model.Ctx{Start: i,
+					End:      i + 2880,
+					CurEpoch: 6,
+				}, p)
+			if err != nil {
+				return err
+			}
+			cur, err = col.Aggregate(cctx.Context, pipe)
+			if err != nil {
+				return err
+			}
+			err = cur.All(cctx.Context, &result)
+			if err != nil {
+				return err
+			}
+			pre = result[0]["total_c"].(float64)
+
+			pipe, err = util.Parse(
+				model.Ctx{Start: i,
+					End:      i + 2880,
+					CurEpoch: 7,
+				}, p)
+			if err != nil {
+				return err
+			}
+			cur, err = col.Aggregate(cctx.Context, pipe)
+			if err != nil {
+				return err
+			}
+			err = cur.All(cctx.Context, &result)
+			if err != nil {
+				return err
+			}
+			prove = result[0]["total_c"].(float64)
+
+			pipe, err = util.Parse(
+				model.Ctx{Start: i,
+					End:      i + 2880,
+					CurEpoch: 25,
+				}, p)
+			if err != nil {
+				return err
+			}
+			cur, err = col.Aggregate(cctx.Context, pipe)
+			if err != nil {
+				return err
+			}
+			err = cur.All(cctx.Context, &result)
+			if err != nil {
+				return err
+			}
+			preb = result[0]["total_c"].(float64)
+
+			pipe, err = util.Parse(
+				model.Ctx{Start: i,
+					End:      i + 2880,
+					CurEpoch: 26,
+				}, p)
+			if err != nil {
+				return err
+			}
+			cur, err = col.Aggregate(cctx.Context, pipe)
+			if err != nil {
+				return err
+			}
+			err = cur.All(cctx.Context, &result)
+			if err != nil {
+				return err
+			}
+			agg = result[0]["total_c"].(float64)
+
+			fmt.Printf("%.4f,%.4f,%.4f,%.4f,%.4f", wdpost/1e18, pre/1e18, prove/1e18, preb/1e18, agg/1e18)
 		}
 		return nil
 	},
