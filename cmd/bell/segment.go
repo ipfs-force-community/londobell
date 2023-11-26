@@ -5,13 +5,17 @@ import (
 
 	"github.com/dtynn/dix"
 	"github.com/urfave/cli/v2"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
 	"github.com/filecoin-project/lotus/api/v0api"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/dep"
+	"github.com/ipfs-force-community/londobell/lib/mgoutil"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
 )
 
@@ -23,6 +27,51 @@ var segmentCmd = &cli.Command{
 	},
 }
 
+var catchMinerInfoCmd = &cli.Command{
+	Name: "catch",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name: "dsn",
+		},
+		&cli.Int64Flag{
+			Name: "start",
+		},
+		&cli.Int64Flag{
+			Name: "end",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		mutil, err := mgoutil.Connect(cctx.Context, cctx.String("dsn"))
+		if err != nil {
+			return err
+		}
+		col := mutil.Database("bell").Collection("ExecTrace")
+		start := cctx.Int64("start")
+		end := cctx.Int64("end")
+		result := make([]bson.M, 0)
+		for i := start; i < end; i += 2880 {
+			pipe, err := util.Parse(
+				model.Ctx{Start: i,
+					End:      i + 2880,
+					CurEpoch: 5,
+				}, p)
+			if err != nil {
+				return err
+			}
+			cur, err := col.Aggregate(cctx.Context, pipe)
+			if err != nil {
+				return err
+			}
+			err = cur.All(cctx.Context, &result)
+			if err != nil {
+				return err
+			}
+			fmt.Println(result[0]["total_c"].(float64))
+		}
+		return nil
+	},
+}
+var p = `[{$match :{ Depth: 1, "MsgRct.ExitCode": 0,"Msg.Method": Ctx.CurEpoch, "Msg.To":"01228108",Epoch: {$gte: Ctx.Start, $lt: Ctx.End}}},{$addFields: {converted_c: {$convert: {input: "$GasCost.TotalCost", to : "double", onError: 0, onNull: 0}}}},{$group:{_id:null, total_c: { $sum: "$converted_c" }}}]`
 var segmentUpdateCmd = &cli.Command{
 	Name: "update",
 	Flags: []cli.Flag{

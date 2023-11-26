@@ -27,6 +27,7 @@ func main() {
 		Commands: []*cli.Command{
 			cfgCmd,
 			segmentCmd,
+			catchMinerInfoCmd,
 			daemonCmd,
 			traceCmd,
 			compareCmd,
