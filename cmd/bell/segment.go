@@ -141,7 +141,7 @@ var catchMinerInfoCmd = &cli.Command{
 			}
 			agg = result[0]["total_c"].(float64)
 
-			fmt.Printf("%.4f,%.4f,%.4f,%.4f,%.4f", wdpost/1e18, pre/1e18, prove/1e18, preb/1e18, agg/1e18)
+			fmt.Printf("%.4f,%.4f,%.4f,%.4f,%.4f\n", wdpost/1e18, pre/1e18, prove/1e18, preb/1e18, agg/1e18)
 		}
 		return nil
 	},
