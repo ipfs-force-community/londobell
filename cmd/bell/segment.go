@@ -71,7 +71,7 @@ var catchMinerInfoCmd = &cli.Command{
 		return nil
 	},
 }
-var p = `[{$match :{ Depth: 1, "MsgRct.ExitCode": 0,"Msg.Method": Ctx.CurEpoch, "Msg.To":"01228108",Epoch: {$gte: Ctx.Start, $lt: Ctx.End}}},{$addFields: {converted_c: {$convert: {input: "$GasCost.TotalCost", to : "double", onError: 0, onNull: 0}}}},{$group:{_id:null, total_c: { $sum: "$converted_c" }}}]`
+var p = `[{$match :{ Depth: 1, "MsgRct.ExitCode": 0,"Msg.Method": ctx.CurEpoch, "Msg.To":"01228108",Epoch: {$gte: ctx.Start, $lt: ctx.End}}},{$addFields: {converted_c: {$convert: {input: "$GasCost.TotalCost", to : "double", onError: 0, onNull: 0}}}},{$group:{_id:null, total_c: { $sum: "$converted_c" }}}]`
 var segmentUpdateCmd = &cli.Command{
 	Name: "update",
 	Flags: []cli.Flag{
