@@ -67,7 +67,11 @@ var catchMinerInfoCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
-			wdpost = result[0]["total_c"].(float64)
+			if len(result) != 0 {
+				wdpost = result[0]["total_c"].(float64)
+			} else {
+				wdpost = 0
+			}
 
 			pipe, err = util.Parse(
 				model.Ctx{Start: i,
@@ -85,8 +89,11 @@ var catchMinerInfoCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
-			pre = result[0]["total_c"].(float64)
-
+			if len(result) != 0 {
+				pre = result[0]["total_c"].(float64)
+			} else {
+				pre = 0
+			}
 			pipe, err = util.Parse(
 				model.Ctx{Start: i,
 					End:      i + 2880,
@@ -103,8 +110,11 @@ var catchMinerInfoCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
-			prove = result[0]["total_c"].(float64)
-
+			if len(result) != 0 {
+				prove = result[0]["total_c"].(float64)
+			} else {
+				prove = 0
+			}
 			pipe, err = util.Parse(
 				model.Ctx{Start: i,
 					End:      i + 2880,
@@ -121,8 +131,11 @@ var catchMinerInfoCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
-			preb = result[0]["total_c"].(float64)
-
+			if len(result) != 0 {
+				preb = result[0]["total_c"].(float64)
+			} else {
+				preb = 0
+			}
 			pipe, err = util.Parse(
 				model.Ctx{Start: i,
 					End:      i + 2880,
@@ -139,8 +152,11 @@ var catchMinerInfoCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
-			agg = result[0]["total_c"].(float64)
-
+			if len(result) != 0 {
+				agg = result[0]["total_c"].(float64)
+			} else {
+				agg = 0
+			}
 			fmt.Printf("%.4f,%.4f,%.4f,%.4f,%.4f\n", wdpost/1e18, pre/1e18, prove/1e18, preb/1e18, agg/1e18)
 		}
 		return nil
