@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -20,6 +21,42 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs/go-cid"
 )
+
+var (
+	poolCache = make(map[cid.Cid]int64)
+	mu        sync.Mutex
+)
+
+func RefreshMpool() {
+	ticker := time.NewTicker(time.Second)
+	tlog := log.With("task", "RefreshMpool")
+	for range ticker.C {
+
+		api := fullnode.API.GetAppropriateAPI()
+		unStoredMsgs, _, err := getUnStoredMsgs(context.Background(), api)
+		if err != nil {
+			tlog.Error(err)
+			break
+		}
+		refreshMpoolCache(unStoredMsgs)
+
+	}
+}
+
+func refreshMpoolCache(unStoredMsgs map[*types.TipSet][]*types.SignedMessage) {
+	newCache := make(map[cid.Cid]int64)
+	for _, msgs := range unStoredMsgs {
+		for _, msg := range msgs {
+			if _, ok := poolCache[msg.Cid()]; !ok {
+				poolCache[msg.Cid()] = time.Now().Unix()
+			}
+			newCache[msg.Cid()] = poolCache[msg.Cid()]
+		}
+	}
+	mu.Lock()
+	poolCache = newCache
+	mu.Unlock()
+}
 
 func GetMpool(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -38,6 +75,7 @@ func GetMpool(c *gin.Context) {
 	api := fullnode.API.GetAppropriateAPI()
 
 	unStoredMsgs, head, err := getUnStoredMsgs(ctx, api)
+	refreshMpoolCache(unStoredMsgs)
 
 	if err != nil {
 		alog.Error(err)
@@ -71,7 +109,10 @@ func GetMpool(c *gin.Context) {
 					}
 
 					res.Data = model.PendingMessagesRes{TotalCount: 1, PendingMessages: []model.PendingMessage{{
-						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName, Hash: hash.String(),
+						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(),
+						From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value,
+						GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium,
+						Method: methodName, Hash: hash.String(), MsgTime: poolCache[msg.Cid()],
 					}}}
 					c.JSON(http.StatusOK, res)
 					return
@@ -128,7 +169,10 @@ func GetMpool(c *gin.Context) {
 				// 当mcid与smsg.Message.Cid()不同时说明消息被覆盖掉了
 				if mcid == smsg.Message.Cid() {
 					res.Data = model.PendingMessagesRes{TotalCount: 1, PendingMessages: []model.PendingMessage{{
-						Cid: smsg.Message.Cid(), SignedCid: msg.Cid(), Epoch: head.Height(), From: smsg.Message.From, To: smsg.Message.To, Value: smsg.Message.Value, GasLimit: smsg.Message.GasLimit, GasPremium: smsg.Message.GasPremium, Method: methodName, Hash: hash.String(),
+						Cid: smsg.Message.Cid(), SignedCid: msg.Cid(), Epoch: head.Height(),
+						From: smsg.Message.From, To: smsg.Message.To, Value: smsg.Message.Value,
+						GasLimit: smsg.Message.GasLimit, GasPremium: smsg.Message.GasPremium,
+						Method: methodName, Hash: hash.String(), MsgTime: poolCache[msg.Cid()],
 					}}}
 					c.JSON(http.StatusOK, res)
 					return
@@ -166,7 +210,10 @@ func GetMpool(c *gin.Context) {
 						}
 
 						res.Data = model.PendingMessagesRes{TotalCount: 1, PendingMessages: []model.PendingMessage{{
-							Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName, Hash: hash.String(),
+							Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(),
+							From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value,
+							GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium,
+							Method: methodName, Hash: hash.String(), MsgTime: poolCache[msg.Cid()],
 						}}}
 
 						return nil
@@ -213,7 +260,10 @@ func GetMpool(c *gin.Context) {
 
 					mutex.Lock()
 					pendingMessages = append(pendingMessages, model.PendingMessage{
-						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName, Hash: hash.String(),
+						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(),
+						From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value,
+						GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium,
+						Method: methodName, Hash: hash.String(), MsgTime: poolCache[msg.Cid()],
 					})
 					totalCount++
 					mutex.Unlock()
@@ -228,7 +278,10 @@ func GetMpool(c *gin.Context) {
 					// todo: methodName为空时加入mpool吗？
 					mutex.Lock()
 					pendingMessages = append(pendingMessages, model.PendingMessage{
-						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(), From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value, GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium, Method: methodName, Hash: hash.String(),
+						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(),
+						From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value,
+						GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium,
+						Method: methodName, Hash: hash.String(), MsgTime: poolCache[msg.Cid()],
 					})
 					totalCount++
 					mutex.Unlock()
@@ -246,7 +299,7 @@ func GetMpool(c *gin.Context) {
 
 	// sort
 	sort.Slice(pendingMessages, func(i, j int) bool {
-		return pendingMessages[i].Epoch > pendingMessages[j].Epoch
+		return pendingMessages[i].MsgTime > pendingMessages[j].MsgTime
 	})
 
 	if req.Index == 0 && req.Limit == 0 {
