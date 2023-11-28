@@ -154,15 +154,13 @@ func Run(cctx *cli.Context, adapter bool) error {
 		tick := time.NewTicker(15 * time.Second)
 		defer tick.Stop()
 		go func() {
-			for {
-				select {
-				case <-tick.C:
-					err = fullnode.API.Choose(ctx)
-					if err != nil {
-						log.Warn(err)
-						continue
-					}
+			for range tick.C {
+				err = fullnode.API.Choose(ctx)
+				if err != nil {
+					log.Warn(err)
+					continue
 				}
+
 			}
 		}()
 
@@ -194,15 +192,18 @@ func Run(cctx *cli.Context, adapter bool) error {
 			return err
 		}
 
+		// 定时任务
+		// 刷新agg config
 		go multiquery.Reload(cctx.Context, &multiquery.DBStateManager, dep.ConfigFilePath(repoPath))
 
-		//start := time.Now()
-		//multiquery.TestPeriodicRefreshDataBaseState(cctx.Context, &multiquery.DBStateManager) //todo:test
-		//fmt.Printf("PeriodicRefreshDataBaseState done, elapsed: %v\n", time.Now().Sub(start))
+		// 刷新消息池
+		go aggregators.RefreshMpool()
 
+		// 刷新state索引
 		mlog := log.With("server", "multi-query")
 		go multiquery.PeriodicRefreshDataBaseState(cctx.Context, mlog, &multiquery.DBStateManager)
 
+		// http server
 		common.InitAggregators()
 		RegisterAggregatorsApi(router)
 
