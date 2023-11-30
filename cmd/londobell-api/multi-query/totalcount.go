@@ -46,12 +46,15 @@ var (
 
 func init() {
 	addupOnce.Do(func() {
-		addupes = append(addupes, AddUpBlockState, AddUpBlockMethodStates /* AddUpDealActorState */)
+		addupes = append(addupes, AddUpBlockState, AddUpBlockMethodStates, AddUpActorStates, AddUpActorMethodStates /* AddUpDealActorState */)
+		// addupes = append(addupes, AddUpActorStates, AddUpActorMethodStates /* AddUpDealActorState */)
 	})
 }
 
+// todo: 1. 重启时，需要从数据库中获取当前的状态，然后从当前状态开始刷
+// 2. 先存入缓存,然后定期compact再存入数据库,避免碎片
 func PeriodicRefreshDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbsm *DataBaseStateManager) {
-	// 2023-10-25 15:23:03 目前tmp与正式库重合的区块为213(3330379 - 3330166)
+	// 2023-10-25 15:23:03 目前tmp与正式库重合的区块为213(3330379 - 3330166),保留Epoch为TempDBCapacity设置,默认2小时
 	// 数据查询,会以缓存中的max epoch作为起始epoch从tmp库中查询,当前15分钟的设置能保证数据的完整
 	tick := time.NewTicker(15 * time.Minute)
 	defer tick.Stop()
@@ -190,6 +193,14 @@ func AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, state *segment
 
 func AddUpBlockMethodStates(ctx context.Context, log *zap.SugaredLogger, state *segment.State, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, nextEndEpoch int64) error {
 	return seg.AddUpBlockMethodStates(ctx, log, nextEndEpoch, state, addUpState, cols)
+}
+
+func AddUpActorStates(ctx context.Context, log *zap.SugaredLogger, state *segment.State, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, nextEndEpoch int64) error {
+	return seg.AddUpActorStates(ctx, log, nextEndEpoch, state, addUpState, cols)
+}
+
+func AddUpActorMethodStates(ctx context.Context, log *zap.SugaredLogger, state *segment.State, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment, nextEndEpoch int64) error {
+	return seg.AddUpActorMethodStates(ctx, log, nextEndEpoch, state, addUpState, cols)
 }
 
 //func AddUpDealActorState(ctx context.Context, log *zap.SugaredLogger, addUpState *segment.AddUpState, cols common.Collections, seg *segment.Segment) error {
@@ -1212,32 +1223,32 @@ func refreshTotalCountForBlockMsgsByMethodName(ctx context.Context, state *segme
 func refreshTotalCountForActorMsgs(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
-		count, err := GetActorStates(ctx, state, cols, actorID)
+		actorStates, err := DBStateManager.GetActorStates(ctx, state.GetDSN(), actorID)
 		if err != nil {
 			return err
 		}
 
-		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
+		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: actorStates, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
 		state.SetStartEpoch(*tmpStartEpoch)
 		state.SetEndEpoch(curEpoch + 1)
 
-		count, err := GetActorStates(ctx, state, cols, actorID)
+		actorStates, err := GetActorStates(ctx, state, cols, actorID)
 		if err != nil {
 			return err
 		}
 
-		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
+		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: actorStates, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
-		count, err := GetActorStates(ctx, state, cols, actorID)
+		actorStates, err := DBStateManager.GetActorStates(ctx, state.GetDSN(), actorID)
 		if err != nil {
 			return err
 		}
 
-		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
+		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: actorStates, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
@@ -1247,32 +1258,32 @@ func refreshTotalCountForActorMsgs(ctx context.Context, state *segment.State, co
 func refreshTotalCountForActorMsgByMethodName(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
 	switch state.GetDType() {
 	case smodel.Formal:
-		count, err := GetActorMethodStates(ctx, state, cols, actorID, methodName)
+		actorStates, err := DBStateManager.GetActorMethodStates(ctx, state.GetDSN(), actorID, methodName)
 		if err != nil {
 			return err
 		}
 
-		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: count, DType: state.GetDType()})
+		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: actorStates, DType: state.GetDType()})
 		*tmpStartEpoch = state.GetEndEpoch()
 		return nil
 	case smodel.Tmp:
 		state.SetStartEpoch(*tmpStartEpoch)
 		state.SetEndEpoch(curEpoch + 1)
 
-		count, err := GetActorMethodStates(ctx, state, cols, actorID, methodName)
+		actorStates, err := GetActorMethodStates(ctx, state, cols, actorID, methodName)
 		if err != nil {
 			return err
 		}
 
-		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: count, DType: state.GetDType()})
+		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: actorStates, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
-		count, err := GetActorMethodStates(ctx, state, cols, actorID, methodName)
+		actorStates, err := DBStateManager.GetActorMethodStates(ctx, state.GetDSN(), actorID, methodName)
 		if err != nil {
 			return err
 		}
 
-		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: count, DType: state.GetDType()})
+		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorMethodStates: actorStates, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
@@ -1733,6 +1744,7 @@ func GetBlockMethodStates(ctx context.Context, state *segment.State, cols common
 				StartEpoch: startEpoch,
 				EndEpoch:   endEpoch,
 				Count:      countRes[0].Count,
+				MethodName: methodName,
 			}}, nil
 		}
 	}
@@ -1785,7 +1797,7 @@ func GetAllBlockMethodNames(ctx context.Context, state *segment.State, cols comm
 	return nil, fmt.Errorf("no ExecTrace collection")
 }
 
-func GetActorStates(ctx context.Context, state *segment.State, cols common.Collections, actorID string) (int64, error) {
+func GetActorStates(ctx context.Context, state *segment.State, cols common.Collections, actorID string) ([]smodel.SegmentState, error) {
 	rlog := log.With("query", "GetActorStates")
 
 	start := time.Now()
@@ -1794,11 +1806,15 @@ func GetActorStates(ctx context.Context, state *segment.State, cols common.Colle
 		rlog.Infof("refresh ActorMsgsCountMap successfully for [%v, %v), elapsed: %v", startEpoch, endEpoch, time.Now().Sub(start).String())
 	}()
 
+	if endEpoch <= startEpoch {
+		return nil, nil
+	}
+
 	var countRes []model.CountRes
 	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID}, string(monitor.GetCountOfMessageForActorAggregator())) // todo: ExecTrace
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
-		return 0, err
+		return nil, err
 	}
 
 	tableName := ctx.Value(TableKey).(string)
@@ -1807,28 +1823,34 @@ func GetActorStates(ctx context.Context, state *segment.State, cols common.Colle
 			cur, err := col.Aggregate(ctx, pipe) // todo
 			if err != nil {
 				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
-				return 0, err
+				return nil, err
 			}
 
 			err = cur.All(ctx, &countRes)
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
-				return 0, err
+				return nil, err
 			}
 
 			if len(countRes) == 0 {
 				rlog.Warnf("no actor between %v and %v", startEpoch, endEpoch)
-				return 0, nil
+				return nil, nil
 			}
 
-			return countRes[0].Count, nil
+			return []smodel.SegmentState{smodel.SegmentState{
+				Dsn:        state.GetDSN(),
+				StartEpoch: startEpoch,
+				EndEpoch:   endEpoch,
+				Count:      countRes[0].Count,
+				ActorID:    actorID,
+			}}, nil
 		}
 	}
 
-	return 0, fmt.Errorf("no ActorMessage collection")
+	return nil, fmt.Errorf("no ActorMessage collection")
 }
 
-func GetActorMethodStates(ctx context.Context, state *segment.State, cols common.Collections, actorID, methodName string) (int64, error) {
+func GetActorMethodStates(ctx context.Context, state *segment.State, cols common.Collections, actorID, methodName string) ([]smodel.SegmentState, error) {
 	rlog := log.With("query", "GetActorMethodStates")
 
 	start := time.Now()
@@ -1838,14 +1860,14 @@ func GetActorMethodStates(ctx context.Context, state *segment.State, cols common
 	}()
 
 	if endEpoch <= startEpoch {
-		return 0, nil
+		return nil, nil
 	}
 
 	var countRes []model.CountRes
 	pipe, err := util.Parse(model.Ctx{StartEpoch: int64(startEpoch), EndEpoch: int64(endEpoch), Addr: actorID, MethodName: methodName}, string(monitor.GetCountOfActorMessagesByMethodNameAggregator())) // todo: ExecTrace
 	if err != nil {
 		//log.Errorf("parse for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
-		return 0, err
+		return nil, err
 	}
 
 	tableName := ctx.Value(TableKey).(string)
@@ -1854,26 +1876,33 @@ func GetActorMethodStates(ctx context.Context, state *segment.State, cols common
 			cur, err := col.Aggregate(ctx, pipe) //, options.Aggregate().SetAllowDiskUse(true)
 			if err != nil {
 				//log.Errorf("get all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
-				return 0, err
+				return nil, err
 			}
 
 			err = cur.All(ctx, &countRes)
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
-				return 0, err
+				return nil, err
 			}
 
 			if len(countRes) == 0 {
 				rlog.Warnf("no actor between %v and %v", startEpoch, endEpoch)
-				return 0, nil
+				return nil, nil
 			}
 
-			return countRes[0].Count, nil
+			return []smodel.SegmentState{smodel.SegmentState{
+				Dsn:        state.GetDSN(),
+				StartEpoch: startEpoch,
+				EndEpoch:   endEpoch,
+				Count:      countRes[0].Count,
+				ActorID:    actorID,
+				MethodName: methodName,
+			}}, nil
 
 		}
 	}
 
-	return 0, fmt.Errorf("no ActorMessage collection")
+	return nil, fmt.Errorf("no ActorMessage collection")
 }
 
 func GetAllActorMethodStates(ctx context.Context, state *segment.State, cols common.Collections, actorID string) ([]model.AllMethodsForActorRes, error) {

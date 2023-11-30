@@ -315,9 +315,13 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 		case BlockHeaderMethodStates:
 			totalCount = countlist.BlockHeaderMethodStates
 		case ActorStates:
-			totalCount = countlist.ActorStates
+			for _, as := range countlist.ActorStates {
+				totalCount += as.Count
+			}
 		case ActorMethodStates:
-			totalCount = countlist.ActorMethodStates
+			for _, ams := range countlist.ActorMethodStates {
+				totalCount += ams.Count
+			}
 		case ActorTransferStates:
 			totalCount = countlist.ActorTransferStates
 		case ActorEventStates:
@@ -408,25 +412,21 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 		}
 	case ActorStates:
 		for _, segmentList := range segmentLists {
-			aggLists = append(aggLists, &aggUtil{
-				start: segmentList.start,
-				end:   segmentList.end,
-				skip:  segmentList.skip,
-				limit: segmentList.limit,
-				cols:  segmentList.Cols,
-				count: segmentList.ActorStates,
+			sort.Slice(segmentList.ActorStates, func(i, j int) bool {
+				return segmentList.ActorStates[i].StartEpoch > segmentList.ActorStates[j].StartEpoch
 			})
+
+			innerAggLists := aggListsFromSegmentState(segmentList.ActorStates, segmentList.skip, segmentList.limit, segmentList.Cols, skipTag, limitTag)
+			aggLists = append(aggLists, innerAggLists...)
 		}
 	case ActorMethodStates:
 		for _, segmentList := range segmentLists {
-			aggLists = append(aggLists, &aggUtil{
-				start: segmentList.start,
-				end:   segmentList.end,
-				skip:  segmentList.skip,
-				limit: segmentList.limit,
-				cols:  segmentList.Cols,
-				count: segmentList.ActorMethodStates,
+			sort.Slice(segmentList.ActorMethodStates, func(i, j int) bool {
+				return segmentList.ActorMethodStates[i].StartEpoch > segmentList.ActorMethodStates[j].StartEpoch
 			})
+
+			innerAggLists := aggListsFromSegmentState(segmentList.ActorMethodStates, segmentList.skip, segmentList.limit, segmentList.Cols, skipTag, limitTag)
+			aggLists = append(aggLists, innerAggLists...)
 		}
 	case ActorTransferStates:
 		for _, segmentList := range segmentLists {
@@ -822,10 +822,10 @@ func MultiBiSearch(ctx context.Context, indexReq, limitReq int64, countUtils []C
 	for i := range countUtils {
 		tmp := int64(0)
 		switch ptype {
-		case ActorStates:
-			tmp = countUtils[i].ActorStates
-		case ActorMethodStates:
-			tmp = countUtils[i].ActorMethodStates
+		// case ActorStates:
+		// 	tmp = countUtils[i].ActorStates
+		// case ActorMethodStates:
+		// 	tmp = countUtils[i].ActorMethodStates
 		case MinedStates:
 			tmp = countUtils[i].MinedStates
 		case ActorTransferStates:
@@ -856,10 +856,10 @@ func MultiBiSearch(ctx context.Context, indexReq, limitReq int64, countUtils []C
 		for len(result) < int(limitReq) && countUtilsIdx < len(countUtils) {
 			tmp := int64(0)
 			switch ptype {
-			case ActorStates:
-				tmp = countUtils[i].ActorStates
-			case ActorMethodStates:
-				tmp = countUtils[i].ActorMethodStates
+			// case ActorStates:
+			// 	tmp = countUtils[i].ActorStates
+			// case ActorMethodStates:
+			// 	tmp = countUtils[i].ActorMethodStates
 			case MinedStates:
 				tmp = countUtils[i].MinedStates
 			case ActorTransferStates:
