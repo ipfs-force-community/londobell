@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
@@ -57,6 +60,13 @@ func (a *AddUpState) UpdateBlockStates(blockStates []model.SegmentState) {
 	a.State.blockStates = blockStates
 }
 
+func (a *AddUpState) UpdateActorStates(actorStates []model.SegmentState) {
+	a.lk.Lock()
+	defer a.lk.Unlock()
+
+	a.State.actorStates = actorStates
+}
+
 func (a *AddUpState) UpdateBlockMethodStates(blockMethodStates []model.SegmentState) {
 	a.lk.Lock()
 	defer a.lk.Unlock()
@@ -64,13 +74,20 @@ func (a *AddUpState) UpdateBlockMethodStates(blockMethodStates []model.SegmentSt
 	a.State.blockMethodStates = blockMethodStates
 }
 
+func (a *AddUpState) UpdateActorMethodStates(actorMethodStates []model.SegmentState) {
+	a.lk.Lock()
+	defer a.lk.Unlock()
+
+	a.State.actorMethodStates = actorMethodStates
+}
+
 type PersistState struct {
 	Dsn        string
 	Start      int64
 	End        int64
 	Count      int64
-	NextStart  int64
 	MethodName string
+	ActorID    string
 }
 
 // 累加
@@ -85,13 +102,20 @@ func (s *Segment) AddUpDBState(ctx context.Context, log *zap.SugaredLogger, next
 	var err error
 	defer func() {
 		if err != nil {
-			rlog.Infof("addup DBState failed between %v and %v, elapsed: %v, err: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String(), err)
+			rlog.Infof("failed between %d and %d, elapsed: %s, err: %v", startEpoch, nextEndEpoch, time.Since(starttime), err)
 		} else {
-			rlog.Infof("addup DBState successfully between %v and %v, elapsed: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String())
+			rlog.Infof("successfully between %d and %d, elapsed: %s", startEpoch, nextEndEpoch, time.Since(starttime))
 		}
 	}()
 
-	err = s.db.FindOneAndUpdate(ctx, "DBState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v", dsn, dbState.StartEpoch)}, {Key: "Dsn", Value: dsn}, {Key: "StartEpoch", Value: dbState.StartEpoch}, {Key: "DType", Value: dType}, {Key: "Interval", Value: interval}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndEpoch", Value: dbState.EndEpoch}}}})
+	err = s.db.FindOneAndUpdate(ctx, "DBState", bson.D{
+		{Key: "_id", Value: fmt.Sprintf("%v-%v", dsn, dbState.StartEpoch)},
+		{Key: "StartEpoch", Value: dbState.StartEpoch},
+		{Key: "Dsn", Value: dsn},
+		{Key: "DType", Value: dType},
+		{Key: "Interval", Value: interval},
+	},
+		bson.D{{Key: "$set", Value: bson.D{{Key: "EndEpoch", Value: dbState.EndEpoch}}}})
 	if err != nil {
 		return fmt.Errorf("update dbstate failed: %w", err)
 	}
@@ -112,11 +136,11 @@ func (s *Segment) AddUpBlockState(ctx context.Context, log *zap.SugaredLogger, n
 
 	starttime := time.Now()
 	defer func() {
-		rlog.Infof("addup BlockState done between %v and %v, elapsed: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String())
+		rlog.Infof("done between %d and %d, elapsed: %s", startEpoch, nextEndEpoch, time.Since(starttime))
 	}()
 
 	blockStates := state.GetBlockStates()
-	newBlockStates, err := s.AddUpSegment(ctx, rlog, blockStates, state, nextEndEpoch, cols, "", common.BlockStates)
+	newBlockStates, err := s.AddUpSegment(ctx, rlog, blockStates, state, nextEndEpoch, cols, "", "", common.BlockStates)
 	if err != nil {
 		rlog.Errorf("AddUpSegment failed: %v", err)
 		return err
@@ -136,7 +160,7 @@ func (s *Segment) AddUpBlockMethodStates(ctx context.Context, log *zap.SugaredLo
 
 	starttime := time.Now()
 	defer func() {
-		rlog.Infof("addup BlockState done between %v and %v, elapsed: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String())
+		rlog.Infof("done between %d and %d, elapsed: %s", startEpoch, nextEndEpoch, time.Since(starttime))
 	}()
 
 	allNewBlockMethodStates := make([]model.SegmentState, 0)
@@ -147,7 +171,7 @@ func (s *Segment) AddUpBlockMethodStates(ctx context.Context, log *zap.SugaredLo
 			method = ""
 		}
 		blockMethodStates := state.GetBlockMethodStates(method)
-		newBlockMethodStates, err := s.AddUpSegment(ctx, rlog, blockMethodStates, state, nextEndEpoch, cols, method, common.BlockMethodStates)
+		newBlockMethodStates, err := s.AddUpSegment(ctx, rlog, blockMethodStates, state, nextEndEpoch, cols, method, "", common.BlockMethodStates)
 		if err != nil {
 			rlog.Errorf("AddUpSegment failed: %v", err)
 			return err
@@ -157,157 +181,416 @@ func (s *Segment) AddUpBlockMethodStates(ctx context.Context, log *zap.SugaredLo
 	}
 
 	// refresh cache blockMethodStates
-	addUpState.UpdateBlockStates(allNewBlockMethodStates)
+	addUpState.UpdateBlockMethodStates(allNewBlockMethodStates)
 
 	return nil
 }
 
-func (s *Segment) AddUpSegment(ctx context.Context, log *zap.SugaredLogger, segmentState []model.SegmentState, state *State, nextEndEpoch int64, cols common.Collections, methodName string, segmentType common.SegmentType) ([]model.SegmentState, error) {
-	rlog := log.With("AddUp", "Segment")
+func (s *Segment) AddUpActorStates(ctx context.Context, log *zap.SugaredLogger, nextEndEpoch int64, state *State, addUpState *AddUpState, cols common.Collections) error {
+	rlog := log.With("AddUp", "ActorStates")
 
 	dbState := state.GetDBState()
-	startEpoch, dsn, interval := int64(dbState.StartEpoch), dbState.Dsn, dbState.Interval
+	startEpoch := int64(dbState.StartEpoch)
 
 	starttime := time.Now()
 	defer func() {
-		rlog.Infof("addup segment state done between %v and %v, elapsed: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String())
+		rlog.Infof("addup done between %d and %d, elapsed: %s", startEpoch, nextEndEpoch, time.Since(starttime))
+	}()
+
+	actorStates := state.GetAllActorStates()
+	newActorStates, err := s.AddUpSegment(ctx, rlog, actorStates, state, nextEndEpoch, cols, "", "", common.ActorStates)
+	if err != nil {
+		rlog.Errorf("AddUpSegment failed: %v", err)
+		return err
+	}
+	// refresh cache blockMethodStates
+
+	addUpState.UpdateActorStates(append(actorStates, newActorStates...))
+
+	return nil
+}
+
+func (s *Segment) AddUpActorMethodStates(ctx context.Context, log *zap.SugaredLogger, nextEndEpoch int64, state *State, addUpState *AddUpState, cols common.Collections) error {
+	rlog := log.With("AddUp", "ActorMethodStates")
+
+	dbState := state.GetDBState()
+	startEpoch := int64(dbState.StartEpoch)
+
+	starttime := time.Now()
+	defer func() {
+		rlog.Infof("done between %d and %d, elapsed: %s", startEpoch, nextEndEpoch, time.Since(starttime))
+	}()
+
+	actorStates := state.GetAllActorStates()
+	newActorStates, err := s.AddUpSegment(ctx, rlog, actorStates, state, nextEndEpoch, cols, "", "", common.ActorMethodStates)
+	if err != nil {
+		rlog.Errorf("AddUpSegment failed: %v", err)
+		return err
+	}
+
+	addUpState.UpdateActorMethodStates(append(actorStates, newActorStates...))
+
+	return nil
+}
+
+func (s *Segment) AddUpSegment(ctx context.Context, log *zap.SugaredLogger, segmentState []model.SegmentState, state *State, nextEndEpoch int64, cols common.Collections, methodName, actorID string, segmentType common.SegmentType) ([]model.SegmentState, error) {
+	rlog := log.With("AddUp", "Segment")
+
+	dbState := state.GetDBState()
+	dbStartEpoch, dsn, interval := int64(dbState.StartEpoch), dbState.Dsn, dbState.Interval
+
+	starttime := time.Now()
+	stateCol := getSegmentColName(segmentType)
+	if stateCol == "" {
+		return nil, fmt.Errorf("not support segment type: %v", segmentType)
+	}
+	defer func() {
+		rlog.Infof("%s done: %d-%d, spent: %s", stateCol, dbStartEpoch, nextEndEpoch, time.Since(starttime))
 	}()
 
 	sort.Slice(segmentState, func(i, j int) bool {
 		return segmentState[i].StartEpoch > segmentState[j].StartEpoch
 	})
 
-	var endEpoch int64
+	var (
+		todoSegmentStates = make([]PersistState, 0)
+		stateEndEpoch     int64
+		newSegmentStates  = make([]model.SegmentState, 0)
+	)
+
 	if len(segmentState) == 0 {
-		endEpoch = startEpoch
+		stateEndEpoch = dbStartEpoch
 	} else {
-		endEpoch = int64(segmentState[0].EndEpoch)
+		stateEndEpoch = int64(segmentState[0].EndEpoch)
 	}
 
-	if nextEndEpoch <= endEpoch {
-		rlog.Infof("skip for nextEndEpoch %v <= endEpoch %v", nextEndEpoch, endEpoch)
+	if nextEndEpoch <= stateEndEpoch {
+		rlog.Infof("skip,want state epoch :%d,have max epoch %d", nextEndEpoch, stateEndEpoch)
 		return nil, nil
 	}
 
-	var (
-		todoSegmentStates = make([]PersistState, 0)
-		initialBlockState PersistState
-		initialEpoch      int64
-	)
-
-	newSegmentStates := make([]model.SegmentState, 0)
-
-	length := len(segmentState)
-	if length == 0 {
-		initialEpoch = startEpoch
-		initialBlockState = PersistState{Dsn: dsn, Start: startEpoch, NextStart: startEpoch, MethodName: methodName}
-	} else {
-		start, end, count := int64(segmentState[0].StartEpoch), int64(segmentState[0].EndEpoch), segmentState[0].Count
-		if end-start == interval {
-			// new next blockState
-			initialEpoch = end
-			initialBlockState = PersistState{Dsn: dsn, Start: end, NextStart: end, MethodName: methodName}
-			newSegmentStates = segmentState[:]
-		} else {
-			initialEpoch = start
-			initialBlockState = PersistState{Dsn: dsn, Start: start, Count: count, NextStart: end, MethodName: methodName}
-			newSegmentStates = segmentState[1:]
-		}
+	col := getSegCol(cols.Cols, segmentType)
+	totalCount, err := getTotalCount(ctx, col, stateEndEpoch, nextEndEpoch, segmentType, methodName)
+	if err != nil {
+		return nil, err
 	}
-
-	first := true
-	for initialEpoch < nextEndEpoch {
-		end := initialEpoch + interval
+	log.Infof("getTotalCount done,total: %d,method: %s", totalCount, methodName)
+	for stateEndEpoch < nextEndEpoch {
+		// TODO 不同的分段类型应有不同的interval,如果没必要分别控制,可合并同表的segment
+		end := stateEndEpoch + interval
 		if end > nextEndEpoch {
 			end = nextEndEpoch
 		}
+		todoSegmentStates = append(todoSegmentStates, PersistState{Dsn: dsn, Start: stateEndEpoch,
+			End: end, MethodName: methodName})
 
-		if first {
-			initialBlockState.End = end
-			todoSegmentStates = append(todoSegmentStates, initialBlockState)
-			first = false
-		} else {
-			todoSegmentStates = append(todoSegmentStates, PersistState{Dsn: dsn, Start: initialEpoch, End: end, NextStart: initialEpoch, MethodName: methodName})
-		}
-
-		initialEpoch = end
+		stateEndEpoch = end
 	}
 
 	lim := limiter.New(s.opts.BatchInsertLimit)
-	var lk sync.Mutex
+	var (
+		lk  sync.Mutex
+		ewg multierror.Group
+	)
 
-	var ewg multierror.Group
 	for _, todoSegmentState := range todoSegmentStates {
 		todoSegmentState := todoSegmentState
 		ewg.Go(func() error {
 			if !lim.Acquire(ctx) {
 				return nil
 			}
-
 			defer func() {
 				lim.Release(ctx)
 			}()
 
 			starttime := time.Now()
-			start, end, dsn, nextStart, methodName := todoSegmentState.Start, todoSegmentState.End, todoSegmentState.Dsn, todoSegmentState.NextStart, todoSegmentState.MethodName
+			start, end, dsn, methodName := todoSegmentState.Start, todoSegmentState.End, todoSegmentState.Dsn, todoSegmentState.MethodName
 			defer func() {
-				rlog.Infof("addup segment successfully between %v and %v, count: %v, elapsed: %v", start, end, todoSegmentState.Count, time.Now().Sub(starttime).String())
+				rlog.Infof("success: %d-%d, count: %d, spent: %s", start, end, todoSegmentState.Count, time.Since(starttime))
 			}()
 
-			for _, col := range cols.Cols {
-				if col != nil && col.Name() == "ExecTrace" {
-					switch segmentType {
-					case common.BlockStates:
-						blockFilter := bson.D{{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: nextStart}}}, {Key: "Epoch", Value: bson.D{{Key: "$lt", Value: end}}}, {Key: "IsBlock", Value: true}}
-						count, err := col.CountDocuments(ctx, blockFilter)
-						if err != nil {
-							return fmt.Errorf("count for block messages failed: %w", err)
-						}
+			switch segmentType {
+			case common.BlockStates:
+				blockFilter := bson.D{
+					{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: start}}},
+					{Key: "Epoch", Value: bson.D{{Key: "$lt", Value: end}}},
+					{Key: "IsBlock", Value: true},
+				}
+				count, err := col.CountDocuments(ctx, blockFilter)
+				if err != nil {
+					return fmt.Errorf("count for block messages failed: %w", err)
+				}
 
-						todoSegmentState.Count += count
+				todoSegmentState.Count += count
+				lk.Lock()
+				newSegmentStates = append(newSegmentStates, model.SegmentState{ID: fmt.Sprintf("%v", start), Dsn: dsn, StartEpoch: abi.ChainEpoch(start), EndEpoch: abi.ChainEpoch(end), Count: todoSegmentState.Count})
+				lk.Unlock()
+			case common.BlockMethodStates:
+				blockMethodFilter := bson.D{
+					{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: start}}},
+					{Key: "Epoch", Value: bson.D{{Key: "$lt", Value: end}}},
+					{Key: "IsBlock", Value: true},
+					{Key: "Msg.MethodName", Value: methodName},
+				}
+				count, err := col.CountDocuments(ctx, blockMethodFilter)
+				if err != nil {
+					return fmt.Errorf("count for blockmethod messages failed: %w", err)
+				}
 
-						err = s.db.FindOneAndUpdate(ctx, "BlockState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v", dsn, start)}, {Key: "Dsn", Value: dsn}, {Key: "StartEpoch", Value: start}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndEpoch", Value: end}, {Key: "Count", Value: todoSegmentState.Count}}}})
-						if err != nil {
-							return fmt.Errorf("update blockstate failed: %w", err)
-						}
+				todoSegmentState.Count += count
 
-						lk.Lock()
-						newSegmentStates = append(newSegmentStates, model.SegmentState{ID: fmt.Sprintf("%v-%v", dsn, start), Dsn: dsn, StartEpoch: abi.ChainEpoch(start), EndEpoch: abi.ChainEpoch(end), Count: todoSegmentState.Count})
-						lk.Unlock()
-					case common.BlockMethodStates:
-						blockMethodFilter := bson.D{{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: nextStart}}}, {Key: "Epoch", Value: bson.D{{Key: "$lt", Value: end}}}, {Key: "IsBlock", Value: true}, {Key: "Msg.MethodName", Value: methodName}}
-						count, err := col.CountDocuments(ctx, blockMethodFilter)
-						if err != nil {
-							return fmt.Errorf("count for blockmethod messages failed: %w", err)
-						}
+				lk.Lock()
+				newSegmentStates = append(newSegmentStates, model.SegmentState{ID: fmt.Sprintf("%v-%v", start, methodName), Dsn: dsn, StartEpoch: abi.ChainEpoch(start), EndEpoch: abi.ChainEpoch(end), Count: todoSegmentState.Count, MethodName: methodName})
+				lk.Unlock()
+			case common.ActorStates, common.ActorMethodStates:
+				var (
+					actors []struct {
+						ActorID    string `bson:"ActorID"`
+						MethodName string `bson:"MethodName"`
+					}
+					segments      []model.SegmentState
+					newDataFilter = bson.D{
+						{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: start}}},
+						{Key: "Epoch", Value: bson.D{{Key: "$lt", Value: end}}},
+						{Key: "IsBlock", Value: true},
+					}
+				)
+				cusor, err := col.Find(ctx, newDataFilter, options.Find().SetProjection(bson.M{"ActorID": 1, "MethodName": 1}))
+				if err != nil {
+					return fmt.Errorf("find actor message failed: %w", err)
+				}
+				err = cusor.All(ctx, &actors)
+				if err != nil {
+					return fmt.Errorf("get actor message failed: %w", err)
+				}
+				todoSegmentState.Count = int64(len(actors))
+				actorMap := make(map[string]int64)
+				actorMethodMap := make(map[string]int64)
 
-						todoSegmentState.Count += count
+				for _, actor := range actors {
+					actorMap[actor.ActorID]++
+					actorMethodMap[fmt.Sprintf("%v-%v", actor.ActorID, actor.MethodName)]++
+				}
+				if segmentType == common.ActorStates {
+					for actorID, count := range actorMap {
+						segment := model.SegmentState{
+							ID:  fmt.Sprintf("%v-%v", start, actorID),
+							Dsn: dsn, StartEpoch: abi.ChainEpoch(start),
+							EndEpoch: abi.ChainEpoch(end), Count: count,
+							ActorID: actorID}
+						segments = append(segments, segment)
 
-						// todo: "" method的_id是否正常
-						err = s.db.FindOneAndUpdate(ctx, "BlockMethodState", bson.D{{Key: "_id", Value: fmt.Sprintf("%v-%v-%v", dsn, start, methodName)}, {Key: "Dsn", Value: dsn}, {Key: "StartEpoch", Value: start}, {Key: "MethodName", Value: methodName}}, bson.D{{Key: "$set", Value: bson.D{{Key: "EndEpoch", Value: end}, {Key: "Count", Value: todoSegmentState.Count}}}})
-						if err != nil {
-							return fmt.Errorf("update blockstate failed: %w", err)
-						}
+					}
+					lk.Lock()
+					newSegmentStates = append(newSegmentStates, segments...)
+					lk.Unlock()
+				} else {
 
-						lk.Lock()
-						newSegmentStates = append(newSegmentStates, model.SegmentState{ID: fmt.Sprintf("%v-%v-%v", dsn, start, methodName), Dsn: dsn, StartEpoch: abi.ChainEpoch(start), EndEpoch: abi.ChainEpoch(end), Count: todoSegmentState.Count, MethodName: methodName})
-						lk.Unlock()
+					extractActorMethod := func(actorMethod string) (actorID string, methodName string) {
+						actorID = actorMethod[:strings.Index(actorMethod, "-")]
+						methodName = actorMethod[strings.Index(actorMethod, "-")+1:]
+						return
+					}
+					for actorMethod, count := range actorMethodMap {
+						actorID, methodName := extractActorMethod(actorMethod)
+						segment := model.SegmentState{
+							ID:  fmt.Sprintf("%v-%v-%v", start, actorID, methodName),
+							Dsn: dsn, StartEpoch: abi.ChainEpoch(start),
+							EndEpoch: abi.ChainEpoch(end), Count: count,
+							MethodName: methodName, ActorID: actorID}
+						segments = append(segments, segment)
 					}
 
-					return nil
+					lk.Lock()
+					newSegmentStates = append(newSegmentStates, segments...)
+					lk.Unlock()
+
 				}
 			}
-
-			return fmt.Errorf("no ExecTrace collections")
+			return nil
 		})
 	}
-
 	if err := ewg.Wait(); err != nil {
-		rlog.Infof("addup segment state failed between %v and %v, elapsed: %v, err: %v", startEpoch, nextEndEpoch, time.Now().Sub(starttime).String(), err)
+		rlog.Infof("addup segment state failed between %d and %d, elapsed: %s, err: %v", dbStartEpoch, nextEndEpoch, time.Since(starttime), err)
 		return nil, err
+	}
+	newSegmentStates, segCount := compactSegment(newSegmentStates, segmentType)
+	log.Infof("compactSegment done,total: %d", segCount)
+	if segCount != totalCount {
+		err = fmt.Errorf("segment count: %d not equal total count : %d", segCount, totalCount)
+		log.Error(err)
+		return nil, err
+	}
+	var docs []interface{}
+	if len(newSegmentStates) > 0 {
+		for _, seg := range newSegmentStates {
+			docs = append(docs, seg)
+		}
+		// TODO 应当全局校验连接,但变动较大且其他地方暂未出现超时情况,暂不处理
+		err = s.wcli.Ping(ctx, nil)
+		if err != nil {
+			log.Warn("mongo disconnect ReConnect...")
+			err = s.ReConnect(ctx)
+			if err != nil {
+				log.Error("failed,", err)
+				return nil, err
+			}
+		}
+		// 每次插入10000避免socket超时
+		for start, end := 0, len(docs); start < end; start += 10000 {
+			tempEnd := start + 10000
+			if tempEnd > end {
+				tempEnd = end
+			}
+			inserted, err := s.db.Insert(ctx, stateCol, docs[start:tempEnd])
+			if err != nil {
+				err = fmt.Errorf("update %s failed: %w", stateCol, err)
+				log.Error(err)
+				return nil, err
+			}
+			log.Infof("%s inserted %d docs", stateCol, inserted)
+		}
+
 	}
 
 	return newSegmentStates, nil
+}
+
+func getSegCol(cols []*mongo.Collection, sType common.SegmentType) *mongo.Collection {
+	var colName string
+	if sType == common.ActorStates || sType == common.ActorMethodStates {
+		colName = "ActorMessage"
+	}
+
+	switch sType {
+	case common.ActorStates, common.ActorMethodStates:
+		colName = "ActorMessage"
+	case common.BlockStates, common.BlockMethodStates:
+		colName = "ExecTrace"
+	default:
+		// should not happen
+		colName = ""
+	}
+	for _, col := range cols {
+		if col != nil && col.Name() == colName {
+			return col
+		}
+	}
+	return nil
+}
+
+func getTotalCount(ctx context.Context, col *mongo.Collection, start, end int64, segmentType common.SegmentType, method string) (int64, error) {
+	filter := bson.D{
+		{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: start}}},
+		{Key: "Epoch", Value: bson.D{{Key: "$lt", Value: end}}},
+		{Key: "IsBlock", Value: true},
+	}
+	if segmentType == common.BlockMethodStates {
+		filter = bson.D{
+			{Key: "Epoch", Value: bson.D{{Key: "$gte", Value: start}}},
+			{Key: "Epoch", Value: bson.D{{Key: "$lt", Value: end}}},
+			{Key: "Msg.MethodName", Value: method},
+			{Key: "IsBlock", Value: true},
+		}
+	}
+	return col.CountDocuments(ctx, filter)
+
+}
+
+func getSegmentColName(sType common.SegmentType) string {
+	switch sType {
+	case common.ActorStates:
+		return "ActorState"
+	case common.ActorMethodStates:
+		return "ActorMethodState"
+	case common.BlockStates:
+		return "BlockState"
+	case common.BlockMethodStates:
+		return "BlockMethodState"
+	default:
+		// should not happen
+		return ""
+	}
+
+}
+
+func compactSegment(segments []model.SegmentState, sType common.SegmentType) ([]model.SegmentState, int64) {
+	var (
+		// 分段信息,用于限制range count大小
+		spanCount = make(map[string]int64)
+		// 分段起始Epoch
+		spanEStart  = make(map[string]abi.ChainEpoch)
+		res         []model.SegmentState
+		countRange  = int64(10000)
+		objSegments = make(map[string][]model.SegmentState)
+		totalCount  int64
+	)
+	for _, seg := range segments {
+		// segObj := getSegObj(seg, sType)
+		var segObj string
+		switch sType {
+		case common.ActorStates:
+			segObj = seg.ActorID
+		case common.ActorMethodStates:
+			segObj = seg.ActorID + seg.MethodName
+		case common.BlockStates:
+			segObj = "block"
+		case common.BlockMethodStates:
+			segObj = seg.MethodName
+		default:
+			// should not happen
+			segObj = ""
+		}
+		objSegments[segObj] = append(objSegments[segObj], seg)
+	}
+
+	for segObj, segs := range objSegments {
+		sort.Slice(segs, func(i, j int) bool {
+			return segs[i].StartEpoch < segs[j].StartEpoch
+		})
+		for _, seg := range segs {
+			if spanEStart[segObj] == 0 {
+				spanEStart[segObj] = segs[0].StartEpoch
+			}
+			// 过滤空数据
+			if spanCount[segObj] == 0 {
+				spanEStart[segObj] = seg.StartEpoch
+			}
+			spanCount[segObj] += seg.Count
+			if spanCount[segObj] >= countRange || seg.EndEpoch == segs[len(segs)-1].EndEpoch {
+				spanEEnd := seg.EndEpoch
+				span := model.SegmentState{
+					StartEpoch: spanEStart[segObj],
+					EndEpoch:   spanEEnd,
+					Count:      spanCount[segObj],
+					Dsn:        seg.Dsn,
+					ActorID:    seg.ActorID,
+					MethodName: seg.MethodName,
+				}
+
+				switch sType {
+				case common.ActorStates:
+					span.ID = fmt.Sprintf("%v-%v", span.StartEpoch, span.ActorID)
+				case common.ActorMethodStates:
+					span.ID = fmt.Sprintf("%v-%v-%v", span.StartEpoch, span.ActorID, span.MethodName)
+				case common.BlockStates:
+					span.ID = fmt.Sprintf("%v", span.StartEpoch)
+				case common.BlockMethodStates:
+					span.ID = fmt.Sprintf("%v-%v", span.StartEpoch, span.MethodName)
+				default:
+					// should not happen
+					span.ID = ""
+				}
+
+				res = append(res, span)
+				totalCount += span.Count
+				spanCount[segObj] = 0
+				// spanEStart[segObj] = spanEEnd
+			}
+		}
+
+	}
+	return res, totalCount
 }
 
 func (s *Segment) DeleteDBState(ctx context.Context, log *zap.SugaredLogger, dsn string) error {
@@ -345,6 +628,32 @@ func (s *Segment) DeleteBlockMethodState(ctx context.Context, log *zap.SugaredLo
 	}
 
 	log.Infof("delete BlockMethodState for %v successfully, deleteCount: %v", dsn, deleteCount)
+
+	return nil
+}
+
+func (s *Segment) DeleteActorState(ctx context.Context, log *zap.SugaredLogger, dsn string) error {
+	filter := bson.D{{Key: "Dsn", Value: dsn}}
+	deleteCount, err := s.db.Delete(ctx, "ActorState", filter)
+	if err != nil {
+		log.Errorf("delete ActorState for %v failed: %v", dsn, err)
+		return err
+	}
+
+	log.Infof("delete ActorState for %v successfully, deleteCount: %v", dsn, deleteCount)
+
+	return nil
+}
+
+func (s *Segment) DeleteActorMethodState(ctx context.Context, log *zap.SugaredLogger, dsn string) error {
+	filter := bson.D{{Key: "Dsn", Value: dsn}}
+	deleteCount, err := s.db.Delete(ctx, "ActorMethodState", filter)
+	if err != nil {
+		log.Errorf("delete ActorMethodState for %v failed: %v", dsn, err)
+		return err
+	}
+
+	log.Infof("delete ActorMethodState for %v successfully, deleteCount: %v", dsn, deleteCount)
 
 	return nil
 }
