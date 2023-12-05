@@ -59,7 +59,6 @@ struct	miner.ExpirationExtension2	github.com/filecoin-project/go-state-types/bui
 struct	miner.ExtendSectorExpiration2Params	github.com/filecoin-project/go-state-types/builtin/latest/miner
 struct	miner.ExtendSectorExpirationParams	github.com/filecoin-project/go-state-types/builtin/latest/miner
 struct	miner.FaultDeclaration	github.com/filecoin-project/go-state-types/builtin/latest/miner
-struct	miner.MovePartitionsParams	github.com/filecoin-project/go-state-types/builtin/latest/miner
 struct	miner.PoStPartition	github.com/filecoin-project/go-state-types/builtin/latest/miner
 struct	miner.PreCommitSectorBatchParams	github.com/filecoin-project/go-state-types/builtin/latest/miner
 struct	miner.PreCommitSectorBatchParams2	github.com/filecoin-project/go-state-types/builtin/latest/miner
