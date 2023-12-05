@@ -1089,6 +1089,15 @@ func (dbsm *DataBaseStateManager) DeleteAllState(ctx context.Context, db config2
 		return err
 	}
 
+	err = dbsm.Segment.DeleteActorMethodState(ctx, dlog, db.Url())
+	if err != nil {
+		return err
+	}
+
+	err = dbsm.Segment.DeleteActorState(ctx, dlog, db.Url())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1118,6 +1127,28 @@ func (dbsm *DataBaseStateManager) DeleteBlockMethodState(ctx context.Context, db
 	dlog := log.With("DeleteBlockMethodState", db)
 
 	err := dbsm.Segment.DeleteBlockMethodState(ctx, dlog, db.Url())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dbsm *DataBaseStateManager) DeleteActorState(ctx context.Context, db config2.DB) error {
+	dlog := log.With("DeleteActorState", db)
+
+	err := dbsm.Segment.DeleteActorState(ctx, dlog, db.Url())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dbsm *DataBaseStateManager) DeleteActorMethodState(ctx context.Context, db config2.DB) error {
+	dlog := log.With("DeleteActorMethodState", db)
+
+	err := dbsm.Segment.DeleteActorMethodState(ctx, dlog, db.Url())
 	if err != nil {
 		return err
 	}

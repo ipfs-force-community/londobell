@@ -44,8 +44,8 @@ type CountUtil struct {
 	// 暂时不对其他state分段
 	BlockMethodStates         []smodel.SegmentState
 	BlockHeaderMethodStates   int64
-	ActorStates               int64
-	ActorMethodStates         int64
+	ActorStates               []smodel.SegmentState
+	ActorMethodStates         []smodel.SegmentState
 	ActorTransferStates       int64
 	ActorEventStates          int64
 	MinedStates               int64
@@ -71,8 +71,8 @@ type segmentUtil struct {
 	// 暂时不对其他state分段
 	BlockMethodStates         []smodel.SegmentState
 	BlockHeaderMethodStates   int64
-	ActorStates               int64
-	ActorMethodStates         int64
+	ActorStates               []smodel.SegmentState
+	ActorMethodStates         []smodel.SegmentState
 	ActorTransferStates       int64
 	ActorEventStates          int64
 	MinedStates               int64

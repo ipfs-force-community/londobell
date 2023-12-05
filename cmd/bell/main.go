@@ -38,6 +38,8 @@ func main() {
 			updateFILCmd,
 			updateRootCidCmd,
 			orphanDaemonCmd,
+			setHeadCmd,
+			updateFinalHeight,
 		},
 		Version: build.UserVersion(),
 		Flags: []cli.Flag{
