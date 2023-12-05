@@ -11,9 +11,9 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 
-	builtin11 "github.com/filecoin-project/go-state-types/builtin"
-	miner11 "github.com/filecoin-project/go-state-types/builtin/v11/miner"
-	adt11 "github.com/filecoin-project/go-state-types/builtin/v11/util/adt"
+	builtin12 "github.com/filecoin-project/go-state-types/builtin"
+	miner12 "github.com/filecoin-project/go-state-types/builtin/v12/miner"
+	adt12 "github.com/filecoin-project/go-state-types/builtin/v12/util/adt"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -22,38 +22,38 @@ import (
 )
 
 func init() {
-	summaryDaysV11 = []abi.ChainEpoch{1, 7, 14, 30}
-	for d := (miner11.MinSectorExpiration / builtin11.EpochsInDay); d <= (miner11.MaxSectorExpirationExtension / builtin11.EpochsInDay); d += 180 {
-		summaryDaysV11 = append(summaryDaysV11, abi.ChainEpoch(d))
+	summaryDaysV12 = []abi.ChainEpoch{1, 7, 14, 30}
+	for d := (miner12.MinSectorExpiration / builtin12.EpochsInDay); d <= (miner12.MaxSectorExpirationExtension / builtin12.EpochsInDay); d += 180 {
+		summaryDaysV12 = append(summaryDaysV12, abi.ChainEpoch(d))
 	}
-	if (miner11.MaxSectorExpirationExtension / builtin11.EpochsInDay) > summaryDaysV11[len(summaryDaysV11)-1] {
-		summaryDaysV11 = append(summaryDaysV11, abi.ChainEpoch(miner11.MaxSectorExpirationExtension/builtin11.EpochsInDay))
+	if (miner12.MaxSectorExpirationExtension / builtin12.EpochsInDay) > summaryDaysV12[len(summaryDaysV12)-1] {
+		summaryDaysV12 = append(summaryDaysV12, abi.ChainEpoch(miner12.MaxSectorExpirationExtension/builtin12.EpochsInDay))
 	}
 
-	reg.MustRegisterPreCheck("MinerSectorSummaryV11", func(ctx *extract.Ctx) bool {
+	reg.MustRegisterPreCheck("MinerSectorSummaryV12", func(ctx *extract.Ctx) bool {
 		return ctx.Opts.ZeroHourExtract.MinerSectorSummary
 	}, func(ctx *extract.Ctx) int {
 		return ctx.Opts.StateRegular.MinerSectorSummaryTicks
 	})
-	reg.MustRegisterRegularExtractor("MinerSectorSummaryV11", extractMinerSectorSummaryV11)
+	reg.MustRegisterRegularExtractor("MinerSectorSummaryV12", extractMinerSectorSummaryV12)
 }
 
-var summaryDaysV11 []abi.ChainEpoch
+var summaryDaysV12 []abi.ChainEpoch
 
-func extractMinerSectorSummaryV11(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner11.State) error {
-	if st.Sectors.Equals(emptyMinerStateV11.Sectors) {
+func extractMinerSectorSummaryV12(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *miner12.State) error {
+	if st.Sectors.Equals(emptyMinerStateV12.Sectors) {
 		return nil
 	}
 
-	daysMax := summaryDaysV11[len(summaryDaysV11)-1]
-	summaries := make([]*model.MinerSectorSummaryRange, 0, len(summaryDaysV11)+1)
+	daysMax := summaryDaysV12[len(summaryDaysV12)-1]
+	summaries := make([]*model.MinerSectorSummaryRange, 0, len(summaryDaysV12)+1)
 	summariesInDays := make([]*model.MinerSectorSummaryRange, 0, int(daysMax+1))
 
 	var prevDays abi.ChainEpoch
-	for _, days := range summaryDaysV11 {
+	for _, days := range summaryDaysV12 {
 		current := &model.MinerSectorSummaryRange{
-			LowerBound:              prevDays * builtin11.EpochsInDay,
-			UpperBound:              days * builtin11.EpochsInDay,
+			LowerBound:              prevDays * builtin12.EpochsInDay,
+			UpperBound:              days * builtin12.EpochsInDay,
 			SectorCount:             0,
 			DealCount:               0,
 			V1SectorCount:           0,
@@ -72,7 +72,7 @@ func extractMinerSectorSummaryV11(ctx *extract.Ctx, res *extract.Res, head *comm
 	}
 
 	last := &model.MinerSectorSummaryRange{
-		LowerBound:              prevDays * builtin11.EpochsInDay,
+		LowerBound:              prevDays * builtin12.EpochsInDay,
 		UpperBound:              -1,
 		SectorCount:             0,
 		V1SectorCount:           0,
@@ -86,12 +86,12 @@ func extractMinerSectorSummaryV11(ctx *extract.Ctx, res *extract.Res, head *comm
 	summaries = append(summaries, last)
 	summariesInDays = append(summariesInDays, last)
 
-	sectors, err := miner11.LoadSectors(adt11.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Sectors)
+	sectors, err := miner12.LoadSectors(adt12.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Sectors)
 	if err != nil {
 		return fmt.Errorf("load sectors from adt store: %w", err)
 	}
 
-	var out miner11.SectorOnChainInfo
+	var out miner12.SectorOnChainInfo
 	minerCommittedCapacity := uint64(0)
 	actStore := ctx.D.ActorStore(ctx.C)
 	minfo, err := st.GetInfo(actStore)
@@ -107,7 +107,7 @@ func extractMinerSectorSummaryV11(ctx *extract.Ctx, res *extract.Res, head *comm
 		}
 
 		remainDuration := out.Expiration - head.Epoch
-		remainDays := remainDuration / builtin11.EpochsInDay
+		remainDays := remainDuration / builtin12.EpochsInDay
 
 		idx := int(remainDays)
 		target := summariesInDays[idx]
@@ -134,7 +134,7 @@ func extractMinerSectorSummaryV11(ctx *extract.Ctx, res *extract.Res, head *comm
 				DealWeight:         out.DealWeight,
 				VerifiedDealWeight: out.VerifiedDealWeight,
 				InitialPledge:      out.InitialPledge,
-				QAPower:            miner11.QAPowerForWeight(sectorSize, out.Expiration-out.Activation, out.DealWeight, out.VerifiedDealWeight),
+				QAPower:            miner12.QAPowerForWeight(sectorSize, out.Expiration-out.Activation, out.DealWeight, out.VerifiedDealWeight),
 				Miner:              head.Addr,
 			})
 		}

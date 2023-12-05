@@ -69,7 +69,10 @@ func InjectRepoPath(cctx *cli.Context) dix.Option {
 func LoadRaConfig(rpath RepoPath) (common.Config, error) {
 	cfgPath := ConfigFilePath(rpath)
 	cfg := common.DefaultConfig()
-	_, err := config.FromFile(cfgPath, &cfg) // todo: config不适合当前数据库配置需求
+	opt := config.SetDefault(func() (interface{}, error) {
+		return &cfg, nil
+	})
+	_, err := config.FromFile(cfgPath, opt) // todo: config不适合当前数据库配置需求
 	if err != nil {
 		return common.Config{}, fmt.Errorf("read config from file %s: %w", cfgPath, err)
 	}

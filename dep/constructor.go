@@ -10,10 +10,10 @@ import (
 
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 
+	bf "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	dstore "github.com/ipfs/go-datastore"
 	levelds "github.com/ipfs/go-ds-leveldb"
-	"github.com/ipfs/go-libipfs/blocks"
 	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 	"go.uber.org/fx"
 
@@ -48,11 +48,11 @@ type WrapAPIBlockstore struct {
 	blockstore.Blockstore
 }
 
-func (a *WrapAPIBlockstore) Put(context.Context, blocks.Block) error {
+func (a *WrapAPIBlockstore) Put(context.Context, bf.Block) error {
 	return nil
 }
 
-func (a *WrapAPIBlockstore) PutMany(context.Context, []blocks.Block) error {
+func (a *WrapAPIBlockstore) PutMany(context.Context, []bf.Block) error {
 	return nil
 }
 
@@ -172,7 +172,10 @@ func InMemMetadataDS(lr repo.LockedRepo, g modules.Genesis) (dtypes.MetadataDS, 
 func LoadRaConfig(rpath RepoPath) (racailum.Config, error) {
 	cfgPath := ConfigFilePath(rpath)
 	cfg := racailum.DefaultConfig()
-	_, err := config.FromFile(cfgPath, &cfg)
+	opt := config.SetDefault(func() (interface{}, error) {
+		return &cfg, nil
+	})
+	_, err := config.FromFile(cfgPath, opt)
 	if err != nil {
 		return racailum.Config{}, fmt.Errorf("read config from file %s: %w", cfgPath, err)
 	}

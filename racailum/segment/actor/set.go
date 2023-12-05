@@ -23,7 +23,7 @@ import (
 
 	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
 	linit "github.com/filecoin-project/lotus/chain/actors/builtin/init"
-	"github.com/filecoin-project/lotus/chain/consensus/filcns"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/types"
 )
@@ -123,9 +123,11 @@ type Set struct {
 }
 
 // LookupMethodInfo returns method info for the given message along with its parent if any
-func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common.StateManager, parent, call *types.Message) (MethodInfo, error) {
+func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common.StateManager, parent, call *types.MessageTrace) (MethodInfo, error) {
 	if call.Method == lbuiltin.MethodSend {
 		return MethodSend, nil
+	} else if call.Method == MARKET_NOTIFY_DEAL_METHOD {
+		return MarketNotifyDeal, nil
 	}
 
 	code := cid.Undef
@@ -204,7 +206,7 @@ func (s *Set) LookupMethodInfo(ctx context.Context, ts *types.TipSet, stm common
 		}, nil
 	}
 
-	vma := filcns.NewActorRegistry()
+	vma := consensus.NewActorRegistry()
 
 	//todo: realcode
 	mi, ok := vma.Methods[code][call.Method]

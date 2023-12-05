@@ -10,6 +10,7 @@ import (
 
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 )
 
@@ -50,7 +51,7 @@ type actorCodeConvertor func(abi.ChainEpoch, string) (cid.Cid, string, bool)
 
 func generateDefaultActorMap() map[cid.Cid]string {
 	actorMap := map[cid.Cid]string{}
-	vma := filcns.NewActorRegistry()
+	vma := consensus.NewActorRegistry()
 	for code := range vma.Methods {
 		actorMap[code] = builtin.ActorNameByCode(code)
 	}

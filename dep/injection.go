@@ -6,19 +6,10 @@ import (
 
 	"github.com/dtynn/dix"
 	"github.com/filecoin-project/lotus/build"
-	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
-	"github.com/filecoin-project/lotus/storage/sealer/storiface"
-	metricsi "github.com/ipfs/go-metrics-interface"
-	"github.com/urfave/cli/v2"
-	"go.uber.org/fx"
-
-	"github.com/ipfs-force-community/londobell/common"
-	"github.com/ipfs-force-community/londobell/lib/cliex"
-	"github.com/ipfs-force-community/londobell/racailum"
-	"github.com/ipfs-force-community/londobell/racailum/segment"
-
 	"github.com/filecoin-project/lotus/chain/beacon"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
+	"github.com/filecoin-project/lotus/chain/index"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -27,6 +18,16 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
+	"github.com/filecoin-project/lotus/storage/sealer/storiface"
+	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/cliex"
+	"github.com/ipfs-force-community/londobell/racailum"
+	"github.com/ipfs-force-community/londobell/racailum/segment"
+	"github.com/ipfs/go-datastore"
+	metricsi "github.com/ipfs/go-metrics-interface"
+	"github.com/urfave/cli/v2"
+	"go.uber.org/fx"
 
 	"github.com/ipfs-force-community/londobell/tmpbell"
 )
@@ -66,11 +67,15 @@ func StateManager() dix.Option {
 		dix.Override(new(journal.DisabledEvents), journal.EnvDisabledEvents),
 		dix.Override(new(store.WeightFunc), filcns.Weight),
 		dix.Override(new(*store.ChainStore), modules.ChainStore),
-		dix.Override(new(stmgr.Executor), filcns.NewTipSetExecutor),
+		dix.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(filcns.RewardFunc)),
 		dix.Override(new(dtypes.DrandSchedule), modules.BuiltinDrandConfig),
 		dix.Override(new(dtypes.AfterGenesisSet), modules.SetGenesis),
 		dix.Override(new(beacon.Schedule), modules.RandomSchedule),
 		dix.Override(new(stmgr.UpgradeSchedule), modules.UpgradeSchedule),
+		dix.Override(new(datastore.Batching), InMemMetadataDS),
+		// 需配合节点设置MsgIndex或DummyMsgIndex
+		// dix.Override(new(index.MsgIndex), modules.MsgIndex),
+		dix.Override(new(index.MsgIndex), modules.DummyMsgIndex),
 		dix.Override(new(*stmgr.StateManager), stmgr.NewStateManager),
 		dix.Override(new(modules.Genesis), modules.LoadGenesis(build.MaybeGenesis())),
 		dix.Override(new(dtypes.ChainBlockstore), dix.From(new(dtypes.BasicChainBlockstore))),

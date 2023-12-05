@@ -1,5 +1,5 @@
 package reg
 
-import "github.com/filecoin-project/lotus/chain/consensus/filcns"
+import "github.com/filecoin-project/lotus/chain/consensus"
 
-var ActorReg = filcns.NewActorRegistry()
+var ActorReg = consensus.NewActorRegistry()

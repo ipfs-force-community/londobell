@@ -131,25 +131,23 @@ type ActorHead struct {
 }
 
 // InvocResultCompact is the compact representation of api.InvocResult
+
 type InvocResultCompact struct {
 	MsgCid cid.Cid
 
-	RawMsg struct {
-		GasLimit   int64
-		GasFeeCap  abi.TokenAmount
-		GasPremium abi.TokenAmount
-	} `mir:"Msg"`
+	RawMsg *types.Message `mir:"Msg"`
 
-	MsgRct *types.MessageReceipt
-
+	MsgRct         *types.MessageReceipt
+	Error          string
 	GasCost        api.MsgGasCost
 	ExecutionTrace ExecutionTraceCompact
 }
 
 // ExecutionTraceCompact is the compact representation of types.ExecutionTrace
+
 type ExecutionTraceCompact struct {
-	Msg      types.Message
-	MsgRct   types.MessageReceipt
+	Msg      types.MessageTrace
+	MsgRct   types.ReturnTrace
 	Error    string
 	Duration time.Duration
 
@@ -158,6 +156,7 @@ type ExecutionTraceCompact struct {
 }
 
 // GasTraceCompact is the compact representation of types.GasTrace
+
 type GasTraceCompact struct {
 	Name string
 
@@ -165,11 +164,7 @@ type GasTraceCompact struct {
 	C int64 `mir:"ComputeGas"`
 	S int64 `mir:"StorageGas"`
 
-	// VT int64 `mir:"TotalVirtualGas"`
-	VC int64 `mir:"VirtualComputeGas"`
-	VS int64 `mir:"VirtualStorageGas"`
-
-	Callers []uintptr
+	TG int64 `mir:"TotalGas"`
 }
 
 // LinkedTipSet represets a normal tipset with its next epoch

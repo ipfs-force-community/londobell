@@ -34,12 +34,10 @@ struct	init.Exec4Params	github.com/filecoin-project/go-state-types/builtin/lates
 struct	init.ExecParams	github.com/filecoin-project/go-state-types/builtin/latest/init
 struct	market.ActivateDealsParams	github.com/filecoin-project/go-state-types/builtin/latest/market
 struct	market.ClientDealProposal	github.com/filecoin-project/go-state-types/builtin/latest/market
-struct	market.ComputeDataCommitmentParams	github.com/filecoin-project/go-state-types/builtin/latest/market
 struct	market.DealLabel	github.com/filecoin-project/go-state-types/builtin/latest/market
 struct	market.DealProposal	github.com/filecoin-project/go-state-types/builtin/latest/market
 struct	market.OnMinerSectorsTerminateParams	github.com/filecoin-project/go-state-types/builtin/latest/market
 struct	market.PublishStorageDealsParams	github.com/filecoin-project/go-state-types/builtin/latest/market
-struct	market.SectorDataSpec	github.com/filecoin-project/go-state-types/builtin/latest/market
 struct	market.SectorDeals	github.com/filecoin-project/go-state-types/builtin/latest/market
 struct	market.VerifyDealsForActivationParams	github.com/filecoin-project/go-state-types/builtin/latest/market
 struct	market.WithdrawBalanceParams	github.com/filecoin-project/go-state-types/builtin/latest/market

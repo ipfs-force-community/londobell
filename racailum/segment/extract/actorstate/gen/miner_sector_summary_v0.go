@@ -27,6 +27,9 @@ func init() {
 	for d := (miner0.MinSectorExpiration / builtin0.EpochsInDay); d <= (miner0.MaxSectorExpirationExtension / builtin0.EpochsInDay); d += 180 {
 		summaryDaysV0 = append(summaryDaysV0, abi.ChainEpoch(d))
 	}
+	if (miner0.MaxSectorExpirationExtension / builtin0.EpochsInDay) > summaryDaysV0[len(summaryDaysV0)-1] {
+		summaryDaysV0 = append(summaryDaysV0, abi.ChainEpoch(miner0.MaxSectorExpirationExtension/builtin0.EpochsInDay))
+	}
 
 	schema.Register(
 		schema.Model{

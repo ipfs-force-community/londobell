@@ -11,7 +11,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v0api"
 	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
-	"github.com/filecoin-project/lotus/chain/consensus/filcns"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/go-multierror"
@@ -24,7 +24,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
 )
 
-var ActorReg = filcns.NewActorRegistry()
+var ActorReg = consensus.NewActorRegistry()
 
 func GetPendingMessages(c *gin.Context) {
 	alog := log.With("method", "GetPendingMessages")

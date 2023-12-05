@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/ipfs/go-cid"
 
+	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -50,6 +51,7 @@ func NewExecTrace(
 	raw *common.ExecutionTraceCompact,
 	returnObj cbor.Er,
 	cost *api.MsgGasCost, meth string, isBlock bool, IDCidMap map[string][2]cid.Cid,
+	rootMsgRct *types.MessageReceipt,
 ) (*ExecTrace, *ExecGas, error) {
 	me := &ExecTrace{
 		Cid:          mcid,
@@ -86,6 +88,10 @@ func NewExecTrace(
 	err := me.genRootids(IDCidMap)
 	if err != nil {
 		elog.Warn(err)
+	}
+	if me.Depth == 1 {
+		me.MsgRct.EventsRoot = rootMsgRct.EventsRoot
+		me.MsgRct.GasUsed = rootMsgRct.GasUsed
 	}
 	//var mg *ExecGas
 	//
@@ -137,8 +143,14 @@ type ExecTrace struct {
 	}
 
 	// raw infos
-	MsgRct types.MessageReceipt
-	Error  string
+	MsgRct struct {
+		ExitCode    exitcode.ExitCode
+		Return      []byte
+		ReturnCodec uint64
+		EventsRoot  *cid.Cid `mir:"-"`
+		GasUsed     int64    `mir:"-"`
+	}
+	Error string
 
 	SeqIndex [][]int `mir:"-"`
 
