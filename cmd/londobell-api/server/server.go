@@ -328,6 +328,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/actormessages_by_methodname", aggregators.GetActorMessagesByMethodName)
 		group.POST("/messages_for_actor", aggregators.GetMessagesForActor)
 		group.POST("/transfer_messages", aggregators.GetTransferMessages)
+		group.POST("/transfer_messages_by_epoch", aggregators.GetTransferMessageByEpoch)
 		group.POST("/transfer_message_for_largeAmount", aggregators.GetTransferMessageForLargeAmount)
 		group.POST("/blockheader", aggregators.GetBlockHeader)
 		group.POST("/incoming_blockheader", aggregators.GetIncomingBlockHeader)

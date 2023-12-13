@@ -682,6 +682,76 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 	return result, nil
 }
 
+// MultiRangeQuery 根据epoch范围定位到某些库查询
+func MultiRangeQuery2(ctx context.Context, startEpoch, endEpoch int64, countUtils []CountUtil, aggregator []byte, req model.CommonReq, tableName string) ([]bson.M, error) {
+	start := startEpoch
+	end := endEpoch
+	limit := req.Limit
+	aggLists := make([]*aggUtil, 0)
+	for i := range countUtils {
+		i := i
+		countList := countUtils[i]
+		if start >= countList.Start {
+			// [start, end)
+			aggLists = append(aggLists, &aggUtil{start: start, end: end, cols: countList.Cols})
+			break
+		}
+
+		if end > countList.Start {
+			//[countList.Start, end)
+			aggLists = append(aggLists, &aggUtil{start: countList.Start, end: end, cols: countList.Cols})
+			end = countList.Start
+			continue
+		} else {
+			continue
+		}
+	}
+
+	var result = make([]bson.M, 0)
+
+	sort.Slice(aggLists, func(i, j int) bool {
+		return aggLists[i].start > aggLists[j].start
+	})
+
+	for i := range aggLists {
+		if limit <= 0 {
+			break
+		}
+		aggList := aggLists[i]
+
+		var aggRes []bson.M
+
+		// 防止有分页需求的脚本
+		if req.Index == 0 && req.Limit == 0 {
+			req.Limit = math.MaxInt64
+		}
+
+		pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Addr: req.Addr, Addrs: req.Addrs, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, Cids: req.Cids, ID: req.ID, Sort: req.Sort, To: req.To, Skip: 0, Limit: limit, ExpirationStartEpoch: req.ExpirationStartEpoch, ExpirationEndEpoch: req.ExpirationEndEpoch, SectorSize: req.SectorSize, TransferType: req.TransferType}, string(aggregator))
+		if err != nil {
+			return nil, err
+		}
+
+		for _, col := range aggList.cols.Cols {
+			if col != nil && col.Name() == tableName {
+				cur, err := col.Aggregate(ctx, pipe)
+				if err != nil {
+					return nil, err
+				}
+
+				err = cur.All(ctx, &aggRes)
+				if err != nil {
+					return nil, err
+				}
+
+				result = append(result, aggRes...)
+				limit -= int64(len(aggRes))
+			}
+		}
+	}
+
+	return result, nil
+}
+
 // MultiTraversalQuery 并发遍历所有库查询, 取一个结果
 func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []CountUtil, tableName string) ([]bson.M, error) {
 	var (
