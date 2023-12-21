@@ -45,18 +45,14 @@ londobell-api随 Filecoin 网络升级的检查项清单
 
 ### Others
 当前没使用vendor模式,但是有些依赖lotus的代码进行了调整,需要在本地机器的go mod目录做响应的调整
-1. go/pkg/mod/github.com/filecoin-project/lotus@v1.24.0-rc2/chain/stmgr/execute.go:TipSetState
-注释以下代码:
+1. /go/pkg/mod/github.com/filecoin-project/lotus@v1.24.0/chain/store/store.go:1163
+调整GetTipsetByHeight逻辑:
+调整以下代码,添加空指针判断:
 ```go
-	// if st, rec, found := tryLookupTipsetState(ctx, sm.cs, ts); found {
-	// 	return st, rec, nil
-	// }
-```
-2. go/pkg/mod/github.com/filecoin-project/lotus@v1.24.0-rc3/build/params_mainnet.go:DrandSchedule
-```go
-var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
-	// 0:                  DrandIncentinet,
-	UpgradeSmokeHeight: DrandMainnet,
-}
-
+	if ts == nil {
+		ts = cs.GetHeaviestTipSet()
+		if ts == nil {
+			return nil, xerrors.Errorf("can't get heaviest tipset")
+		}
+	}
 ```

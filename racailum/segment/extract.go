@@ -19,6 +19,7 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	east "github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate"
+	"github.com/ipfs-force-community/londobell/racailum/segment/extract/tipset"
 	ets "github.com/ipfs-force-community/londobell/racailum/segment/extract/tipset"
 )
 
@@ -63,7 +64,39 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 			return err
 		}
 	} else {
-		aset = Actorset.Set
+		ts := tss[0]
+		version := s.dal.GetNetworkVersion(ctx, ts.Height())
+		if Actorset == nil {
+			aset, err = actor.NewSet(ctx, s.dal.StateManager, ts, tmp)
+			if err != nil {
+				return err
+			}
+			Actorset = &ActorSet{
+				Version: version,
+				Set:     aset,
+			}
+		} else {
+			if Actorset.Version != version {
+				if s.opts.Extract.ExtractOptions.SkipExpensiveEpoch && tipset.IsExpensive(ctx, s.dal.StateManager, ts) {
+					// TODO: extract simple invoc results here
+					elog.Warn("ignore expensive epoch actor load")
+				} else {
+					aset, err = actor.NewSet(ctx, s.dal.StateManager, tss[0], tmp)
+					if err != nil {
+						return err
+					}
+					Actorset = &ActorSet{
+						Version: version,
+						Set:     aset,
+					}
+					elog.Infof("reload new version: %s actor", version)
+				}
+			} else {
+				aset = Actorset.Set
+			}
+
+		}
+
 	}
 
 	pctx := &persistCtx{
