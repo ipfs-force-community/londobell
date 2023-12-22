@@ -6,8 +6,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 
 	bf "github.com/ipfs/go-block-format"
@@ -231,4 +234,23 @@ func SetupTracing(lc fx.Lifecycle, cfg racailum.Config, mux *http.ServeMux) erro
 func SetupGrafana(cfg racailum.Config, mux *http.ServeMux) error {
 	// TODO: move grafana setup here
 	return nil
+}
+
+// Refer to "github.com/filecoin-project/lotus/node/modules"  BuiltinDrandConfig
+func BuiltinDrandConfig() dtypes.DrandSchedule {
+	var DrandSchedule = map[abi.ChainEpoch]build.DrandEnum{
+		// 0:                  DrandIncentinet,
+		build.UpgradeSmokeHeight: build.DrandMainnet,
+	}
+
+	out := dtypes.DrandSchedule{}
+	for start, config := range DrandSchedule {
+		out = append(out, dtypes.DrandPoint{Start: start, Config: build.DrandConfigs[config]})
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Start < out[j].Start
+	})
+
+	return out
 }
