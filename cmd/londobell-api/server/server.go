@@ -338,6 +338,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/blocks_for_message", aggregators.GetBlocksForMessage) // todo: epoch可不要，遍历查询即可
 		group.POST("/count_and_methods_of_messages_for_blockheader", aggregators.GetCountAndMethodsOfMessagesForBlockHeader)
 		group.POST("/messages_for_block", aggregators.GetMessagesForBlock)
+		group.POST("/messages_for_fund", aggregators.GetMessagesForFund)
 		group.POST("/blockheader_messages_by_methodname", aggregators.GetBlockHeaderMessagesByMethodName)
 		group.POST("/all_methods", aggregators.GetAllMethods)
 		group.POST("/all_methods_for_actor", aggregators.GetAllActorMethods)
