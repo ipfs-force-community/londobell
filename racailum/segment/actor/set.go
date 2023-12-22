@@ -42,6 +42,7 @@ const (
 
 // NewSet loads actor codes and construct a actor set with the given tipset
 func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet, tmp bool) (*Set, error) {
+	log.Infow("actor set load", "epoch", ts.Height(), "tmp", tmp)
 	_, span := trace.StartSpan(ctx, "actor.NewSet")
 	defer span.End()
 
@@ -53,6 +54,7 @@ func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSe
 	)
 
 	if tmp {
+		// root = ts.TmpState()
 		root, _, err = stm.TipSetState(ctx, ts.TipSet)
 		if err != nil {
 			return nil, fmt.Errorf("get state of tipset: %v", err)

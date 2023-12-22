@@ -353,7 +353,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	elog := ctx.L.With("epoch", ts.Height())
 
-	if ctx.Opts.SkipExpensiveEpoch && isExpensive(ctx.C, ctx.D, ts) {
+	if ctx.Opts.SkipExpensiveEpoch && IsExpensive(ctx.C, ctx.D, ts) {
 		// TODO: extract simple invoc results here
 		elog.Warn("ignore expensive epoch exec trace")
 		return nil
@@ -1633,7 +1633,7 @@ func extractDealProposal(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	elog.Infow("new dealproposal extracted")
 
 	// upgrade skip
-	if ctx.Opts.SkipExpensiveEpoch && isExpensive(ctx.C, ctx.D, ts) {
+	if ctx.Opts.SkipExpensiveEpoch && IsExpensive(ctx.C, ctx.D, ts) {
 		elog.Warn("ignore expensive epoch for new dealproposal")
 		return nil
 	}

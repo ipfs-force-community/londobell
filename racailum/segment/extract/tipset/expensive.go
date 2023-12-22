@@ -21,7 +21,7 @@ func init() {
 
 var expensiveNetworkVersions = map[network.Version]struct{}{}
 
-func isExpensive(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet) bool {
+func IsExpensive(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet) bool {
 	prev := stm.GetNetworkVersion(ctx, ts.Parent.Height())
 	next := stm.GetNetworkVersion(ctx, ts.Height())
 	if prev == next {

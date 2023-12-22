@@ -324,25 +324,6 @@ func (s *Segment) ExtractToTemporaryDB(ctx context.Context, rawts *types.TipSet)
 	// extract (hi, rawts]
 	tipsets = tipsets[1:]
 
-	// preload Actorset
-	if Actorset == nil {
-		log.Warnw("load Actorset firstly")
-		Actorset, err = NewActorSet(ctx, s.dal.StateManager, tipsets[0], tmp)
-		if err != nil {
-			return fmt.Errorf("new actor set failed: %v", err)
-		}
-	} else {
-		version := s.dal.GetNetworkVersion(ctx, rawts.Height())
-		if version != Actorset.Version {
-			// upgrade occurs, then reload Actorset
-			log.Warnf("need reload Actorset for mismatched network version, Actorset.Version: %v, current version: %v", Actorset.Version, version)
-			Actorset, err = NewActorSet(ctx, s.dal.StateManager, tipsets[0], tmp)
-			if err != nil {
-				return fmt.Errorf("new actor set failed: %v", err)
-			}
-		}
-	}
-
 	if err := s.ExtractTipSets(ctx, tipsets, tmp); err != nil {
 		return err
 	}
