@@ -44,6 +44,9 @@ func GetMessagesForFund(c *gin.Context) {
 				"ExitCode": 0,
 				"MethodName": {$in: ["InvokeContract", "Send(placeholder)", "Send", "Send(ethaccount)"]},
 				"Epoch": {$gte: ctx.StartEpoch,$lt: ctx.EndEpoch},
+				"TransferType": {$ne:"Burn"},
+				"Value": {$ne:"0"},
+				"Type": "from"
 			}
 		},
 		{
