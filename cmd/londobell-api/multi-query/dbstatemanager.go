@@ -597,10 +597,10 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		changedActorCol := database.Collection("ChangedActor")
 		changedClaimCol := database.Collection("ChangedClaim")
 		changedDealStateCol := database.Collection("ChangedDealState")
-
+		filSupplyCol := database.Collection("FilSupply")
 		cols := make([]*mongo.Collection, 0)
 		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol,
-			changedSectorCol, changedActorCol, changedClaimCol, changedDealStateCol, orphanBlockCol)
+			changedSectorCol, changedActorCol, changedClaimCol, changedDealStateCol, orphanBlockCol, filSupplyCol)
 		dbsm.UpdateDBCollectionsMap(db.Url(), config2.Collections{DB: database, Cols: cols})
 	}
 
@@ -712,10 +712,10 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 	changedActorCol := database.Collection("ChangedActor")
 	changedClaimCol := database.Collection("ChangedClaim")
 	changedDealStateCol := database.Collection("ChangedDealState")
-
+	filSupplyCol := database.Collection("FilSupply")
 	cols := make([]*mongo.Collection, 0)
 	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol,
-		changedSectorCol, changedActorCol, changedClaimCol, newDealProposalCol, changedDealStateCol, orphanBlockCol)
+		changedSectorCol, changedActorCol, changedClaimCol, newDealProposalCol, changedDealStateCol, orphanBlockCol, filSupplyCol)
 
 	return config2.Collections{DB: database, Cols: cols}, nil
 }
