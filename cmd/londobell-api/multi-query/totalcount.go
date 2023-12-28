@@ -1221,19 +1221,9 @@ func refreshTotalCountForBlockMsgsByMethodName(ctx context.Context, state *segme
 }
 
 func refreshTotalCountForActorMsgs(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
-	var (
-		actorStates []smodel.SegmentState
-		err         error
-		colName     = ctx.Value(TableKey).(string)
-	)
 	switch state.GetDType() {
 	case smodel.Formal:
-		if colName == "ActorMessage" {
-			actorStates, err = DBStateManager.GetActorStates(ctx, state.GetDSN(), actorID)
-		} else {
-			actorStates, err = GetActorStates(ctx, state, cols, actorID)
-		}
-
+		actorStates, err := DBStateManager.GetActorStates(ctx, state.GetDSN(), actorID)
 		if err != nil {
 			return err
 		}
@@ -1253,52 +1243,12 @@ func refreshTotalCountForActorMsgs(ctx context.Context, state *segment.State, co
 		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: actorStates, DType: state.GetDType()})
 		return nil
 	case smodel.Cold:
-		if colName == "ActorMessage" {
-			actorStates, err = DBStateManager.GetActorStates(ctx, state.GetDSN(), actorID)
-		} else {
-			actorStates, err = GetActorStates(ctx, state, cols, actorID)
-		}
-
+		actorStates, err := DBStateManager.GetActorStates(ctx, state.GetDSN(), actorID)
 		if err != nil {
 			return err
 		}
 
 		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: actorStates, DType: state.GetDType()})
-		return nil
-	default:
-		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())
-	}
-}
-
-func refreshTotalCountForCreateMsgs(ctx context.Context, state *segment.State, cols common.Collections, concurrentCountUtils *ConcurrentCountUtils, tmpStartEpoch *abi.ChainEpoch, curEpoch abi.ChainEpoch, actorID, methodName string) error {
-	switch state.GetDType() {
-	case smodel.Formal:
-		count, err := GetActorStates(ctx, state, cols, actorID)
-		if err != nil {
-			return err
-		}
-
-		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
-		*tmpStartEpoch = state.GetEndEpoch()
-		return nil
-	case smodel.Tmp:
-		state.SetStartEpoch(*tmpStartEpoch)
-		state.SetEndEpoch(curEpoch + 1)
-
-		count, err := GetActorStates(ctx, state, cols, actorID)
-		if err != nil {
-			return err
-		}
-
-		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
-		return nil
-	case smodel.Cold:
-		count, err := GetActorStates(ctx, state, cols, actorID)
-		if err != nil {
-			return err
-		}
-
-		concurrentCountUtils.AppendCountUtils(CountUtil{Start: int64(state.GetStartEpoch()), End: int64(state.GetEndEpoch()), Cols: cols, ActorStates: count, DType: state.GetDType()})
 		return nil
 	default:
 		return fmt.Errorf("invalid dtype: %v for dsn: %v", state.GetDType(), state.GetDSN())

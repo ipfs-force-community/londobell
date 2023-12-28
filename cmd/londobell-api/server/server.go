@@ -286,7 +286,6 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 	{
 		// todo: 1. 原来范围请求变成分页请求的接口 2. 原来只请求formal，现在为了实时性也请求tmp 和天佑沟通
 		group.POST("/address", aggregators.GetAddress)
-		group.POST("/changed_actors", aggregators.GetChangeActorForEpoch)
 		group.POST("/actor_state_epoch", aggregators.GetActorStateForEpoch) // todo: account只存一次，head主键不变
 		group.POST("/balance", aggregators.GetBalance)
 		group.POST("/richlist", aggregators.GetRichList)
