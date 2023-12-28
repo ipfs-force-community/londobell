@@ -344,6 +344,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/all_methods", aggregators.GetAllMethods)
 		group.POST("/all_methods_for_actor", aggregators.GetAllActorMethods)
 		group.POST("/version", aggregators.GetVersion)
+		group.POST("/get_filsupply", aggregators.GetFilSupply)
 		group.POST("/get_transaction_by_cid", aggregators.GetTransactionByCid)
 		group.POST("/get_transaction_receipt_by_cid", aggregators.GetTransactionReceiptByCid)
 		group.POST("/initcode_for_evm", aggregators.GetInitCodeForEvm)

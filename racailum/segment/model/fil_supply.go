@@ -16,8 +16,8 @@ var (
 
 // FilSupply shows the summary of the fil circulating supply
 type FilSupply struct {
-	Epoch abi.ChainEpoch `bson:"_id"`
-	api.CirculatingSupply
+	Epoch                 abi.ChainEpoch `bson:"_id" json:"_id"`
+	api.CirculatingSupply `json:"CirculatingSupply"`
 }
 
 // CollectionName impl common.Document
