@@ -115,9 +115,7 @@ func getActorMsgsByMethodName(ctx context.Context, indexReq, limit, count int64,
 	}
 
 	for _, countUtil := range countUtils {
-		for _, ams := range countUtil.ActorMethodStates {
-			count += ams.Count
-		}
+		count += countUtil.ActorMethodStates
 	}
 	// 检测越界(主要防止双表越界)
 	if count <= indexReq {
@@ -132,8 +130,8 @@ func getActorMsgsByMethodName(ctx context.Context, indexReq, limit, count int64,
 		multiResult, err = multiquery.MultiTraversalQuery(ctx, pipe, countUtils, colName)
 	} else {
 
-		multiResult, err = multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorMethodStates, countUtils, monitor.GetActorMessagesByMethodNameAggregator(),
-			req, colName)
+		multiResult, err = multiquery.MultiBiSearch(ctx, indexReq, req.Limit, countUtils, monitor.GetActorMessagesByMethodNameNoskipAggregator(),
+			monitor.GetCountOfActorMessagesByMethodNameAggregator(), req, colName, multiquery.ActorMethodStates)
 	}
 
 	// multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, req.Limit, multiquery.ActorMethodStates, countUtils, actorMessagesByMethodNameAggregator, req, ctx.Value(multiquery.TableKey).(string))

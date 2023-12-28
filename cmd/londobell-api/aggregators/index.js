@@ -69,32 +69,3 @@ db.Message.createIndex({ _id: 1, "Detail.Method": 1 }, { sparse: true });
 // message
 
 db.OrphanBlock.createIndex({ Epoch: 1 }, { sparse: true });
-
-
-// For SegMent 
-
-db.ActorMethodState.createIndex({ StartEpoch: 1 }, { sparse: true });
-db.ActorMethodState.createIndex({ EndEpoch: 1 }, { sparse: true });
-db.ActorMethodState.createIndex({ Dsn: 1 }, { sparse: true });
-db.ActorMethodState.createIndex({ ActorID: 1 }, { sparse: true });
-db.ActorMethodState.createIndex({ MethodName: 1 }, { sparse: true });
-
-
-db.ActorState.createIndex({ StartEpoch: 1 }, { sparse: true });
-db.ActorState.createIndex({ EndEpoch: 1 }, { sparse: true });
-db.ActorState.createIndex({ Dsn: 1 }, { sparse: true });
-db.ActorState.createIndex({ ActorID: 1 }, { sparse: true });
-
-
-
-db.BlockMethodState.createIndex({ StartEpoch: 1 }, { sparse: true });
-db.BlockMethodState.createIndex({ EndEpoch: 1 }, { sparse: true });
-db.BlockMethodState.createIndex({ Dsn: 1 }, { sparse: true });
-db.BlockMethodState.createIndex({ MethodName: 1 }, { sparse: true });
-
-
-
-
-db.BlockState.createIndex({ StartEpoch: 1 }, { sparse: true });
-db.BlockState.createIndex({ EndEpoch: 1 }, { sparse: true });
-db.BlockState.createIndex({ Dsn: 1 }, { sparse: true });
