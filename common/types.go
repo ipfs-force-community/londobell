@@ -183,6 +183,15 @@ func (lts *LinkedTipSet) State() cid.Cid {
 	return lts.Child.ParentState()
 }
 
+// State returns the state root of current tipset, from its next tipset
+func (lts *LinkedTipSet) TmpState() cid.Cid {
+	if lts.Child == nil {
+		return lts.ParentState()
+	}
+
+	return lts.Child.ParentState()
+}
+
 func (lts *LinkedTipSet) String() string {
 	if lts == nil {
 		return "nil"

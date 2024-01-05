@@ -52,8 +52,12 @@ func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSe
 		err  error
 		root cid.Cid
 	)
+	if tmp {
+		root = ts.TmpState()
+	} else {
+		root = ts.State()
+	}
 
-	root = ts.State()
 	// if tmp {
 	// 	// root = ts.TmpState()
 	// 	root, _, err = stm.TipSetState(ctx, ts.TipSet)
