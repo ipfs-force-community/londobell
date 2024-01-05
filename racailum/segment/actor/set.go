@@ -53,19 +53,20 @@ func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSe
 		root cid.Cid
 	)
 
-	if tmp {
-		// root = ts.TmpState()
-		root, _, err = stm.TipSetState(ctx, ts.TipSet)
-		if err != nil {
-			return nil, fmt.Errorf("get state of tipset: %v", err)
-		}
-	} else {
-		root = ts.State()
-	}
+	root = ts.State()
+	// if tmp {
+	// 	// root = ts.TmpState()
+	// 	root, _, err = stm.TipSetState(ctx, ts.TipSet)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("get state of tipset: %v", err)
+	// 	}
+	// } else {
+	// 	root = ts.State()
+	// }
 
 	tree, err := stm.StateTree(root)
 	if err != nil {
-		return nil, fmt.Errorf("load state tree: %w", err)
+		return nil, fmt.Errorf("load state tree: %w,tmp: %t", err, tmp)
 	}
 
 	// load actor idss
