@@ -47,7 +47,7 @@ func New(ctx context.Context, cfg racailum.Config, cs common.ChainStore, stm com
 		return nil, fmt.Errorf("tmp: no active segment")
 	}
 
-	activeSeg, err := segment.New(ctx, activeSegName, cfg.Segment, cfg.Aggregate, segmgr, cs, stm)
+	activeSeg, err := segment.New(ctx, activeSegName, cfg.Segment, cfg.Aggregate, segmgr, cs, stm, full)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,6 @@ func New(ctx context.Context, cfg racailum.Config, cs common.ChainStore, stm com
 		Full:      full,
 		activeSeg: activeSeg,
 	}
-
 	return tmp, nil
 }
 
