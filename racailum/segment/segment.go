@@ -16,6 +16,7 @@ import (
 	"go.opencensus.io/stats"
 	"go.opencensus.io/trace"
 
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil/mdict"
@@ -66,7 +67,7 @@ func (a *Anchor) Is(ts *common.LinkedTipSet) bool {
 }
 
 // New attempts to construct a *Segment
-func New(ctx context.Context, name string, opts Options, aggopt aggregate.Options, mgr *Manager, cs common.ChainStore, stm common.StateManager) (*Segment, error) {
+func New(ctx context.Context, name string, opts Options, aggopt aggregate.Options, mgr *Manager, cs common.ChainStore, stm common.StateManager, fullNode v0api.FullNode) (*Segment, error) {
 	bound, bhas, err := mgr.LoadBoundary(name)
 	if err != nil {
 		return nil, fmt.Errorf("load boundary: %w", err)
@@ -150,6 +151,7 @@ func New(ctx context.Context, name string, opts Options, aggopt aggregate.Option
 	seg.dal.ChainStore = cs
 	seg.dal.ChainDict = dicts
 	seg.dal.StateManager = stm
+	seg.fullNode = fullNode
 
 	return seg, nil
 }
@@ -165,8 +167,8 @@ type Segment struct {
 	mgr  *Manager
 
 	headNotify chan *types.TipSet
-
-	bound struct {
+	fullNode   v0api.FullNode
+	bound      struct {
 		sync.RWMutex
 		Boundary
 	}

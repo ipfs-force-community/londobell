@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 
 	"go.uber.org/zap"
@@ -14,7 +15,7 @@ import (
 )
 
 // NewCtx constructs a new extract context
-func NewCtx(ctx context.Context, d common.DAL, l *zap.SugaredLogger, aset *actor.Set, latestDealID int64, opts Options) (*Ctx, error) {
+func NewCtx(ctx context.Context, d common.DAL, l *zap.SugaredLogger, aset *actor.Set, latestDealID int64, opts Options, full v0api.FullNode) (*Ctx, error) {
 	ectx := &Ctx{
 		C:    ctx,
 		D:    d,
@@ -24,7 +25,7 @@ func NewCtx(ctx context.Context, d common.DAL, l *zap.SugaredLogger, aset *actor
 
 	ectx.Actors.Set = aset
 	ectx.LatestDealID = latestDealID
-
+	ectx.FullNode = full
 	return ectx, nil
 }
 
@@ -40,6 +41,7 @@ type Ctx struct {
 	}
 
 	LatestDealID int64 // latest dealID of DealProposal
+	FullNode     v0api.FullNode
 }
 
 // NewRes constructs a new extract result
@@ -88,7 +90,11 @@ func LookupID(ctx *Ctx, addr address.Address, ts *types.TipSet) (address.Address
 	if !ok {
 		actorID, err = ctx.D.LookupID(ctx.C, addr, ts)
 		if err != nil {
-			return address.Undef, err
+			ctx.L.Warnf("failed to lookup actor id: %s,err: %s, fallback to full node", addr, err.Error())
+			actorID, err = ctx.FullNode.StateLookupID(ctx.C, addr, ts.Key())
+			if err != nil {
+				return address.Undef, err
+			}
 		}
 
 		ActorIDMapping.SetActorID(addr, actorID)
