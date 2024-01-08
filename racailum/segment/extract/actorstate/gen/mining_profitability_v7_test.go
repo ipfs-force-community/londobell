@@ -37,7 +37,7 @@ func TestMiningProfitabilityV7(t *testing.T) {
 	mockDAL.On("ChainBlockstore").Return(localBs)
 
 	latestDealID := int64(-1)
-	ectx, err := extract.NewCtx(context.Background(), mockDAL, &zap.SugaredLogger{}, &actor.Set{}, latestDealID, extract.DryOptions())
+	ectx, err := extract.NewCtx(context.Background(), mockDAL, &zap.SugaredLogger{}, &actor.Set{}, latestDealID, extract.DryOptions(), nil)
 	require.NoError(t, err)
 
 	res := extract.NewRes(0, 0)

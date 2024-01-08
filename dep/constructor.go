@@ -124,11 +124,12 @@ type raIn struct {
 	Stm        common.StateManager
 	SegMgr     *segment.Manager
 	ShutDownCh dtypes.ShutdownChan
+	Full       v0api.FullNode
 }
 
 // NewRaCailum constructs an instance of RaCailum
 func NewRaCailum(in raIn) (*racailum.RaCailum, error) {
-	return racailum.New(in.Ctx, in.Cfg, in.Sub, in.CS, in.Stm, in.SegMgr, in.ShutDownCh)
+	return racailum.New(in.Ctx, in.Cfg, in.Sub, in.CS, in.Stm, in.SegMgr, in.ShutDownCh, in.Full)
 }
 
 type tmpIn struct {
