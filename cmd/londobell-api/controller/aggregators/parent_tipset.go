@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"context"
 
@@ -39,16 +40,29 @@ func GetParentTipSet(c *gin.Context) {
 		return
 	}
 
-	var parentTipSetRes []model.TipSetRes
+	var (
+		parentTipSetRes []model.TipSetRes
+		start, end      = req.StartEpoch - 1, req.StartEpoch
+	)
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, common2.ParentTipSetAggregator, req, "Tipset")
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
+		var (
+			multiResult []primitive.M
+			err         error
+		)
+		for {
+			multiResult, err = multiquery.MultiRangeQuery(ctx, start, end, countUtils, common2.ParentTipSetAggregator, req, "Tipset")
+			if err != nil {
+				alog.Error(err)
+				util.ReturnOnErr(c, err)
+				return
+			}
 
+			if len(multiResult) == 1 || start <= 0 {
+				break
+			}
+			start, end = start-1, start
+		}
 		if len(multiResult) == 0 {
 			c.JSON(http.StatusOK, res)
 			return
