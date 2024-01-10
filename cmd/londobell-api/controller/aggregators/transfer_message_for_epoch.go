@@ -3,7 +3,6 @@ package aggregators
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -15,11 +14,17 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 )
 
-var (
-	baseTransferPipe = `
-// ActorMessage
+var baseTransferPipe = `
 [
-%s
+	{
+		$match: {
+			"ActorID": ctx.Addr,
+			"ExitCode": 0,
+			"IsBlock": true,
+			"MethodName": {$in: ["Send", "Send(placeholder)"]},
+			"Epoch": {$lte: ctx.EndEpoch},
+		}
+	},
     {
         $sort: {
             "Epoch": -1
@@ -59,11 +64,6 @@ var (
     }
 ]
 `
-	transferMatch string
-	transferType  = `
-	"TransferType": ctx.TransferType,
-	`
-)
 
 func GetTransferMessageByEpoch(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -80,35 +80,11 @@ func GetTransferMessageByEpoch(c *gin.Context) {
 	}
 
 	curEpoch := common.GetCurEpoch()
-	if req.Addr != "" {
-		req.Addr, err = common2.GetIDByAddr(ctx, req.Addr)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-		transferMatch = `
-		{
-			$match: {
-				"ActorID": ctx.Addr,
-				"ExitCode": 0,
-				"IsBlock": true,
-				%s
-				"Epoch": {$lte: ctx.EndEpoch},
-			}
-		},
-		`
-	} else {
-		transferMatch = `
-		{
-			$match: {
-				"ExitCode": 0,
-				"IsBlock": true,
-				%s
-				"Epoch": {$lte: ctx.EndEpoch},
-			}
-		},		
-		`
+	req.Addr, err = common2.GetIDByAddr(ctx, req.Addr)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
 	}
 
 	var (
@@ -116,74 +92,14 @@ func GetTransferMessageByEpoch(c *gin.Context) {
 		pipe       []byte
 	)
 
-	switch req.TransferType {
-	case "":
-		countUtils, err = multiquery.GetTotalCountForActorTransferMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-		transferType = `
-		"TransferType": {$in: ["Blockreward", "Burn", "Send", "Receive"]},	
-		`
-
-	case "blockreward":
-		req.TransferType = "Blockreward"
-		countUtils, err = multiquery.GetTotalCountForActorTransferBlockRewardMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		pipe = common2.TransferTypeForActorNoSkipAggregator
-
-	case "burn":
-		req.TransferType = "Burn"
-		countUtils, err = multiquery.GetTotalCountForActorTransferBurnMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-	case "transfer":
-		countUtils, err = multiquery.GetTotalCountForActorTransferSendAndReceiveMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-		transferType = `
-		"TransferType": {$in: ["Receive", "Send"]},
-		`
-	case "send":
-		req.TransferType = "Send"
-		countUtils, err = multiquery.GetTotalCountForActorTransferSendMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-	case "receive":
-		req.TransferType = "Receive"
-		countUtils, err = multiquery.GetTotalCountForActorTransferReceiveMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-	default:
-		err = fmt.Errorf("invalid transfer type: %v", req.TransferType)
+	countUtils, err = multiquery.GetTotalCountForActorTransferMsgs(ctx, req.Addr, &multiquery.DBStateManager, curEpoch)
+	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
-	transferMatch = fmt.Sprintf(transferMatch, transferType)
-	pipe = []byte(fmt.Sprintf(baseTransferPipe, transferMatch))
+
+	pipe = []byte(baseTransferPipe)
 
 	totalCount := int64(0)
 	for _, countUtil := range countUtils {
