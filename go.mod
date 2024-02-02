@@ -21,7 +21,7 @@ require (
 	github.com/gin-gonic/gin v1.8.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.6.0
-	github.com/ipfs-force-community/londobell-aggregators v0.0.0-20240109021433-bd52d9cb34d6
+	github.com/ipfs-force-community/londobell-aggregators v0.0.0-20240202055152-3cf3043686a7
 	github.com/ipfs/go-blockservice v0.5.1
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-datastore v0.6.0
