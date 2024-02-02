@@ -15,10 +15,20 @@ import (
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 )
 
+var EpochByMessageCidAggregator = `
+[
+    {
+        $match: {
+            Cid: {$eq: ctx.Cid}
+        }
+    }
+]
+`
+
 func GetBlocksForMessage(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
+	var epoch int64
 	alog := log.With("method", "GetBlocksForMessage")
 	req := model.CommonReq{}
 	res := model.CommonRes{Code: model.Success}
@@ -36,7 +46,43 @@ func GetBlocksForMessage(c *gin.Context) {
 		return
 	}
 
-	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(common.BlocksForMessageAggregator))
+	{
+		epochPipe, err := util.Parse(model.Ctx{Cid: req.Cid}, EpochByMessageCidAggregator)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+		var msgEpoch model.EpochReq
+		multiResult, err := multiquery.MultiTraversalQuery(ctx, epochPipe, countUtils, "ExecTrace")
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		if len(multiResult) == 0 {
+			c.JSON(http.StatusOK, res)
+			return
+		}
+		rawByte, err := json.Marshal(multiResult[0])
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+
+		err = json.Unmarshal(rawByte, &msgEpoch)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
+		epoch = msgEpoch.Epoch
+
+	}
+
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid, StartEpoch: epoch}, string(common.BlocksForMessageAggregator))
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
