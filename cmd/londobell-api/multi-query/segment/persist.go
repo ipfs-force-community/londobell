@@ -249,7 +249,7 @@ func (s *Segment) AddUpSegment(ctx context.Context, log *zap.SugaredLogger, segm
 	}()
 
 	sort.Slice(segmentState, func(i, j int) bool {
-		return segmentState[i].StartEpoch > segmentState[j].StartEpoch
+		return segmentState[i].EndEpoch > segmentState[j].EndEpoch
 	})
 
 	var (
@@ -458,9 +458,6 @@ func (s *Segment) AddUpSegment(ctx context.Context, log *zap.SugaredLogger, segm
 
 func getSegCol(cols []*mongo.Collection, sType common.SegmentType) *mongo.Collection {
 	var colName string
-	if sType == common.ActorStates || sType == common.ActorMethodStates {
-		colName = "ActorMessage"
-	}
 
 	switch sType {
 	case common.ActorStates, common.ActorMethodStates:
