@@ -32,6 +32,12 @@ var query = `
 		}
 	},
 	{
+		$skip: ctx.Skip
+	},
+	{
+		$limit: ctx.Limit
+	},	
+	{
 		$project: {
 			Cid: "$Cid",
 			Epoch: "$Epoch",
@@ -73,59 +79,13 @@ func GetMessagesForBlock(c *gin.Context) {
 	}
 
 	// get block message
-	blockMsg, err := getBlockMsg(req.Cid, countUtils)
+	messagesForBlockRes, err := getBlockMsg(req, countUtils)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
 
-	if len(blockMsg) == 0 {
-		c.JSON(http.StatusOK, res)
-		return
-	}
-	cids := formatList(blockMsg[0].Messages)
-	script := fmt.Sprintf(query, blockMsg[0].Epoch, cids, cids)
-	pipe, err := util.Parse(model.Ctx{Cid: req.Cid, Skip: req.Index * req.Limit, Limit: req.Limit}, script)
-
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
-	}
-
-	var messagesForBlockRes []model.TraceForMessageSimplifyRes
-
-	// multi dbs query
-	{
-		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "ActorMessage")
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		if len(multiResult) == 0 {
-			c.JSON(http.StatusOK, res)
-			return
-		}
-
-		raw := multiResult
-		rawByte, err := json.Marshal(raw)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		err = json.Unmarshal(rawByte, &messagesForBlockRes)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-	}
-	// messagesForBlockRes.Method = messagesForBlockRes.MethodName
 	res.Data = messagesForBlockRes
 	c.JSON(http.StatusOK, res)
 }
@@ -136,8 +96,11 @@ type BlockMessage struct {
 	Messages []string `bson:"Messages"`
 }
 
-func getBlockMsg(cid string, countUtils []multiquery.CountUtil) ([]BlockMessage, error) {
-	var res []BlockMessage
+func getBlockMsg(req model.CommonReq, countUtils []multiquery.CountUtil) ([]model.TraceForMessageSimplifyRes, error) {
+	var (
+		blockMsgs []BlockMessage
+		res       []model.TraceForMessageSimplifyRes
+	)
 	script := `
 [    
 	{
@@ -150,7 +113,7 @@ func getBlockMsg(cid string, countUtils []multiquery.CountUtil) ([]BlockMessage,
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	pipe, err := util.Parse(model.Ctx{Cid: cid}, script)
+	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, script)
 	if err != nil {
 		return res, err
 	}
@@ -170,11 +133,50 @@ func getBlockMsg(cid string, countUtils []multiquery.CountUtil) ([]BlockMessage,
 			return res, err
 		}
 
+		err = json.Unmarshal(rawByte, &blockMsgs)
+		if err != nil {
+			return res, err
+		}
+	}
+
+	if err != nil {
+		return res, err
+	}
+
+	if len(blockMsgs) == 0 {
+		return res, err
+	}
+	cids := formatList(blockMsgs[0].Messages)
+	script = fmt.Sprintf(query, blockMsgs[0].Epoch, cids, cids)
+	pipe, err = util.Parse(model.Ctx{Cid: req.Cid, Skip: req.Index * req.Limit, Limit: req.Limit}, script)
+
+	if err != nil {
+		return res, err
+	}
+
+	// multi dbs query
+	{
+		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "ActorMessage")
+		if err != nil {
+			return res, err
+		}
+
+		if len(multiResult) == 0 {
+			return res, nil
+		}
+
+		raw := multiResult
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			return res, err
+		}
+
 		err = json.Unmarshal(rawByte, &res)
 		if err != nil {
 			return res, err
 		}
 	}
+
 	return res, nil
 }
 

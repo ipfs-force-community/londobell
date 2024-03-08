@@ -1,10 +1,8 @@
 package aggregators
 
 import (
-	"encoding/json"
+	"math"
 	"net/http"
-
-	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
 
 	"context"
 
@@ -38,46 +36,25 @@ func GetCountAndMethodsOfMessagesForBlockHeader(c *gin.Context) {
 		util.ReturnOnErr(c, err)
 		return
 	}
-
-	pipe, err := util.Parse(model.Ctx{Cid: req.Cid}, string(common2.CountAndMethodNameOfMessagesForBlockHeaderAggregator))
+	req.Limit = math.MaxInt64
+	messagesForBlockRes, err := getBlockMsg(req, countUtils)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
-
 	var countAndMethodsForBlockHeaderRes []model.CountAndMethodsForBlockHeader
 
-	// multi dbs query
-	{
-		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "BlockMessage")
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		if len(multiResult) == 0 {
-			c.JSON(http.StatusOK, res)
-			return
-		}
-
-		raw := multiResult
-		rawByte, err := json.Marshal(raw)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		err = json.Unmarshal(rawByte, &countAndMethodsForBlockHeaderRes)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
+	methodCount := make(map[string]int64)
+	for _, blockMsg := range messagesForBlockRes {
+		methodCount[blockMsg.Method]++
 	}
-
+	for method, count := range methodCount {
+		countAndMethodsForBlockHeaderRes = append(countAndMethodsForBlockHeaderRes, model.CountAndMethodsForBlockHeader{
+			MethodName: method,
+			Count:      count,
+		})
+	}
 	res.Data = countAndMethodsForBlockHeaderRes
 	c.JSON(http.StatusOK, res)
 }
