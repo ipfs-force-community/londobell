@@ -2,9 +2,10 @@ package aggregators
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
-
-	common2 "github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
+	"strings"
 
 	"context"
 
@@ -39,38 +40,150 @@ func GetPunishment(c *gin.Context) {
 		return
 	}
 
-	var punishmentRes []model.PunishmentRes
-
-	// multi dbs query
-	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, countUtils, common2.PunishmentAggregator, req, "ExecTrace")
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		if len(multiResult) == 0 {
-			c.JSON(http.StatusOK, res)
-			return
-		}
-
-		raw := multiResult
-		rawByte, err := json.Marshal(raw)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
-
-		err = json.Unmarshal(rawByte, &punishmentRes)
-		if err != nil {
-			alog.Error(err)
-			util.ReturnOnErr(c, err)
-			return
-		}
+	punishmentRes, err := getPunishment(ctx, req, &countUtils)
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
 	}
-
 	res.Data = punishmentRes
 	c.JSON(http.StatusOK, res)
+}
+
+func getPunishment(ctx context.Context, req model.CommonReq, countUtils *[]multiquery.CountUtil) ([]model.PunishmentRes, error) {
+
+	// type TraceRes struct {
+	// 	ID string `json:"id" bson:"_id"`
+	// }
+	// type Result struct {
+	// 	ExecTrace []TraceRes `bson:"ExecTrace"`
+	// }
+	var (
+		parentID      string
+		punishmentRes []model.PunishmentRes
+	)
+	// get target ExecTrace
+
+	query := []byte(fmt.Sprintf(`
+		[
+			{
+				$match: {
+					"Msg.To": "099",
+					"Msg.Method": 0,
+					"SubCallCount": 0,
+					"Detail.Return": null,
+					"GasCost": null,
+					"Epoch": {
+						$eq: %d,
+					}
+				}
+			}  
+		]	
+			`, req.StartEpoch))
+	queryRes, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, *countUtils, query, req, "ExecTrace")
+	if err != nil {
+		return nil, err
+	}
+
+	if len(queryRes) == 0 {
+		return punishmentRes, nil
+	}
+
+	for index := range queryRes {
+		parentID, err = getParentID(queryRes[index]["_id"].(string))
+		if err != nil {
+			break
+		}
+
+		query := []byte(fmt.Sprintf(`
+			[
+				{
+					$match: {
+						"_id": "%s",
+					}
+				},
+				{
+					$lookup: {
+						from: "Message",
+						let: {
+							id: "$Cid",
+						},
+						pipeline: [
+							{
+								$match: {
+									$expr: {
+										$and: [
+											{$eq: ["$_id", "$$id"]},
+										]
+									}
+								}
+							}
+						],
+						as: "burnMessage"
+					}
+				},
+				{
+					$unwind: "$burnMessage"
+				},
+				{
+					$project: {
+						_id: 0,
+						Miner: "$burnMessage.From",
+						Epoch: "$Epoch",
+						BlockTime: {
+							$toDate: {$add: [{$toDecimal: {
+										$dateFromString: {
+											dateString: "2020-08-25T06:00:00", //格式："2020-08-25T06:00:00"
+											timezone: "Asia/Shanghai"
+										}
+									}}, {$multiply: ["$Epoch", 30*1000]}]}
+						},
+						Value: "$burnMessage.Value",
+						PenaltyType: {
+							$cond:{
+								if:{
+									$eq:["$burnMessage.Detail.Method", "ApplyRewards"]
+								},then: "block",
+								else: "sector"
+							}
+						},
+						Source: "londobell"
+					}
+				}          
+			]
+			`, parentID))
+		queryRes, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, *countUtils, query, req, "ExecTrace")
+		if err != nil {
+			return nil, err
+		}
+		if len(queryRes) == 0 {
+			return punishmentRes, nil
+		}
+
+		raw := queryRes
+		rawByte, err := json.Marshal(raw)
+		if err != nil {
+			return nil, err
+		}
+		var res []model.PunishmentRes
+		err = json.Unmarshal(rawByte, &res)
+		if err != nil {
+			return nil, err
+		}
+		punishmentRes = append(punishmentRes, res...)
+
+	}
+
+	// get message
+
+	return punishmentRes, nil
+}
+
+func getParentID(id string) (string, error) {
+	elems := strings.Split(id, "-")
+	if len(elems) < 2 {
+		return id, errors.New("invalid id: " + id)
+	}
+	id = strings.TrimSuffix(id, "-"+elems[len(elems)-1])
+	return id, nil
 }
