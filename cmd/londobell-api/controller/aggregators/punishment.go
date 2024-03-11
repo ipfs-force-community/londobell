@@ -10,6 +10,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 	multiquery "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query"
@@ -39,7 +40,7 @@ func GetPunishment(c *gin.Context) {
 		util.ReturnOnErr(c, err)
 		return
 	}
-
+	alog.Info("get punishment")
 	punishmentRes, err := getPunishment(ctx, req, &countUtils)
 	if err != nil {
 		alog.Error(err)
@@ -52,14 +53,8 @@ func GetPunishment(c *gin.Context) {
 
 func getPunishment(ctx context.Context, req model.CommonReq, countUtils *[]multiquery.CountUtil) ([]model.PunishmentRes, error) {
 
-	// type TraceRes struct {
-	// 	ID string `json:"id" bson:"_id"`
-	// }
-	// type Result struct {
-	// 	ExecTrace []TraceRes `bson:"ExecTrace"`
-	// }
+	alog := log.With("method", "GetPunishment")
 	var (
-		parentID      string
 		punishmentRes []model.PunishmentRes
 	)
 	// get target ExecTrace
@@ -88,14 +83,89 @@ func getPunishment(ctx context.Context, req model.CommonReq, countUtils *[]multi
 	if len(queryRes) == 0 {
 		return punishmentRes, nil
 	}
-
 	for index := range queryRes {
-		parentID, err = getParentID(queryRes[index]["_id"].(string))
+		var id string
+		var ok bool
+		if id, ok = queryRes[index]["_id"].(string); !ok {
+			break
+		}
+		parentID, err := getParentID(id)
 		if err != nil {
 			break
 		}
-
 		query := []byte(fmt.Sprintf(`
+		[
+			{
+				$match: {
+					"_id": "%s",
+				}
+			},
+			{
+				$lookup: {
+					from: "Message",
+					let: {
+						id: "$Cid",
+					},
+					pipeline: [
+						{
+							$match: {
+								$expr: {
+									$and: [
+										{$eq: ["$_id", "$$id"]},
+									   {$or: [
+											   {$eq: ["$Detail.Method", "TerminateSectors"]},
+											   {$eq: ["$Detail.Method", "OnDeferredCronEvent"]},
+											   {$eq: ["$Detail.Method", "ApplyRewards"]},
+											   {$eq: ["$Detail.Method", "DeclareFaultsRecovered"]}
+										   ]
+									   }                                
+									]
+								}
+							}
+						}
+					],
+					as: "message"
+				}
+			},
+            {
+    
+				$project: {
+						_id: 0,
+						Methods: "$message.Detail.Method"                
+					}
+			}
+
+		]	
+			`, parentID))
+
+		parent, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, *countUtils, query, req, "ExecTrace")
+		if err != nil {
+			return nil, err
+		}
+
+		if len(parent) == 0 {
+			return punishmentRes, nil
+		}
+
+		var method string
+
+		if methods, ok := parent[0]["Methods"].(primitive.A); !ok {
+			alog.Info(parent)
+			break
+		} else {
+			if len(methods) == 0 {
+				break
+			}
+			if method, ok = methods[0].(string); !ok {
+				break
+			}
+		}
+		penaltyType := "sector"
+		if method == "ApplyRewards" {
+			penaltyType = "block"
+		}
+
+		query = []byte(fmt.Sprintf(`
 			[
 				{
 					$match: {
@@ -139,28 +209,21 @@ func getPunishment(ctx context.Context, req model.CommonReq, countUtils *[]multi
 									}}, {$multiply: ["$Epoch", 30*1000]}]}
 						},
 						Value: "$burnMessage.Value",
-						PenaltyType: {
-							$cond:{
-								if:{
-									$eq:["$burnMessage.Detail.Method", "ApplyRewards"]
-								},then: "block",
-								else: "sector"
-							}
-						},
+						PenaltyType: "%s",
 						Source: "londobell"
 					}
 				}          
 			]
-			`, parentID))
-		queryRes, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, *countUtils, query, req, "ExecTrace")
+			`, id, penaltyType))
+		punishment, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.EndEpoch, *countUtils, query, req, "ExecTrace")
 		if err != nil {
 			return nil, err
 		}
-		if len(queryRes) == 0 {
+		if len(punishment) == 0 {
 			return punishmentRes, nil
 		}
 
-		raw := queryRes
+		raw := punishment
 		rawByte, err := json.Marshal(raw)
 		if err != nil {
 			return nil, err
