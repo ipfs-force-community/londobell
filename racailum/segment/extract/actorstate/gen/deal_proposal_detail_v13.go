@@ -7,10 +7,12 @@ package gen
 import (
 	"fmt"
 
+	"bytes"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	market6 "github.com/filecoin-project/specs-actors/v6/actors/builtin/market"
-	adt6 "github.com/filecoin-project/specs-actors/v6/actors/util/adt"
+	market13 "github.com/filecoin-project/go-state-types/builtin/v13/market"
+	adt13 "github.com/filecoin-project/go-state-types/builtin/v13/util/adt"
+	lmarket "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/ipfs/go-cid"
 
 	"github.com/ipfs-force-community/londobell/common"
@@ -20,16 +22,16 @@ import (
 )
 
 func init() {
-	reg.MustRegisterPreCheck("DealProposalDetailedV6", func(ctx *extract.Ctx) bool {
+	reg.MustRegisterPreCheck("DealProposalDetailedV13", func(ctx *extract.Ctx) bool {
 		return ctx.Opts.ZeroHourExtract.DealProposalDetail
 	}, func(ctx *extract.Ctx) int {
 		return ctx.Opts.StateRegular.DealProposalDetailTicks
 	})
-	reg.MustRegisterRegularExtractor("DealProposalDetailedV6", extractDealProposalDetailedV6)
+	reg.MustRegisterRegularExtractor("DealProposalDetailedV13", extractDealProposalDetailedV13)
 
 }
 
-func extractDealProposalDetailedV6(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market6.State) error {
+func extractDealProposalDetailedV13(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *market13.State) error {
 	id, err := GenRegularHeadID(head.Head, head.Addr, head.Epoch)
 	if err != nil {
 		return fmt.Errorf("ge regular id: %w", err)
@@ -37,20 +39,24 @@ func extractDealProposalDetailedV6(ctx *extract.Ctx, res *extract.Res, head *com
 
 	details := map[address.Address]*model.DealProposalDetail{}
 
-	deals, err := market6.AsDealProposalArray(adt6.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.Proposals)
+	state, err := lmarket.Load(adt13.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), head.Actor)
 	if err != nil {
-		return fmt.Errorf("load deal proposal array: %w", err)
+		return fmt.Errorf("failed to load market actor state: %w", err)
 	}
 
-	dealsStateArr, err := market6.AsDealStateArray(adt6.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)), st.States)
+	dealsStateArr, err := state.States()
 	if err != nil {
 		return fmt.Errorf("load deal state array: %w", err)
 	}
 
-	var out market6.DealProposal
-	var dealProposals []model.DealProposal
+	deals, err := state.Proposals()
+	if err != nil {
+		return fmt.Errorf("load deal proposal array: %w", err)
+	}
 
-	err = deals.ForEach(&out, func(idx int64) error {
+	var dealProposals []model.DealProposalV8
+
+	err = deals.ForEach(func(idx abi.DealID, out lmarket.DealProposal) error {
 		if _, ok := details[out.Provider]; !ok {
 			details[out.Provider] = &model.DealProposalDetail{
 				ActorStateExBasic: model.ActorStateExBasic{
@@ -69,7 +75,7 @@ func extractDealProposalDetailedV6(ctx *extract.Ctx, res *extract.Res, head *com
 
 		// no matter expire or slash
 
-		unExpired := out.EndEpoch > head.Epoch || (found && dealState.SlashEpoch != -1)
+		unExpired := out.EndEpoch > head.Epoch || (found && dealState.SlashEpoch() != -1)
 		if unExpired && out.VerifiedDeal {
 			details[out.Provider].Detail.VerifiedDealCount++
 		} else if unExpired {
@@ -94,12 +100,30 @@ func extractDealProposalDetailedV6(ctx *extract.Ctx, res *extract.Res, head *com
 			return fmt.Errorf("lookup ID for client %v at %v failed: %v", out.Client, head.Epoch, err)
 		}
 
-		dealProposals = append(dealProposals, model.DealProposal{
-			ID:           idx,
-			Epoch:        head.Epoch,
-			ProviderID:   providerID,
-			ClientID:     clientID,
-			DealProposal: out,
+		labelBytes := new(bytes.Buffer)
+		err = out.Label.MarshalCBOR(labelBytes)
+		if err != nil {
+			return fmt.Errorf("marshal label failed: %v", err)
+		}
+
+		dealProposals = append(dealProposals, model.DealProposalV8{
+			ID:         int64(idx),
+			Epoch:      head.Epoch,
+			ProviderID: providerID,
+			ClientID:   clientID,
+			MDealProposalV8: model.MDealProposalV8{
+				PieceCID:             out.PieceCID,
+				PieceSize:            out.PieceSize,
+				VerifiedDeal:         out.VerifiedDeal,
+				Client:               out.Client,
+				Provider:             out.Provider,
+				Label:                labelBytes.Bytes(),
+				StartEpoch:           out.StartEpoch,
+				EndEpoch:             out.EndEpoch,
+				StoragePricePerEpoch: out.StoragePricePerEpoch,
+				ProviderCollateral:   out.ProviderCollateral,
+				ClientCollateral:     out.ClientCollateral,
+			},
 		})
 
 		return nil
