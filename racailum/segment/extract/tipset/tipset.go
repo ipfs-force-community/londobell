@@ -608,7 +608,9 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				if eventsRoot != nil {
 					events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
 					if err != nil {
-						return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
+						// return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
+						elog.Warnf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
+						break
 					}
 
 					if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
