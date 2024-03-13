@@ -610,44 +610,44 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					if err != nil {
 						// return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
 						elog.Warnf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
-						break
-					}
-
-					if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
-						etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
-						if err != nil {
-							elog.Warnw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
-						} else {
-							res.Docs = append(res.Docs, etm)
-							etcnt++
-						}
-					}
-
-					if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
-						for i, evt := range events {
-							actorID, err := address.NewIDAddress(uint64(evt.Emitter))
+					} else {
+						if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
+							etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
 							if err != nil {
-								return fmt.Errorf("failed to create ID address: %w", err)
-							}
-
-							data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
-							if !ok {
-								// not an eth event.
-								elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
-								continue
-							}
-
-							logIndex := uint64(i)
-							removed := false
-							aet, err := model.NewActorEvent(actorID, ts.Height(), mcid, signedCid, topics, data, logIndex, removed, p.seq)
-							if err != nil {
-								elog.Warnw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+								elog.Warnw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
 							} else {
-								aecnt++
-								res.Docs = append(res.Docs, aet)
+								res.Docs = append(res.Docs, etm)
+								etcnt++
+							}
+						}
+
+						if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
+							for i, evt := range events {
+								actorID, err := address.NewIDAddress(uint64(evt.Emitter))
+								if err != nil {
+									return fmt.Errorf("failed to create ID address: %w", err)
+								}
+
+								data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
+								if !ok {
+									// not an eth event.
+									elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
+									continue
+								}
+
+								logIndex := uint64(i)
+								removed := false
+								aet, err := model.NewActorEvent(actorID, ts.Height(), mcid, signedCid, topics, data, logIndex, removed, p.seq)
+								if err != nil {
+									elog.Warnw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+								} else {
+									aecnt++
+									res.Docs = append(res.Docs, aet)
+								}
 							}
 						}
 					}
+
 				}
 			}
 		}
