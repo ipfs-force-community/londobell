@@ -60,3 +60,14 @@ londobell-api随 Filecoin 网络升级的检查项清单
 
 2.额外检查
 检查`github.com/filecoin-project/lotus/node/` build变更,根据变更调整`dep`部分代码
+如：
+go/pkg/mod/github.com/filecoin-project/lotus@v1.26.2/build/params_mainnet.go注释`DrandSchedule`
+```go
+var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
+        //0:                    DrandIncentinet,
+        UpgradeSmokeHeight:   DrandMainnet,
+        UpgradePhoenixHeight: DrandQuicknet,
+}
+```
+
+go/pkg/mod/github.com/filecoin-project/lotus@v1.26.2/build/params_calibnet.go
