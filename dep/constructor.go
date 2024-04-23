@@ -239,9 +239,15 @@ func SetupGrafana(cfg racailum.Config, mux *http.ServeMux) error {
 
 // Refer to "github.com/filecoin-project/lotus/node/modules"  BuiltinDrandConfig
 func BuiltinDrandConfig() dtypes.DrandSchedule {
+	// var DrandSchedule = map[abi.ChainEpoch]build.DrandEnum{
+	// 0:                  DrandIncentinet,
+	// 	build.UpgradeSmokeHeight: build.DrandMainnet,
+	// }
+
 	var DrandSchedule = map[abi.ChainEpoch]build.DrandEnum{
-		// 0:                  DrandIncentinet,
-		build.UpgradeSmokeHeight: build.DrandMainnet,
+		// 0:                    build.DrandIncentinet,
+		build.UpgradeSmokeHeight:   build.DrandMainnet,
+		build.UpgradePhoenixHeight: build.DrandQuicknet,
 	}
 
 	out := dtypes.DrandSchedule{}

@@ -11,15 +11,14 @@ import (
 var _ common.IndexedDocument = (*SegmentState)(nil)
 
 type SegmentState struct {
-	ID         string         `bson:"_id"`
-	Dsn        string         `bson:"Dsn"`
-	StartEpoch abi.ChainEpoch `bson:"StartEpoch"`
-	EndEpoch   abi.ChainEpoch `bson:"EndEpoch"`
-	Count      int64          `bson:"Count"`
+	ID         string `bson:"_id"`
+	Dsn        string
+	StartEpoch abi.ChainEpoch // included
+	EndEpoch   abi.ChainEpoch // not included
+	Count      int64
 
-	ActorID    string `bson:"ActorID"`
-	MethodName string `bson:"MethodName"`
-	ExtraData  string `bson:"ExtraData"`
+	ActorID    string
+	MethodName string
 }
 
 func NewSegmentState(dsn string, startEpoch, endEpoch abi.ChainEpoch, count int64) *SegmentState {

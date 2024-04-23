@@ -110,7 +110,11 @@ func extractDealProposalDetailedV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, 
 		}
 
 		// no matter expire or slash
+		{{ if ge .Ver 8 }}
+		unExpired := out.EndEpoch > head.Epoch || (found && dealState.SlashEpoch() != -1)
+		{{- else }}
 		unExpired := out.EndEpoch > head.Epoch || (found && dealState.SlashEpoch != -1)
+		{{- end}}
 		if unExpired && out.VerifiedDeal {
 			details[out.Provider].Detail.VerifiedDealCount++
 		} else if unExpired {

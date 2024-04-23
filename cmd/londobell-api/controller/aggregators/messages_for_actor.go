@@ -148,9 +148,7 @@ func getActorMsgs(ctx context.Context, indexReq, limit, count int64, req model.C
 		return messagesForActor, count, err
 	}
 	for _, countUtil := range countUtils {
-		for _, as := range countUtil.ActorStates {
-			count += as.Count
-		}
+		count += countUtil.ActorStates
 	}
 
 	// 检测越界(主要防止双表越界)
@@ -166,8 +164,8 @@ func getActorMsgs(ctx context.Context, indexReq, limit, count int64, req model.C
 		}
 		multiResult, err = multiquery.MultiTraversalQuery(ctx, pipe, countUtils, colName)
 	} else {
-
-		multiResult, err = multiquery.MultiPagingQuery(ctx, req.Index, limit, multiquery.ActorStates, countUtils, common2.MessagesForActorAggregator, req, colName)
+		multiResult, err = multiquery.MultiBiSearch(ctx, indexReq, limit, countUtils, common2.ActorMessageNoSkip,
+			monitor.GetCountOfMessageForActorAggregator(), req, colName, multiquery.ActorStates)
 	}
 
 	// multiResult, err := multiquery.MultiPagingQuery(ctx, req.Index, limit, multiquery.ActorStates, countUtils, messagesForActorAggregator, req, colName)

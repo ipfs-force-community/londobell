@@ -608,44 +608,46 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				if eventsRoot != nil {
 					events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
 					if err != nil {
-						return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
-					}
-
-					if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
-						etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
-						if err != nil {
-							elog.Warnw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
-						} else {
-							res.Docs = append(res.Docs, etm)
-							etcnt++
-						}
-					}
-
-					if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
-						for i, evt := range events {
-							actorID, err := address.NewIDAddress(uint64(evt.Emitter))
+						// return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
+						elog.Warnf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
+					} else {
+						if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
+							etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
 							if err != nil {
-								return fmt.Errorf("failed to create ID address: %w", err)
-							}
-
-							data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
-							if !ok {
-								// not an eth event.
-								elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
-								continue
-							}
-
-							logIndex := uint64(i)
-							removed := false
-							aet, err := model.NewActorEvent(actorID, ts.Height(), mcid, signedCid, topics, data, logIndex, removed, p.seq)
-							if err != nil {
-								elog.Warnw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+								elog.Warnw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
 							} else {
-								aecnt++
-								res.Docs = append(res.Docs, aet)
+								res.Docs = append(res.Docs, etm)
+								etcnt++
+							}
+						}
+
+						if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
+							for i, evt := range events {
+								actorID, err := address.NewIDAddress(uint64(evt.Emitter))
+								if err != nil {
+									return fmt.Errorf("failed to create ID address: %w", err)
+								}
+
+								data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
+								if !ok {
+									// not an eth event.
+									elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
+									continue
+								}
+
+								logIndex := uint64(i)
+								removed := false
+								aet, err := model.NewActorEvent(actorID, ts.Height(), mcid, signedCid, topics, data, logIndex, removed, p.seq)
+								if err != nil {
+									elog.Warnw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
+								} else {
+									aecnt++
+									res.Docs = append(res.Docs, aet)
+								}
 							}
 						}
 					}
+
 				}
 			}
 		}
@@ -762,15 +764,15 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				return fmt.Errorf("failed to load verifiedRegistry state: %v", err)
 			}
 
-			cmkact, err := ctx.D.LoadActor(ctx.C, builtin.StorageMarketActorAddr, ts.Child)
-			if err != nil {
-				return fmt.Errorf("failed to load StorageMarketActorAddr actor at %v: %v", ts.Child.Height(), err)
-			}
+			// cmkact, err := ctx.D.LoadActor(ctx.C, builtin.StorageMarketActorAddr, ts.Child)
+			// if err != nil {
+			// 	return fmt.Errorf("failed to load StorageMarketActorAddr actor at %v: %v", ts.Child.Height(), err)
+			// }
 
-			cmkas, err := market.Load(ctx.D.ActorStore(ctx.C), cmkact)
-			if err != nil {
-				return fmt.Errorf("failed to load storageMarket state: %v", err)
-			}
+			// cmkas, err := market.Load(ctx.D.ActorStore(ctx.C), cmkact)
+			// if err != nil {
+			// 	return fmt.Errorf("failed to load storageMarket state: %v", err)
+			// }
 
 			// ProveCommitSector & ProveCommitAggregate generate部分sector
 			if p.exec != nil && p.exec.MsgRct.ExitCode.IsSuccess() && strings.Contains(mi.Actor, "miner") && (p.exec.Msg.Method == builtintypes.MethodsMiner.ProveCommitSector || p.exec.Msg.Method == builtintypes.MethodsMiner.ProveCommitAggregate) {
@@ -939,36 +941,40 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				}
 
 				if ctx.Opts.EnabelExtract.EnableExtractSectorClaim && av > actors.Version8 {
-					var allocIDs []verifreg.AllocationId
 
-					state, err := cmkas.States()
+					claims, err := cvas.GetClaims(minerID)
 					if err != nil {
-						return fmt.Errorf("get market state failed: %v", err)
+						return fmt.Errorf("get cliams for %v  failed: %v", minerID, err)
+					}
+					for claimID, claim := range claims {
+						sct := model.NewSectorClaim(uint64(claimID), claim.Provider, claim.Client, claim.Data, claim.Size, claim.TermMin, claim.TermMax, claim.TermStart, claim.Sector, ts.Height())
+						sctCnt++
+						res.Docs = append(res.Docs, sct)
 					}
 
-					for _, deal := range Deals {
-						dealState, found, err := state.Get(deal)
-						if err != nil {
-							return fmt.Errorf("get dealstate failed: %v", err)
-						}
+					// for _, deal := range Deals {
+					// 	dealState, found, err := state.Get(deal)
+					// 	if err != nil {
+					// 		return fmt.Errorf("get dealstate failed: %v", err)
+					// 	}
 
-						if found {
-							allocIDs = append(allocIDs, dealState.VerifiedClaim)
-						}
-					}
+					// 	if found {
+					// 		allocIDs = append(allocIDs, dealState.VerifiedClaim)
+					// 	}
+					// }
 
-					for _, allocID := range allocIDs {
-						claim, found, err := cvas.GetClaim(minerID, verifreg.ClaimId(allocID))
-						if err != nil {
-							return fmt.Errorf("get cliam for %v of %v failed: %v", allocID, minerID, err)
-						}
+					// for _, allocID := range allocIDs {
+					// 	claim, found, err := cvas.GetClaim(minerID, verifreg.ClaimId(allocID))
+					// 	if err != nil {
+					// 		return fmt.Errorf("get cliam for %v of %v failed: %v", allocID, minerID, err)
+					// 	}
 
-						if found {
-							sct := model.NewSectorClaim(uint64(allocID), claim.Provider, claim.Client, claim.Data, claim.Size, claim.TermMin, claim.TermMax, claim.TermStart, claim.Sector, ts.Height())
-							sctCnt++
-							res.Docs = append(res.Docs, sct)
-						}
-					}
+					// 	if found {
+					// 		sct := model.NewSectorClaim(uint64(allocID), claim.Provider, claim.Client, claim.Data, claim.Size, claim.TermMin, claim.TermMax, claim.TermStart, claim.Sector, ts.Height())
+					// 		sctCnt++
+					// 		res.Docs = append(res.Docs, sct)
+					// 	}
+					// }
 				}
 			}
 
