@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -23,7 +24,7 @@ var epochAggregator string = `
     },
 	{
         $project: {
-			"Addr":    1,
+			"ActorID": "$Addr",
 			"Code":    1,
 			"Balance": 1,
 			"Epoch":   1,
@@ -128,7 +129,7 @@ func getActorState(epoch int64, ctx context.Context, countUtils []multiquery.Cou
 
 func diffActorState(reqRes, baseRes []model.ActorStateRes) []model.ActorStateRes {
 	if baseRes == nil {
-		return reqRes
+		return tidyActorCode(reqRes)
 	}
 	var changedActorsRes []model.ActorStateRes
 	base := make(map[string]model.ActorStateRes)
@@ -149,5 +150,14 @@ func diffActorState(reqRes, baseRes []model.ActorStateRes) []model.ActorStateRes
 			}
 		}
 	}
-	return changedActorsRes
+	return tidyActorCode(changedActorsRes)
+}
+
+func tidyActorCode(actors []model.ActorStateRes) []model.ActorStateRes {
+	for index, actor := range actors {
+		parts := strings.Split(actor.Code, "/")
+		code := parts[len(parts)-1]
+		actors[index].Code = code
+	}
+	return actors
 }
