@@ -2,7 +2,7 @@ module github.com/ipfs-force-community/londobell
 
 go 1.21
 
-toolchain go1.21.6
+
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2
