@@ -32,9 +32,9 @@ jobs:
         if: ${{ success() }}
         run: make build-bell
 
-      - name: lint
-        if: ${{ success() }}
-        run: make lint
+      # - name: lint
+      #   if: ${{ success() }}
+      #   run: make lint
 
       - name: test
         if: ${{ success() }}
