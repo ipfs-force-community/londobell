@@ -82,6 +82,7 @@ func extractDealProposalDetailedV0(ctx *extract.Ctx, res *extract.Res, head *com
 		}
 
 		// no matter expire or slash
+
 		unExpired := out.EndEpoch > head.Epoch || (found && dealState.SlashEpoch != -1)
 		if unExpired && out.VerifiedDeal {
 			details[out.Provider].Detail.VerifiedDealCount++

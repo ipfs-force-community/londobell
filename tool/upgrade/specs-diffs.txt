@@ -64,3 +64,7 @@ Specs v10 => v11:
 
 Specs v11 => v12:
 
+Specs v12 => v13:
+	> market.State
+		+ ProviderSectors: cid.Cid
+

@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ipfs-force-community/londobell/common"
-
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -81,9 +79,12 @@ var fixActorMessageCmd = &cli.Command{
 		db := client.Database(cctx.String("name"))
 		actorMessageCol := db.Collection("ActorMessage")
 		tipsetCol := db.Collection("Tipset")
-		finalHeightCol := db.Collection("FinalHeight")
 
-		var duration time.Duration
+		var (
+			duration          time.Duration
+			lastCompleteEpoch int64
+		)
+
 		if !cctx.IsSet("tick") {
 			duration = 24 * time.Hour
 		} else {
@@ -101,42 +102,39 @@ var fixActorMessageCmd = &cli.Command{
 					continue
 				}
 
-				var tipsetRes []EpochRes
-				if err = cursor.All(context.TODO(), &tipsetRes); err != nil {
+				var startTipsetRes, endTipsetRes []EpochRes
+				if err = cursor.All(context.TODO(), &startTipsetRes); err != nil {
 					log.Errorf("cur all failed: %v", err)
 					continue
 				}
 
-				if len(tipsetRes) != 1 {
+				if len(startTipsetRes) != 1 {
 					log.Warn("not found in Tipset")
 					continue
 				}
 
-				startEpoch := tipsetRes[0].Epoch
-
-				var endEpoch int64
-				if cctx.Bool("tmp") {
-					endEpoch = int64(common.GetCurEpoch())
-				} else {
-					cursor, err = finalHeightCol.Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "_id", Value: -1}}), options.Find().SetLimit(-1))
-					if err != nil {
-						log.Errorf("FinalHeight find failed: %v", err)
-						continue
-					}
-
-					var finalHeightRes []EpochRes
-					if err = cursor.All(context.TODO(), &finalHeightRes); err != nil {
-						log.Errorf("cur all failed: %v", err)
-						continue
-					}
-
-					if len(finalHeightRes) != 1 {
-						log.Warn("not found in FinalHeight")
-						continue
-					}
-
-					endEpoch = finalHeightRes[0].Epoch
+				startEpoch := startTipsetRes[0].Epoch
+				if lastCompleteEpoch > startEpoch {
+					startEpoch = lastCompleteEpoch
 				}
+
+				endEpochcursor, err := tipsetCol.Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "_id", Value: -1}}), options.Find().SetLimit(-1))
+				if err != nil {
+					log.Errorf("tipset find failed: %v", err)
+					continue
+				}
+
+				if err = endEpochcursor.All(context.TODO(), &endTipsetRes); err != nil {
+					log.Errorf("cur all failed: %v", err)
+					continue
+				}
+
+				if len(endTipsetRes) != 1 {
+					log.Warn("not found in Tipset")
+					continue
+				}
+
+				endEpoch := endTipsetRes[0].Epoch
 
 				tsDone := startEpoch
 
@@ -144,8 +142,7 @@ var fixActorMessageCmd = &cli.Command{
 					Start int64
 					End   int64
 				}
-
-				part := make([]Range, 0)
+				var part []Range
 				for tsDone < endEpoch {
 					start := tsDone
 					end := start + 2880*5
@@ -255,7 +252,7 @@ var fixActorMessageCmd = &cli.Command{
 					log.Errorf("falied: %v", err)
 					continue
 				}
-
+				lastCompleteEpoch = endEpoch
 				log.Infof("all finished, [%v, %v] elapsed: %v\n", startEpoch, endEpoch, time.Now().Sub(starttime).String())
 
 			case <-ctx.Done():

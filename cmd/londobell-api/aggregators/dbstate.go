@@ -413,16 +413,10 @@ func deleteDataBaseStateForType(ctx context.Context, dBStMgr *multiquery.DataBas
 		if err := dBStMgr.DeleteBlockMethodState(ctx, db); err != nil {
 			return err
 		}
-	case multiquery.ActorStates:
-		if err := dBStMgr.DeleteActorState(ctx, db); err != nil {
-			return err
-		}
-	case multiquery.ActorMethodStates:
-		if err := dBStMgr.DeleteActorMethodState(ctx, db); err != nil {
-			return err
-		}
 	// 其他暂时不处理
 	case multiquery.BlockHeaderMethodStates:
+	case multiquery.ActorStates:
+	case multiquery.ActorMethodStates:
 	case multiquery.ActorTransferStates:
 	case multiquery.ActorEventStates:
 	case multiquery.MinedStates:

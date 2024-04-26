@@ -600,7 +600,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		filSupplyCol := database.Collection("FilSupply")
 		cols := make([]*mongo.Collection, 0)
 		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol,
-			changedSectorCol, changedActorCol, changedClaimCol, changedDealStateCol, orphanBlockCol, filSupplyCol)
+			changedSectorCol, changedActorCol, filSupplyCol, changedClaimCol, changedDealStateCol, orphanBlockCol)
 		dbsm.UpdateDBCollectionsMap(db.Url(), config2.Collections{DB: database, Cols: cols})
 	}
 
@@ -715,7 +715,7 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 	filSupplyCol := database.Collection("FilSupply")
 	cols := make([]*mongo.Collection, 0)
 	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol,
-		changedSectorCol, changedActorCol, changedClaimCol, newDealProposalCol, changedDealStateCol, orphanBlockCol, filSupplyCol)
+		changedSectorCol, changedActorCol, filSupplyCol, changedClaimCol, newDealProposalCol, changedDealStateCol, orphanBlockCol)
 
 	return config2.Collections{DB: database, Cols: cols}, nil
 }
@@ -1091,15 +1091,6 @@ func (dbsm *DataBaseStateManager) DeleteAllState(ctx context.Context, db config2
 		return err
 	}
 
-	err = dbsm.Segment.DeleteActorMethodState(ctx, dlog, db.Url())
-	if err != nil {
-		return err
-	}
-
-	err = dbsm.Segment.DeleteActorState(ctx, dlog, db.Url())
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -1129,28 +1120,6 @@ func (dbsm *DataBaseStateManager) DeleteBlockMethodState(ctx context.Context, db
 	dlog := log.With("DeleteBlockMethodState", db)
 
 	err := dbsm.Segment.DeleteBlockMethodState(ctx, dlog, db.Url())
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (dbsm *DataBaseStateManager) DeleteActorState(ctx context.Context, db config2.DB) error {
-	dlog := log.With("DeleteActorState", db)
-
-	err := dbsm.Segment.DeleteActorState(ctx, dlog, db.Url())
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (dbsm *DataBaseStateManager) DeleteActorMethodState(ctx context.Context, db config2.DB) error {
-	dlog := log.With("DeleteActorMethodState", db)
-
-	err := dbsm.Segment.DeleteActorMethodState(ctx, dlog, db.Url())
 	if err != nil {
 		return err
 	}
