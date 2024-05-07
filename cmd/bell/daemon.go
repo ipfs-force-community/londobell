@@ -54,7 +54,7 @@ var daemonStartCmd = &cli.Command{
 
 		stopper, err := dix.New(ctx,
 			dep.Bell(ctx, fxlog, &components),
-			dep.InjectFullNode(cctx),
+			dep.InjectCluster(cctx),
 			dep.InjectRepoPath(cctx),
 			dix.Override(new(dtypes.ShutdownChan), shutdownCh),
 		)

@@ -2,12 +2,19 @@ package cliex
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
+	"net/http"
 	"time"
 
+	"github.com/filecoin-project/go-jsonrpc"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
+	"github.com/ipfs-force-community/londobell/common"
 
 	logging "github.com/ipfs/go-log/v2"
 
+	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -22,15 +29,29 @@ const (
 
 var log = logging.Logger("headsub")
 
-func NewHeadSub(full v0api.FullNode) (*HeadSub, error) {
+type Node struct {
+	API      string
+	FullNode v0api.FullNode
+	Closer   jsonrpc.ClientCloser
+	Gap      abi.ChainEpoch
+	Token    string
+}
+type Cluster struct {
+	Current        *Node
+	Master         string
+	Nodes          []*Node
+	MasterGapLimit abi.ChainEpoch
+}
+
+func NewHeadSub(cluster Cluster) (*HeadSub, error) {
 	return &HeadSub{
-		full:     full,
+		cluster:  cluster,
 		interval: minReListenInterval,
 	}, nil
 }
 
 type HeadSub struct {
-	full     v0api.FullNode
+	cluster  Cluster
 	interval time.Duration
 }
 
@@ -40,11 +61,91 @@ func (h *HeadSub) Sub(ctx context.Context) (<-chan types.TipSetKey, error) {
 	return ch, nil
 }
 
+func (h *HeadSub) healthCheck() {
+	log.Info("health check start")
+	defer log.Info("health check stop")
+	var best = h.cluster.Current
+
+	for index, node := range h.cluster.Nodes {
+
+		node, err := InjectFullNode(node.API, node.Token)
+		if err != nil {
+			log.Warnf("node check failed,node: %s err: %s", node.API, err.Error())
+			continue
+		}
+		h.cluster.Nodes[index] = node
+		if node.API == h.cluster.Master {
+			if node.Gap < h.cluster.MasterGapLimit {
+				log.Info("master check success,node: ", h.cluster.Master)
+				// h.cluster.Current = node
+				best = node
+				break
+			}
+		}
+		if node.Gap < best.Gap {
+			best = node
+		}
+
+	}
+	h.cluster.Current = best
+	for _, node := range h.cluster.Nodes {
+
+		if node.API != h.cluster.Current.API {
+			if node.Closer != nil {
+				node.Closer()
+				node.Closer = nil
+			}
+		}
+	}
+}
+
+func InjectFullNode(api, token string) (*Node, error) {
+
+	var requestHeader http.Header
+	node := Node{
+		API: api,
+	}
+	if token != "" {
+		requestHeader = http.Header{"Authorization": []string{"Bearer " + token}}
+	}
+
+	full, closer, err := client.NewFullNodeRPCV0(context.Background(), api, requestHeader)
+	if err != nil {
+		return &node, err
+	}
+
+	node.FullNode = full
+	node.Closer = closer
+	node.Gap, err = getGap(&node)
+	if err != nil {
+		return &node, err
+	}
+	return &node, nil
+
+}
+
+func getGap(node *Node) (abi.ChainEpoch, error) {
+	fmt.Println(node)
+	headTipset, err := node.FullNode.ChainHead(context.Background())
+	if err != nil {
+		return 0, err
+	}
+	gap := headTipset.Height() - common.GetCurEpoch()
+
+	randomNumber := rand.Intn(5)
+	fmt.Println("random number ", randomNumber)
+	return gap + abi.ChainEpoch(randomNumber), nil
+
+}
+
 func (h *HeadSub) watch(ctx context.Context, tx chan types.TipSetKey) {
 	log.Info("head change loop start")
 	defer log.Info("head change loop stop")
 
 	for {
+		if len(h.cluster.Nodes) > 1 {
+			h.healthCheck()
+		}
 		ch, err := h.reListen(ctx)
 		if err != nil {
 			log.Errorf("failed to listen head change: %s", err)
@@ -96,7 +197,9 @@ func (h *HeadSub) applyChanges(ctx context.Context, tx chan types.TipSetKey, cha
 
 func (h *HeadSub) reListen(ctx context.Context) (<-chan []*api.HeadChange, error) {
 	for {
-		ch, err := h.full.ChainNotify(ctx)
+		// check full delay
+		// h.full =
+		ch, err := h.cluster.Current.FullNode.ChainNotify(ctx)
 		if err == nil {
 			h.interval = minReListenInterval
 			return ch, nil
@@ -128,7 +231,7 @@ func (h *HeadSub) reListenInNonChan(ctx context.Context) (<-chan []*api.HeadChan
 	tryCtx, tryCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer tryCancel()
 
-	head, err := h.full.ChainHead(tryCtx)
+	head, err := h.cluster.Current.FullNode.ChainHead(tryCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +266,7 @@ func (h *HeadSub) startChainHeadLoop(ctx context.Context, ch chan []*api.HeadCha
 		}
 
 		reqCtx, reqCancel := context.WithTimeout(ctx, 5*time.Second)
-		head, err := h.full.ChainHead(reqCtx)
+		head, err := h.cluster.Current.FullNode.ChainHead(reqCtx)
 		reqCancel()
 		if err != nil {
 			log.Errorf("call ChainHead: %s", err)

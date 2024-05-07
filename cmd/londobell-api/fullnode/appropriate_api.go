@@ -110,6 +110,13 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 			continue
 		}
 
+		// 为了兼容老版本的配置，master默认为第一个节点，延迟在两分钟内(4Epoch)，使用master节点
+		if node == nodes[0] && curEpoch-headTs.Height() < 4 {
+			log.Info("master node is not available")
+			candidates = append(candidates, Candidate{ts: headTs, gap: curEpoch - headTs.Height(), weight: headWeight, api: api, url: url, closer: closer})
+			break
+		}
+
 		candidates = append(candidates, Candidate{ts: headTs, gap: curEpoch - headTs.Height(), weight: headWeight, api: api, url: url, closer: closer})
 	}
 

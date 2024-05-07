@@ -22,3 +22,24 @@
   - 自动检查项的通过情况
   - 代码逻辑
   - 测试用例的编写和补充
+
+
+
+
+## 配置说明
+### api
+api依赖配置为config.json，具体配置如下：token字段为可选项
+```json
+[
+    {
+            "node":"ws://172.31.44.94:1234/rpc/v0",
+            "token":"<KEY>"
+    }
+]
+```
+
+## 运行说明
+### 编译
+需要注意的是，编译时需要同步ffi版本:`git submodule update --init --recursive`
+
+

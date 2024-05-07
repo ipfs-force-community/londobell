@@ -7,7 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/client"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
+	"github.com/ipfs-force-community/londobell/lib/cliex"
+	"github.com/marmotedu/log"
 
 	"github.com/dtynn/dix"
 	"github.com/mitchellh/go-homedir"
@@ -64,6 +68,49 @@ func InjectFullNode(cctx *cli.Context) dix.Option {
 		})
 
 		return full, nil
+	})
+}
+
+func InjectCluster(cctx *cli.Context) dix.Option {
+	return dix.Override(new(cliex.Cluster), func(lc fx.Lifecycle) (cliex.Cluster, error) {
+		var cluster cliex.Cluster
+		token := cctx.String("token")
+		api := cctx.String("api-url")
+		gapLimit := cctx.Int("gap-limit")
+		nodeConfig := cctx.String("nodeconfig")
+		if gapLimit == 0 {
+			gapLimit = 4
+		}
+		if nodeConfig != "" {
+			if err := util.ParseNodes(nodeConfig); err != nil {
+				return cluster, nil
+			}
+			for _, node := range util.Nodes {
+				n := cliex.Node{
+					API:   node.URL,
+					Token: node.Token,
+				}
+				cluster.Nodes = append(cluster.Nodes, &n)
+			}
+
+		}
+
+		node, err := cliex.InjectFullNode(api, token)
+		if err != nil {
+			log.Errorf("InjectCluster failed,node: %s err: %s", api, err.Error())
+			return cluster, err
+		}
+		cluster.Current = node
+		cluster.Master = api
+		cluster.MasterGapLimit = abi.ChainEpoch(gapLimit)
+		lc.Append(fx.Hook{
+			OnStop: func(_ context.Context) error {
+				cluster.Current.Closer()
+				return nil
+			},
+		})
+
+		return cluster, nil
 	})
 }
 
