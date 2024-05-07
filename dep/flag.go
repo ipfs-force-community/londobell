@@ -11,7 +11,6 @@ import (
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/lib/cliex"
-	"github.com/marmotedu/log"
 
 	"github.com/dtynn/dix"
 	"github.com/mitchellh/go-homedir"
@@ -97,7 +96,6 @@ func InjectCluster(cctx *cli.Context) dix.Option {
 
 		node, err := cliex.InjectFullNode(api, token)
 		if err != nil {
-			log.Errorf("InjectCluster failed,node: %s err: %s", api, err.Error())
 			return cluster, err
 		}
 		cluster.Current = node
