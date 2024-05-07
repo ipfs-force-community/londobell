@@ -37,6 +37,16 @@ var daemonStartCmd = &cli.Command{
 			Name:  "tmp",
 			Usage: "enable temporary db to store close data",
 		},
+		&cli.StringFlag{
+			Name:     "nodeconfig",
+			Usage:    "The location of the node configuration, eg: ./config.json(node: token)",
+			Required: true,
+		},
+		&cli.IntFlag{
+			Name:     "gap-limit",
+			Usage:    "The master node gap limit",
+			Required: true,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := context.Background()
