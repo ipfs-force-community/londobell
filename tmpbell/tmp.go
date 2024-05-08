@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ipfs-force-community/londobell/lib/cliex"
 	"github.com/ipfs-force-community/londobell/metrics"
 	"go.opencensus.io/stats"
 
@@ -16,12 +17,11 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
 
-	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/vm"
 )
 
 type TmpBell struct {
-	Full      v0api.FullNode
+	Cluster   *cliex.Cluster
 	activeSeg *segment.Segment
 }
 
@@ -35,7 +35,7 @@ var (
 	continuousNullTipSet = 0
 )
 
-func New(ctx context.Context, cfg racailum.Config, cs common.ChainStore, stm common.StateManager, segmgr *segment.Manager, full v0api.FullNode) (*TmpBell, error) {
+func New(ctx context.Context, cfg racailum.Config, cs common.ChainStore, stm common.StateManager, segmgr *segment.Manager, cluster *cliex.Cluster) (*TmpBell, error) {
 	vm.EnableDetailedTracing = cfg.EnableTracing
 
 	activeSegName, has, err := segmgr.LoadActive()
@@ -47,13 +47,13 @@ func New(ctx context.Context, cfg racailum.Config, cs common.ChainStore, stm com
 		return nil, fmt.Errorf("tmp: no active segment")
 	}
 
-	activeSeg, err := segment.New(ctx, activeSegName, cfg.Segment, cfg.Aggregate, segmgr, cs, stm, full)
+	activeSeg, err := segment.New(ctx, activeSegName, cfg.Segment, cfg.Aggregate, segmgr, cs, stm, cluster)
 	if err != nil {
 		return nil, err
 	}
 
 	tmp := &TmpBell{
-		Full:      full,
+		Cluster:   cluster,
 		activeSeg: activeSeg,
 	}
 	return tmp, nil
@@ -61,7 +61,7 @@ func New(ctx context.Context, cfg racailum.Config, cs common.ChainStore, stm com
 
 // MonitorForTmpDB monitors chainHead of lotus and tmpFinalHeight, and decides whether to extract to temporary db
 func (t *TmpBell) MonitorForTmpDB(ctx context.Context, tempDBCapacity, triggerSpan uint) error {
-	head, err := t.Full.ChainHead(ctx)
+	head, err := t.Cluster.Current.FullNode.ChainHead(ctx)
 	if err != nil {
 		return err
 	}

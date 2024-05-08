@@ -124,26 +124,26 @@ type raIn struct {
 	Stm        common.StateManager
 	SegMgr     *segment.Manager
 	ShutDownCh dtypes.ShutdownChan
-	Full       v0api.FullNode
+	Cluster    *cliex.Cluster
 }
 
 // NewRaCailum constructs an instance of RaCailum
 func NewRaCailum(in raIn) (*racailum.RaCailum, error) {
-	return racailum.New(in.Ctx, in.Cfg, in.Sub, in.CS, in.Stm, in.SegMgr, in.ShutDownCh, in.Full)
+	return racailum.New(in.Ctx, in.Cfg, in.Sub, in.CS, in.Stm, in.SegMgr, in.ShutDownCh, in.Cluster)
 }
 
 type tmpIn struct {
 	fx.In
-	Ctx    GlobalContext
-	Cfg    racailum.Config
-	CS     common.ChainStore
-	Stm    common.StateManager
-	SegMgr *segment.Manager
-	Full   v0api.FullNode
+	Ctx     GlobalContext
+	Cfg     racailum.Config
+	CS      common.ChainStore
+	Stm     common.StateManager
+	SegMgr  *segment.Manager
+	Cluster *cliex.Cluster
 }
 
 func NewTmpBell(in tmpIn) (*tmpbell.TmpBell, error) {
-	return tmpbell.New(in.Ctx, in.Cfg, in.CS, in.Stm, in.SegMgr, in.Full)
+	return tmpbell.New(in.Ctx, in.Cfg, in.CS, in.Stm, in.SegMgr, in.Cluster)
 }
 
 // SegmentOpt is used to combine a group of option funcs

@@ -111,7 +111,7 @@ var segmentUpdateCmd = &cli.Command{
 		}
 
 		if cctx.IsSet("child-hi") || cctx.IsSet("child-lo") {
-			if err := setSegmentBoundary(cctx, slog, di.Full, di.CStore, segname, di.SegMgr); err != nil {
+			if err := setSegmentBoundary(cctx, slog, di.CStore, segname, di.SegMgr); err != nil {
 				return err
 			}
 		}
@@ -129,7 +129,7 @@ var segmentUpdateCmd = &cli.Command{
 	},
 }
 
-func setSegmentBoundary(cctx *cli.Context, slog *zap.SugaredLogger, full v0api.FullNode, cstore common.ChainStore, segname string, segmgr *segment.Manager) error {
+func setSegmentBoundary(cctx *cli.Context, slog *zap.SugaredLogger, cstore common.ChainStore, segname string, segmgr *segment.Manager) error {
 	bound, _, err := segmgr.LoadBoundary(segname)
 	if err != nil {
 		return fmt.Errorf("load boundary for %s: %w", segname, err)

@@ -10,6 +10,7 @@ import (
 	"go.opencensus.io/stats"
 
 	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/cliex"
 	"github.com/ipfs-force-community/londobell/metrics"
 	"github.com/ipfs-force-community/londobell/racailum/grafana"
 	"github.com/ipfs-force-community/londobell/racailum/segment"
@@ -17,7 +18,6 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
 	"github.com/ipfs-force-community/londobell/racailum/tracing"
 
-	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
 	lconfig "github.com/filecoin-project/lotus/node/config"
@@ -85,7 +85,7 @@ type Config struct {
 }
 
 // New returns an instance of *RaCailum
-func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.ChainStore, stm common.StateManager, segmgr *segment.Manager, shutdownCh dtypes.ShutdownChan, full v0api.FullNode) (*RaCailum, error) {
+func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.ChainStore, stm common.StateManager, segmgr *segment.Manager, shutdownCh dtypes.ShutdownChan, cluster *cliex.Cluster) (*RaCailum, error) {
 	vm.EnableDetailedTracing = cfg.EnableTracing
 
 	activeSegName, has, err := segmgr.LoadActive()
@@ -97,7 +97,7 @@ func New(ctx context.Context, cfg Config, sub common.HeadNotifier, cs common.Cha
 		return nil, fmt.Errorf("no active segment")
 	}
 
-	activeSeg, err := segment.New(ctx, activeSegName, cfg.Segment, cfg.Aggregate, segmgr, cs, stm, full)
+	activeSeg, err := segment.New(ctx, activeSegName, cfg.Segment, cfg.Aggregate, segmgr, cs, stm, cluster)
 	if err != nil {
 		return nil, err
 	}

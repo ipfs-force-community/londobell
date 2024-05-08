@@ -147,7 +147,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 	innerCtx, innerCancel := context.WithCancel(ctx.ctx)
 	defer innerCancel()
 
-	ectx, err := extract.NewCtx(innerCtx, s.dal, elog, ctx.actorSet, ctx.latestDealID, s.opts.Extract.ExtractOptions, s.fullNode)
+	ectx, err := extract.NewCtx(innerCtx, s.dal, elog, ctx.actorSet, ctx.latestDealID, s.opts.Extract.ExtractOptions, s.cluster)
 	if err != nil {
 		return err
 	}
@@ -345,7 +345,7 @@ func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet, allow
 	latestDealID := int64(-1)
 
 	dlog := log.With("dry", true)
-	ectx, err := extract.NewCtx(ctx, s.dal, dlog, aset, latestDealID, dryOptions, s.fullNode)
+	ectx, err := extract.NewCtx(ctx, s.dal, dlog, aset, latestDealID, dryOptions, s.cluster)
 	if err != nil {
 		return nil, fmt.Errorf("new extract context: %w", err)
 	}

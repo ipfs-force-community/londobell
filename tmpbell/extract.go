@@ -19,7 +19,7 @@ import (
 func (t *TmpBell) ExtractIncomingHead(ctx context.Context, tempDBCapacity uint) {
 	for {
 		start := time.Now()
-		head, err := t.Full.ChainHead(ctx)
+		head, err := t.Cluster.Current.FullNode.ChainHead(ctx)
 		if err != nil {
 			log.Errorf("get chain head: %s", err)
 			stats.Record(ctx, metrics.GetTipSetError.M(1))
@@ -45,7 +45,7 @@ func (t *TmpBell) ExtractIncomingHead(ctx context.Context, tempDBCapacity uint) 
 		}
 
 		log.Infof("request next tipset at height %v", nextExtractHeight)
-		nextExtractTipSet, err := t.Full.ChainGetTipSetByHeight(ctx, nextExtractHeight, types.EmptyTSK)
+		nextExtractTipSet, err := t.Cluster.Current.FullNode.ChainGetTipSetByHeight(ctx, nextExtractHeight, types.EmptyTSK)
 		if err != nil {
 			log.Errorf("get next tipset: %s", err)
 			stats.Record(ctx, metrics.GetTipSetError.M(1))
@@ -107,19 +107,19 @@ func (t *TmpBell) ExtractIncomingHead(ctx context.Context, tempDBCapacity uint) 
 		}
 
 		stats.Record(ctx, metrics.ExtractError.M(0))
-		log.Infof("extract tipset %v to temporary db spent: %v", nextExtractTipSet.Height(), time.Now().Sub(start).String())
+		log.Infof("extract tipset %v to temporary db spent: %v", nextExtractTipSet.Height(), time.Since(start).String())
 	}
 }
 
 // UpdateTemporaryBoundary updates finalHeight to boundary.hi
 func (t *TmpBell) UpdateTemporaryBoundary(ctx context.Context, finalHeight abi.ChainEpoch) error {
-	finalTipSet, err := t.Full.ChainGetTipSetByHeight(ctx, finalHeight, types.EmptyTSK)
+	finalTipSet, err := t.Cluster.Current.FullNode.ChainGetTipSetByHeight(ctx, finalHeight, types.EmptyTSK)
 	if err != nil {
 		log.Errorf("get tipset at curFormalDBHeight failed: %v", err)
 		return err
 	}
 
-	hi, err := LoadLinkedTipSet(ctx, finalTipSet.Key(), t.Full)
+	hi, err := LoadLinkedTipSet(ctx, finalTipSet.Key(), t.Cluster.Current.FullNode)
 	if err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ func (t *TmpBell) SearchCommonAncestor(ctx context.Context, base, external *type
 			external, err = t.activeSeg.GetTipSetByTSk(ctx, external.Parents())
 			if err != nil {
 				log.Warnf("get external.Parent from full node")
-				external, err = t.Full.ChainGetTipSet(ctx, external.Parents())
+				external, err = t.Cluster.Current.FullNode.ChainGetTipSet(ctx, external.Parents())
 				if err != nil {
 					return nil, err
 				}
