@@ -43,7 +43,7 @@ type Cluster struct {
 	MasterGapLimit abi.ChainEpoch
 }
 
-func NewHeadSub(cluster Cluster) (*HeadSub, error) {
+func NewHeadSub(cluster *Cluster) (*HeadSub, error) {
 	return &HeadSub{
 		cluster:  cluster,
 		interval: minReListenInterval,
@@ -51,7 +51,7 @@ func NewHeadSub(cluster Cluster) (*HeadSub, error) {
 }
 
 type HeadSub struct {
-	cluster  Cluster
+	cluster  *Cluster
 	interval time.Duration
 }
 

@@ -71,7 +71,7 @@ func InjectFullNode(cctx *cli.Context) dix.Option {
 }
 
 func InjectCluster(cctx *cli.Context) dix.Option {
-	return dix.Override(new(cliex.Cluster), func(lc fx.Lifecycle) (cliex.Cluster, error) {
+	return dix.Override(new(*cliex.Cluster), func(lc fx.Lifecycle) (*cliex.Cluster, error) {
 		var cluster cliex.Cluster
 		token := cctx.String("token")
 		api := cctx.String("api-url")
@@ -82,7 +82,7 @@ func InjectCluster(cctx *cli.Context) dix.Option {
 		}
 		if nodeConfig != "" {
 			if err := util.ParseNodes(nodeConfig); err != nil {
-				return cluster, nil
+				return &cluster, nil
 			}
 			for _, node := range util.Nodes {
 				n := cliex.Node{
@@ -96,7 +96,7 @@ func InjectCluster(cctx *cli.Context) dix.Option {
 
 		node, err := cliex.InjectFullNode(api, token)
 		if err != nil {
-			return cluster, err
+			return &cluster, err
 		}
 		cluster.Current = node
 		cluster.Master = api
@@ -108,7 +108,7 @@ func InjectCluster(cctx *cli.Context) dix.Option {
 			},
 		})
 
-		return cluster, nil
+		return &cluster, nil
 	})
 }
 
