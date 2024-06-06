@@ -15,7 +15,8 @@ import (
 )
 
 var cfgCmd = &cli.Command{
-	Name: "cfg",
+	Name:  "cfg",
+	Usage: "config for bell",
 	Subcommands: []*cli.Command{
 		cfgInitCmd,
 	},
@@ -24,6 +25,7 @@ var cfgCmd = &cli.Command{
 var cfgInitCmd = &cli.Command{
 	Name:  "init",
 	Flags: []cli.Flag{},
+	Usage: "initialize config for bell",
 	Action: func(cctx *cli.Context) error {
 		rpath, err := dep.GetRepoPath(cctx)
 		if err != nil {

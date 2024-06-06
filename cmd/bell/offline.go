@@ -19,6 +19,7 @@ var offlineCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		extractorCmd,
 	},
+	Usage: "offline extractor data,support custom start,end epoch",
 }
 
 var extractorCmd = &cli.Command{

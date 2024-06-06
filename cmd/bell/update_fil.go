@@ -51,7 +51,7 @@ import (
 
 var updateFILCmd = &cli.Command{
 	Name:  "update-fil",
-	Usage: "update-fil",
+	Usage: "single-use command(just for old version bell): update mongo ExecTrace with FIL field",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "dsn",

@@ -23,7 +23,7 @@ import (
 
 var updateRootCidCmd = &cli.Command{
 	Name:  "update-rootcid",
-	Usage: "update-rootcid",
+	Usage: "single-use command(just for old version bell): update mongo ExecTrace,ActorMessage,ExecTrace with rootcid field",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "dsn",
