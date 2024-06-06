@@ -23,11 +23,13 @@ import (
 // common flags
 var (
 	FullNodeAPIFlag = &cli.StringFlag{
-		Name: "api-url",
+		Name:  "api-url",
+		Usage: "api url of full node, eg: http://127.0.0.1:1234",
 	}
 
 	TokenFlag = &cli.StringFlag{
-		Name: "token",
+		Name:  "token",
+		Usage: "token for api url",
 	}
 
 	RepoFlag = &cli.StringFlag{

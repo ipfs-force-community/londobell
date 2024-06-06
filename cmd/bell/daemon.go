@@ -28,6 +28,7 @@ var daemonCmd = &cli.Command{
 		daemonStartCmd,
 		daemonStopCmd,
 	},
+	Usage: "start/stop bell sync chain data",
 }
 
 var daemonStartCmd = &cli.Command{

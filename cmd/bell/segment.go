@@ -21,6 +21,7 @@ var segmentCmd = &cli.Command{
 		segmentUpdateCmd,
 		segmentShowCmd,
 	},
+	Usage: "manage segment",
 }
 
 var segmentUpdateCmd = &cli.Command{
