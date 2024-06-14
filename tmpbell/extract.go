@@ -19,7 +19,7 @@ import (
 func (t *TmpBell) ExtractIncomingHead(ctx context.Context, tempDBCapacity uint) {
 	for {
 		start := time.Now()
-		head, err := t.Full.ChainHead(ctx)
+		head, err := t.Full.GetAppropriateAPI().ChainHead(ctx)
 		if err != nil {
 			log.Errorf("get chain head: %s", err)
 			stats.Record(ctx, metrics.GetTipSetError.M(1))
@@ -45,7 +45,7 @@ func (t *TmpBell) ExtractIncomingHead(ctx context.Context, tempDBCapacity uint) 
 		}
 
 		log.Infof("request next tipset at height %v", nextExtractHeight)
-		nextExtractTipSet, err := t.Full.ChainGetTipSetByHeight(ctx, nextExtractHeight, types.EmptyTSK)
+		nextExtractTipSet, err := t.Full.GetAppropriateAPI().ChainGetTipSetByHeight(ctx, nextExtractHeight, types.EmptyTSK)
 		if err != nil {
 			log.Errorf("get next tipset: %s", err)
 			stats.Record(ctx, metrics.GetTipSetError.M(1))
@@ -113,7 +113,7 @@ func (t *TmpBell) ExtractIncomingHead(ctx context.Context, tempDBCapacity uint) 
 
 // UpdateTemporaryBoundary updates finalHeight to boundary.hi
 func (t *TmpBell) UpdateTemporaryBoundary(ctx context.Context, finalHeight abi.ChainEpoch) error {
-	finalTipSet, err := t.Full.ChainGetTipSetByHeight(ctx, finalHeight, types.EmptyTSK)
+	finalTipSet, err := t.Full.GetAppropriateAPI().ChainGetTipSetByHeight(ctx, finalHeight, types.EmptyTSK)
 	if err != nil {
 		log.Errorf("get tipset at curFormalDBHeight failed: %v", err)
 		return err
@@ -201,7 +201,7 @@ func (t *TmpBell) SearchCommonAncestor(ctx context.Context, base, external *type
 			external, err = t.activeSeg.GetTipSetByTSk(ctx, external.Parents())
 			if err != nil {
 				log.Warnf("get external.Parent from full node")
-				external, err = t.Full.ChainGetTipSet(ctx, external.Parents())
+				external, err = t.Full.GetAppropriateAPI().ChainGetTipSet(ctx, external.Parents())
 				if err != nil {
 					return nil, err
 				}

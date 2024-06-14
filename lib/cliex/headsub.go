@@ -8,9 +8,9 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 
-	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/ipfs-force-community/londobell/common"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 
 var log = logging.Logger("headsub")
 
-func NewHeadSub(full v0api.FullNode) (*HeadSub, error) {
+func NewHeadSub(full common.FullNodeApiGetter) (*HeadSub, error) {
 	return &HeadSub{
 		full:     full,
 		interval: minReListenInterval,
@@ -30,7 +30,7 @@ func NewHeadSub(full v0api.FullNode) (*HeadSub, error) {
 }
 
 type HeadSub struct {
-	full     v0api.FullNode
+	full     common.FullNodeApiGetter
 	interval time.Duration
 }
 
@@ -96,7 +96,7 @@ func (h *HeadSub) applyChanges(ctx context.Context, tx chan types.TipSetKey, cha
 
 func (h *HeadSub) reListen(ctx context.Context) (<-chan []*api.HeadChange, error) {
 	for {
-		ch, err := h.full.ChainNotify(ctx)
+		ch, err := h.full.GetAppropriateAPI().ChainNotify(ctx)
 		if err == nil {
 			h.interval = minReListenInterval
 			return ch, nil
@@ -128,7 +128,7 @@ func (h *HeadSub) reListenInNonChan(ctx context.Context) (<-chan []*api.HeadChan
 	tryCtx, tryCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer tryCancel()
 
-	head, err := h.full.ChainHead(tryCtx)
+	head, err := h.full.GetAppropriateAPI().ChainHead(tryCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (h *HeadSub) startChainHeadLoop(ctx context.Context, ch chan []*api.HeadCha
 		}
 
 		reqCtx, reqCancel := context.WithTimeout(ctx, 5*time.Second)
-		head, err := h.full.ChainHead(reqCtx)
+		head, err := h.full.GetAppropriateAPI().ChainHead(reqCtx)
 		reqCancel()
 		if err != nil {
 			log.Errorf("call ChainHead: %s", err)

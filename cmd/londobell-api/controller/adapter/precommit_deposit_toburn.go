@@ -54,7 +54,7 @@ func GetPreCommitDepositToBurnInfo(c *gin.Context) {
 	}
 
 	curEpoch := abi.ChainEpoch(req.Epoch)
-	curTs, err := fullnode.Components.Full.ChainGetTipSetByHeight(ctx, curEpoch, types.EmptyTSK)
+	curTs, err := fullnode.Components.Full.GetAppropriateAPI().ChainGetTipSetByHeight(ctx, curEpoch, types.EmptyTSK)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	"go.mongodb.org/mongo-driver/bson"
@@ -109,6 +110,11 @@ type DocumentDB interface {
 // DetailPrinter prints more detailed info
 type DetailPrinter interface {
 	PrintDetail(log *zap.SugaredLogger)
+}
+
+// FullNodeApiGetter will return an appropriate API
+type FullNodeApiGetter interface {
+	GetAppropriateAPI() v0api.FullNode
 }
 
 // aliases for variables and methods

@@ -22,7 +22,6 @@ import (
 
 	"github.com/filecoin-project/lotus/node/modules"
 
-	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -67,8 +66,8 @@ func (a *WrapAPIBlockstore) DeleteBlock(context.Context, cid.Cid) error {
 	return nil
 }
 
-func ChainIOBlockstore(full v0api.FullNode) (dtypes.BasicChainBlockstore, error) {
-	bs := blockstore.NewAPIBlockstore(full)
+func ChainIOBlockstore(full common.FullNodeApiGetter) (dtypes.BasicChainBlockstore, error) {
+	bs := blockstore.NewAPIBlockstore(full.GetAppropriateAPI())
 	wrapBlockStore := &WrapAPIBlockstore{
 		bs,
 	}
@@ -124,7 +123,7 @@ type raIn struct {
 	Stm        common.StateManager
 	SegMgr     *segment.Manager
 	ShutDownCh dtypes.ShutdownChan
-	Full       v0api.FullNode
+	Full       common.FullNodeApiGetter
 }
 
 // NewRaCailum constructs an instance of RaCailum
@@ -139,7 +138,7 @@ type tmpIn struct {
 	CS     common.ChainStore
 	Stm    common.StateManager
 	SegMgr *segment.Manager
-	Full   v0api.FullNode
+	Full   common.FullNodeApiGetter
 }
 
 func NewTmpBell(in tmpIn) (*tmpbell.TmpBell, error) {

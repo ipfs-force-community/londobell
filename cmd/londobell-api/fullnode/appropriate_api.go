@@ -3,6 +3,7 @@ package fullnode
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"sync"
 
@@ -129,6 +130,9 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 		}
 	}
 
+	// TODO: 测试
+	candidate = candidates[rand.Int31n(int32(len(candidates)))]
+
 	// close all inappropriate nodes
 	if candidate.gap > 10 {
 		log.Warnf("gap %v of candidate %v more than 10", candidate.gap, candidate.url)
@@ -193,7 +197,13 @@ func (a *AppropriateAPI) InjectNewFullNode(cctx *cli.Context) (bool, error) {
 	}
 
 	// inject new fullnode
-	stopFunc, err := dix.New(context.Background(), dep.Bell(context.Background(), Fxlog, &Components), dep.InjectRepoPath(cctx), InjectAppropriateFullNode(appropriateNode.api))
+	stopFunc, err := dix.New(
+		context.Background(),
+		dep.Bell(context.Background(), Fxlog, &Components),
+		dep.InjectRepoPath(cctx),
+		//InjectAppropriateFullNode(appropriateNode.api),
+		InjectFullNodeApiGetter(),
+	)
 	if err != nil {
 		log.Errorf("inject dependencies failed: %v", err)
 		return true, err
