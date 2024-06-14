@@ -74,7 +74,7 @@ var daemonStartCmd = &cli.Command{
 			return err
 		}
 
-		tick := time.NewTicker(5 * time.Minute)
+		tick := time.NewTicker(10 * time.Minute)
 		defer tick.Stop()
 		go func() {
 			for range tick.C {
