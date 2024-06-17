@@ -69,10 +69,6 @@ var daemonStartCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		_, err = fullnode.API.InjectNewFullNode(cctx)
-		if err != nil {
-			return err
-		}
 
 		tick := time.NewTicker(10 * time.Minute)
 		defer tick.Stop()
@@ -82,17 +78,6 @@ var daemonStartCmd = &cli.Command{
 				if err != nil {
 					log.Warn(err)
 					continue
-				}
-
-				injectNew, err := fullnode.API.InjectNewFullNode(cctx)
-				if injectNew {
-					if err != nil {
-						log.Errorf("inject new fullnode failed: %v", err)
-					} else {
-						log.Info("inject new fullnode successfully")
-					}
-				} else {
-					log.Info("no new fullnode injected")
 				}
 			}
 		}()

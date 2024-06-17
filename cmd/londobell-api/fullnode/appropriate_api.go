@@ -201,7 +201,6 @@ func (a *AppropriateAPI) InjectNewFullNode(cctx *cli.Context) (bool, error) {
 		context.Background(),
 		dep.Bell(context.Background(), Fxlog, &Components),
 		dep.InjectRepoPath(cctx),
-		//InjectAppropriateFullNode(appropriateNode.api),
 		InjectFullNodeApiGetter(),
 	)
 	if err != nil {

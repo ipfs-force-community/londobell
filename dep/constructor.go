@@ -66,8 +66,25 @@ func (a *WrapAPIBlockstore) DeleteBlock(context.Context, cid.Cid) error {
 	return nil
 }
 
+type wrapChainIO struct {
+	full common.FullNodeApiGetter
+}
+
+func (cio *wrapChainIO) ChainReadObj(ctx context.Context, c cid.Cid) ([]byte, error) {
+	return cio.full.GetAppropriateAPI().ChainReadObj(ctx, c)
+}
+
+func (cio *wrapChainIO) ChainHasObj(ctx context.Context, c cid.Cid) (bool, error) {
+	return cio.full.GetAppropriateAPI().ChainHasObj(ctx, c)
+}
+
+func (cio *wrapChainIO) ChainPutObj(ctx context.Context, blk bf.Block) error {
+	return cio.full.GetAppropriateAPI().ChainPutObj(ctx, blk)
+}
+
 func ChainIOBlockstore(full common.FullNodeApiGetter) (dtypes.BasicChainBlockstore, error) {
-	bs := blockstore.NewAPIBlockstore(full.GetAppropriateAPI())
+	chainIO := &wrapChainIO{full: full}
+	bs := blockstore.NewAPIBlockstore(chainIO)
 	wrapBlockStore := &WrapAPIBlockstore{
 		bs,
 	}
