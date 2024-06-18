@@ -3,7 +3,6 @@ package fullnode
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"sync"
 
@@ -129,9 +128,6 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 			candidate = candidates[i]
 		}
 	}
-
-	// TODO: 测试
-	candidate = candidates[rand.Int31n(int32(len(candidates)))]
 
 	// close all inappropriate nodes
 	if candidate.gap > 10 {
