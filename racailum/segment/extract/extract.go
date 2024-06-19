@@ -87,7 +87,7 @@ func LookupID(ctx *Ctx, addr address.Address, ts *types.TipSet) (address.Address
 	var err error
 	actorID, ok := ActorIDMapping.GetActorID(addr)
 	if !ok {
-		actorID, err = ctx.D.LookupID(ctx.C, addr, ts)
+		actorID, err = ctx.D.LookupIDAddress(ctx.C, addr, ts)
 		if err != nil {
 			ctx.L.Warnf("failed to lookup actor id: %s,err: %s, fallback to full node", addr, err.Error())
 			actorID, err = ctx.FullNode.GetAppropriateAPI().StateLookupID(ctx.C, addr, ts.Key())

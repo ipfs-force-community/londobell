@@ -54,6 +54,12 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
 
+const (
+	// VERCHECK
+	// see miner_state.go SectorOnChainInfoFlags
+	SIMPLE_QA_POWER = 1 << iota // QA power mechanism introduced in FIP-0045
+)
+
 func init() {
 	execTraceExample := &model.ExecTrace{}
 	execTraceExample.Msg.Method = 2
@@ -817,7 +823,10 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					}
 
 					for _, info := range sectorInfos {
-						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, false, ts.Height())
+						simpleQAPower := SIMPLE_QA_POWER == info.Flags
+						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation,
+							info.Expiration, info.DealWeight, info.VerifiedDealWeight, simpleQAPower,
+							info.InitialPledge, false, ts.Height())
 						mstCnt++
 						res.Docs = append(res.Docs, mst)
 					}
@@ -878,7 +887,10 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 						}
 
 						for _, info := range sectorInfos {
-							mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, false, ts.Height())
+							simpleQAPower := SIMPLE_QA_POWER == info.Flags
+							mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation,
+								info.Expiration, info.DealWeight, info.VerifiedDealWeight, simpleQAPower,
+								info.InitialPledge, false, ts.Height())
 							mstCnt++
 							res.Docs = append(res.Docs, mst)
 						}
@@ -932,7 +944,10 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					}
 
 					for _, info := range sectorInfos {
-						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, false, ts.Height())
+						simpleQAPower := SIMPLE_QA_POWER == info.Flags
+						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation,
+							info.Expiration, info.DealWeight, info.VerifiedDealWeight, simpleQAPower,
+							info.InitialPledge, false, ts.Height())
 						mstCnt++
 						res.Docs = append(res.Docs, mst)
 
@@ -1011,7 +1026,10 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				}
 
 				for _, info := range sectorInfos {
-					mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, true, ts.Height())
+					simpleQAPower := SIMPLE_QA_POWER == info.Flags
+					mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation,
+						info.Expiration, info.DealWeight, info.VerifiedDealWeight, simpleQAPower, info.InitialPledge,
+						true, ts.Height())
 					mstCnt++
 					res.Docs = append(res.Docs, mst)
 				}
@@ -1470,22 +1488,15 @@ func newEthTxFromSignedMessage(ctx context.Context, smsg *types.SignedMessage, t
 	var err error
 
 	if smsg.Signature.Type == crypto.SigTypeDelegated {
-		tx, err = ethtypes.EthTxFromSignedEthMessage(smsg)
+		ethTrans, err := ethtypes.EthTransactionFromSignedFilecoinMessage(smsg)
 		if err != nil {
 			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to convert from signed message: %w", err)
 		}
 
-		tx.Hash, err = tx.TxHash()
+		tx, err = ethTrans.ToEthTx(smsg)
 		if err != nil {
-			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to calculate hash for ethTx: %w", err)
+			return ethtypes.EmptyEthHash, err
 		}
-
-		fromAddr, err := lookupEthAddress(ctx, smsg.Message.From, ts, sm)
-		if err != nil {
-			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to resolve Ethereum address: %w", err)
-		}
-
-		tx.From = fromAddr
 	} else if smsg.Signature.Type == crypto.SigTypeSecp256k1 { // Secp Filecoin Message
 		tx = ethTxFromNativeMessage(ctx, smsg.VMMessage(), ts, sm)
 		tx.Hash, err = ethtypes.EthHashFromCid(smsg.Cid())
@@ -1521,7 +1532,7 @@ func lookupEthAddress(ctx context.Context, addr address.Address, ts *types.TipSe
 		return ethAddr, nil
 	}
 
-	idAddr, err := sm.LookupID(ctx, addr, ts)
+	idAddr, err := sm.LookupIDAddress(ctx, addr, ts)
 	if err != nil {
 		return ethtypes.EthAddress{}, err
 	}
@@ -1532,16 +1543,18 @@ func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, ts *types.T
 	// We don't care if we error here, conversion is best effort for non-eth transactions
 	from, _ := lookupEthAddress(ctx, msg.From, ts, sm)
 	to, _ := lookupEthAddress(ctx, msg.To, ts, sm)
+	maxFeePerGas := ethtypes.EthBigInt(msg.GasFeeCap)
+	maxPriorityFeePerGas := ethtypes.EthBigInt(msg.GasPremium)
 	return ethtypes.EthTx{
 		To:                   &to,
 		From:                 from,
 		Nonce:                ethtypes.EthUint64(msg.Nonce),
 		ChainID:              ethtypes.EthUint64(build.Eip155ChainId),
 		Value:                ethtypes.EthBigInt(msg.Value),
-		Type:                 ethtypes.Eip1559TxType,
+		Type:                 ethtypes.EIP1559TxType,
 		Gas:                  ethtypes.EthUint64(msg.GasLimit),
-		MaxFeePerGas:         ethtypes.EthBigInt(msg.GasFeeCap),
-		MaxPriorityFeePerGas: ethtypes.EthBigInt(msg.GasPremium),
+		MaxFeePerGas:         &maxFeePerGas,
+		MaxPriorityFeePerGas: &maxPriorityFeePerGas,
 		AccessList:           []ethtypes.EthHash{},
 	}
 }
