@@ -26,22 +26,15 @@ func NewEthHashFromSignedMessage(ctx context.Context, smsg *types.SignedMessage,
 
 	// This is an eth tx
 	if smsg.Signature.Type == crypto.SigTypeDelegated {
-		tx, err = ethtypes.EthTxFromSignedEthMessage(smsg)
+		ethTrans, err := ethtypes.EthTransactionFromSignedFilecoinMessage(smsg)
 		if err != nil {
 			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to convert from signed message: %w", err)
 		}
 
-		tx.Hash, err = tx.TxHash()
+		tx, err = ethTrans.ToEthTx(smsg)
 		if err != nil {
-			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to calculate hash for ethTx: %w", err)
+			return ethtypes.EmptyEthHash, err
 		}
-
-		fromAddr, err := lookupEthAddress(ctx, smsg.Message.From, sa)
-		if err != nil {
-			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to resolve Ethereum address: %w", err)
-		}
-
-		tx.From = fromAddr
 	} else if smsg.Signature.Type == crypto.SigTypeSecp256k1 { // Secp Filecoin Message
 		tx = ethTxFromNativeMessage(ctx, smsg.VMMessage(), sa)
 		tx.Hash, err = ethtypes.EthHashFromCid(smsg.Cid())
@@ -94,16 +87,18 @@ func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, sa v0api.Fu
 	// We don't care if we error here, conversion is best effort for non-eth transactions
 	from, _ := lookupEthAddress(ctx, msg.From, sa)
 	to, _ := lookupEthAddress(ctx, msg.To, sa)
+	maxFeePerGas := ethtypes.EthBigInt(msg.GasFeeCap)
+	maxPriorityFeePerGas := ethtypes.EthBigInt(msg.GasPremium)
 	return ethtypes.EthTx{
 		To:                   &to,
 		From:                 from,
 		Nonce:                ethtypes.EthUint64(msg.Nonce),
 		ChainID:              ethtypes.EthUint64(build.Eip155ChainId),
 		Value:                ethtypes.EthBigInt(msg.Value),
-		Type:                 ethtypes.Eip1559TxType,
+		Type:                 ethtypes.EIP1559TxType,
 		Gas:                  ethtypes.EthUint64(msg.GasLimit),
-		MaxFeePerGas:         ethtypes.EthBigInt(msg.GasFeeCap),
-		MaxPriorityFeePerGas: ethtypes.EthBigInt(msg.GasPremium),
+		MaxFeePerGas:         &maxFeePerGas,
+		MaxPriorityFeePerGas: &maxPriorityFeePerGas,
 		AccessList:           []ethtypes.EthHash{},
 	}
 }

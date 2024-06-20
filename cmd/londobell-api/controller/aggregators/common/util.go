@@ -429,16 +429,18 @@ func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, api v0api.F
 	// We don't care if we error here, conversion is best effort for non-eth transactions
 	from, _ := lookupEthAddress(ctx, msg.From, api)
 	to, _ := lookupEthAddress(ctx, msg.To, api)
+	maxFeePerGas := ethtypes.EthBigInt(msg.GasFeeCap)
+	maxPriorityFeePerGas := ethtypes.EthBigInt(msg.GasPremium)
 	return ethtypes.EthTx{
 		To:                   &to,
 		From:                 from,
 		Nonce:                ethtypes.EthUint64(msg.Nonce),
 		ChainID:              ethtypes.EthUint64(build.Eip155ChainId),
 		Value:                ethtypes.EthBigInt(msg.Value),
-		Type:                 ethtypes.Eip1559TxType,
+		Type:                 ethtypes.EIP1559TxType,
 		Gas:                  ethtypes.EthUint64(msg.GasLimit),
-		MaxFeePerGas:         ethtypes.EthBigInt(msg.GasFeeCap),
-		MaxPriorityFeePerGas: ethtypes.EthBigInt(msg.GasPremium),
+		MaxFeePerGas:         &maxFeePerGas,
+		MaxPriorityFeePerGas: &maxPriorityFeePerGas,
 		AccessList:           []ethtypes.EthHash{},
 	}
 }
@@ -484,7 +486,7 @@ func EthTxFromSignedEthMessage(msg *types.Message) (ethtypes.EthTx, error) {
 		return ethtypes.EthTx{}, xerrors.Errorf("signature is not delegated type, from is type: %d", msg.From.Protocol())
 	}
 
-	txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(msg)
+	txArgs, err := ethtypes.Eth1559TxArgsFromUnsignedFilecoinMessage(msg)
 	if err != nil {
 		return ethtypes.EthTx{}, xerrors.Errorf("failed to convert the unsigned message: %w", err)
 	}
@@ -495,15 +497,17 @@ func EthTxFromSignedEthMessage(msg *types.Message) (ethtypes.EthTx, error) {
 	//	return EthTx{}, xerrors.Errorf("failed to recover signature: %w", err)
 	//}
 
+	maxFeePerGas := ethtypes.EthBigInt(txArgs.MaxFeePerGas)
+	maxPriorityFeePerGas := ethtypes.EthBigInt(txArgs.MaxPriorityFeePerGas)
 	tx := ethtypes.EthTx{
 		Nonce:                ethtypes.EthUint64(txArgs.Nonce),
 		ChainID:              ethtypes.EthUint64(txArgs.ChainID),
 		To:                   txArgs.To,
 		Value:                ethtypes.EthBigInt(txArgs.Value),
-		Type:                 ethtypes.Eip1559TxType,
+		Type:                 ethtypes.EIP1559TxType,
 		Gas:                  ethtypes.EthUint64(txArgs.GasLimit),
-		MaxFeePerGas:         ethtypes.EthBigInt(txArgs.MaxFeePerGas),
-		MaxPriorityFeePerGas: ethtypes.EthBigInt(txArgs.MaxPriorityFeePerGas),
+		MaxFeePerGas:         &maxFeePerGas,
+		MaxPriorityFeePerGas: &maxPriorityFeePerGas,
 		AccessList:           []ethtypes.EthHash{},
 		//V:                    v,
 		//R:                    r,
