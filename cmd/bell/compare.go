@@ -14,6 +14,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/fx"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/dep"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil"
@@ -43,6 +45,11 @@ var compareCmd = &cli.Command{
 			Required: true,
 			Usage:    "tipsetkey for end epoch, Separated by ',' ",
 		},
+		&cli.StringFlag{
+			Name:     "nodeconfig",
+			Usage:    "The location of the node configuration, eg: ./config.json(api: token)",
+			Required: true,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		di := struct {
@@ -51,11 +58,21 @@ var compareCmd = &cli.Command{
 			SegMgr *segment.Manager
 		}{}
 
+		if err := util.ParseNodes(cctx.String("nodeconfig")); err != nil {
+			return err
+		}
+
+		fullnode.API = fullnode.NewAppropriateAPI(util.Nodes)
+		err := fullnode.API.Choose(context.Background())
+		if err != nil {
+			return err
+		}
+
 		stopper, err := dix.New(
 			cctx.Context,
 			dep.Bell(cctx.Context, fxlog, &di),
-			dep.InjectFullNode(cctx),
 			dep.InjectRepoPath(cctx),
+			fullnode.InjectFullNodeApiGetter(),
 		)
 		if err != nil {
 			return err

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/dtynn/dix"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/dep"
 	"github.com/ipfs-force-community/londobell/racailum"
 )
@@ -46,6 +49,11 @@ var extractorCmd = &cli.Command{
 			Value: false,
 			Usage: "writable or readonly for offline extract",
 		},
+		&cli.StringFlag{
+			Name:     "nodeconfig",
+			Usage:    "The location of the node configuration, eg: ./config.json(api: token)",
+			Required: true,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := context.Background()
@@ -54,10 +62,34 @@ var extractorCmd = &cli.Command{
 			fx.In
 			Ra *racailum.RaCailum
 		}
-		_, err := dix.New(ctx,
+
+		if err := util.ParseNodes(cctx.String("nodeconfig")); err != nil {
+			return err
+		}
+
+		fullnode.API = fullnode.NewAppropriateAPI(util.Nodes)
+		err := fullnode.API.Choose(context.Background())
+		if err != nil {
+			return err
+		}
+
+		tick := time.NewTicker(10 * time.Minute)
+		defer tick.Stop()
+		go func() {
+			for range tick.C {
+				err = fullnode.API.Choose(ctx)
+				if err != nil {
+					log.Warn(err)
+					continue
+				}
+			}
+		}()
+
+		_, err = dix.New(ctx,
 			dep.WalkRaCalium(cctx, fxlog, &components),
 			dep.InjectRepoPath(cctx),
 			dep.InjectWritableOffline(cctx),
+			fullnode.InjectFullNodeApiGetter(),
 			dix.Override(new(dtypes.ShutdownChan), shutdownCh),
 		)
 		if err != nil {

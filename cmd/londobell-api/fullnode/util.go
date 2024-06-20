@@ -37,7 +37,7 @@ type StateComponents struct {
 	fx.In
 	SM   common.StateManager
 	CS   common.ChainStore
-	Full v0api.FullNode
+	Full common.FullNodeApiGetter
 }
 
 type fxlogger struct {
@@ -59,5 +59,11 @@ func GetFullNodeAPI(ctx context.Context, url string) (v0api.FullNode, jsonrpc.Cl
 func InjectAppropriateFullNode(full v0api.FullNode) dix.Option {
 	return dix.Override(new(v0api.FullNode), func(lc fx.Lifecycle) v0api.FullNode {
 		return full
+	})
+}
+
+func InjectFullNodeApiGetter() dix.Option {
+	return dix.Override(new(common.FullNodeApiGetter), func(lc fx.Lifecycle) common.FullNodeApiGetter {
+		return API
 	})
 }

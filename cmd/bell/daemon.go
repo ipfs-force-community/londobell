@@ -16,6 +16,8 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 
 	"github.com/ipfs-force-community/londobell/api"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
+	"github.com/ipfs-force-community/londobell/cmd/londobell-api/util"
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/dep"
 	"github.com/ipfs-force-community/londobell/racailum"
@@ -38,6 +40,11 @@ var daemonStartCmd = &cli.Command{
 			Name:  "tmp",
 			Usage: "enable temporary db to store close data",
 		},
+		&cli.StringFlag{
+			Name:     "nodeconfig",
+			Usage:    "The location of the node configuration, eg: ./config.json(api: token)",
+			Required: true,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := context.Background()
@@ -53,10 +60,32 @@ var daemonStartCmd = &cli.Command{
 			Tmp      *tmpbell.TmpBell
 		}
 
+		if err := util.ParseNodes(cctx.String("nodeconfig")); err != nil {
+			return err
+		}
+
+		fullnode.API = fullnode.NewAppropriateAPI(util.Nodes)
+		err := fullnode.API.Choose(ctx)
+		if err != nil {
+			return err
+		}
+
+		tick := time.NewTicker(10 * time.Minute)
+		defer tick.Stop()
+		go func() {
+			for range tick.C {
+				err = fullnode.API.Choose(ctx)
+				if err != nil {
+					log.Warn(err)
+					continue
+				}
+			}
+		}()
+
 		stopper, err := dix.New(ctx,
 			dep.Bell(ctx, fxlog, &components),
-			dep.InjectFullNode(cctx),
 			dep.InjectRepoPath(cctx),
+			fullnode.InjectFullNodeApiGetter(),
 			dix.Override(new(dtypes.ShutdownChan), shutdownCh),
 		)
 		if err != nil {
