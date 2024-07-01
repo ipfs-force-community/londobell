@@ -24,7 +24,7 @@ func main() {
 		Commands: []*cli.Command{
 			daemonCmd,
 		},
-		Version: build.UserVersion(),
+		Version: string(build.NodeUserVersion()),
 	}
 
 	app.Setup()

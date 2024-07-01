@@ -41,7 +41,7 @@ func main() {
 			setHeadCmd,
 			updateFinalHeight,
 		},
-		Version: build.UserVersion(),
+		Version: string(build.NodeUserVersion()),
 		Flags: []cli.Flag{
 			dep.RepoFlag,
 			dep.FullNodeAPIFlag,

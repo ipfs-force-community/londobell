@@ -2,6 +2,7 @@ package extract
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/filecoin-project/go-address"
@@ -84,15 +85,19 @@ func (am *ActorIDMap) SetActorID(addr, actorID address.Address) {
 }
 
 func LookupID(ctx *Ctx, addr address.Address, ts *types.TipSet) (address.Address, error) {
-	var err error
 	actorID, ok := ActorIDMapping.GetActorID(addr)
 	if !ok {
-		actorID, err = ctx.D.LookupID(ctx.C, addr, ts)
+		aID, err := ctx.D.LookupID(ctx.C, addr, ts)
 		if err != nil {
 			ctx.L.Warnf("failed to lookup actor id: %s,err: %s, fallback to full node", addr, err.Error())
 			actorID, err = ctx.FullNode.GetAppropriateAPI().StateLookupID(ctx.C, addr, ts.Key())
 			if err != nil {
 				return address.Undef, err
+			}
+		} else {
+			actorID, err = address.NewIDAddress(uint64(aID))
+			if err != nil {
+				return address.Undef, fmt.Errorf("parse actor id(%d) failed: %w", aID, err)
 			}
 		}
 

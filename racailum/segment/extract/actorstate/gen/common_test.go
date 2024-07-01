@@ -108,9 +108,9 @@ func (m *MockDAL) ComputeBaseFee(ctx context.Context, ts *types.TipSet) (abi.Tok
 	return args.Get(0).(abi.TokenAmount), args.Error(1)
 }
 
-func (m *MockDAL) LookupID(ctx context.Context, addr address.Address, ts *types.TipSet) (address.Address, error) {
+func (m *MockDAL) LookupID(ctx context.Context, addr address.Address, ts *types.TipSet) (abi.ActorID, error) {
 	args := m.Called(ctx, ts)
-	return args.Get(0).(address.Address), args.Error(1)
+	return args.Get(0).(abi.ActorID), args.Error(1)
 }
 
 func (m *MockDAL) MessagesForTipset(ctx context.Context, ts *types.TipSet) ([]types.ChainMsg, error) {

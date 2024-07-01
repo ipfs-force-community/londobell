@@ -101,7 +101,7 @@ func GetMpool(c *gin.Context) {
 						return
 					}
 
-					hash, err := adapter.NewEthHashFromSignedMessage(ctx, msg, api)
+					hash, err := util.NewEthHashFromSignedMessage(msg)
 					if err != nil {
 						alog.Error(fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid()))
 						util.ReturnOnErr(c, err)
@@ -160,7 +160,7 @@ func GetMpool(c *gin.Context) {
 					util.ReturnOnErr(c, err)
 					return
 				}
-				hash, err := adapter.NewEthHashFromSignedMessage(ctx, smsg, api)
+				hash, err := util.NewEthHashFromSignedMessage(smsg)
 				if err != nil {
 					alog.Error(fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid()))
 					util.ReturnOnErr(c, err)
@@ -196,7 +196,7 @@ func GetMpool(c *gin.Context) {
 				i := i
 				msg := msgs[i]
 				g.Go(func() error {
-					hash, err := adapter.NewEthHashFromSignedMessage(ctx, msg, api)
+					hash, err := util.NewEthHashFromSignedMessage(msg)
 					if err != nil {
 						alog.Error(fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid()))
 						return err
@@ -253,7 +253,7 @@ func GetMpool(c *gin.Context) {
 				// todo: InvokeEVM和其他未定义方法区分开??
 				// filter by methodName
 				if req.MethodName != "" && methodName == req.MethodName {
-					hash, err := adapter.NewEthHashFromSignedMessage(ctx, msg, api)
+					hash, err := util.NewEthHashFromSignedMessage(msg)
 					if err != nil {
 						return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid())
 					}
@@ -270,7 +270,7 @@ func GetMpool(c *gin.Context) {
 				}
 
 				if req.MethodName == "" {
-					hash, err := adapter.NewEthHashFromSignedMessage(ctx, msg, api)
+					hash, err := util.NewEthHashFromSignedMessage(msg)
 					if err != nil {
 						return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid())
 					}

@@ -21,6 +21,6 @@ func GetVersion(c *gin.Context) {
 		return
 	}
 
-	res.Data = build.UserVersion()
+	res.Data = build.NodeUserVersion()
 	c.JSON(http.StatusOK, res)
 }
