@@ -41,10 +41,10 @@ Mongo索引⚠️：[index.js]()
 `./bell --bell-repo=.tmpbell cfg init`
 2. 设置配置参数:  name 为tmpbell数据库名
 ```bash
-./bell --bell-repo=.tmpbell --api-url ws://113.240.65.28:13453/rpc/v0 --token"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiYWRtaW4iLCJwZXJtIjoiYWRtaW4iLCJleHQiOiIifQ.5OofPCBnQNaY-GFbj2bL_KfxsivwHEpPxNT3Y9TuDvw" segment update --name tmpbell --dsn-write-slice "mongodb://127.0.0.1:27017/tmpbell" --dsn-read "mongodb://127.0.0.1:27017/tmpbell" --child-hi bafy2bzacednj2zwkpsi3aivmtmncrwn6k3jy7heht6737sqax67ahgv66ch6k --child-lo bafy2bzacednj2zwkpsi3aivmtmncrwn6k3jy7heht6737sqax67ahgv66ch6k --set-active=true
+./bell --bell-repo=.tmpbell --api-url ws://113.240.65.28:13453/rpc/v0 --token "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiYWRtaW4iLCJwZXJtIjoiYWRtaW4iLCJleHQiOiIifQ.5OofPCBnQNaY-GFbj2bL_KfxsivwHEpPxNT3Y9TuDvw" segment update --name tmpbell --dsn-write-slice "mongodb://127.0.0.1:27017/tmpbell" --dsn-read "mongodb://127.0.0.1:27017/tmpbell" --child-hi bafy2bzacednj2zwkpsi3aivmtmncrwn6k3jy7heht6737sqax67ahgv66ch6k --child-lo bafy2bzacednj2zwkpsi3aivmtmncrwn6k3jy7heht6737sqax67ahgv66ch6k --set-active=true --nodeconfig ./config.json
 ```
 3. 运行: --tmp: optional ，开启则为tmpbell，否则为bell
-   `./bell --bell-repo=.tmpbell --api-url ws://113.240.65.28:13453/rpc/v0 --token "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiYWRtaW4iLCJwZXJtIjoiYWRtaW4iLCJleHQiOiIifQ.5OofPCBnQNaY-GFbj2bL_KfxsivwHEpPxNT3Y9TuDvw"  daemon run --tmp`
+   `./bell --bell-repo=.tmpbell --api-url ws://113.240.65.28:13453/rpc/v0 --token "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiYWRtaW4iLCJwZXJtIjoiYWRtaW4iLCJleHQiOiIifQ.5OofPCBnQNaY-GFbj2bL_KfxsivwHEpPxNT3Y9TuDvw"  daemon run --tmp --nodeconfig ./config.json`
 
 ### OrphanBell
 
