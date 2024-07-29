@@ -72,3 +72,7 @@ var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
 ```
 
 go/pkg/mod/github.com/filecoin-project/lotus@v1.26.2/build/params_calibnet.go
+
+3. 检查 method
+
+检查本次升级中是否有新增 `method`，若有则调整 `cmd/londobell-api/util/util.go` 中 `AllMethodList`。
