@@ -78,24 +78,33 @@ func (m *Message) IsMutable() bool {
 }
 
 // NewMessage converts from *types.Message to *Message with required infomations
-func NewMessage(mcid, signedCid cid.Cid, raw *types.MessageTrace, act, meth string, params cbor.Er, epoch abi.ChainEpoch, gasFeeCap, gasPremium abi.TokenAmount, nonce uint64, isBlock bool) (*Message, error) {
+func NewMessage(mcid, signedCid cid.Cid, raw *types.MessageTrace, act, meth string, params cbor.Er,
+	epoch abi.ChainEpoch, rootMsg *types.Message, rootCid cid.Cid, nonce uint64, isBlock bool) (*Message, error) {
 	var msg *Message
+	msgTrace := raw
+
+	// If MessageTrace is root message, then use Message.GasLimit value
+	if mcid.Equals(rootCid) {
+		rawClone := *raw
+		rawClone.GasLimit = uint64(rootMsg.GasLimit)
+		msgTrace = &rawClone
+	}
 	if isBlock {
 		msg = &Message{
 			Cid:        mcid,
-			Message:    raw,
+			Message:    msgTrace,
 			SignedCid:  signedCid,
-			GasPremium: gasPremium,
-			GasFeeCap:  gasFeeCap,
+			GasPremium: rootMsg.GasPremium,
+			GasFeeCap:  rootMsg.GasFeeCap,
 			Nonce:      nonce,
 		}
 	} else {
 		msg = &Message{
 			Cid:        mcid,
-			Message:    raw,
+			Message:    msgTrace,
 			SignedCid:  signedCid,
-			GasPremium: gasPremium,
-			GasFeeCap:  gasFeeCap,
+			GasPremium: rootMsg.GasPremium,
+			GasFeeCap:  rootMsg.GasFeeCap,
 		}
 	}
 
