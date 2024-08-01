@@ -570,7 +570,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				if depth == 1 {
 					nonce = p.rootMsg.Nonce
 				}
-				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height(), p.rootMsg.GasFeeCap, p.rootMsg.GasPremium, nonce, isBlock)
+				mmsg, err := model.NewMessage(mcid, signedCid, msg, mi.Actor, mi.Method.Name, mi.ParamObj(), ts.Height(), p.rootMsg, p.rootCid, nonce, isBlock)
 				if err != nil {
 					elog.Warnw("convert to model.Message", "mcid", mcid, "signedCid", signedCid, "from", msg.From, "to", msg.To, "actor", mi.Actor, "method", mi.Method.Name, "err", err.Error())
 				} else {
