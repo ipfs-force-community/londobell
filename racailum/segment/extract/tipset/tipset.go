@@ -3,6 +3,7 @@ package tipset
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v10/evm"
 	"github.com/filecoin-project/go-state-types/builtin/v11/miner"
 	sverifreg "github.com/filecoin-project/go-state-types/builtin/v11/verifreg"
+	miner13 "github.com/filecoin-project/go-state-types/builtin/v13/miner"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/lotus/api"
@@ -41,6 +43,7 @@ import (
 	miner3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/miner"
 	multisig3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/multisig"
 	"github.com/ipfs/go-cid"
+	"github.com/multiformats/go-multicodec"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.opencensus.io/trace"
 	"golang.org/x/xerrors"
@@ -53,6 +56,18 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
 )
+
+// The address used in messages to actors that have since been deleted.
+//
+// 0xff0000000000000000000000ffffffffffffffff
+var revertedEthAddress ethtypes.EthAddress
+
+func init() {
+	revertedEthAddress[0] = 0xff
+	for i := 20 - 8; i < 20; i++ {
+		revertedEthAddress[i] = 0xff
+	}
+}
 
 func init() {
 	execTraceExample := &model.ExecTrace{}
@@ -341,6 +356,11 @@ func copyIndexes(src []int) []int {
 	return dst
 }
 
+// Use Flags instead of SimpleQAPower: https://github.com/filecoin-project/go-state-types/pull/212/files
+func IsSimpleQAPower(flags miner13.SectorOnChainInfoFlags) bool {
+	return flags == miner13.SIMPLE_QA_POWER
+}
+
 func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
 
 	_, span := trace.StartSpan(ctx.C, "extractor.extractExecTrace")
@@ -496,11 +516,12 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				continue
 			}
 
-			hash, err := newEthTxFromSignedMessage(ctx.C, smsg, ts.TipSet, ctx.D)
+			ethTx, err := newEthTxFromSignedMessage(ctx.C, smsg, ts.TipSet, ctx.D)
 			if err != nil {
 				return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, smsg.Cid())
 			}
 
+			hash := ethTx.Hash
 			eht, err := model.NewEthHash(hash, smsg.Cid(), ts.Height())
 			if err != nil {
 				elog.Warnw("convert to model.EthHash", "mcid", smsg.Cid(), "err", err.Error())
@@ -817,7 +838,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					}
 
 					for _, info := range sectorInfos {
-						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, false, ts.Height())
+						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, false, ts.Height())
 						mstCnt++
 						res.Docs = append(res.Docs, mst)
 					}
@@ -878,7 +899,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 						}
 
 						for _, info := range sectorInfos {
-							mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, false, ts.Height())
+							mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, false, ts.Height())
 							mstCnt++
 							res.Docs = append(res.Docs, mst)
 						}
@@ -932,7 +953,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					}
 
 					for _, info := range sectorInfos {
-						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, false, ts.Height())
+						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, false, ts.Height())
 						mstCnt++
 						res.Docs = append(res.Docs, mst)
 
@@ -1011,7 +1032,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				}
 
 				for _, info := range sectorInfos {
-					mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, info.SimpleQAPower, info.InitialPledge, true, ts.Height())
+					mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, true, ts.Height())
 					mstCnt++
 					res.Docs = append(res.Docs, mst)
 				}
@@ -1454,7 +1475,7 @@ func extractChangedActor(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 			ActorID: actorID,
 			Balance: act.Balance,
 			Code:    actType,
-			Address: act.Address,
+			Address: act.DelegatedAddress,
 		})
 	}
 
@@ -1465,85 +1486,215 @@ func extractChangedActor(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	return nil
 }
 
-func newEthTxFromSignedMessage(ctx context.Context, smsg *types.SignedMessage, ts *types.TipSet, sm common.StateManager) (ethtypes.EthHash, error) {
-	var tx ethtypes.EthTx
-	var err error
-
-	if smsg.Signature.Type == crypto.SigTypeDelegated {
-		tx, err = ethtypes.EthTxFromSignedEthMessage(smsg)
+// decodePayload is a utility function which decodes the payload using the given codec
+func decodePayload(payload []byte, codec uint64) (ethtypes.EthBytes, error) {
+	switch multicodec.Code(codec) {
+	case multicodec.Identity:
+		return nil, nil
+	case multicodec.DagCbor, multicodec.Cbor:
+		buf, err := cbg.ReadByteArray(bytes.NewReader(payload), uint64(len(payload)))
 		if err != nil {
-			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to convert from signed message: %w", err)
+			return nil, xerrors.Errorf("decodePayload: failed to decode cbor payload: %w", err)
 		}
+		return buf, nil
+	case multicodec.Raw:
+		return ethtypes.EthBytes(payload), nil
+	}
 
-		tx.Hash, err = tx.TxHash()
-		if err != nil {
-			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to calculate hash for ethTx: %w", err)
-		}
+	return nil, xerrors.Errorf("decodePayload: unsupported codec: %d", codec)
+}
 
-		fromAddr, err := lookupEthAddress(ctx, smsg.Message.From, ts, sm)
-		if err != nil {
-			return ethtypes.EmptyEthHash, xerrors.Errorf("failed to resolve Ethereum address: %w", err)
-		}
+func encodeFilecoinParamsAsABI(method abi.MethodNum, codec uint64, params []byte) []byte {
+	buf := []byte{0x86, 0x8e, 0x10, 0xc4} // Native method selector.
+	return append(buf, encodeAsABIHelper(uint64(method), codec, params)...)
+}
 
-		tx.From = fromAddr
-	} else if smsg.Signature.Type == crypto.SigTypeSecp256k1 { // Secp Filecoin Message
-		tx = ethTxFromNativeMessage(ctx, smsg.VMMessage(), ts, sm)
-		tx.Hash, err = ethtypes.EthHashFromCid(smsg.Cid())
-		if err != nil {
-			return ethtypes.EmptyEthHash, err
+// Format 2 numbers followed by an arbitrary byte array as solidity ABI. Both our native
+// inputs/outputs follow the same pattern, so we can reuse this code.
+func encodeAsABIHelper(param1 uint64, param2 uint64, data []byte) []byte {
+	const EVM_WORD_SIZE = 32
+
+	// The first two params are "static" numbers. Then, we record the offset of the "data" arg,
+	// then, at that offset, we record the length of the data.
+	//
+	// In practice, this means we have 4 256-bit words back to back where the third arg (the
+	// offset) is _always_ '32*3'.
+	staticArgs := []uint64{param1, param2, EVM_WORD_SIZE * 3, uint64(len(data))}
+	// We always pad out to the next EVM "word" (32 bytes).
+	totalWords := len(staticArgs) + (len(data) / EVM_WORD_SIZE)
+	if len(data)%EVM_WORD_SIZE != 0 {
+		totalWords++
+	}
+	sz := totalWords * EVM_WORD_SIZE
+	buf := make([]byte, sz)
+	offset := 0
+	// Below, we use copy instead of "appending" to preserve all the zero padding.
+	for _, arg := range staticArgs {
+		// Write each "arg" into the last 8 bytes of each 32 byte word.
+		offset += EVM_WORD_SIZE
+		start := offset - 8
+		binary.BigEndian.PutUint64(buf[start:offset], arg)
+	}
+
+	// Finally, we copy in the data.
+	copy(buf[offset:], data)
+
+	return buf
+}
+
+// Convert a native message to an eth transaction.
+//
+//   - The state-tree must be from after the message was applied (ideally the following tipset).
+//   - In some cases, the "to" address may be `0xff0000000000000000000000ffffffffffffffff`. This
+//     means that the "to" address has not been assigned in the passed state-tree and can only
+//     happen if the transaction reverted.
+//
+// ethTxFromNativeMessage does NOT populate:
+// - BlockHash
+// - BlockNumber
+// - TransactionIndex
+// - Hash
+func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, ts *types.TipSet, sm common.StateManager) (ethtypes.EthTx, error) {
+	// Lookup the from address. This must succeed.
+	from, err := lookupEthAddress(ctx, msg.From, ts, sm)
+	if err != nil {
+		return ethtypes.EthTx{}, xerrors.Errorf("failed to lookup sender address %s when converting a native message to an eth txn: %w", msg.From, err)
+	}
+	// Lookup the to address. If the recipient doesn't exist, we replace the address with a
+	// known sentinel address.
+	to, err := lookupEthAddress(ctx, msg.To, ts, sm)
+	if err != nil {
+		if !errors.Is(err, types.ErrActorNotFound) {
+			return ethtypes.EthTx{}, xerrors.Errorf("failed to lookup receiver address %s when converting a native message to an eth txn: %w", msg.To, err)
 		}
-	} else { // BLS Filecoin message
-		tx = ethTxFromNativeMessage(ctx, smsg.VMMessage(), ts, sm)
-		tx.Hash, err = ethtypes.EthHashFromCid(smsg.Message.Cid())
-		if err != nil {
-			return ethtypes.EmptyEthHash, err
+		to = revertedEthAddress
+	}
+
+	// For empty, we use "0" as the codec. Otherwise, we use CBOR for message
+	// parameters.
+	var codec uint64
+	if len(msg.Params) > 0 {
+		codec = uint64(multicodec.Cbor)
+	}
+
+	maxFeePerGas := ethtypes.EthBigInt(msg.GasFeeCap)
+	maxPriorityFeePerGas := ethtypes.EthBigInt(msg.GasPremium)
+
+	// We decode as a native call first.
+	ethTx := ethtypes.EthTx{
+		To:                   &to,
+		From:                 from,
+		Input:                encodeFilecoinParamsAsABI(msg.Method, codec, msg.Params),
+		Nonce:                ethtypes.EthUint64(msg.Nonce),
+		ChainID:              ethtypes.EthUint64(build.Eip155ChainId),
+		Value:                ethtypes.EthBigInt(msg.Value),
+		Type:                 ethtypes.EIP1559TxType,
+		Gas:                  ethtypes.EthUint64(msg.GasLimit),
+		MaxFeePerGas:         &maxFeePerGas,
+		MaxPriorityFeePerGas: &maxPriorityFeePerGas,
+		AccessList:           []ethtypes.EthHash{},
+	}
+
+	// Then we try to see if it's "special". If we fail, we ignore the error and keep treating
+	// it as a native message. Unfortunately, the user is free to send garbage that may not
+	// properly decode.
+	if msg.Method == builtintypes.MethodsEVM.InvokeContract {
+		// try to decode it as a contract invocation first.
+		if inp, err := decodePayload(msg.Params, codec); err == nil {
+			ethTx.Input = []byte(inp)
+		}
+	} else if msg.To == builtin2.EthereumAddressManagerActorAddr && msg.Method == builtintypes.MethodsEAM.CreateExternal {
+		// Then, try to decode it as a contract deployment from an EOA.
+		if inp, err := decodePayload(msg.Params, codec); err == nil {
+			ethTx.Input = []byte(inp)
+			ethTx.To = nil
 		}
 	}
 
-	return tx.Hash, nil
+	return ethTx, nil
 }
 
+func newEthTxFromSignedMessage(ctx context.Context, smsg *types.SignedMessage, ts *types.TipSet, sm common.StateManager) (ethtypes.EthTx, error) {
+	var tx ethtypes.EthTx
+	var err error
+
+	// This is an eth tx
+	if smsg.Signature.Type == crypto.SigTypeDelegated {
+		ethTx, err := ethtypes.EthTransactionFromSignedFilecoinMessage(smsg)
+		if err != nil {
+			return ethtypes.EthTx{}, xerrors.Errorf("failed to convert from signed message: %w", err)
+		}
+		tx, err = ethTx.ToEthTx(smsg)
+		if err != nil {
+			return ethtypes.EthTx{}, xerrors.Errorf("failed to convert from signed message: %w", err)
+		}
+	} else if smsg.Signature.Type == crypto.SigTypeSecp256k1 { // Secp Filecoin Message
+		tx, err = ethTxFromNativeMessage(ctx, smsg.VMMessage(), ts, sm)
+		if err != nil {
+			return ethtypes.EthTx{}, err
+		}
+		tx.Hash, err = ethtypes.EthHashFromCid(smsg.Cid())
+		if err != nil {
+			return ethtypes.EthTx{}, err
+		}
+	} else { // BLS Filecoin message
+		tx, err = ethTxFromNativeMessage(ctx, smsg.VMMessage(), ts, sm)
+		if err != nil {
+			return ethtypes.EthTx{}, err
+		}
+		tx.Hash, err = ethtypes.EthHashFromCid(smsg.Message.Cid())
+		if err != nil {
+			return ethtypes.EthTx{}, err
+		}
+	}
+
+	return tx, nil
+}
+
+// lookupEthAddress makes its best effort at finding the Ethereum address for a
+// Filecoin address. It does the following:
+//
+//  1. If the supplied address is an f410 address, we return its payload as the EthAddress.
+//  2. Otherwise (f0, f1, f2, f3), we look up the actor on the state tree. If it has a delegated address, we return it if it's f410 address.
+//  3. Otherwise, we fall back to returning a masked ID Ethereum address. If the supplied address is an f0 address, we
+//     use that ID to form the masked ID address.
+//  4. Otherwise, we fetch the actor's ID from the state tree and form the masked ID with it.
+//
+// If the actor doesn't exist in the state-tree but we have its ID, we use a masked ID address. It could have been deleted.
 func lookupEthAddress(ctx context.Context, addr address.Address, ts *types.TipSet, sm common.StateManager) (ethtypes.EthAddress, error) {
+	// Attempt to convert directly, if it's an f4 address.
 	ethAddr, err := ethtypes.EthAddressFromFilecoinAddress(addr)
 	if err == nil && !ethAddr.IsMaskedID() {
 		return ethAddr, nil
 	}
 
-	if actor, err := sm.LoadActor(ctx, addr, ts); err != nil {
-		return ethtypes.EthAddress{}, err
-	} else if actor.Address != nil {
-		if ethAddr, err := ethtypes.EthAddressFromFilecoinAddress(*actor.Address); err == nil && !ethAddr.IsMaskedID() {
-			return ethAddr, nil
-		}
-	}
-
-	if err == nil && ethAddr.IsMaskedID() {
-		return ethAddr, nil
-	}
-
-	idAddr, err := sm.LookupID(ctx, addr, ts)
+	// Otherwise, resolve the ID addr.
+	id, err := sm.LookupID(ctx, addr, ts)
 	if err != nil {
 		return ethtypes.EthAddress{}, err
 	}
-	return ethtypes.EthAddressFromFilecoinAddress(idAddr)
-}
-
-func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, ts *types.TipSet, sm common.StateManager) ethtypes.EthTx {
-	// We don't care if we error here, conversion is best effort for non-eth transactions
-	from, _ := lookupEthAddress(ctx, msg.From, ts, sm)
-	to, _ := lookupEthAddress(ctx, msg.To, ts, sm)
-	return ethtypes.EthTx{
-		To:                   &to,
-		From:                 from,
-		Nonce:                ethtypes.EthUint64(msg.Nonce),
-		ChainID:              ethtypes.EthUint64(build.Eip155ChainId),
-		Value:                ethtypes.EthBigInt(msg.Value),
-		Type:                 ethtypes.Eip1559TxType,
-		Gas:                  ethtypes.EthUint64(msg.GasLimit),
-		MaxFeePerGas:         ethtypes.EthBigInt(msg.GasFeeCap),
-		MaxPriorityFeePerGas: ethtypes.EthBigInt(msg.GasPremium),
-		AccessList:           []ethtypes.EthHash{},
+	idAddr, err := address.NewIDAddress(uint64(id))
+	if err != nil {
+		return ethtypes.EthAddress{}, err
 	}
+
+	// revive:disable:empty-block easier to grok when the cases are explicit
+
+	// Lookup on the target actor and try to get an f410 address.
+	if actor, err := sm.LoadActor(ctx, idAddr, ts); errors.Is(err, types.ErrActorNotFound) {
+		// Not found -> use a masked ID address
+	} else if err != nil {
+		// Any other error -> fail.
+		return ethtypes.EthAddress{}, err
+	} else if actor.DelegatedAddress == nil {
+		// No delegated address -> use masked ID address.
+	} else if ethAddr, err := ethtypes.EthAddressFromFilecoinAddress(*actor.DelegatedAddress); err == nil && !ethAddr.IsMaskedID() {
+		// Conversable into an eth address, use it.
+		return ethAddr, nil
+	}
+
+	// Otherwise, use the masked address.
+	return ethtypes.EthAddressFromFilecoinAddress(idAddr)
 }
 
 func ethLogFromEvent(ctx *extract.Ctx, ts *types.TipSet, entries []types.EventEntry) (data []byte, topics []ethtypes.EthHash, ok bool) {

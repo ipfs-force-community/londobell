@@ -13,6 +13,7 @@ import (
 var log = logging.Logger("parse")
 
 // Object classes
+//
 //nolint:deadcode
 const (
 	Object   = "Object"
@@ -28,13 +29,25 @@ const (
 // filfox: AddLockedFund
 // todo: update upgrade
 // Other is ""
-var AllMethodList = []string{"AddBalance", "AddVerifiedClient", "AllowanceExported", "Approve", "AuthenticateMessage", "Cancel", "CancelExported",
-	"ChangeBeneficiary", "ChangeMultiaddrs", "ChangeOwnerAddress", "ChangePeerID", "ChangeWorkerAddress", "Collect", "CompactPartitions", "CompactSectorNumbers",
-	"ConfirmChangeWorkerAddress", "ConfirmUpdateWorkerKey", "Constructor", "ControlAddresses", "CreateExternal", "CreateMiner", "DeclareFaults", "DeclareFaultsRecovered",
-	"DisputeWindowedPoSt", "Exec", "ExtendClaimTerms", "ExtendSectorExpiration", "ExtendSectorExpiration2", "GetBeneficiary", "IncreaseAllowanceExported",
-	"InvokeContract", "Other", "PreCommitSector", "PreCommitSectorBatch", "PreCommitSectorBatch2", "Propose", "ProveCommitAggregate", "ProveCommitSector",
-	"ProveReplicaUpdates", "PubkeyAddress", "PublishStorageDeals", "RemoveExpiredAllocations", "RemoveSigner", "RepayDebt", "ReportConsensusFault", "Send",
-	"Send(ethaccount)", "Send(placeholder)", "Settle", "SubmitWindowedPoSt", "SwapSigner", "TerminateSectors", "TransferFromExported", "UpdateChannelState", "WithdrawBalance"}
+var AllMethodList = []string{
+	"AddBalance", "AddVerifiedClient", "AllowanceExported", "Approve", "AuthenticateMessage",
+	"Cancel", "CancelExported", "ChangeBeneficiary", "ChangeMultiaddrs", "ChangeOwnerAddress", "ChangePeerID",
+	"ChangeWorkerAddress", "Collect", "CompactPartitions", "CompactSectorNumbers", "ConfirmChangeWorkerAddress",
+	"ConfirmUpdateWorkerKey", "Constructor", "ControlAddresses", "CreateExternal", "CreateMiner",
+	"DeclareFaults", "DeclareFaultsRecovered", "DisputeWindowedPoSt",
+	"Exec", "ExtendClaimTerms", "ExtendSectorExpiration", "ExtendSectorExpiration2",
+	"GetBeneficiary",
+	"IncreaseAllowanceExported", "InvokeContract",
+	"Other",
+	"PreCommitSector", "PreCommitSectorBatch", "PreCommitSectorBatch2", "Propose", "ProveCommitAggregate",
+	"ProveCommitSector", "ProveCommitSectors3", "ProveCommitSectorsNI", "ProveReplicaUpdates", "ProveReplicaUpdates2",
+	"ProveReplicaUpdates3", "PubkeyAddress", "PublishStorageDeals",
+	"RemoveExpiredAllocations", "RemoveSigner", "RepayDebt", "ReportConsensusFault",
+	"Send", "Send(ethaccount)", "Send(placeholder)", "Settle", "SubmitWindowedPoSt", "SwapSigner",
+	"TerminateSectors", "TransferFromExported",
+	"UpdateChannelState",
+	"WithdrawBalance",
+}
 
 // Parse generates a aggregation pipeline from the given source code with context
 func Parse(ctx, src interface{}) (interface{}, error) {

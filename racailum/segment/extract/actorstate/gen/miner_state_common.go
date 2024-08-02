@@ -53,6 +53,9 @@ import (
 	miner13 "github.com/filecoin-project/go-state-types/builtin/v13/miner"
 	adt13 "github.com/filecoin-project/go-state-types/builtin/v13/util/adt"
 
+	miner14 "github.com/filecoin-project/go-state-types/builtin/v14/miner"
+	adt14 "github.com/filecoin-project/go-state-types/builtin/v14/util/adt"
+
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	cstore "github.com/filecoin-project/lotus/chain/store"
 )
@@ -150,6 +153,13 @@ func init() {
 
 	emptyMinerStateV13 = empty13
 
+	empty14, err := newEmptyMinerStateV14()
+	if err != nil {
+		panic(fmt.Errorf("construct empty miner state v14: %w", err))
+	}
+
+	emptyMinerStateV14 = empty14
+
 }
 
 var (
@@ -166,6 +176,7 @@ var (
 	emptyMinerStateV11 *miner11.State
 	emptyMinerStateV12 *miner12.State
 	emptyMinerStateV13 *miner13.State
+	emptyMinerStateV14 *miner14.State
 )
 
 func isEmptyMinerStateV0(mst *miner0.State) bool {
@@ -906,6 +917,89 @@ func newEmptyMinerStateV13() (*miner13.State, error) {
 	}
 
 	return &miner13.State{
+		Info: cid.Undef,
+
+		PreCommitDeposits: abi.NewTokenAmount(0),
+		LockedFunds:       abi.NewTokenAmount(0),
+		FeeDebt:           abi.NewTokenAmount(0),
+
+		VestingFunds: emptyVestingFundsCid,
+
+		InitialPledge: abi.NewTokenAmount(0),
+
+		PreCommittedSectors:        emptyPrecommitMapCid,
+		PreCommittedSectorsCleanUp: emptyPrecommitsCleanUpArrayCid,
+		AllocatedSectors:           emptyBitfieldCid,
+		Sectors:                    emptySectorsArrayCid,
+		ProvingPeriodStart:         0,
+		CurrentDeadline:            0,
+		Deadlines:                  emptyDeadlinesCid,
+		EarlyTerminations:          bitfield.New(),
+		DeadlineCronActive:         false,
+	}, nil
+}
+
+func isEmptyMinerStateV14(mst *miner14.State) bool {
+	earlyCount, err := mst.EarlyTerminations.Count()
+	if err != nil || earlyCount != 0 {
+		return false
+	}
+
+	return isEmptyOrZero(mst.PreCommitDeposits) &&
+		isEmptyOrZero(mst.LockedFunds) &&
+		isEmptyOrZero(mst.FeeDebt) &&
+		mst.VestingFunds.Equals(emptyMinerStateV14.VestingFunds) &&
+		isEmptyOrZero(mst.InitialPledge) &&
+		mst.PreCommittedSectors.Equals(emptyMinerStateV14.PreCommittedSectors) &&
+		mst.PreCommittedSectorsCleanUp.Equals(emptyMinerStateV14.PreCommittedSectorsCleanUp) &&
+		mst.AllocatedSectors.Equals(emptyMinerStateV14.AllocatedSectors) &&
+		mst.Sectors.Equals(emptyMinerStateV14.Sectors) &&
+		mst.Deadlines.Equals(emptyMinerStateV14.Deadlines)
+}
+
+// VERCHECK
+
+func newEmptyMinerStateV14() (*miner14.State, error) {
+	ctx := context.Background()
+	inMemStore := bstore.NewMemorySync()
+	store := adt14.WrapStore(ctx, cstore.ActorStore(ctx, inMemStore))
+	emptyPrecommitMapCid, err := adt14.StoreEmptyMap(store, builtin.DefaultHamtBitwidth)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct empty map: %w", err)
+	}
+	emptyPrecommitsCleanUpArrayCid, err := adt14.StoreEmptyArray(store, miner14.PrecommitCleanUpAmtBitwidth)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct empty precommits array: %w", err)
+	}
+	emptySectorsArrayCid, err := adt14.StoreEmptyArray(store, miner14.SectorsAmtBitwidth)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct empty sectors array: %w", err)
+	}
+
+	emptyBitfield := bitfield.NewFromSet(nil)
+	emptyBitfieldCid, err := store.Put(store.Context(), emptyBitfield)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct empty bitfield: %w", err)
+	}
+	emptyDeadline, err := miner14.ConstructDeadline(store)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct empty deadline: %w", err)
+	}
+	emptyDeadlineCid, err := store.Put(store.Context(), emptyDeadline)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct empty deadline: %w", err)
+	}
+	emptyDeadlines := miner14.ConstructDeadlines(emptyDeadlineCid)
+	emptyDeadlinesCid, err := store.Put(store.Context(), emptyDeadlines)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct empty deadlines: %w", err)
+	}
+	emptyVestingFundsCid, err := store.Put(store.Context(), miner14.ConstructVestingFunds())
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct empty vesting funds: %w", err)
+	}
+
+	return &miner14.State{
 		Info: cid.Undef,
 
 		PreCommitDeposits: abi.NewTokenAmount(0),

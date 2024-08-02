@@ -46,7 +46,7 @@ londobell-api随 Filecoin 网络升级的检查项清单
 
 ### Others
 1. 当前没使用vendor模式,但是有些依赖lotus的代码进行了调整,需要在本地机器的go mod目录做响应的调整
-1. /go/pkg/mod/github.com/filecoin-project/lotus@v1.24.0/chain/store/store.go:1249
+2. /go/pkg/mod/github.com/filecoin-project/lotus@v1.24.0/chain/store/store.go:1249
 调整GetTipsetByHeight逻辑:
 调整以下代码,添加空指针判断:
 ```go
@@ -59,6 +59,7 @@ londobell-api随 Filecoin 网络升级的检查项清单
 ```
 
 2.额外检查
+
 检查`github.com/filecoin-project/lotus/node/` build变更,根据变更调整`dep`部分代码
 如：
 go/pkg/mod/github.com/filecoin-project/lotus@v1.26.2/build/params_mainnet.go注释`DrandSchedule`
@@ -71,3 +72,7 @@ var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
 ```
 
 go/pkg/mod/github.com/filecoin-project/lotus@v1.26.2/build/params_calibnet.go
+
+3. 检查 method
+
+检查本次升级中是否有新增 `method`，若有则调整 `cmd/londobell-api/util/util.go` 中 `AllMethodList`。

@@ -28,6 +28,9 @@ import (
 	miner13 "github.com/filecoin-project/go-state-types/builtin/v13/miner"
 	util13 "github.com/filecoin-project/go-state-types/builtin/v13/util"
 	adt13 "github.com/filecoin-project/go-state-types/builtin/v13/util/adt"
+	miner14 "github.com/filecoin-project/go-state-types/builtin/v14/miner"
+	util14 "github.com/filecoin-project/go-state-types/builtin/v14/util"
+	adt14 "github.com/filecoin-project/go-state-types/builtin/v14/util/adt"
 	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
 	util8 "github.com/filecoin-project/go-state-types/builtin/v8/util"
 	adt8 "github.com/filecoin-project/go-state-types/builtin/v8/util/adt"
@@ -302,6 +305,8 @@ func MakeSystemState(store adt.Store, c cid.Cid) (system.State, error) {
 			return system.MakeState(store, actorstypes.Version12, cid.Undef)
 		case actorstypes.Version13:
 			return system.MakeState(store, actorstypes.Version13, cid.Undef)
+		case actorstypes.Version14:
+			return system.MakeState(store, actorstypes.Version14, cid.Undef)
 		}
 	}
 
@@ -878,6 +883,97 @@ func getMinerResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, r
 			}
 
 			var precommit miner13.SectorPreCommitOnChainInfo
+			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+				precommitSectorCount++
+				return nil
+			})
+
+			resData.State = state
+			resData.SectorCount = sectorCount
+			resData.FaultSectorCount = faultSectorCount
+			resData.ActiveSectorCount = activeSectorCount
+			resData.LiveSectorCount = liveSectorCount
+			resData.RecoverSectorCount = recoverSectorCount
+			resData.TerminateSectorCount = terminateSectorCount
+			resData.PrecommitSectorCount = precommitSectorCount
+
+			return nil
+		case actorstypes.Version14:
+			state := miner14.State{}
+			err = stor.Get(ctx, mact.Head, &state)
+			if err != nil {
+				return err
+			}
+
+			dls, err := state.LoadDeadlines(stor)
+			if err != nil {
+				return err
+			}
+
+			err = dls.ForEach(stor, func(dlIdx uint64, dl *miner14.Deadline) error {
+				partitions, err := dl.PartitionsArray(stor)
+				if err != nil {
+					return err
+				}
+				var part miner14.Partition
+				return partitions.ForEach(&part, func(partIdx int64) error {
+					sc, err := part.Sectors.Count()
+					if err != nil {
+						return err
+					}
+					sectorCount += sc
+
+					fc, err := part.Faults.Count()
+					if err != nil {
+						return err
+					}
+					faultSectorCount += fc
+
+					active, err := part.ActiveSectors()
+					if err != nil {
+						return err
+					}
+					ac, err := active.Count()
+					if err != nil {
+						return err
+					}
+					activeSectorCount += ac
+
+					live, err := part.LiveSectors()
+					if err != nil {
+						return err
+					}
+					lc, err := live.Count()
+					if err != nil {
+						return err
+					}
+					liveSectorCount += lc
+
+					rc, err := part.Recoveries.Count()
+					if err != nil {
+						return err
+					}
+					recoverSectorCount += rc
+
+					tc, err := part.Terminated.Count()
+					if err != nil {
+						return err
+					}
+					terminateSectorCount += tc
+
+					return nil
+				})
+			})
+			if err != nil {
+				return err
+			}
+
+			precommitted, err := adt14.AsMap(stor, state.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+			if err != nil {
+				return err
+			}
+
+			var precommit miner14.SectorPreCommitOnChainInfo
 			precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
 				precommitSectorCount++
 				return nil
@@ -1660,6 +1756,22 @@ func getDepositToBurnByCode(ctx context.Context, mact *types.Actor, stor adt.Sto
 			}
 			return depositToBurn, nil
 
+		case actorstypes.Version14:
+			state := &miner14.State{}
+			err := stor.Get(ctx, mact.Head, state)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+
+			if !state.PreCommittedSectorsCleanUp.Defined() {
+				return abi.NewTokenAmount(0), nil
+			}
+			depositToBurn, err := CleanUpExpiredPreCommits(state, stor, curEpoch)
+			if err != nil {
+				return abi.NewTokenAmount(0), err
+			}
+			return depositToBurn, nil
+
 		}
 	}
 
@@ -2086,6 +2198,65 @@ func CleanUpExpiredPreCommits(state interface{}, store adt.Store, currEpoch abi.
 		// This deposit was locked separately to pledge collateral so there's no pledge change here.
 		return depositToBurn, nil
 
+	case *miner14.State:
+		st := state.(*miner14.State)
+		depositToBurn = abi.NewTokenAmount(0)
+
+		// cleanup expired pre-committed sectors
+		cleanUpQ, err := util14.LoadBitfieldQueue(store, st.PreCommittedSectorsCleanUp, st.QuantSpecEveryDeadline(), miner14.PrecommitCleanUpAmtBitwidth)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to load sector expiry queue: %w", err)
+		}
+
+		sectors, modified, err := PopUntil(cleanUpQ, currEpoch)
+		if err != nil {
+			return depositToBurn, xerrors.Errorf("failed to pop expired sectors: %w", err)
+		}
+
+		if modified {
+			st.PreCommittedSectorsCleanUp, err = cleanUpQ.Root()
+			if err != nil {
+				return depositToBurn, xerrors.Errorf("failed to save pre commit clean up queue: %w", err)
+			}
+		}
+
+		var precommitsToDelete []abi.SectorNumber
+		if err = sectors.ForEach(func(i uint64) error {
+			sectorNo := abi.SectorNumber(i)
+			sector, found, err := st.GetPrecommittedSector(store, sectorNo)
+			if err != nil {
+				return err
+			}
+			if !found {
+				// already committed/deleted
+				return nil
+			}
+
+			// mark it for deletion
+			precommitsToDelete = append(precommitsToDelete, sectorNo)
+
+			// increment deposit to burn
+			depositToBurn = big.Add(depositToBurn, sector.PreCommitDeposit)
+			return nil
+		}); err != nil {
+			return big.Zero(), xerrors.Errorf("failed to check pre-commit expiries: %w", err)
+		}
+
+		// Actually delete it.
+		if len(precommitsToDelete) > 0 {
+			if err := DeletePrecommittedSectors(st, store, precommitsToDelete...); err != nil {
+				return big.Zero(), fmt.Errorf("failed to delete pre-commits: %w", err)
+			}
+		}
+
+		st.PreCommitDeposits = big.Sub(st.PreCommitDeposits, depositToBurn)
+		if st.PreCommitDeposits.LessThan(big.Zero()) {
+			return big.Zero(), xerrors.Errorf("pre-commit clean up caused negative deposits: %v", st.PreCommitDeposits)
+		}
+
+		// This deposit was locked separately to pledge collateral so there's no pledge change here.
+		return depositToBurn, nil
+
 	default:
 		return big.Zero(), fmt.Errorf("CleanUpExpiredPreCommits gets invalid type: %v", state)
 	}
@@ -2259,6 +2430,33 @@ func PopUntil(queue interface{}, until abi.ChainEpoch) (values bitfield.BitField
 		}
 
 		return merged, true, nil
+	case util14.BitfieldQueue:
+		q := queue.(util14.BitfieldQueue)
+		if err = q.ForEach(func(epoch abi.ChainEpoch, bf bitfield.BitField) error {
+			if epoch > until {
+				return stopErr
+			}
+			poppedKeys = append(poppedKeys, uint64(epoch))
+			poppedValues = append(poppedValues, bf)
+			return err
+		}); err != nil && err != stopErr {
+			return bitfield.BitField{}, false, err
+		}
+
+		// Nothing expired.
+		if len(poppedKeys) == 0 {
+			return bitfield.New(), false, nil
+		}
+
+		if err = q.BatchDelete(poppedKeys, true); err != nil {
+			return bitfield.BitField{}, false, err
+		}
+		merged, err := bitfield.MultiMerge(poppedValues...)
+		if err != nil {
+			return bitfield.BitField{}, false, err
+		}
+
+		return merged, true, nil
 
 	default:
 		return bitfield.BitField{}, false, fmt.Errorf("PopUntil gets invalid type: %v", queue)
@@ -2351,6 +2549,21 @@ func DeletePrecommittedSectors(state interface{}, store adt.Store, sectorNos ...
 
 		for _, sectorNo := range sectorNos {
 			err = precommitted.Delete(miner13.SectorKey(sectorNo))
+			if err != nil {
+				return xerrors.Errorf("failed to delete precommitment for %v: %w", sectorNo, err)
+			}
+		}
+		st.PreCommittedSectors, err = precommitted.Root()
+		return err
+	case *miner14.State:
+		st := state.(*miner14.State)
+		precommitted, err := adt14.AsMap(store, st.PreCommittedSectors, sbuiltin.DefaultHamtBitwidth)
+		if err != nil {
+			return err
+		}
+
+		for _, sectorNo := range sectorNos {
+			err = precommitted.Delete(miner14.SectorKey(sectorNo))
 			if err != nil {
 				return xerrors.Errorf("failed to delete precommitment for %v: %w", sectorNo, err)
 			}

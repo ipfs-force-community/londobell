@@ -278,8 +278,8 @@ func GetAllAddrs(ctx context.Context, addrStr string, api v0api.FullNode) ([]str
 			return nil, err
 		}
 
-		if actor.Address != nil {
-			delegated := actor.Address
+		if actor.DelegatedAddress != nil {
+			delegated := actor.DelegatedAddress
 			addrs = append(addrs, delegated.String()[1:])
 		}
 
@@ -301,8 +301,8 @@ func GetAllAddrs(ctx context.Context, addrStr string, api v0api.FullNode) ([]str
 			return nil, err
 		}
 
-		if actor.Address != nil {
-			delegated := actor.Address
+		if actor.DelegatedAddress != nil {
+			delegated := actor.DelegatedAddress
 			addrs = append(addrs, delegated.String()[1:])
 		}
 
@@ -383,148 +383,6 @@ func GetTraceByCid(ctx context.Context, cid string) ([]model.TraceForMessageRes,
 
 func IsSigTypeDelegatedMessage(from address.Address) bool {
 	return from.Protocol() == address.Delegated
-}
-
-func newEthTxFromSignedMessage(ctx context.Context, msg *types.Message, signedCid cid.Cid, api v0api.FullNode) (ethtypes.EthTx, error) {
-	var tx ethtypes.EthTx
-	var err error
-
-	// This is an eth tx
-	if msg.From.Protocol() == address.Delegated {
-		tx, err = EthTxFromSignedEthMessage(msg)
-		if err != nil {
-			return ethtypes.EthTx{}, xerrors.Errorf("failed to convert from signed message: %w", err)
-		}
-
-		// todo:暂时不计算
-		//tx.Hash, err = tx.TxHash()
-		//if err != nil {
-		//	return ethtypes.EthTx{}, xerrors.Errorf("failed to calculate hash for ethTx: %w", err)
-		//}
-
-		fromAddr, err := lookupEthAddress(ctx, msg.From, api)
-		if err != nil {
-			return ethtypes.EthTx{}, xerrors.Errorf("failed to resolve Ethereum address: %w", err)
-		}
-
-		tx.From = fromAddr
-	} else if msg.From.Protocol() == address.SECP256K1 { // Secp Filecoin Message
-		tx = ethTxFromNativeMessage(ctx, msg, api)
-		tx.Hash, err = ethtypes.EthHashFromCid(signedCid)
-		if err != nil {
-			return tx, err
-		}
-	} else { // BLS Filecoin message
-		tx = ethTxFromNativeMessage(ctx, msg, api)
-		tx.Hash, err = ethtypes.EthHashFromCid(signedCid)
-		if err != nil {
-			return tx, err
-		}
-	}
-
-	return tx, nil
-}
-
-func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, api v0api.FullNode) ethtypes.EthTx {
-	// We don't care if we error here, conversion is best effort for non-eth transactions
-	from, _ := lookupEthAddress(ctx, msg.From, api)
-	to, _ := lookupEthAddress(ctx, msg.To, api)
-	return ethtypes.EthTx{
-		To:                   &to,
-		From:                 from,
-		Nonce:                ethtypes.EthUint64(msg.Nonce),
-		ChainID:              ethtypes.EthUint64(build.Eip155ChainId),
-		Value:                ethtypes.EthBigInt(msg.Value),
-		Type:                 ethtypes.Eip1559TxType,
-		Gas:                  ethtypes.EthUint64(msg.GasLimit),
-		MaxFeePerGas:         ethtypes.EthBigInt(msg.GasFeeCap),
-		MaxPriorityFeePerGas: ethtypes.EthBigInt(msg.GasPremium),
-		AccessList:           []ethtypes.EthHash{},
-	}
-}
-
-func lookupEthAddress(ctx context.Context, addr address.Address, api v0api.FullNode) (ethtypes.EthAddress, error) {
-	// BLOCK A: We are trying to get an actual Ethereum address from an f410 address.
-	// Attempt to convert directly, if it's an f4 address.
-	ethAddr, err := ethtypes.EthAddressFromFilecoinAddress(addr)
-	if err == nil && !ethAddr.IsMaskedID() {
-		return ethAddr, nil
-	}
-
-	// Lookup on the target actor and try to get an f410 address.
-	if actor, err := api.StateGetActor(ctx, addr, types.EmptyTSK); err != nil {
-		return ethtypes.EthAddress{}, err
-	} else if actor.Address != nil {
-		if ethAddr, err := ethtypes.EthAddressFromFilecoinAddress(*actor.Address); err == nil && !ethAddr.IsMaskedID() {
-			return ethAddr, nil
-		}
-	}
-
-	// BLOCK B: We gave up on getting an actual Ethereum address and are falling back to a Masked ID address.
-	// Check if we already have an ID addr, and use it if possible.
-	if err == nil && ethAddr.IsMaskedID() {
-		return ethAddr, nil
-	}
-
-	// Otherwise, resolve the ID addr.
-	idAddrStr, err := GetIDByAddr(ctx, addr.String()[1:])
-	if err != nil {
-		return ethtypes.EthAddress{}, err
-	}
-
-	idAddr, err := address.NewFromString(buildnet.NetPrefix + idAddrStr)
-	if err != nil {
-		return ethtypes.EthAddress{}, err
-	}
-	return ethtypes.EthAddressFromFilecoinAddress(idAddr)
-}
-
-func EthTxFromSignedEthMessage(msg *types.Message) (ethtypes.EthTx, error) {
-	if !IsSigTypeDelegatedMessage(msg.From) {
-		return ethtypes.EthTx{}, xerrors.Errorf("signature is not delegated type, from is type: %d", msg.From.Protocol())
-	}
-
-	txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(msg)
-	if err != nil {
-		return ethtypes.EthTx{}, xerrors.Errorf("failed to convert the unsigned message: %w", err)
-	}
-
-	// todo: 目前数据库没存Signature，有无必要？
-	//r, s, v, err := RecoverSignature(smsg.Signature)
-	//if err != nil {
-	//	return EthTx{}, xerrors.Errorf("failed to recover signature: %w", err)
-	//}
-
-	tx := ethtypes.EthTx{
-		Nonce:                ethtypes.EthUint64(txArgs.Nonce),
-		ChainID:              ethtypes.EthUint64(txArgs.ChainID),
-		To:                   txArgs.To,
-		Value:                ethtypes.EthBigInt(txArgs.Value),
-		Type:                 ethtypes.Eip1559TxType,
-		Gas:                  ethtypes.EthUint64(txArgs.GasLimit),
-		MaxFeePerGas:         ethtypes.EthBigInt(txArgs.MaxFeePerGas),
-		MaxPriorityFeePerGas: ethtypes.EthBigInt(txArgs.MaxPriorityFeePerGas),
-		AccessList:           []ethtypes.EthHash{},
-		//V:                    v,
-		//R:                    r,
-		//S:                    s,
-		Input: txArgs.Input,
-	}
-
-	// todo: v、R、S为空无法hash
-	//tx.Hash, err = tx.TxHash()
-	//if err != nil {
-	//	return ethtypes.EthTx{}, err
-	//}
-
-	//fromAddr, err := lookupEthAddress(ctx, smsg.Message.From, sa)
-	//if err != nil {
-	//	return ethtypes.EthTx{}, xerrors.Errorf("failed to resolve Ethereum address: %w", err)
-	//}
-	//
-	//tx.From = fromAddr
-
-	return tx, nil
 }
 
 func GetMessageByTrace(trace model.TraceForMessageRes) (*types.Message, error) {
@@ -666,7 +524,7 @@ func NewEthTxFromMessageLookup(ctx context.Context, epoch abi.ChainEpoch, msg *t
 		return ethtypes.EthTx{}, err
 	}
 
-	tx, err := newEthTxFromSignedMessage(ctx, msg, signedCid, api)
+	tx, err := util.NewEthTxFromMessage(ctx, msg, signedCid, api)
 	if err != nil {
 		return ethtypes.EthTx{}, err
 	}
@@ -765,7 +623,7 @@ func NewEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, trace model.TraceFo
 				return api.EthTxReceipt{}, xerrors.Errorf("failed to create ID address: %w", err)
 			}
 
-			l.Address, err = lookupEthAddress(ctx, addr, sa)
+			l.Address, err = util.LookupEthAddress(ctx, addr, sa)
 			if err != nil {
 				return api.EthTxReceipt{}, xerrors.Errorf("failed to resolve Ethereum address: %w", err)
 			}

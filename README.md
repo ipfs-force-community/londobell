@@ -11,7 +11,7 @@
 - 代码的提交必须经由 Pull Request， 并应当始终确保：
   - 可编译
   - 可通过 go test 检查
-　- 可通过 golangci-lint 检查
+  - 可通过 golangci-lint 检查
 
 - 原则上，Pull Request 要求聚焦，多个不相关的改动应当分到不同的 PR 中去; 不相关的改动包含但不限于：
   - 同时对多个不相依赖的模块或逻辑进行修改

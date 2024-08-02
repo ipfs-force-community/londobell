@@ -94,7 +94,7 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 
 		api, closer, err := client.NewFullNodeRPCV0(ctx, url, requestHeader)
 		if err != nil {
-			log.Warnf("api:%v is not accessiable", url)
+			log.Warnf("api:%v is not accessiable, err: %v", url, err)
 			continue
 		}
 

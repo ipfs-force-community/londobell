@@ -29,7 +29,7 @@ func main() {
 		Flags: []cli.Flag{
 			dep.RepoFlag,
 		},
-		Version: build.UserVersion(),
+		Version: string(build.NodeUserVersion()),
 	}
 
 	app.Setup()

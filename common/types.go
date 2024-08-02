@@ -58,7 +58,7 @@ type StateManager interface {
 	GetVMCirculatingSupplyDetailed(ctx context.Context, height abi.ChainEpoch, st *state.StateTree) (api.CirculatingSupply, error)
 	SearchForMessage(ctx context.Context, head *types.TipSet, mcid cid.Cid, lookbackLimit abi.ChainEpoch, allowReplaced bool) (*types.TipSet, *types.MessageReceipt, cid.Cid, error)
 	TipSetState(ctx context.Context, ts *types.TipSet) (st cid.Cid, rec cid.Cid, err error)
-	LookupID(ctx context.Context, addr address.Address, ts *types.TipSet) (address.Address, error)
+	LookupID(ctx context.Context, addr address.Address, ts *types.TipSet) (abi.ActorID, error)
 }
 
 // ChainDict is a dict for enums
