@@ -652,7 +652,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 								data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
 								if !ok {
 									// not an eth event.
-									elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
+									elog.Debugw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
 									continue
 								}
 
@@ -1708,7 +1708,7 @@ func ethLogFromEvent(ctx *extract.Ctx, ts *types.TipSet, entries []types.EventEn
 	for _, entry := range entries {
 		// Drop events with non-raw topics to avoid mistakes.
 		if entry.Codec != cid.Raw {
-			elog.Warnw("did not expect an event entry with a non-raw codec", "codec", entry.Codec, "key", entry.Key)
+			elog.Debugw("did not expect an event entry with a non-raw codec", "codec", entry.Codec, "key", entry.Key)
 			return nil, nil, false
 		}
 		// Check if the key is t1..t4

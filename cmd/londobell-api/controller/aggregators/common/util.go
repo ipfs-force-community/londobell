@@ -645,7 +645,7 @@ func ethLogFromEvent(entries []types.EventEntry) (data []byte, topics []ethtypes
 	for _, entry := range entries {
 		// Drop events with non-raw topics to avoid mistakes.
 		if entry.Codec != cid.Raw {
-			log.Warnw("did not expect an event entry with a non-raw codec", "codec", entry.Codec, "key", entry.Key)
+			log.Debugw("did not expect an event entry with a non-raw codec", "codec", entry.Codec, "key", entry.Key)
 			return nil, nil, false
 		}
 		// Check if the key is t1..t4
