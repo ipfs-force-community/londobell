@@ -3,6 +3,7 @@ package segment
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.opencensus.io/stats"
@@ -215,6 +216,9 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 				if nerr := common.NonCtxCanceledErr(err); nerr != nil {
 					stats.Record(ctx.ctx, metrics.ExtractError.M(1))
 					elog.Errorf("insert extracted documents from tipsets: %s", err)
+					if strings.Contains(err.Error(), "an inserted document is too large") {
+						return nil
+					}
 					return nerr
 				}
 			}
@@ -223,6 +227,9 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 		})
 	} else {
 		if err := s.insertMany(ctx.ctx, elog, docs); err != nil {
+			if strings.Contains(err.Error(), "an inserted document is too large") {
+				return nil
+			}
 			return fmt.Errorf("insert extracted documents from tipsets: %w", err)
 		}
 	}
