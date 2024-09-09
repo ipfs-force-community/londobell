@@ -589,7 +589,7 @@ func NewEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, trace model.TraceFo
 		// Create and Create2 return the same things.
 		var ret eam.CreateExternalReturn
 		if err := ret.UnmarshalCBOR(bytes.NewReader(trace.ReturnsBson.Data)); err != nil {
-			return api.EthTxReceipt{}, xerrors.Errorf("failed to parse contract creation result: %w", err)
+			return api.EthTxReceipt{}, xerrors.Errorf("failed to parse contract creation result: %w, data: %s", err, string(trace.ReturnsBson.Data))
 		}
 		addr := ethtypes.EthAddress(ret.EthAddress)
 		receipt.ContractAddress = &addr
