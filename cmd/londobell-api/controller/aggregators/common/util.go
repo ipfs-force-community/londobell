@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -590,7 +589,7 @@ func NewEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, trace model.TraceFo
 		// Create and Create2 return the same things.
 		var ret eam.CreateExternalReturn
 		if err := ret.UnmarshalCBOR(bytes.NewReader(trace.ReturnsBson.Data)); err != nil {
-			return api.EthTxReceipt{}, xerrors.Errorf("failed to parse contract creation result: %w, data: %s, %s, %v", err, string(trace.ReturnsBson.Data), hex.EncodeToString(trace.ReturnsBson.Data), trace.ReturnsBson.Data)
+			return api.EthTxReceipt{}, xerrors.Errorf("failed to parse contract creation result: %w", err)
 		}
 		addr := ethtypes.EthAddress(ret.EthAddress)
 		receipt.ContractAddress = &addr
