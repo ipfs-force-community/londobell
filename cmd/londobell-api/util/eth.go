@@ -230,7 +230,8 @@ func NewEthTxFromMessage(ctx context.Context, msg *types.Message, msgCID cid.Cid
 		if err != nil {
 			return ethtypes.EthTx{}, xerrors.Errorf("failed to convert from signed message: %w", err)
 		}
-		ethTx.Hash, err = ethtypes.EthHashFromCid(msgCID)
+		tx = *ethTx
+		tx.Hash, err = ethtypes.EthHashFromCid(msgCID)
 		if err != nil {
 			return ethtypes.EthTx{}, xerrors.Errorf("failed to convert from signed message: %w", err)
 		}
