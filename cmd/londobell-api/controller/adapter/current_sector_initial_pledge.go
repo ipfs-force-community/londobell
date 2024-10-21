@@ -73,11 +73,25 @@ func CurrentSectorInitialPledge(c *gin.Context) {
 		return
 	}
 
-	QualityAdjPowerSmoothed, err := pst.TotalPowerSmoothed()
+	qualityAdjPowerSmoothed, err := pst.TotalPowerSmoothed()
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
+	}
+
+	pledgeCollateral, err := pst.TotalLocked()
+	if err != nil {
+		alog.Error(err)
+		util.ReturnOnErr(c, err)
+		return
+	}
+
+	var epochsSinceRampStart int64
+	var rampDurationEpochs uint64
+	if pst.RampStartEpoch() > 0 {
+		epochsSinceRampStart = req.Epoch - pst.RampStartEpoch()
+		rampDurationEpochs = pst.RampDurationEpochs()
 	}
 
 	ract, err := api.StateGetActor(ctx, reward.Address, ts.Key())
@@ -99,7 +113,14 @@ func CurrentSectorInitialPledge(c *gin.Context) {
 		req.QualityAdjPower = "1099511627776"
 	}
 
-	initPledge, err := rst.InitialPledgeForPower(big.MustFromString(req.QualityAdjPower), abi.NewTokenAmount(0), &QualityAdjPowerSmoothed, circ.FilCirculating)
+	initPledge, err := rst.InitialPledgeForPower(
+		big.MustFromString(req.QualityAdjPower),
+		pledgeCollateral,
+		&qualityAdjPowerSmoothed,
+		circ.FilCirculating,
+		epochsSinceRampStart,
+		rampDurationEpochs,
+	)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)

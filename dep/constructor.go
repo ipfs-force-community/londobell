@@ -11,6 +11,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/build/buildconstants"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 
 	bf "github.com/ipfs/go-block-format"
@@ -260,7 +261,7 @@ func BuiltinDrandConfig() dtypes.DrandSchedule {
 	// 	build.UpgradeSmokeHeight: build.DrandMainnet,
 	// }
 
-	var DrandSchedule = map[abi.ChainEpoch]build.DrandEnum{
+	var DrandSchedule = map[abi.ChainEpoch]buildconstants.DrandEnum{
 		// 0:                    build.DrandIncentinet,
 		build.UpgradeSmokeHeight:   build.DrandMainnet,
 		build.UpgradePhoenixHeight: build.DrandQuicknet,

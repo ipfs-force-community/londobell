@@ -567,7 +567,7 @@ func NewEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, trace model.TraceFo
 		BlockNumber:      blockNumber,
 		Type:             ethtypes.EthUint64(2),
 		Logs:             []ethtypes.EthLog{}, // empty log array is compulsory when no logs, or libraries like ethers.js break
-		LogsBloom:        ethtypes.EmptyEthBloom[:],
+		LogsBloom:        ethtypes.NewEmptyEthBloom(),
 	}
 
 	if exitcode.ExitCode(trace.ExitCode).IsSuccess() {
