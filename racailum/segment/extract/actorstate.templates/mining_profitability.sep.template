@@ -101,14 +101,27 @@ func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, h
 		return fmt.Errorf("expecting *power{{ .Ver }}.State, got %T", pwrState)
 	}
 
+	{{ if ge .Ver 15 -}}
+	qaPower := miner{{ .Ver }}.QAPowerForWeight(sectorSize32GiB, 180, big.Zero())
+	{{- else -}}
 	qaPower := miner{{ .Ver }}.QAPowerForWeight(sectorSize32GiB, 180, big.Zero(), big.Zero())
+	{{- end }}
 
     {{ if ge .Ver 9 -}}
     storagePledge := miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, miner{{ .Ver }}.QAPowerMax(sectorSize32GiB), miner{{ .Ver }}.PreCommitDepositProjectionPeriod)
 	{{- else -}}
     storagePledge := miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner{{ .Ver }}.InitialPledgeProjectionPeriod)
     {{- end }}
-	{{ if eq .Ver 0 -}}
+
+	{{ if ge .Ver 15 -}}
+	var epochsSinceRampStart int64
+	var rampDurationEpochs uint64
+	if pwrState.RampStartEpoch > 0 {
+		epochsSinceRampStart = int64(head.Epoch) - pwrState.RampStartEpoch
+		rampDurationEpochs = pwrState.RampDurationEpochs
+	}
+	initPledge := miner15.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating, epochsSinceRampStart, rampDurationEpochs)
+	{{ else if eq .Ver 0 -}}
 	initPledge := miner{{ .Ver }}.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, pwrState.ThisEpochPledgeCollateral,
 		st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating)
 	{{- else -}}
