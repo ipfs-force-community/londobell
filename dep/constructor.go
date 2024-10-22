@@ -10,7 +10,6 @@ import (
 	"strconv"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/build/buildconstants"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 
@@ -256,20 +255,20 @@ func SetupGrafana(cfg racailum.Config, mux *http.ServeMux) error {
 
 // Refer to "github.com/filecoin-project/lotus/node/modules"  BuiltinDrandConfig
 func BuiltinDrandConfig() dtypes.DrandSchedule {
-	// var DrandSchedule = map[abi.ChainEpoch]build.DrandEnum{
+	// var DrandSchedule = map[abi.ChainEpoch]buildconstants.DrandEnum{
 	// 0:                  DrandIncentinet,
-	// 	build.UpgradeSmokeHeight: build.DrandMainnet,
+	// 	buildconstants.UpgradeSmokeHeight: buildconstants.DrandMainnet,
 	// }
 
 	var DrandSchedule = map[abi.ChainEpoch]buildconstants.DrandEnum{
-		// 0:                    build.DrandIncentinet,
-		build.UpgradeSmokeHeight:   build.DrandMainnet,
-		build.UpgradePhoenixHeight: build.DrandQuicknet,
+		// 0:                    buildconstants.DrandIncentinet,
+		buildconstants.UpgradeSmokeHeight:   buildconstants.DrandMainnet,
+		buildconstants.UpgradePhoenixHeight: buildconstants.DrandQuicknet,
 	}
 
 	out := dtypes.DrandSchedule{}
 	for start, config := range DrandSchedule {
-		out = append(out, dtypes.DrandPoint{Start: start, Config: build.DrandConfigs[config]})
+		out = append(out, dtypes.DrandPoint{Start: start, Config: buildconstants.DrandConfigs[config]})
 	}
 
 	sort.Slice(out, func(i, j int) bool {

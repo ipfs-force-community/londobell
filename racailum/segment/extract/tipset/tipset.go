@@ -27,7 +27,7 @@ import (
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/build/buildconstants"
 	builtin2 "github.com/filecoin-project/lotus/chain/actors/builtin"
 	_init "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
@@ -1586,7 +1586,7 @@ func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, ts *types.T
 		From:                 from,
 		Input:                encodeFilecoinParamsAsABI(msg.Method, codec, msg.Params),
 		Nonce:                ethtypes.EthUint64(msg.Nonce),
-		ChainID:              ethtypes.EthUint64(build.Eip155ChainId),
+		ChainID:              ethtypes.EthUint64(buildconstants.Eip155ChainId),
 		Value:                ethtypes.EthBigInt(msg.Value),
 		Type:                 ethtypes.EIP1559TxType,
 		Gas:                  ethtypes.EthUint64(msg.GasLimit),

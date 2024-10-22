@@ -9,7 +9,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
-	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/build/buildconstants"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
@@ -58,11 +58,11 @@ func GetCreateTime(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	case addr == sbuiltin.DatacapActorAddr:
-		res.Data = model.TimeOfTraceRes{Epoch: build.UpgradeSharkHeight}
+		res.Data = model.TimeOfTraceRes{Epoch: buildconstants.UpgradeSharkHeight}
 		c.JSON(http.StatusOK, res)
 		return
 	case addr == sbuiltin.EthereumAddressManagerActorAddr:
-		res.Data = model.TimeOfTraceRes{Epoch: build.UpgradeHyggeHeight}
+		res.Data = model.TimeOfTraceRes{Epoch: buildconstants.UpgradeHyggeHeight}
 		c.JSON(http.StatusOK, res)
 		return
 	case builtin.IsAccountActor(actor.Code), builtin.IsEthAccountActor(actor.Code), builtin.IsPlaceholderActor(actor.Code):
