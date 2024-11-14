@@ -9,8 +9,8 @@ require (
 	github.com/filecoin-project/go-amt-ipld/v4 v4.4.0
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-jsonrpc v0.6.0
-	github.com/filecoin-project/go-state-types v0.15.0-rc1
-	github.com/filecoin-project/lotus v1.30.0-rc2
+	github.com/filecoin-project/go-state-types v0.15.0
+	github.com/filecoin-project/lotus v1.30.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v3 v3.1.2
@@ -43,7 +43,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/urfave/cli/v2 v2.25.5
-	github.com/whyrusleeping/cbor-gen v0.1.2
+	github.com/whyrusleeping/cbor-gen v0.2.0
 	go.mongodb.org/mongo-driver v1.5.0
 	go.opencensus.io v0.24.0
 	go.opentelemetry.io/otel/sdk v1.28.0
@@ -63,7 +63,7 @@ require (
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
 	github.com/filecoin-project/go-commp-utils/v2 v2.1.0 // indirect
-	github.com/filecoin-project/go-f3 v0.7.0 // indirect
+	github.com/filecoin-project/go-f3 v0.7.2 // indirect
 	github.com/filecoin-project/go-fil-commp-hashhash v0.2.0 // indirect
 	github.com/georgysavva/scany/v2 v2.1.3 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
@@ -96,7 +96,7 @@ require (
 	github.com/pion/turn/v2 v2.1.6 // indirect
 	github.com/pion/webrtc/v3 v3.2.40 // indirect
 	github.com/samber/lo v1.39.0 // indirect
-	github.com/triplewz/poseidon v0.0.1 // indirect
+	github.com/triplewz/poseidon v0.0.2-0.20240407130934-5265fab9d889 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yugabyte/pgx/v5 v5.5.3-yb-2 // indirect
 	github.com/zondax/ledger-filecoin-go v0.11.1 // indirect
@@ -148,7 +148,7 @@ require (
 	github.com/elastic/go-windows v1.0.0 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/fatih/color v1.15.0 // indirect
-	github.com/filecoin-project/filecoin-ffi v1.28.0-rc2 // indirect
+	github.com/filecoin-project/filecoin-ffi v1.30.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v2 v2.1.1-0.20201006184820-924ee87a1349 // indirect
 	github.com/filecoin-project/go-amt-ipld/v3 v3.1.0 // indirect
 	github.com/filecoin-project/go-cbor-util v0.0.1 // indirect
@@ -320,13 +320,13 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.27.0 // indirect
+	golang.org/x/crypto v0.28.0 // indirect
 	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.25.0 // indirect
-	golang.org/x/term v0.24.0 // indirect
-	golang.org/x/text v0.18.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/term v0.25.0 // indirect
+	golang.org/x/text v0.19.0 // indirect
 	golang.org/x/tools v0.24.0 // indirect; indirect	gonum.org/v1/gonum v0.15.0 // indirect
 	google.golang.org/grpc v1.64.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
