@@ -23,7 +23,7 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v10/evm"
 	"github.com/filecoin-project/go-state-types/builtin/v11/miner"
 	sverifreg "github.com/filecoin-project/go-state-types/builtin/v11/verifreg"
-	miner13 "github.com/filecoin-project/go-state-types/builtin/v13/miner"
+	miner16 "github.com/filecoin-project/go-state-types/builtin/v16/miner"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/lotus/api"
@@ -357,8 +357,8 @@ func copyIndexes(src []int) []int {
 }
 
 // Use Flags instead of SimpleQAPower: https://github.com/filecoin-project/go-state-types/pull/212/files
-func IsSimpleQAPower(flags miner13.SectorOnChainInfoFlags) bool {
-	return flags == miner13.SIMPLE_QA_POWER
+func IsSimpleQAPower(flags miner16.SectorOnChainInfoFlags) bool {
+	return flags == miner16.SIMPLE_QA_POWER
 }
 
 func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
@@ -838,7 +838,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					}
 
 					for _, info := range sectorInfos {
-						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, false, ts.Height())
+						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DeprecatedDealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, false, ts.Height())
 						mstCnt++
 						res.Docs = append(res.Docs, mst)
 					}
@@ -899,7 +899,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 						}
 
 						for _, info := range sectorInfos {
-							mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, false, ts.Height())
+							mst := model.NewMinerSector(minerID, info.SectorNumber, info.DeprecatedDealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, false, ts.Height())
 							mstCnt++
 							res.Docs = append(res.Docs, mst)
 						}
@@ -953,11 +953,11 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					}
 
 					for _, info := range sectorInfos {
-						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, false, ts.Height())
+						mst := model.NewMinerSector(minerID, info.SectorNumber, info.DeprecatedDealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, false, ts.Height())
 						mstCnt++
 						res.Docs = append(res.Docs, mst)
 
-						Deals = append(Deals, info.DealIDs...)
+						Deals = append(Deals, info.DeprecatedDealIDs...)
 					}
 				}
 
@@ -1032,7 +1032,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				}
 
 				for _, info := range sectorInfos {
-					mst := model.NewMinerSector(minerID, info.SectorNumber, info.DealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, true, ts.Height())
+					mst := model.NewMinerSector(minerID, info.SectorNumber, info.DeprecatedDealIDs, info.Activation, info.Expiration, info.DealWeight, info.VerifiedDealWeight, IsSimpleQAPower(info.Flags), info.InitialPledge, true, ts.Height())
 					mstCnt++
 					res.Docs = append(res.Docs, mst)
 				}

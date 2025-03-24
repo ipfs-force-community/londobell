@@ -57,6 +57,9 @@ import (
 	miner15 "github.com/filecoin-project/go-state-types/builtin/v15/miner"
 	adt15 "github.com/filecoin-project/go-state-types/builtin/v15/util/adt"
 
+	miner16 "github.com/filecoin-project/go-state-types/builtin/v16/miner"
+	adt16 "github.com/filecoin-project/go-state-types/builtin/v16/util/adt"
+
 	"github.com/filecoin-project/go-state-types/builtin"
 
 	builtin3 "github.com/filecoin-project/specs-actors/v3/actors/builtin"
@@ -335,7 +338,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			isEmptyOrZero(detail.InitialPledge) {
 			return nil
 		}
-
 		if !st.VestingFunds.Equals(emptyMinerStateV5.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt5.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
@@ -450,7 +452,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			isEmptyOrZero(detail.InitialPledge) {
 			return nil
 		}
-
 		if !st.VestingFunds.Equals(emptyMinerStateV6.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt6.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
@@ -565,7 +566,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			isEmptyOrZero(detail.InitialPledge) {
 			return nil
 		}
-
 		if !st.VestingFunds.Equals(emptyMinerStateV7.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt7.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
@@ -680,7 +680,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			isEmptyOrZero(detail.InitialPledge) {
 			return nil
 		}
-
 		if !st.VestingFunds.Equals(emptyMinerStateV8.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt8.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
@@ -688,7 +687,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			}
 
 			// assign vest in future
-			for _, v := range funds.Funds {
+			for _, v := range funds {
 				if v.Epoch < head.Epoch {
 					continue
 				}
@@ -795,7 +794,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			isEmptyOrZero(detail.InitialPledge) {
 			return nil
 		}
-
 		if !st.VestingFunds.Equals(emptyMinerStateV9.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt9.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
@@ -803,7 +801,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			}
 
 			// assign vest in future
-			for _, v := range funds.Funds {
+			for _, v := range funds {
 				if v.Epoch < head.Epoch {
 					continue
 				}
@@ -921,7 +919,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			isEmptyOrZero(detail.InitialPledge) {
 			return nil
 		}
-
 		if !st.VestingFunds.Equals(emptyMinerStateV10.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt10.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
@@ -929,7 +926,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			}
 
 			// assign vest in future
-			for _, v := range funds.Funds {
+			for _, v := range funds {
 				if v.Epoch < head.Epoch {
 					continue
 				}
@@ -1047,7 +1044,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			isEmptyOrZero(detail.InitialPledge) {
 			return nil
 		}
-
 		if !st.VestingFunds.Equals(emptyMinerStateV11.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt11.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
@@ -1055,7 +1051,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			}
 
 			// assign vest in future
-			for _, v := range funds.Funds {
+			for _, v := range funds {
 				if v.Epoch < head.Epoch {
 					continue
 				}
@@ -1173,7 +1169,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			isEmptyOrZero(detail.InitialPledge) {
 			return nil
 		}
-
 		if !st.VestingFunds.Equals(emptyMinerStateV12.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt12.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
@@ -1181,7 +1176,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			}
 
 			// assign vest in future
-			for _, v := range funds.Funds {
+			for _, v := range funds {
 				if v.Epoch < head.Epoch {
 					continue
 				}
@@ -1299,7 +1294,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			isEmptyOrZero(detail.InitialPledge) {
 			return nil
 		}
-
 		if !st.VestingFunds.Equals(emptyMinerStateV13.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt13.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
@@ -1307,7 +1301,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			}
 
 			// assign vest in future
-			for _, v := range funds.Funds {
+			for _, v := range funds {
 				if v.Epoch < head.Epoch {
 					continue
 				}
@@ -1425,7 +1419,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			isEmptyOrZero(detail.InitialPledge) {
 			return nil
 		}
-
 		if !st.VestingFunds.Equals(emptyMinerStateV14.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt14.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
@@ -1433,7 +1426,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			}
 
 			// assign vest in future
-			for _, v := range funds.Funds {
+			for _, v := range funds {
 				if v.Epoch < head.Epoch {
 					continue
 				}
@@ -1551,7 +1544,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			isEmptyOrZero(detail.InitialPledge) {
 			return nil
 		}
-
 		if !st.VestingFunds.Equals(emptyMinerStateV15.VestingFunds) {
 			funds, err := st.LoadVestingFunds(adt15.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
@@ -1559,7 +1551,7 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			}
 
 			// assign vest in future
-			for _, v := range funds.Funds {
+			for _, v := range funds {
 				if v.Epoch < head.Epoch {
 					continue
 				}
@@ -1648,6 +1640,129 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 		}
 
 		var precommit miner15.SectorPreCommitOnChainInfo
+		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
+			mInfo.PrecommitSectorCount++
+			return nil
+		})
+
+		mInfo.Beneficiary = info.Beneficiary
+		mInfo.BeneficiaryTerm.Quota = info.BeneficiaryTerm.Quota
+		mInfo.BeneficiaryTerm.UsedQuota = info.BeneficiaryTerm.UsedQuota
+		mInfo.BeneficiaryTerm.Expiration = info.BeneficiaryTerm.Expiration
+		if mInfo.PendingBeneficiaryTerm != nil {
+			mInfo.PendingBeneficiaryTerm.NewBeneficiary = info.PendingBeneficiaryTerm.NewBeneficiary
+			mInfo.PendingBeneficiaryTerm.NewQuota = info.PendingBeneficiaryTerm.NewQuota
+			mInfo.PendingBeneficiaryTerm.NewExpiration = info.PendingBeneficiaryTerm.NewExpiration
+			mInfo.PendingBeneficiaryTerm.ApprovedByBeneficiary = info.PendingBeneficiaryTerm.ApprovedByBeneficiary
+			mInfo.PendingBeneficiaryTerm.ApprovedByNominee = info.PendingBeneficiaryTerm.ApprovedByNominee
+		}
+		mInfo.State = st
+
+	case *miner16.State:
+		if err := mir.Mirror(&detail, st); err != nil {
+			return fmt.Errorf("mirroring *miner16.State: %w", err)
+		}
+
+		if isEmptyOrZero(detail.PreCommitDeposits) &&
+			isEmptyOrZero(detail.LockedFunds) &&
+			isEmptyOrZero(detail.FeeDebt) &&
+			isEmptyOrZero(detail.InitialPledge) {
+			return nil
+		}
+		funds, err := st.LoadVestingFunds(adt16.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+		if err != nil {
+			return fmt.Errorf("load vesting funds: %w", err)
+		}
+
+		// assign vest in future
+		for _, v := range funds {
+			if v.Epoch < head.Epoch {
+				continue
+			}
+
+			for j := range tsRange {
+				if v.Epoch < tsRange[j] {
+					vestInFuture[j] = big.Add(vestInFuture[j], v.Amount)
+					break
+				}
+			}
+		}
+		actStore := ctx.D.ActorStore(ctx.C)
+		deadlines, err := st.LoadDeadlines(actStore)
+		if err != nil {
+			return fmt.Errorf("load deadlines failed: %w", err)
+		}
+
+		err = deadlines.ForEach(actStore, func(dlIdx uint64, dl *miner16.Deadline) error {
+			if dl == nil {
+				return nil
+			}
+
+			ps, err := dl.PartitionsArray(actStore)
+			if err != nil {
+				return fmt.Errorf("get dl partition failed: %w", err)
+			}
+			var part miner16.Partition
+			dlInfo := miner16.NewDeadlineInfo(st.ProvingPeriodStart, dlIdx, head.Epoch).NextNotElapsed()
+			quant := miner16.QuantSpecForDeadline(dlInfo)
+
+			return ps.ForEach(&part, func(partIdx int64) error {
+				expirations, err := miner16.LoadExpirationQueue(actStore, part.ExpirationsEpochs, quant, miner16.PartitionExpirationAmtBitwidth)
+				if err != nil {
+					return fmt.Errorf("failed to load expiration queue: %w", err)
+				}
+
+				for i := range tsRange {
+					popped, err := PopUntilV16(expirations, tsRange[i])
+					if err != nil {
+						return fmt.Errorf("failed to pop expiration queue until %d: %w", tsRange[i], err)
+					}
+
+					pledgeRelease[i] = popped.OnTimePledge
+				}
+
+				return nil
+			})
+		})
+
+		if err != nil {
+			return fmt.Errorf("process sector pledge failed")
+		}
+
+		info, err := st.GetInfo(adt16.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
+		if err != nil {
+			return fmt.Errorf("load miner info: %w", err)
+		}
+
+		mInfo.Owner = info.Owner
+		mInfo.Worker = info.Worker
+		mInfo.ControlAddresses = info.ControlAddresses
+		if info.PendingWorkerKey != nil {
+			mInfo.PendingWorkerKey.NewWorker = info.PendingWorkerKey.NewWorker
+			mInfo.PendingWorkerKey.EffectiveAt = info.PendingWorkerKey.EffectiveAt
+		}
+		mInfo.PeerID = info.PeerId
+		mInfo.Multiaddrs = info.Multiaddrs
+		mInfo.WindowPoStProofType = info.WindowPoStProofType
+		mInfo.SectorSize = info.SectorSize
+		mInfo.WindowPoStPartitionSectors = info.WindowPoStPartitionSectors
+		mInfo.ConsensusFaultElapsed = info.ConsensusFaultElapsed
+		mInfo.PendingOwnerAddress = info.PendingOwnerAddress
+
+		mInfo.Balance = head.Balance
+		mInfo.AvailableBalance, err = st.GetAvailableBalance(head.Balance)
+		if err != nil {
+			return fmt.Errorf("get available balance failed: %w", err)
+		}
+
+		mInfo.FeeDebt = st.FeeDebt
+
+		precommitted, err := adt16.AsMap(ctx.D.ActorStore(ctx.C), st.PreCommittedSectors, builtin.DefaultHamtBitwidth)
+		if err != nil {
+			return fmt.Errorf("load state PreCommittedSectors: %w", err)
+		}
+
+		var precommit miner16.SectorPreCommitOnChainInfo
 		precommitted.ForEach(&precommit, func(string) error { // nolint: errcheck
 			mInfo.PrecommitSectorCount++
 			return nil
@@ -2029,6 +2144,48 @@ func PopUntilV15(q miner15.ExpirationQueue, until abi.ChainEpoch) (*miner15.Expi
 		return nil, err
 	}
 	return &miner15.ExpirationSet{
+		OnTimeSectors: allOnTime,
+		EarlySectors:  allEarly, OnTimePledge: onTimePledge, ActivePower: activePower, FaultyPower: faultyPower}, nil
+}
+
+func PopUntilV16(q miner16.ExpirationQueue, until abi.ChainEpoch) (*miner16.ExpirationSet, error) {
+	var onTimeSectors []bitfield.BitField
+	var earlySectors []bitfield.BitField
+	activePower := miner16.NewPowerPairZero()
+	faultyPower := miner16.NewPowerPairZero()
+	onTimePledge := big.Zero()
+
+	var poppedKeys []uint64
+	var thisValue miner16.ExpirationSet
+	stopErr := fmt.Errorf("stop")
+	if err := q.Array.ForEach(&thisValue, func(i int64) error {
+		if abi.ChainEpoch(i) > until {
+			return stopErr
+		}
+		poppedKeys = append(poppedKeys, uint64(i))
+		onTimeSectors = append(onTimeSectors, thisValue.OnTimeSectors)
+		earlySectors = append(earlySectors, thisValue.EarlySectors)
+		activePower = activePower.Add(thisValue.ActivePower)
+		faultyPower = faultyPower.Add(thisValue.FaultyPower)
+		onTimePledge = big.Add(onTimePledge, thisValue.OnTimePledge)
+		return nil
+	}); err != nil && err != stopErr {
+		return nil, err
+	}
+
+	if err := q.Array.BatchDelete(poppedKeys, true); err != nil {
+		return nil, err
+	}
+
+	allOnTime, err := bitfield.MultiMerge(onTimeSectors...)
+	if err != nil {
+		return nil, err
+	}
+	allEarly, err := bitfield.MultiMerge(earlySectors...)
+	if err != nil {
+		return nil, err
+	}
+	return &miner16.ExpirationSet{
 		OnTimeSectors: allOnTime,
 		EarlySectors:  allEarly, OnTimePledge: onTimePledge, ActivePower: activePower, FaultyPower: faultyPower}, nil
 }

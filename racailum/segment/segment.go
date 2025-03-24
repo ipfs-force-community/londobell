@@ -247,7 +247,7 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 	}
 
 	if !s.bound.Hi.Is(tipsets[0]) {
-		return fmt.Errorf("current segment is not the ancestor of the incoming chain: %s", tipsets[0])
+		return fmt.Errorf("current segment is not the ancestor (%s) of the incoming chain: %s", s.bound.Hi.TSK, tipsets[0])
 	}
 
 	for i := 1; i < len(tipsets); i++ {

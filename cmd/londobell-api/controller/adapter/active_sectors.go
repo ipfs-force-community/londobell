@@ -81,9 +81,9 @@ func GetActiveSectors(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-//VDCPower = VerifiedDealWeight*10 / (Expiration - Activation)
-//DCPower = DealWeight / (Expiration - Activation)
-//CCPower = ((Expiration - Activation) * sectorsize - VerifiedDealWeight - DealWeight) / (Expiration - Activation)
+// VDCPower = VerifiedDealWeight*10 / (Expiration - Activation)
+// DCPower = DealWeight / (Expiration - Activation)
+// CCPower = ((Expiration - Activation) * sectorsize - VerifiedDealWeight - DealWeight) / (Expiration - Activation)
 func ComputeQAPower(sectorInfos []*miner.SectorOnChainInfo, sectorSize abi.SectorSize) (model.QAPowerRes, []model.SectorOnChainInfo) {
 	var totalVDCPower, totalDCPower, totalCCPower = decimal.NewFromInt(0), decimal.NewFromInt(0), decimal.NewFromInt(0)
 	sectorExpirations := make([]model.SectorOnChainInfo, 0, len(sectorInfos))
@@ -107,16 +107,22 @@ func ComputeQAPower(sectorInfos []*miner.SectorOnChainInfo, sectorSize abi.Secto
 			SectorNumber:          sectorInfo.SectorNumber,
 			SealProof:             sectorInfo.SealProof,
 			SealedCID:             sectorInfo.SealedCID,
-			DealIDs:               sectorInfo.DealIDs,
+			DealIDs:               sectorInfo.DeprecatedDealIDs,
 			Activation:            sectorInfo.Activation,
 			Expiration:            sectorInfo.Expiration,
 			DealWeight:            sectorInfo.DealWeight,
 			VerifiedDealWeight:    sectorInfo.VerifiedDealWeight,
 			InitialPledge:         sectorInfo.InitialPledge,
-			ExpectedDayReward:     sectorInfo.ExpectedDayReward,
-			ExpectedStoragePledge: sectorInfo.ExpectedStoragePledge,
+			ExpectedDayReward:     big.Zero(),
+			ExpectedStoragePledge: big.Zero(),
 
 			SectorKeyCID: sectorInfo.SectorKeyCID,
+		}
+		if sectorInfo.ExpectedDayReward != nil {
+			info.ExpectedDayReward = *sectorInfo.ExpectedDayReward
+		}
+		if sectorInfo.ExpectedStoragePledge != nil {
+			info.ExpectedStoragePledge = *sectorInfo.ExpectedStoragePledge
 		}
 
 		adjPowerDecimal := decimal.NewFromInt(sminer.QAPowerForSector(sectorSize, info).Int64())

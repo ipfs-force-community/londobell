@@ -113,7 +113,15 @@ func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, h
     storagePledge := miner{{ .Ver }}.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner{{ .Ver }}.InitialPledgeProjectionPeriod)
     {{- end }}
 
-	{{ if ge .Ver 15 -}}
+	{{ if ge .Ver 16 -}}
+	var epochsSinceRampStart int64
+	var rampDurationEpochs uint64
+	if pwrState.RampStartEpoch > 0 {
+		epochsSinceRampStart = int64(head.Epoch) - pwrState.RampStartEpoch
+		rampDurationEpochs = pwrState.RampDurationEpochs
+	}
+	initPledge := miner16.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating, epochsSinceRampStart, rampDurationEpochs)
+	{{ else if ge .Ver 15 -}}
 	var epochsSinceRampStart int64
 	var rampDurationEpochs uint64
 	if pwrState.RampStartEpoch > 0 {

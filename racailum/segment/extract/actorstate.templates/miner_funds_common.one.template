@@ -128,7 +128,6 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 
         mInfo.State = st
 
-
 	{{ else }}
 	case *miner{{ .Ver }}.State:
 		if err := mir.Mirror(&detail, st); err != nil {
@@ -142,14 +141,21 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 			return nil
 		}
 
+		{{- if lt .Ver 16 }}
 		if !st.VestingFunds.Equals(emptyMinerStateV{{ .Ver }}.VestingFunds) {
+		{{ else }}
+		{{ end -}}
 			funds, err := st.LoadVestingFunds(adt{{ .Ver }}.WrapStore(ctx.C, ctx.D.ActorStore(ctx.C)))
 			if err != nil {
 				return fmt.Errorf("load vesting funds: %w", err)
 			}
 
 			// assign vest in future
+			{{- if lt .Ver 8 }}
 			for _, v := range funds.Funds {
+			{{ else }}
+			for _, v := range funds {
+			{{ end -}}
 				if v.Epoch < head.Epoch {
 					continue
 				}
@@ -161,7 +167,11 @@ func extractMinerFunds(ctx *extract.Ctx, res *extract.Res, head *common.ActorHea
 					}
 				}
 			}
+		{{- if lt .Ver 16 }}
 		}
+		{{ else }}
+		{{ end -}}
+
 		actStore := ctx.D.ActorStore(ctx.C)
 		deadlines, err := st.LoadDeadlines(actStore)
 		if err != nil {
