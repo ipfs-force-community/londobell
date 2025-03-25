@@ -9,11 +9,13 @@ import (
 	"github.com/filecoin-project/lotus/chain/beacon"
 	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
+	"github.com/filecoin-project/lotus/chain/index"
 	"github.com/filecoin-project/lotus/chain/proofs"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/lotus/journal"
+	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
@@ -75,9 +77,9 @@ func StateManager() dix.Option {
 		dix.Override(new(beacon.Schedule), modules.RandomSchedule),
 		dix.Override(new(stmgr.UpgradeSchedule), modules.UpgradeSchedule),
 		dix.Override(new(datastore.Batching), InMemMetadataDS),
-		// 需配合节点设置MsgIndex或DummyMsgIndex
-		// dix.Override(new(index.MsgIndex), modules.MsgIndex),
-		// dix.Override(new(index.MsgIndex), modules.DummyMsgIndex),
+		dix.Override(new(index.Indexer), modules.ChainIndexer(config.ChainIndexerConfig{
+			EnableIndexer: false,
+		})),
 		dix.Override(new(*stmgr.StateManager), stmgr.NewStateManager),
 		dix.Override(new(modules.Genesis), modules.LoadGenesis(build.MaybeGenesis())),
 		dix.Override(new(dtypes.ChainBlockstore), dix.From(new(dtypes.BasicChainBlockstore))),
