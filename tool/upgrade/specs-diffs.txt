@@ -77,3 +77,14 @@ Specs v14 => v15:
 		> ThisEpochQAPowerSmoothed
 			 smoothing.FilterEstimate => smoothing.FilterEstimate
 
+Specs v15 => v16:
+	> evm.State
+		+ TransientData: *evm.TransientData
+		> Tombstone
+			 *evm.Tombstone => *evm.Tombstone
+	> miner.Deadline
+		+ DailyFee: big.Int
+		+ LivePower: miner.PowerPair
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+
