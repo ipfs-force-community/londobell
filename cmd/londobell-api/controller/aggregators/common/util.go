@@ -20,7 +20,7 @@ import (
 	"github.com/ipfs-force-community/londobell/common"
 
 	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/build/buildconstants"
 
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin/v10/eam"
@@ -534,7 +534,7 @@ func NewEthTxFromMessageLookup(ctx context.Context, epoch abi.ChainEpoch, msg *t
 		ti = ethtypes.EthUint64(txIdx)
 	)
 
-	tx.ChainID = ethtypes.EthUint64(build.Eip155ChainId)
+	tx.ChainID = ethtypes.EthUint64(buildconstants.Eip155ChainId)
 	tx.BlockHash = &blkHash
 	tx.BlockNumber = &bn
 	tx.TransactionIndex = &ti
@@ -567,7 +567,7 @@ func NewEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, trace model.TraceFo
 		BlockNumber:      blockNumber,
 		Type:             ethtypes.EthUint64(2),
 		Logs:             []ethtypes.EthLog{}, // empty log array is compulsory when no logs, or libraries like ethers.js break
-		LogsBloom:        ethtypes.EmptyEthBloom[:],
+		LogsBloom:        ethtypes.NewEmptyEthBloom(),
 	}
 
 	if exitcode.ExitCode(trace.ExitCode).IsSuccess() {

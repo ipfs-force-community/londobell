@@ -13,10 +13,10 @@ import (
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	builtin9 "github.com/filecoin-project/go-state-types/builtin"
-	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
-	power9 "github.com/filecoin-project/go-state-types/builtin/v9/power"
-	reward9 "github.com/filecoin-project/go-state-types/builtin/v9/reward"
+	builtin15 "github.com/filecoin-project/go-state-types/builtin"
+	miner15 "github.com/filecoin-project/go-state-types/builtin/v15/miner"
+	power15 "github.com/filecoin-project/go-state-types/builtin/v15/power"
+	reward15 "github.com/filecoin-project/go-state-types/builtin/v15/reward"
 
 	"github.com/filecoin-project/lotus/chain/vm"
 
@@ -27,17 +27,16 @@ import (
 )
 
 func init() {
-	reg.MustRegisterPreCheck("MiningProfitabilityV9", func(ctx *extract.Ctx) bool {
+	reg.MustRegisterPreCheck("MiningProfitabilityV15", func(ctx *extract.Ctx) bool {
 		return ctx.Opts.ZeroHourExtract.MiningProfitability
 	}, nil)
-	reg.MustRegisterRegularExtractor("MiningProfitabilityV9", extractMiningProfitabilityV9)
+	reg.MustRegisterRegularExtractor("MiningProfitabilityV15", extractMiningProfitabilityV15)
 
 }
 
 // VERCHECK
-// see https://github.com/filecoin-project/builtin-actors/blob/v9.0.0/actors/miner/src/lib.rs#L4866-L4896
-// and https://github.com/filecoin-project/builtin-actors/blob/v9.0.0/actors/miner/src/monies.rs#L143-L157
-func extractMiningProfitabilityV9(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward9.State) error {
+
+func extractMiningProfitabilityV15(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward15.State) error {
 	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Global.Power.Head)
 	if err != nil {
 		return fmt.Errorf("load head block data for power state (%s): %w", head.Head, err)
@@ -48,27 +47,33 @@ func extractMiningProfitabilityV9(ctx *extract.Ctx, res *extract.Res, head *comm
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
 	}
 
-	pwrState, ok := state.(*power9.State)
+	pwrState, ok := state.(*power15.State)
 	if !ok {
-		return fmt.Errorf("expecting *power9.State, got %T", pwrState)
+		return fmt.Errorf("expecting *power15.State, got %T", pwrState)
 	}
 
-	qaPower := miner9.QAPowerForWeight(sectorSize32GiB, 180, big.Zero(), big.Zero())
+	qaPower := miner15.QAPowerForWeight(sectorSize32GiB, 180, big.Zero())
 
-	storagePledge := miner9.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, miner9.QAPowerMax(sectorSize32GiB), miner9.PreCommitDepositProjectionPeriod)
+	storagePledge := miner15.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, miner15.QAPowerMax(sectorSize32GiB), miner15.PreCommitDepositProjectionPeriod)
 
-	initPledge := miner9.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating)
+	var epochsSinceRampStart int64
+	var rampDurationEpochs uint64
+	if pwrState.RampStartEpoch > 0 {
+		epochsSinceRampStart = int64(head.Epoch) - pwrState.RampStartEpoch
+		rampDurationEpochs = pwrState.RampDurationEpochs
+	}
+	initPledge := miner15.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating, epochsSinceRampStart, rampDurationEpochs)
 
 	// we just ignore the influence of spaceRacePledgeCap here
 	consensusPledge := big.Sub(initPledge, storagePledge)
 
 	detail := model.MiningProfitabilityDetail{
-		ExpectedDayReward:         miner9.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, builtin9.EpochsInDay),
+		ExpectedDayReward:         miner15.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, builtin15.EpochsInDay),
 		InitialPledge:             initPledge,
 		InitialConsensusPledge:    consensusPledge,
 		InitialStoragePledge:      storagePledge,
 		ProjectionOfInitialPledge: storagePledge, // TODO: projection is just equal to the init storage power here, correct me if I'm wrong
-		ProjectionOfFaultFee:      miner9.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, abi.ChainEpoch(builtin9.EpochsInDay*351)/100),
+		ProjectionOfFaultFee:      miner15.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, abi.ChainEpoch(builtin15.EpochsInDay*351)/100),
 		Mined:                     st.TotalStoragePowerReward,
 	}
 

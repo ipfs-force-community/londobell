@@ -62,6 +62,7 @@ func extractMiningProfitabilityV0(ctx *extract.Ctx, res *extract.Res, head *comm
 	qaPower := miner0.QAPowerForWeight(sectorSize32GiB, 180, big.Zero(), big.Zero())
 
 	storagePledge := miner0.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower, miner0.InitialPledgeProjectionPeriod)
+
 	initPledge := miner0.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, pwrState.ThisEpochPledgeCollateral,
 		st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating)
 

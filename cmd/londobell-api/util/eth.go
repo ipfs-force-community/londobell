@@ -12,7 +12,7 @@ import (
 	builtintypes "github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api/v0api"
-	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/build/buildconstants"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
@@ -192,7 +192,7 @@ func EthTxFromNativeMessage(ctx context.Context, msg *types.Message, api v0api.F
 		From:                 from,
 		Input:                encodeFilecoinParamsAsABI(msg.Method, codec, msg.Params),
 		Nonce:                ethtypes.EthUint64(msg.Nonce),
-		ChainID:              ethtypes.EthUint64(build.Eip155ChainId),
+		ChainID:              ethtypes.EthUint64(buildconstants.Eip155ChainId),
 		Value:                ethtypes.EthBigInt(msg.Value),
 		Type:                 ethtypes.EIP1559TxType,
 		Gas:                  ethtypes.EthUint64(msg.GasLimit),
@@ -329,7 +329,7 @@ func ethTransactionFromSignedFilecoinMessage(msg *types.Message) (*ethtypes.EthT
 	gasPremium := ethtypes.EthBigInt(msg.GasPremium)
 
 	ethTx := &ethtypes.EthTx{
-		ChainID: ethtypes.EthUint64(build.Eip155ChainId),
+		ChainID: ethtypes.EthUint64(buildconstants.Eip155ChainId),
 		Type:    ethtypes.EIP1559TxType,
 		Nonce:   ethtypes.EthUint64(msg.Nonce),
 		// Hash:                 hash,
@@ -350,7 +350,7 @@ func ethTransactionFromSignedFilecoinMessage(msg *types.Message) (*ethtypes.EthT
 	// switch len(smsg.Signature.Data) {
 	// case EthEIP1559TxSignatureLen:
 	// 	tx := Eth1559TxArgs{
-	// 		ChainID:              build.Eip155ChainId,
+	// 		ChainID:              buildconstants.Eip155ChainId,
 	// 		Nonce:                int(smsg.Message.Nonce),
 	// 		To:                   to,
 	// 		Value:                smsg.Message.Value,

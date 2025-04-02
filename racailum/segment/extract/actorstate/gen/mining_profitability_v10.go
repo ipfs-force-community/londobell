@@ -55,6 +55,7 @@ func extractMiningProfitabilityV10(ctx *extract.Ctx, res *extract.Res, head *com
 	qaPower := miner10.QAPowerForWeight(sectorSize32GiB, 180, big.Zero(), big.Zero())
 
 	storagePledge := miner10.ExpectedRewardForPower(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, miner10.QAPowerMax(sectorSize32GiB), miner10.PreCommitDepositProjectionPeriod)
+
 	initPledge := miner10.InitialPledgeForPower(qaPower, st.ThisEpochBaselinePower, st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, head.CirculatingSupply.FilCirculating)
 
 	// we just ignore the influence of spaceRacePledgeCap here

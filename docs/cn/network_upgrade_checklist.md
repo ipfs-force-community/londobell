@@ -9,7 +9,7 @@
 - [ ] 执行 `./tool/scripts/upgrade-lotus.sh <target version>` 将本库的lotus升级为指定版本
 - [ ] 执行 `./tool/scripts/submodule-check.sh <target version>` 检查ffi是否更新
 - [ ] 执行 `make gen-extractor`，沿用之前的逻辑生成出新版本的 extractor 代码 
-- [ ] 尝试执行 `make build-bell`，并解决可能出现的编译器错误，此时的编译错误通常由以下 lotus 内部的变化导致：
+- [ ] 尝试执行 `make build-bell` 和 `make build-bell-calib`，并解决可能出现的编译器错误，此时的编译错误通常由以下 lotus 内部的变化导致：
   - 重命名
   - 代码结构调整
   - 函数签名变化
@@ -45,34 +45,28 @@ londobell-api随 Filecoin 网络升级的检查项清单
 
 
 ### Others
-1. 当前没使用vendor模式,但是有些依赖lotus的代码进行了调整,需要在本地机器的go mod目录做响应的调整
-2. /go/pkg/mod/github.com/filecoin-project/lotus@v1.24.0/chain/store/store.go:1249
-调整GetTipsetByHeight逻辑:
-调整以下代码,添加空指针判断:
-```go
-	if ts == nil {
-		ts = cs.GetHeaviestTipSet()
-		if ts == nil {
-			return nil, xerrors.Errorf("can't get heaviest tipset")
-		}
-	}
-```
 
-2.额外检查
+#### 检查`github.com/filecoin-project/lotus/node/` build变更，根据变更调整`dep`部分代码
 
-检查`github.com/filecoin-project/lotus/node/` build变更,根据变更调整`dep`部分代码
-如：
-go/pkg/mod/github.com/filecoin-project/lotus@v1.26.2/build/params_mainnet.go注释`DrandSchedule`
+1. calibnet 网络：`~/go/pkg/mod/github.com/filecoin-project/lotus\@v1.30.0/build/buildconstants/calibnet.go` 注释 `DrandSchedule`
+
 ```go
 var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
-        //0:                    DrandIncentinet,
-        UpgradeSmokeHeight:   DrandMainnet,
+        // 0:                    DrandMainnet,
         UpgradePhoenixHeight: DrandQuicknet,
 }
 ```
 
-go/pkg/mod/github.com/filecoin-project/lotus@v1.26.2/build/params_calibnet.go
+1. 主网：`~/go/pkg/mod/github.com/filecoin-project/lotus\@v1.30.0/build/buildconstants/params_mainnet.go` 注释 `DrandSchedule`
 
-3. 检查 method
+  ```go
+  var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
+          //0:                    DrandIncentinet,
+          // UpgradeSmokeHeight:   DrandMainnet,
+          UpgradePhoenixHeight: DrandQuicknet,
+  }
+```
+
+#### 检查 method
 
 检查本次升级中是否有新增 `method`，若有则调整 `cmd/londobell-api/util/util.go` 中 `AllMethodList`。

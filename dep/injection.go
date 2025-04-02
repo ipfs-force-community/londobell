@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/index"
+	"github.com/filecoin-project/lotus/chain/proofs"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/vm"
@@ -61,7 +62,8 @@ func SegmentManager() dix.Option {
 }
 
 func StateManager() dix.Option {
-	return dix.Options(dix.Override(new(vm.SyscallBuilder), vm.Syscalls),
+	return dix.Options(dix.Override(new(proofs.Verifier), ffiwrapper.ProofVerifier),
+		dix.Override(new(vm.SyscallBuilder), vm.Syscalls),
 		dix.Override(new(storiface.Verifier), ffiwrapper.ProofVerifier),
 		dix.Override(new(journal.Journal), modules.OpenFilesystemJournal),
 		dix.Override(new(journal.DisabledEvents), journal.EnvDisabledEvents),

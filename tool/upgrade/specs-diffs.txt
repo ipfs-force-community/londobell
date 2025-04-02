@@ -70,3 +70,10 @@ Specs v12 => v13:
 
 Specs v13 => v14:
 
+Specs v14 => v15:
+	> power.State
+		+ RampDurationEpochs: uint64
+		+ RampStartEpoch: int64
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+
