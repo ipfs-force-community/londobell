@@ -53,7 +53,11 @@ func isEmptyMinerStateV{{ $vinfo.Ver }}(mst *miner{{ $vinfo.Ver }}.State) bool {
 	return isEmptyOrZero(mst.PreCommitDeposits) &&
 		isEmptyOrZero(mst.LockedFunds) &&
 		isEmptyOrZero(mst.FeeDebt) &&
+		{{- if lt $vinfo.Ver 16}}
 		mst.VestingFunds.Equals(emptyMinerStateV{{ $vinfo.Ver }}.VestingFunds) &&
+		{{- else -}}
+		mst.VestingFunds == nil &&
+		{{- end }}
 		isEmptyOrZero(mst.InitialPledge) &&
 		mst.PreCommittedSectors.Equals(emptyMinerStateV{{ $vinfo.Ver }}.PreCommittedSectors) &&
 		{{ if gt $vinfo.Ver 4 -}}
@@ -125,10 +129,12 @@ func newEmptyMinerStateV{{ $vinfo.Ver }}() (*miner{{ $vinfo.Ver }}.State, error)
     if err != nil {
         return nil, fmt.Errorf("failed to construct empty deadlines: %w", err)
     }
+	{{- if lt $vinfo.Ver 16 }}
     emptyVestingFundsCid, err := store.Put(store.Context(), miner{{ $vinfo.Ver }}.ConstructVestingFunds())
     if err != nil {
         return nil, fmt.Errorf("failed to construct empty vesting funds: %w", err)
     }
+	{{ end }}
 
     return &miner{{ $vinfo.Ver }}.State{
         Info: cid.Undef,
@@ -137,7 +143,11 @@ func newEmptyMinerStateV{{ $vinfo.Ver }}() (*miner{{ $vinfo.Ver }}.State, error)
         LockedFunds:       abi.NewTokenAmount(0),
         FeeDebt:           abi.NewTokenAmount(0),
 
+		{{ if lt $vinfo.Ver 16 }}
         VestingFunds: emptyVestingFundsCid,
+		{{ else }}
+		VestingFunds: nil,
+		{{ end }}
 
         InitialPledge: abi.NewTokenAmount(0),
 

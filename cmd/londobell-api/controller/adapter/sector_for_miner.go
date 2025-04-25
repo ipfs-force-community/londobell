@@ -91,8 +91,8 @@ func GetSectorForMinerInfo(c *gin.Context) {
 	resData.Pledge = si.InitialPledge
 	resData.DealWeight = si.DealWeight
 	resData.VerifiedDealWeight = si.VerifiedDealWeight
-	resData.ExpectedDayReward = si.ExpectedDayReward
-	resData.ExpectedStoragePledge = si.ExpectedStoragePledge
+	// resData.ExpectedDayReward = si.ExpectedDayReward
+	// resData.ExpectedStoragePledge = si.ExpectedStoragePledge
 	resData.ReplaceSectorAge = 0
 	resData.ReplaceDayReward = big.NewInt(0)
 

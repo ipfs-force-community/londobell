@@ -86,10 +86,22 @@ func GetSectorInfo(c *gin.Context) {
 		resData.Pledge = info.InitialPledge
 		resData.DealWeight = info.DealWeight
 		resData.VerifiedDealWeight = info.VerifiedDealWeight
-		resData.ExpectedDayReward = info.ExpectedDayReward
-		resData.ExpectedStoragePledge = info.ExpectedStoragePledge
+		resData.ExpectedDayReward = big.NewInt(0)
+		resData.ExpectedStoragePledge = big.NewInt(0)
 		resData.ReplaceSectorAge = 0
 		resData.ReplaceDayReward = big.NewInt(0)
+		if info.ExpectedDayReward != nil {
+			resData.ExpectedDayReward = *info.ExpectedDayReward
+		}
+		if info.ExpectedStoragePledge != nil {
+			resData.ExpectedStoragePledge = *info.ExpectedStoragePledge
+		}
+		// if info.ReplaceSectorAge != nil {
+		// 	resData.ReplaceSectorAge = *info.ReplaceSectorAge
+		// }
+		// if info.ReplaceDayReward != nil {
+		// 	resData.ReplaceDayReward = *info.ReplaceDayReward
+		// }
 
 		resDatas = append(resDatas, resData)
 	}
