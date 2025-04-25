@@ -16,4 +16,5 @@ type CurrentSectorInitialPledgeRes struct {
 	FilCirculating             abi.TokenAmount
 	FilReserveDisbursed        abi.TokenAmount
 	CurrentSectorInitialPledge abi.TokenAmount
+	DailyFee                   abi.TokenAmount
 }
