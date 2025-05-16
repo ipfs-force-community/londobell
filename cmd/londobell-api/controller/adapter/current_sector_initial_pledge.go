@@ -2,8 +2,10 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/filecoin-project/lotus/blockstore"
 
@@ -40,6 +42,7 @@ func CurrentSectorInitialPledge(c *gin.Context) {
 
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)
+		req.Epoch = int64(ts.Height())
 	} else {
 		ts, err = api.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
 	}
@@ -151,7 +154,41 @@ func CurrentSectorInitialPledge(c *gin.Context) {
 		FilReserveDisbursed:        circ.FilReserveDisbursed,
 		CurrentSectorInitialPledge: initPledge,
 	}
+	dailyFee, err := dailyProofFee(circ.FilCirculating, big.MustFromString(req.QualityAdjPower))
+	if err == nil {
+		resData.DailyFee = dailyFee
+	} else {
+		alog.Error("dailyProofFee failed: ", err)
+		resData.DailyFee = big.NewInt(0)
+	}
 
 	res.Data = resData
 	c.JSON(http.StatusOK, res)
+}
+
+const DAILY_FEE_CIRCULATING_SUPPLY_QAP_MULTIPLIER_NUM = 161817
+
+var DAILY_FEE_CIRCULATING_SUPPLY_QAP_MULTIPLIER_DENOM = big.NewInt(0)
+
+func init() {
+	var err error
+	DAILY_FEE_CIRCULATING_SUPPLY_QAP_MULTIPLIER_DENOM, err = big.FromString(
+		strings.ReplaceAll("1_000_000_000_000_000_000_000_000_000_000", "_", ""))
+	if err != nil {
+		fmt.Printf("parse DAILY_FEE_CIRCULATING_SUPPLY_QAP_MULTIPLIER_DENOM failed: %v\n", err)
+	}
+}
+
+// pub fn daily_proof_fee: https://github.com/filecoin-project/builtin-actors/blob/41bb0b28b479e75ea5d841fd216612acdbdb74c8/actors/miner/src/policy.rs#L214
+func dailyProofFee(filCirculating abi.TokenAmount, qaPower abi.TokenAmount) (big.Int, error) {
+	if DAILY_FEE_CIRCULATING_SUPPLY_QAP_MULTIPLIER_DENOM.IsZero() {
+		return big.Int{}, fmt.Errorf("DAILY_FEE_CIRCULATING_SUPPLY_QAP_MULTIPLIER_DENOM is zero")
+	}
+
+	val := big.NewInt(0).Mul(filCirculating.Int,
+		big.NewInt(DAILY_FEE_CIRCULATING_SUPPLY_QAP_MULTIPLIER_NUM).Int)
+	val = big.NewInt(0).Mul(val, qaPower.Int)
+
+	ret := big.NewInt(0).Div(val, DAILY_FEE_CIRCULATING_SUPPLY_QAP_MULTIPLIER_DENOM.Int)
+	return big.Int{Int: ret}, nil
 }
