@@ -563,6 +563,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 			log.Warnf("db %v is invalid", db)
 			continue
 		}
+		log.Infof("db: %v", db)
 
 		client, err := mongo.Connect(ctx, options.Client().ApplyURI(db.Url()).SetRegistry(bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{})).Build()))
 		if err != nil {

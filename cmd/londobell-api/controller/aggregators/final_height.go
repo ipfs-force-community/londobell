@@ -43,7 +43,9 @@ func GetFinalHeight(c *gin.Context) {
 }
 
 func GetFinalHeightForFormalDB(ctx context.Context) (abi.ChainEpoch, error) {
-	cols, ok := multiquery.DBStateManager.GetDBCollections(multiquery.DBStateManager.GetFormalCfg().Url())
+	formalCfg := multiquery.DBStateManager.GetFormalCfg()
+	log.Infof("GetFinalHeightForFormalDB: %v", formalCfg)
+	cols, ok := multiquery.DBStateManager.GetDBCollections(formalCfg.Url())
 	if !ok {
 		return 0, fmt.Errorf("url %v not found in DBCollectionsMap", multiquery.DBStateManager.GetFormalCfg().Url())
 	}
