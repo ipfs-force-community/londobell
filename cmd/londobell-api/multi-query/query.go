@@ -35,6 +35,7 @@ func GetFinalHeight(ctx context.Context, cols common.Collections) (abi.ChainEpoc
 		return 0, err
 	}
 
+	log.Infof("GetFinalHeightForFormalDB: %+v", len(cols.Cols))
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == "FinalHeight" {
 			cur, err := col.Aggregate(ctx, pipe)

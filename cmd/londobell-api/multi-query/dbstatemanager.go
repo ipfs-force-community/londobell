@@ -448,6 +448,7 @@ func (dbsm *DataBaseStateManager) GetDBCollections(url string) (config2.Collecti
 	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
 
 	cols, ok := dbsm.DBCfg.DBCollectionsMap[url]
+	log.Infof("GetDBCollections: url: %s, ok: %v, len: %d", url, ok, len(cols.Cols))
 	if ok {
 		return cols, true
 	}
@@ -563,7 +564,7 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 			log.Warnf("db %v is invalid", db)
 			continue
 		}
-		log.Infof("db: %v", db)
+		log.Infof("LoadDBCollectionsMap: %v", db)
 
 		client, err := mongo.Connect(ctx, options.Client().ApplyURI(db.Url()).SetRegistry(bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{})).Build()))
 		if err != nil {

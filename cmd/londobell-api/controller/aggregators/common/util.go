@@ -136,6 +136,7 @@ func GetIDByAddr(ctx context.Context, addrStr string) (string, error) {
 func GetAddrs(ctx context.Context, addr string) (model.AddressRes, error) {
 	formal := multiquery.DBStateManager.GetFormalCfg()
 	cols, ok := multiquery.DBStateManager.GetDBCollections(formal.Url())
+	log.Infof("GetAddrs: %+v, len: %v", formal.Url(), len(cols.Cols))
 	if !ok {
 		return model.AddressRes{}, fmt.Errorf("url %v not found in DBCollectionsMap", formal.Url())
 	}
@@ -147,8 +148,16 @@ func GetAddrs(ctx context.Context, addr string) (model.AddressRes, error) {
 		return model.AddressRes{}, err
 	}
 
+	found := false
+
+	defer func() {
+		log.Infof("GetAddrs, pipe %+v, found: %v", pipe, found)
+	}()
+
 	for _, col := range cols.Cols {
+		log.Infof("GetAddrs, col name: %v", col.Name())
 		if col != nil && col.Name() == "ActorAddress" {
+			found = true
 			cur, err := col.Aggregate(ctx, pipe)
 			if err != nil {
 				return model.AddressRes{}, err
