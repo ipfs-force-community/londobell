@@ -15,6 +15,17 @@ const DefaultInterval = 3 * builtin.EpochsInHour
 
 type DType int
 
+func (dt DType) ToString() string {
+	switch dt {
+	case Tmp:
+		return "tmp"
+	case Formal:
+		return "formal"
+	default:
+		return "cold"
+	}
+}
+
 const (
 	Tmp DType = iota
 	Formal

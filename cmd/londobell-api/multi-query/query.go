@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"sync"
+	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
 
@@ -517,8 +518,8 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 		ewg    multierror.Group
 	)
 
+	start := time.Now()
 	lim := limiter.New(16)
-
 	for i := range aggLists {
 		i := i
 		aggList := aggLists[i]
@@ -563,6 +564,8 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 	if err := ewg.Wait(); err != nil {
 		return nil, err
 	}
+	log.Infof("MultiPagingQuery table: %s, list: %d, took: %v", tableName, len(aggLists),
+		time.Since(start))
 
 	for i := 0; i < len(res); i++ {
 		result = append(result, res[i]...)
@@ -635,6 +638,7 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 		result = make([]bson.M, 0)
 	)
 
+	starQuery := time.Now()
 	for i := range aggLists {
 		i := i
 		aggList := aggLists[i]
@@ -674,6 +678,7 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 	if err := ewg.Wait(); err != nil {
 		return nil, err
 	}
+	log.Infof("MultiRangeQuery table: %s, list: %d, took: %v", tableName, len(aggLists), time.Since(starQuery))
 
 	for i := 0; i < len(res); i++ {
 		result = append(result, res[i]...)
@@ -772,6 +777,7 @@ func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []Cou
 	}
 
 	for _, countList := range priorityLists {
+		start := time.Now()
 		for _, col := range countList.Cols.Cols {
 			if col != nil && col.Name() == tableName {
 				cur, err := col.Aggregate(ctx, pipe)
@@ -789,8 +795,10 @@ func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []Cou
 				}
 			}
 		}
+		log.Infof("MultiTraversalQuery db type: %s, table: %s, took: %v", countList.DType.ToString(), tableName, time.Since(start))
 	}
 
+	start := time.Now()
 	for i := range delayedLists {
 		i := i
 		countList := delayedLists[i]
@@ -834,6 +842,7 @@ func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []Cou
 	if err := ewg.Wait(); err != nil {
 		return nil, err
 	}
+	log.Infof("MultiTraversalQuery db type: cold, table: %s, took: %v", tableName, time.Since(start))
 
 	return result, nil
 }
@@ -845,6 +854,10 @@ func MultiUnionQuery(ctx context.Context, pipe interface{}, countLists []CountUt
 		res    = make([][]bson.M, len(countLists))
 		result = make([]bson.M, 0)
 	)
+	start := time.Now()
+	defer func() {
+		log.Infof("MultiUnionQuery table: %s, took: %v", tableName, time.Since(start))
+	}()
 
 	// todo: 所有库都查询一次，最终查询时间为最慢库的查询时间，费时
 	// 先查询formal，再并发查询冷库？
@@ -889,6 +902,12 @@ func MultiBiSearch(ctx context.Context, indexReq, limitReq int64, countUtils []C
 	req model.CommonReq, tableName string, ptype Ptype) ([]bson.M, error) {
 	sum := int64(0)
 	result := []bson.M{}
+
+	startQuery := time.Now()
+	defer func() {
+		log.Infof("MultiUnionQuery table: %, took: %v", tableName, time.Since(startQuery))
+	}()
+
 	for i := range countUtils {
 		tmp := int64(0)
 		switch ptype {
