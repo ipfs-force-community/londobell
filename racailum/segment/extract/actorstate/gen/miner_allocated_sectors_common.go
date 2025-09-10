@@ -40,7 +40,8 @@ func extractAllocatedSectors(ctx *extract.Ctx, res *extract.Res, head *common.Ac
 		root.Equals(emptyMinerStateV13.AllocatedSectors) ||
 		root.Equals(emptyMinerStateV14.AllocatedSectors) ||
 		root.Equals(emptyMinerStateV15.AllocatedSectors) ||
-		root.Equals(emptyMinerStateV16.AllocatedSectors) {
+		root.Equals(emptyMinerStateV16.AllocatedSectors) ||
+		root.Equals(emptyMinerStateV17.AllocatedSectors) {
 
 		return nil
 	}
