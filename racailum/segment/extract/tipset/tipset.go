@@ -23,7 +23,7 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v10/evm"
 	"github.com/filecoin-project/go-state-types/builtin/v11/miner"
 	sverifreg "github.com/filecoin-project/go-state-types/builtin/v11/verifreg"
-	miner16 "github.com/filecoin-project/go-state-types/builtin/v16/miner"
+	miner17 "github.com/filecoin-project/go-state-types/builtin/v17/miner"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/lotus/api"
@@ -357,8 +357,8 @@ func copyIndexes(src []int) []int {
 }
 
 // Use Flags instead of SimpleQAPower: https://github.com/filecoin-project/go-state-types/pull/212/files
-func IsSimpleQAPower(flags miner16.SectorOnChainInfoFlags) bool {
-	return flags == miner16.SIMPLE_QA_POWER
+func IsSimpleQAPower(flags miner17.SectorOnChainInfoFlags) bool {
+	return flags == miner17.SIMPLE_QA_POWER
 }
 
 func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
