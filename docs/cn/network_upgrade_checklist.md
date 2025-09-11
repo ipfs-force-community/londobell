@@ -46,6 +46,20 @@ londobell-api随 Filecoin 网络升级的检查项清单
 
 ### Others
 
+#### 处理 nil
+1. 当前没使用vendor模式,但是有些依赖lotus的代码进行了调整,需要在本地机器的go mod目录做响应的调整
+2. /go/pkg/mod/github.com/filecoin-project/lotus@v1.24.0/chain/store/store.go:1249
+调整GetTipsetByHeight逻辑:
+调整以下代码,添加空指针判断:
+```go
+	if ts == nil {
+		ts = cs.GetHeaviestTipSet()
+		if ts == nil {
+			return nil, xerrors.Errorf("can't get heaviest tipset")
+		}
+	}
+```
+
 #### 检查`github.com/filecoin-project/lotus/node/` build变更，根据变更调整`dep`部分代码
 
 1. calibnet 网络：`~/go/pkg/mod/github.com/filecoin-project/lotus\@v1.30.0/build/buildconstants/calibnet.go` 注释 `DrandSchedule`
