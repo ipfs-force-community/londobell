@@ -45,6 +45,10 @@ lint: $(BUILD_DEPS)
 dep-check: build-dep/.update-modules
 	./tool/scripts/submodule-check.sh
 
+build: $(BUILD_DEPS) build-bell build-adapter build-aggregators
+
+build-calib: $(BUILD_DEPS) build-bell-calib build-adapter-calib build-aggregators-calib
+
 build-bell: $(BUILD_DEPS)
 	rm -rf ./bell
 	go build $(GOFLAGS) -o bell ./cmd/bell

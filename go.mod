@@ -9,8 +9,8 @@ require (
 	github.com/filecoin-project/go-amt-ipld/v4 v4.4.0
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-jsonrpc v0.8.0
-	github.com/filecoin-project/go-state-types v0.17.0-dev2
-	github.com/filecoin-project/lotus v1.34.0-rc2
+	github.com/filecoin-project/go-state-types v0.17.0
+	github.com/filecoin-project/lotus v1.34.1
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v3 v3.1.2
@@ -161,7 +161,7 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/fatih/color v1.18.0 // indirect
-	github.com/filecoin-project/filecoin-ffi v1.33.1-dev // indirect
+	github.com/filecoin-project/filecoin-ffi v1.34.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v2 v2.1.1-0.20201006184820-924ee87a1349 // indirect
 	github.com/filecoin-project/go-amt-ipld/v3 v3.1.0 // indirect
 	github.com/filecoin-project/go-cbor-util v0.0.2 // indirect
