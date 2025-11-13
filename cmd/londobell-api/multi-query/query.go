@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/ipfs-force-community/londobell/lib/limiter"
 
@@ -774,7 +775,13 @@ func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []Cou
 	for _, countList := range priorityLists {
 		for _, col := range countList.Cols.Cols {
 			if col != nil && col.Name() == tableName {
-				cur, err := col.Aggregate(ctx, pipe)
+				var cur *mongo.Cursor
+				var err error
+				if tableName == "BlockMessage" {
+					cur, err = col.Aggregate(ctx, pipe, options.Aggregate().SetAllowDiskUse(true))
+				} else {
+					cur, err = col.Aggregate(ctx, pipe)
+				}
 				if err != nil {
 					return nil, err
 				}
@@ -808,7 +815,13 @@ func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []Cou
 					}
 					lock.RUnlock()
 
-					cur, err := col.Aggregate(ctx, pipe)
+					var cur *mongo.Cursor
+					var err error
+					if tableName == "BlockMessage" {
+						cur, err = col.Aggregate(ctx, pipe, options.Aggregate().SetAllowDiskUse(true))
+					} else {
+						cur, err = col.Aggregate(ctx, pipe)
+					}
 					if err != nil {
 						return err
 					}
