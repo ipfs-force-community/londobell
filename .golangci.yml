@@ -1,12 +1,12 @@
 run:
   timeout: 5m
 
+version: 2
+
 linters:
   disable-all: true
   enable:
-    - gofmt
     - govet
-    - goimports
     - misspell
     - goconst
     - revive
@@ -14,10 +14,6 @@ linters:
     - gosec
     - unconvert
     - staticcheck
-    - varcheck
-    - structcheck
-    - deadcode
-    - exportloopref
 
 # We don't want to skip builtin/
 skip-dirs-use-default: false

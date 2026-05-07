@@ -50,7 +50,7 @@ func GetFilSupply(c *gin.Context) {
 	epochsStr := fmt.Sprintf("%v", req.Epochs)
 	epochsStr = strings.Trim(epochsStr, "[]")
 	epochsStr = strings.ReplaceAll(epochsStr, " ", ",")
-	epochsStr = fmt.Sprintf("[" + epochsStr + "]")
+	epochsStr = fmt.Sprintf("[%s]", epochsStr)
 
 	pipe, err := util.Parse(model.Ctx{}, fmt.Sprintf(pipeJS, epochsStr))
 	if err != nil {

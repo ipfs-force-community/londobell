@@ -9,6 +9,7 @@ ClaimedPowerV14
 ClaimedPowerV15
 ClaimedPowerV16
 ClaimedPowerV17
+ClaimedPowerV18
 ClaimedPowerV2
 ClaimedPowerV3
 ClaimedPowerV4
@@ -32,6 +33,7 @@ DealProposalDetailedV14
 DealProposalDetailedV15
 DealProposalDetailedV16
 DealProposalDetailedV17
+DealProposalDetailedV18
 DealProposalDetailedV2
 DealProposalDetailedV3
 DealProposalDetailedV4
@@ -49,6 +51,7 @@ DealProposalSummaryV14
 DealProposalSummaryV15
 DealProposalSummaryV16
 DealProposalSummaryV17
+DealProposalSummaryV18
 DealProposalSummaryV2
 DealProposalSummaryV3
 DealProposalSummaryV4
@@ -66,6 +69,7 @@ MarketFundsV14
 MarketFundsV15
 MarketFundsV16
 MarketFundsV17
+MarketFundsV18
 MarketFundsV2
 MarketFundsV3
 MarketFundsV4
@@ -83,6 +87,7 @@ MinerFundsV14
 MinerFundsV15
 MinerFundsV16
 MinerFundsV17
+MinerFundsV18
 MinerFundsV2
 MinerFundsV3
 MinerFundsV4
@@ -100,6 +105,7 @@ MinerSectorHealthV14
 MinerSectorHealthV15
 MinerSectorHealthV16
 MinerSectorHealthV17
+MinerSectorHealthV18
 MinerSectorHealthV2
 MinerSectorHealthV3
 MinerSectorHealthV4
@@ -117,6 +123,7 @@ MinerSectorSummaryV14
 MinerSectorSummaryV15
 MinerSectorSummaryV16
 MinerSectorSummaryV17
+MinerSectorSummaryV18
 MinerSectorSummaryV2
 MinerSectorSummaryV3
 MinerSectorSummaryV4
@@ -134,6 +141,7 @@ MiningProfitabilityV14
 MiningProfitabilityV15
 MiningProfitabilityV16
 MiningProfitabilityV17
+MiningProfitabilityV18
 MiningProfitabilityV2
 MiningProfitabilityV3
 MiningProfitabilityV4
@@ -151,6 +159,7 @@ MultisigBalanceV14
 MultisigBalanceV15
 MultisigBalanceV16
 MultisigBalanceV17
+MultisigBalanceV18
 MultisigBalanceV2
 MultisigBalanceV3
 MultisigBalanceV4
@@ -168,6 +177,7 @@ PendingTxnsV14
 PendingTxnsV15
 PendingTxnsV16
 PendingTxnsV17
+PendingTxnsV18
 PendingTxnsV2
 PendingTxnsV3
 PendingTxnsV4
@@ -185,6 +195,7 @@ VerifRegV14
 VerifRegV15
 VerifRegV16
 VerifRegV17
+VerifRegV18
 VerifRegV2
 VerifRegV3
 VerifRegV4

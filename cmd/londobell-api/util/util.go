@@ -36,7 +36,8 @@ var AllMethodList = []string{
 	"ConfirmUpdateWorkerKey", "Constructor", "ControlAddresses", "CreateExternal", "CreateMiner",
 	"DeclareFaults", "DeclareFaultsRecovered", "DisputeWindowedPoSt",
 	"Exec", "ExtendClaimTerms", "ExtendSectorExpiration", "ExtendSectorExpiration2",
-	"GetBeneficiary",
+	"GenerateSectorLocation", "GenerateSectorLocationExported",
+	"GetBeneficiary", "GetNominalSectorExpiration", "GetNominalSectorExpirationExported",
 	"IncreaseAllowanceExported", "InvokeContract",
 	"Other",
 	"PreCommitSector", "PreCommitSectorBatch", "PreCommitSectorBatch2", "Propose", "ProveCommitAggregate",
@@ -46,6 +47,7 @@ var AllMethodList = []string{
 	"Send", "Send(ethaccount)", "Send(placeholder)", "Settle", "SubmitWindowedPoSt", "SwapSigner",
 	"TerminateSectors", "TransferFromExported",
 	"UpdateChannelState",
+	"ValidateSectorStatus", "ValidateSectorStatusExported",
 	"WithdrawBalance",
 }
 
