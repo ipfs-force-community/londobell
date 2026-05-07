@@ -54,11 +54,13 @@ func NewSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSe
 	)
 
 	if tmp {
-		// root = ts.TmpState()
-		root, _, err = stm.TipSetState(ctx, ts.TipSet)
-		if err != nil {
-			return nil, fmt.Errorf("get state of tipset: %v", err)
+		// In tmp mode, we extract the latest tipset which has no child.
+		// We can get the state root directly from the block header's ParentStateRoot.
+		blocks := ts.Blocks()
+		if len(blocks) == 0 {
+			return nil, fmt.Errorf("tipset has no blocks")
 		}
+		root = blocks[0].ParentStateRoot
 	} else {
 		root = ts.State()
 	}
