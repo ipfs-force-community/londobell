@@ -10,11 +10,15 @@ import (
 	miner5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/miner"
 
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
+	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
+	miner11 "github.com/filecoin-project/go-state-types/builtin/v11/miner"
+	miner12 "github.com/filecoin-project/go-state-types/builtin/v12/miner"
 	miner8 "github.com/filecoin-project/go-state-types/builtin/v8/miner"
 	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
 	"github.com/filecoin-project/go-state-types/manifest"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
+	market "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	builtin0 "github.com/filecoin-project/specs-actors/actors/builtin"
 	miner0 "github.com/filecoin-project/specs-actors/actors/builtin/miner"
 	builtin2 "github.com/filecoin-project/specs-actors/v2/actors/builtin"
@@ -29,10 +33,10 @@ import (
 	builtin7 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
 	miner7 "github.com/filecoin-project/specs-actors/v7/actors/builtin/miner"
 
-	miner10 "github.com/filecoin-project/go-state-types/builtin/v10/miner"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	sbuiltin "github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -77,7 +81,7 @@ func GetSectorNumberByDealID(c *gin.Context) {
 		DealID: abi.DealID(req.DealID),
 	}
 
-	err = getSectorByDealIDResByCode(ctx, act, stor, req.DealID, &resData)
+	err = getSectorByDealIDResByCode(ctx, api, act, stor, req.DealID, &resData)
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
@@ -88,14 +92,13 @@ func GetSectorNumberByDealID(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-func getSectorByDealIDResByCode(ctx context.Context, mact *types.Actor, stor adt.Store, dealID uint64, resData *model.SectorNumberByDealIDRes) (err error) {
+func getSectorByDealIDResByCode(ctx context.Context, api v0api.FullNode, mact *types.Actor, stor adt.Store, dealID uint64, resData *model.SectorNumberByDealIDRes) (err error) {
 	if name, av, ok := actors.GetActorMetaByCode(mact.Code); ok {
 		if name != manifest.MinerKey {
 			return fmt.Errorf("actor code is not miner: %s", name)
 		}
 
 		switch av {
-
 		case actorstypes.Version8:
 			state := miner8.State{}
 			err = stor.Get(ctx, mact.Head, &state)
@@ -116,15 +119,10 @@ func getSectorByDealIDResByCode(ctx context.Context, mact *types.Actor, stor adt
 						return nil
 					}
 				}
-
 				return nil
 			})
+			return err
 
-			if err != nil {
-				return err
-			}
-
-			return nil
 		case actorstypes.Version9:
 			state := miner9.State{}
 			err = stor.Get(ctx, mact.Head, &state)
@@ -145,17 +143,10 @@ func getSectorByDealIDResByCode(ctx context.Context, mact *types.Actor, stor adt
 						return nil
 					}
 				}
-
 				return nil
 			})
+			return err
 
-			if err != nil {
-				return err
-			}
-
-			return nil
-
-			// v10
 		case actorstypes.Version10:
 			state := miner10.State{}
 			err = stor.Get(ctx, mact.Head, &state)
@@ -176,15 +167,61 @@ func getSectorByDealIDResByCode(ctx context.Context, mact *types.Actor, stor adt
 						return nil
 					}
 				}
-
 				return nil
 			})
+			return err
 
+		case actorstypes.Version11:
+			state := miner11.State{}
+			err = stor.Get(ctx, mact.Head, &state)
 			if err != nil {
 				return err
 			}
 
-			return nil
+			sectors, err := miner11.LoadSectors(stor, state.Sectors)
+			if err != nil {
+				return fmt.Errorf("load sectors from adt store: %w", err)
+			}
+
+			var out miner11.SectorOnChainInfo
+			err = sectors.ForEach(&out, func(n int64) error {
+				for _, id := range out.DealIDs {
+					if id == abi.DealID(dealID) {
+						resData.SectorNumber = out.SectorNumber
+						return nil
+					}
+				}
+				return nil
+			})
+			return err
+
+		case actorstypes.Version12:
+			state := miner12.State{}
+			err = stor.Get(ctx, mact.Head, &state)
+			if err != nil {
+				return err
+			}
+
+			sectors, err := miner12.LoadSectors(stor, state.Sectors)
+			if err != nil {
+				return fmt.Errorf("load sectors from adt store: %w", err)
+			}
+
+			var out miner12.SectorOnChainInfo
+			err = sectors.ForEach(&out, func(n int64) error {
+				for _, id := range out.DealIDs {
+					if id == abi.DealID(dealID) {
+						resData.SectorNumber = out.SectorNumber
+						return nil
+					}
+				}
+				return nil
+			})
+			return err
+
+		case actorstypes.Version13, actorstypes.Version14, actorstypes.Version15,
+			actorstypes.Version16, actorstypes.Version17, actorstypes.Version18:
+			return getSectorNumberFromMarketDealState(ctx, api, stor, dealID, resData)
 		}
 	}
 
@@ -209,15 +246,10 @@ func getSectorByDealIDResByCode(ctx context.Context, mact *types.Actor, stor adt
 					return nil
 				}
 			}
-
 			return nil
 		})
+		return err
 
-		if err != nil {
-			return err
-		}
-
-		return nil
 	case builtin2.StorageMinerActorCodeID:
 		state := miner2.State{}
 		err = stor.Get(ctx, mact.Head, &state)
@@ -238,15 +270,9 @@ func getSectorByDealIDResByCode(ctx context.Context, mact *types.Actor, stor adt
 					return nil
 				}
 			}
-
 			return nil
 		})
-
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 
 	case builtin3.StorageMinerActorCodeID:
 		state := miner3.State{}
@@ -268,15 +294,9 @@ func getSectorByDealIDResByCode(ctx context.Context, mact *types.Actor, stor adt
 					return nil
 				}
 			}
-
 			return nil
 		})
-
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 
 	case builtin4.StorageMinerActorCodeID:
 		state := miner4.State{}
@@ -298,15 +318,9 @@ func getSectorByDealIDResByCode(ctx context.Context, mact *types.Actor, stor adt
 					return nil
 				}
 			}
-
 			return nil
 		})
-
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 
 	case builtin5.StorageMinerActorCodeID:
 		state := miner5.State{}
@@ -328,15 +342,9 @@ func getSectorByDealIDResByCode(ctx context.Context, mact *types.Actor, stor adt
 					return nil
 				}
 			}
-
 			return nil
 		})
-
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 
 	case builtin6.StorageMinerActorCodeID:
 		state := miner6.State{}
@@ -358,15 +366,9 @@ func getSectorByDealIDResByCode(ctx context.Context, mact *types.Actor, stor adt
 					return nil
 				}
 			}
-
 			return nil
 		})
-
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 
 	case builtin7.StorageMinerActorCodeID:
 		state := miner7.State{}
@@ -388,17 +390,39 @@ func getSectorByDealIDResByCode(ctx context.Context, mact *types.Actor, stor adt
 					return nil
 				}
 			}
-
 			return nil
 		})
-
-		if err != nil {
-			return err
-		}
-
-		return nil
-
+		return err
 	}
 
 	return fmt.Errorf("unknown actor code %s", mact.Code)
+}
+
+func getSectorNumberFromMarketDealState(ctx context.Context, api v0api.FullNode, stor adt.Store, dealID uint64, resData *model.SectorNumberByDealIDRes) error {
+	marketAct, err := api.StateGetActor(ctx, sbuiltin.StorageMarketActorAddr, types.EmptyTSK)
+	if err != nil {
+		return fmt.Errorf("get market actor: %w", err)
+	}
+
+	marketState, err := market.Load(stor, marketAct)
+	if err != nil {
+		return fmt.Errorf("load market state: %w", err)
+	}
+
+	dealStates, err := marketState.States()
+	if err != nil {
+		return fmt.Errorf("load market deal states: %w", err)
+	}
+
+	ds, found, err := dealStates.Get(abi.DealID(dealID))
+	if err != nil {
+		return fmt.Errorf("get deal state for deal %d: %w", dealID, err)
+	}
+
+	if !found {
+		return fmt.Errorf("deal state not found for deal %d", dealID)
+	}
+
+	resData.SectorNumber = ds.SectorNumber()
+	return nil
 }
