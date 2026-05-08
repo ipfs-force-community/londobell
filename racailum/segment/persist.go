@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"go.mongodb.org/mongo-driver/bson"
@@ -40,7 +41,37 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 
 		insertOps++
 		inserted, err = s.db.Insert(ctx, col, insertDocs[col])
-		if err != nil {
+		if err != nil && strings.Contains(err.Error(), "too large") {
+			l.Warnw("batch insert contains oversized documents, retrying individually", "collection", col)
+			var truncated int
+			inserted = 0
+			for _, doc := range insertDocs[col] {
+				n, e := s.db.Insert(ctx, col, []interface{}{doc})
+				if e != nil {
+					if strings.Contains(e.Error(), "too large") {
+						shrunk, shrinkErr := truncateOversizedDoc(doc)
+						if shrinkErr != nil {
+							l.Warnw("unable to truncate oversized document", "collection", col, "error", shrinkErr)
+							truncated++
+							continue
+						}
+						n, e = s.db.Insert(ctx, col, []interface{}{shrunk})
+						if e != nil {
+							l.Warnw("still too large after truncation", "collection", col, "error", e)
+							truncated++
+							continue
+						}
+						truncated++
+					} else {
+						return e
+					}
+				}
+				inserted += n
+			}
+			if truncated > 0 {
+				l.Warnw("oversized documents truncated to allow sync to continue", "collection", col, "truncated", truncated, "inserted", inserted)
+			}
+		} else if err != nil {
 			return err
 		}
 
@@ -171,6 +202,70 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 	l.Infow("documents inserted and updated", logFields...)
 
 	return nil
+}
+
+const maxBSONDocumentSize = 15 * 1024 * 1024
+const maxFieldSize = 10 * 1024 * 1024
+
+func truncateOversizedDoc(doc interface{}) (interface{}, error) {
+	raw, err := bson.Marshal(doc)
+	if err != nil {
+		return nil, fmt.Errorf("marshal doc: %w", err)
+	}
+
+	if len(raw) <= maxBSONDocumentSize {
+		return doc, nil
+	}
+
+	var m bson.M
+	if err := bson.Unmarshal(raw, &m); err != nil {
+		return nil, fmt.Errorf("unmarshal to bson.M: %w", err)
+	}
+
+	truncated := truncateLargeFields(m)
+
+	truncated["TruncatedFields"] = true
+	return truncated, nil
+}
+
+func truncateLargeFields(m bson.M) bson.M {
+	for key, val := range m {
+		switch v := val.(type) {
+		case []byte:
+			if len(v) > maxFieldSize {
+				m[key] = append(v[:maxFieldSize], []byte("...<truncated>")...)
+			}
+		case string:
+			if len(v) > maxFieldSize {
+				m[key] = v[:maxFieldSize] + "...<truncated>"
+			}
+		case bson.M:
+			m[key] = truncateLargeFields(v)
+		case bson.A:
+			m[key] = truncateLargeArray(v)
+		}
+	}
+	return m
+}
+
+func truncateLargeArray(a bson.A) bson.A {
+	for i, val := range a {
+		switch v := val.(type) {
+		case []byte:
+			if len(v) > maxFieldSize {
+				a[i] = append(v[:maxFieldSize], []byte("...<truncated>")...)
+			}
+		case string:
+			if len(v) > maxFieldSize {
+				a[i] = v[:maxFieldSize] + "...<truncated>"
+			}
+		case bson.M:
+			a[i] = truncateLargeFields(v)
+		case bson.A:
+			a[i] = truncateLargeArray(v)
+		}
+	}
+	return a
 }
 
 func (s *Segment) GetTipSetItemsCount(ctx context.Context, l *zap.SugaredLogger) (uint, error) {
