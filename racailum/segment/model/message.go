@@ -3,6 +3,7 @@ package model
 import (
 	"bytes"
 	"fmt"
+	"io"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/cbor"
@@ -15,7 +16,23 @@ import (
 )
 
 func init() {
-	mcodec.RegisterSchemaType(new(MessageParams))
+	mcodec.RegisterSchemaType(new(MessageParams), &evmInvokeParams{Raw: []byte{}})
+
+	if err := mcodec.RegisterCodec(
+		func(e evmInvokeParams) ([]byte, bool, error) {
+			return e.Raw, false, nil
+		},
+		func(raw []byte) (evmInvokeParams, error) {
+			if raw == nil {
+				return evmInvokeParams{Raw: []byte{}}, nil
+			}
+			return evmInvokeParams{Raw: raw}, nil
+		},
+		true,
+		evmInvokeParams{Raw: []byte{0xde, 0xad}},
+	); err != nil {
+		panic(fmt.Errorf("register evmInvokeParams codec: %w", err))
+	}
 }
 
 var _ common.IndexedDocument = (*Message)(nil)
@@ -26,6 +43,23 @@ var (
 
 // MessageParams is a type alias
 type MessageParams cbor.Er
+
+// evmInvokeParams stores the raw params bytes for EVM InvokeContract messages,
+// which are raw bytes (codec 85) rather than CBOR-encoded data.
+type evmInvokeParams struct {
+	Raw []byte
+}
+
+func (e *evmInvokeParams) MarshalCBOR(w io.Writer) error {
+	_, err := w.Write(e.Raw)
+	return err
+}
+
+func (e *evmInvokeParams) UnmarshalCBOR(r io.Reader) error {
+	var err error
+	e.Raw, err = io.ReadAll(r)
+	return err
+}
 
 // MessageDetail is the detail of message
 type MessageDetail struct {
@@ -112,12 +146,16 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.MessageTrace, act, meth stri
 	msg.Detail.Method = meth
 
 	if params != nil && len(raw.Params) > 0 {
-		err := params.UnmarshalCBOR(bytes.NewReader(raw.Params))
-		if err != nil {
-			return nil, fmt.Errorf("unmarshal cbor for message params, codec %v,err: %w", raw.ParamsCodec, err)
-		}
+		if act == "evm" && meth == "InvokeContract" {
+			msg.Detail.Params = &evmInvokeParams{Raw: raw.Params}
+		} else {
+			err := params.UnmarshalCBOR(bytes.NewReader(raw.Params))
+			if err != nil {
+				return nil, fmt.Errorf("unmarshal cbor for message params, codec %v,err: %w", raw.ParamsCodec, err)
+			}
 
-		msg.Detail.Params = params
+			msg.Detail.Params = params
+		}
 	}
 
 	msg.Detail.PackedHeight = epoch
