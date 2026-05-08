@@ -1,7 +1,7 @@
 package model
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
@@ -71,12 +71,24 @@ func (ae *ActorEvent) ResetPolicy(lower, upper *abi.ChainEpoch) (interface{}, bo
 }
 
 func (ae *ActorEvent) genID(epoch abi.ChainEpoch, logIndex uint64, seq []int) {
-	seqStrs := make([]string, 0, len(seq))
+	n := 20 + len(seq)*6
+	var b strings.Builder
+	b.Grow(n)
+	b.WriteString(strconv.FormatInt(int64(epoch), 10))
+	b.WriteByte('-')
 	for i := range seq {
-		seqStrs = append(seqStrs, fmt.Sprintf("%05d", seq[i]))
+		if i > 0 {
+			b.WriteByte('-')
+		}
+		s := strconv.Itoa(seq[i])
+		for j := 5 - len(s); j > 0; j-- {
+			b.WriteByte('0')
+		}
+		b.WriteString(s)
 	}
-
-	ae.ID = fmt.Sprintf("%d-%s-%d", epoch, strings.Join(seqStrs, "-"), logIndex)
+	b.WriteByte('-')
+	b.WriteString(strconv.FormatUint(logIndex, 10))
+	ae.ID = b.String()
 }
 
 func (ae *ActorEvent) IsMutable() bool {

@@ -11,9 +11,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/go-state-types/actors"
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/filecoin-project/go-address"
 	amt4 "github.com/filecoin-project/go-amt-ipld/v4"
@@ -49,6 +51,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/ipfs-force-community/londobell/common"
+	"github.com/ipfs-force-community/londobell/lib/limiter"
 	"github.com/ipfs-force-community/londobell/lib/mir"
 	"github.com/ipfs-force-community/londobell/racailum/segment/actor"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -505,6 +508,15 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 
 	var msgcnt, tracecnt, actorMsgCnt, createMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt, aecnt, mstCnt, sctCnt int
 
+	type pendingActorEventBatch struct {
+		events    []types.Event
+		mcid      cid.Cid
+		signedCid cid.Cid
+		seq       []int
+	}
+	var pendingActorEvents []pendingActorEventBatch
+	seenEventsRoots := map[cid.Cid]struct{}{}
+
 	if ctx.Opts.EnabelExtract.EnableExtractEthHash {
 		for _, cmsg := range allmsgs {
 			smsg, ok := cmsg.(*types.SignedMessage)
@@ -643,28 +655,14 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 						}
 
 						if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
-							for i, evt := range events {
-								actorID, err := address.NewIDAddress(uint64(evt.Emitter))
-								if err != nil {
-									return fmt.Errorf("failed to create ID address: %w", err)
-								}
-
-								data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
-								if !ok {
-									// not an eth event.
-									elog.Warnw("ethLogFromEvent not an eth event", "actorID", actorID, "mcid", mcid, "signedCid", signedCid)
-									continue
-								}
-
-								logIndex := uint64(i)
-								removed := false
-								aet, err := model.NewActorEvent(actorID, ts.Height(), mcid, signedCid, topics, data, logIndex, removed, p.seq)
-								if err != nil {
-									elog.Warnw("convert to model.ActorEvent", "actorID", actorID, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
-								} else {
-									aecnt++
-									res.Docs = append(res.Docs, aet)
-								}
+							if _, seen := seenEventsRoots[*eventsRoot]; !seen {
+								seenEventsRoots[*eventsRoot] = struct{}{}
+								pendingActorEvents = append(pendingActorEvents, pendingActorEventBatch{
+									events:    events,
+									mcid:      mcid,
+									signedCid: signedCid,
+									seq:       copyIndexes(p.seq),
+								})
 							}
 						}
 					}
@@ -1061,6 +1059,53 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 					res.Docs = append(res.Docs, sct)
 				}
 			}
+		}
+	}
+
+	if len(pendingActorEvents) > 0 {
+		var eventsMu sync.Mutex
+		var eventsWg multierror.Group
+		eventLim := limiter.New(16)
+
+		for pi := range pendingActorEvents {
+			pe := pendingActorEvents[pi]
+			eventsWg.Go(func() error {
+				if !eventLim.Acquire(ctx.C) {
+					return nil
+				}
+				defer eventLim.Release(ctx.C)
+
+				local := make([]common.Document, 0, len(pe.events))
+				for i, evt := range pe.events {
+					actorID, err := address.NewIDAddress(uint64(evt.Emitter))
+					if err != nil {
+						return fmt.Errorf("create ID address: %w", err)
+					}
+
+					data, topics, ok := ethLogFromEvent(ctx, ts.TipSet, evt.Entries)
+					if !ok {
+						continue
+					}
+
+					aet, err := model.NewActorEvent(actorID, ts.Height(), pe.mcid, pe.signedCid, topics, data, uint64(i), false, pe.seq)
+					if err != nil {
+						elog.Warnw("convert to model.ActorEvent", "actorID", actorID, "mcid", pe.mcid, "signedCid", pe.signedCid, "err", err.Error())
+						continue
+					}
+					local = append(local, aet)
+				}
+
+				eventsMu.Lock()
+				res.Docs = append(res.Docs, local...)
+				aecnt += len(local)
+				eventsMu.Unlock()
+
+				return nil
+			})
+		}
+
+		if err := eventsWg.Wait(); err != nil {
+			return fmt.Errorf("process actor events: %w", err)
 		}
 	}
 
