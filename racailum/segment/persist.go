@@ -80,8 +80,8 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 			return err
 		}
 
-		insertDocs[col] = insertDocs[col][:0]
 		statsMu.Lock()
+		insertDocs[col] = insertDocs[col][:0]
 		insertedCounts[col] = insertedCounts[col] + inserted
 		statsMu.Unlock()
 		return nil
@@ -144,7 +144,9 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 			statsMu.Unlock()
 		}
 
+		statsMu.Lock()
 		updateDocs[col] = updateDocs[col][:0]
+		statsMu.Unlock()
 		return nil
 	}
 
