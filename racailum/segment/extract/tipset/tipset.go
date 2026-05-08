@@ -509,10 +509,10 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	var msgcnt, tracecnt, actorMsgCnt, createMsgCnt, ethCnt, etcnt, emtCnt, initCodeCnt, aecnt, mstCnt, sctCnt int
 
 	type pendingActorEventBatch struct {
-		events    []types.Event
-		mcid      cid.Cid
-		signedCid cid.Cid
-		seq       []int
+		eventsRoot cid.Cid
+		mcid       cid.Cid
+		signedCid  cid.Cid
+		seq        []int
 	}
 	var pendingActorEvents []pendingActorEventBatch
 	seenEventsRoots := map[cid.Cid]struct{}{}
@@ -639,34 +639,17 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 			if p.rootMsgRct.EventsRoot != nil && p.rootMsgRct.Version() == types.MessageReceiptV1 {
 				eventsRoot := p.rootMsgRct.EventsRoot
 				if eventsRoot != nil {
-					events, err := GetEvents(ctx.C, *eventsRoot, ctx.D)
-					if err != nil {
-						// return fmt.Errorf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
-						elog.Warnf("get events failed: %v, eventsRoot: %v, mcid: %v, signedCid: %v", err, eventsRoot, mcid, signedCid)
-					} else {
-						if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
-							etm, err := model.NewEventsRoot(*eventsRoot, events, ts.Height())
-							if err != nil {
-								elog.Warnw("convert to model.EventsRoot", "eventsRoot", eventsRoot, "mcid", mcid, "signedCid", signedCid, "err", err.Error())
-							} else {
-								res.Docs = append(res.Docs, etm)
-								etcnt++
-							}
-						}
-
-						if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
-							if _, seen := seenEventsRoots[*eventsRoot]; !seen {
-								seenEventsRoots[*eventsRoot] = struct{}{}
-								pendingActorEvents = append(pendingActorEvents, pendingActorEventBatch{
-									events:    events,
-									mcid:      mcid,
-									signedCid: signedCid,
-									seq:       copyIndexes(p.seq),
-								})
-							}
+					if ctx.Opts.EnabelExtract.EnableExtractActorEvent {
+						if _, seen := seenEventsRoots[*eventsRoot]; !seen {
+							seenEventsRoots[*eventsRoot] = struct{}{}
+							pendingActorEvents = append(pendingActorEvents, pendingActorEventBatch{
+								eventsRoot: *eventsRoot,
+								mcid:       mcid,
+								signedCid:  signedCid,
+								seq:        copyIndexes(p.seq),
+							})
 						}
 					}
-
 				}
 			}
 		}
@@ -1063,6 +1046,31 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 	}
 
 	if len(pendingActorEvents) > 0 {
+		eventsCache := make(map[cid.Cid][]types.Event, len(pendingActorEvents))
+
+		if ctx.Opts.EnabelExtract.EnableExtractEventsRoot {
+			for _, pe := range pendingActorEvents {
+				events, ok := eventsCache[pe.eventsRoot]
+				if !ok {
+					var loadErr error
+					events, loadErr = GetEvents(ctx.C, pe.eventsRoot, ctx.D)
+					if loadErr != nil {
+						elog.Warnf("get events failed: %v, root: %v", loadErr, pe.eventsRoot)
+						continue
+					}
+					eventsCache[pe.eventsRoot] = events
+				}
+
+				etm, err := model.NewEventsRoot(pe.eventsRoot, events, ts.Height())
+				if err != nil {
+					elog.Warnw("convert to model.EventsRoot", "eventsRoot", pe.eventsRoot, "mcid", pe.mcid, "signedCid", pe.signedCid, "err", err.Error())
+				} else {
+					res.Docs = append(res.Docs, etm)
+					etcnt++
+				}
+			}
+		}
+
 		var eventsMu sync.Mutex
 		var eventsWg multierror.Group
 		eventLim := limiter.New(16)
@@ -1075,8 +1083,21 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				}
 				defer eventLim.Release(ctx.C)
 
-				local := make([]common.Document, 0, len(pe.events))
-				for i, evt := range pe.events {
+				events, ok := eventsCache[pe.eventsRoot]
+				if !ok {
+					var loadErr error
+					events, loadErr = GetEvents(ctx.C, pe.eventsRoot, ctx.D)
+					if loadErr != nil {
+						elog.Warnf("get events failed: %v, root: %v", loadErr, pe.eventsRoot)
+						return nil
+					}
+					eventsMu.Lock()
+					eventsCache[pe.eventsRoot] = events
+					eventsMu.Unlock()
+				}
+
+				local := make([]common.Document, 0, len(events))
+				for i, evt := range events {
 					actorID, err := address.NewIDAddress(uint64(evt.Emitter))
 					if err != nil {
 						return fmt.Errorf("create ID address: %w", err)
