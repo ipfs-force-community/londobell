@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/cbor"
@@ -146,7 +147,7 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.MessageTrace, act, meth stri
 	msg.Detail.Method = meth
 
 	if params != nil && len(raw.Params) > 0 {
-		if act == "evm" && meth == "InvokeContract" {
+		if strings.HasSuffix(act, "/evm") && meth == "InvokeContract" {
 			msg.Detail.Params = &evmInvokeParams{Raw: raw.Params}
 		} else {
 			err := params.UnmarshalCBOR(bytes.NewReader(raw.Params))
