@@ -58,6 +58,10 @@ import (
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract/actorstate"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model/schema"
+
+	"github.com/filecoin-project/lotus/blockstore"
+	ladt "github.com/filecoin-project/lotus/chain/actors/adt"
+	chainStore "github.com/filecoin-project/lotus/chain/store"
 )
 
 // The address used in messages to actors that have since been deleted.
@@ -1053,7 +1057,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				events, ok := eventsCache[pe.eventsRoot]
 				if !ok {
 					var loadErr error
-					events, loadErr = GetEvents(ctx.C, pe.eventsRoot, ctx.D)
+					events, loadErr = GetEvents(ctx.C, pe.eventsRoot, ctx.D, ctx.EventsBlockstore)
 					if loadErr != nil {
 						elog.Warnf("get events failed: %v, root: %v", loadErr, pe.eventsRoot)
 						continue
@@ -1086,7 +1090,7 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				events, ok := eventsCache[pe.eventsRoot]
 				if !ok {
 					var loadErr error
-					events, loadErr = GetEvents(ctx.C, pe.eventsRoot, ctx.D)
+					events, loadErr = GetEvents(ctx.C, pe.eventsRoot, ctx.D, ctx.EventsBlockstore)
 					if loadErr != nil {
 						elog.Warnf("get events failed: %v, root: %v", loadErr, pe.eventsRoot)
 						return nil
@@ -1139,8 +1143,14 @@ func IsBlock(seq []int, from address.Address) bool {
 	return len(seq) == 1 && (strings.HasPrefix(from.String()[1:], "1") || strings.HasPrefix(from.String()[1:], "3") || strings.HasPrefix(from.String()[1:], "4"))
 }
 
-func GetEvents(ctx context.Context, root cid.Cid, cs common.ChainStore) ([]types.Event, error) {
-	store := cs.ActorStore(ctx)
+func GetEvents(ctx context.Context, root cid.Cid, cs common.ChainStore, eventsBS blockstore.Blockstore) ([]types.Event, error) {
+	var store ladt.Store
+	if eventsBS != nil {
+		store = chainStore.ActorStore(ctx, eventsBS)
+	} else {
+		store = cs.ActorStore(ctx)
+	}
+
 	evtArr, err := amt4.LoadAMT(ctx, store, root, amt4.UseTreeBitWidth(types.EventAMTBitwidth))
 	if err != nil {
 		return nil, xerrors.Errorf("load events amt: %w", err)

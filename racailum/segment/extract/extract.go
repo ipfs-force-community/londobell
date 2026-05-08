@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/go-address"
+	bstore "github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/types"
 
 	"go.uber.org/zap"
@@ -15,7 +16,7 @@ import (
 )
 
 // NewCtx constructs a new extract context
-func NewCtx(ctx context.Context, d common.DAL, l *zap.SugaredLogger, aset *actor.Set, latestDealID int64, opts Options, full common.FullNodeApiGetter) (*Ctx, error) {
+func NewCtx(ctx context.Context, d common.DAL, l *zap.SugaredLogger, aset *actor.Set, latestDealID int64, opts Options, full common.FullNodeApiGetter, eventsBlockstore bstore.Blockstore) (*Ctx, error) {
 	ectx := &Ctx{
 		C:    ctx,
 		D:    d,
@@ -26,6 +27,7 @@ func NewCtx(ctx context.Context, d common.DAL, l *zap.SugaredLogger, aset *actor
 	ectx.Actors.Set = aset
 	ectx.LatestDealID = latestDealID
 	ectx.FullNode = full
+	ectx.EventsBlockstore = eventsBlockstore
 	return ectx, nil
 }
 
@@ -40,8 +42,9 @@ type Ctx struct {
 		Set *actor.Set
 	}
 
-	LatestDealID int64 // latest dealID of DealProposal
-	FullNode     common.FullNodeApiGetter
+	LatestDealID    int64 // latest dealID of DealProposal
+	FullNode        common.FullNodeApiGetter
+	EventsBlockstore bstore.Blockstore
 }
 
 // NewRes constructs a new extract result

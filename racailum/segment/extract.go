@@ -12,7 +12,12 @@ import (
 	"go.opencensus.io/trace"
 
 	"github.com/hashicorp/go-multierror"
+	bf "github.com/ipfs/go-block-format"
+	"github.com/ipfs/go-cid"
 	"go.uber.org/zap"
+
+	v0api "github.com/filecoin-project/lotus/api/v0api"
+	"github.com/filecoin-project/lotus/blockstore"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/limiter"
@@ -29,6 +34,24 @@ type persistCtx struct {
 	log                   *zap.SugaredLogger
 	asyncPersistWaitGroup multierror.Group
 	latestDealID          int64
+}
+
+// rawChainIO provides ChainReadObj/ChainHasObj from the FullNode API,
+// used to create an uncached blockstore for event AMT loading.
+type rawChainIO struct {
+	api v0api.FullNode
+}
+
+func (cio *rawChainIO) ChainReadObj(ctx context.Context, c cid.Cid) ([]byte, error) {
+	return cio.api.ChainReadObj(ctx, c)
+}
+
+func (cio *rawChainIO) ChainHasObj(ctx context.Context, c cid.Cid) (bool, error) {
+	return cio.api.ChainHasObj(ctx, c)
+}
+
+func (cio *rawChainIO) ChainPutObj(ctx context.Context, blk bf.Block) error {
+	return nil
 }
 
 func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet, tmp bool) error {
@@ -147,7 +170,13 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 	innerCtx, innerCancel := context.WithCancel(ctx.ctx)
 	defer innerCancel()
 
-	ectx, err := extract.NewCtx(innerCtx, s.dal, elog, ctx.actorSet, ctx.latestDealID, s.opts.Extract.ExtractOptions, s.fullNode)
+	var eventsBlockstore blockstore.Blockstore
+	if s.fullNode != nil {
+		fullAPI := s.fullNode.GetAppropriateAPI()
+		eventsBlockstore = blockstore.NewAPIBlockstore(&rawChainIO{api: fullAPI})
+	}
+
+	ectx, err := extract.NewCtx(innerCtx, s.dal, elog, ctx.actorSet, ctx.latestDealID, s.opts.Extract.ExtractOptions, s.fullNode, eventsBlockstore)
 	if err != nil {
 		return err
 	}
@@ -345,7 +374,12 @@ func (s *Segment) DryExtract(ctx context.Context, ts *common.LinkedTipSet, allow
 	latestDealID := int64(-1)
 
 	dlog := log.With("dry", true)
-	ectx, err := extract.NewCtx(ctx, s.dal, dlog, aset, latestDealID, dryOptions, s.fullNode)
+	var dryEventsBlockstore blockstore.Blockstore
+	if s.fullNode != nil {
+		fullAPI := s.fullNode.GetAppropriateAPI()
+		dryEventsBlockstore = blockstore.NewAPIBlockstore(&rawChainIO{api: fullAPI})
+	}
+	ectx, err := extract.NewCtx(ctx, s.dal, dlog, aset, latestDealID, dryOptions, s.fullNode, dryEventsBlockstore)
 	if err != nil {
 		return nil, fmt.Errorf("new extract context: %w", err)
 	}
