@@ -87,7 +87,7 @@ func ChainIOBlockstore(full common.FullNodeApiGetter) (dtypes.BasicChainBlocksto
 		bs,
 	}
 
-	cacheSize := 1 << 25
+	cacheSize := 500000
 	if size := os.Getenv("BELL_CACHE_SIZE"); size != "" {
 		var err error
 		cacheSize, err = strconv.Atoi(size)
