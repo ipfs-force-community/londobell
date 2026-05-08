@@ -35,7 +35,7 @@ type HeadSub struct {
 }
 
 func (h *HeadSub) Sub(ctx context.Context) (<-chan types.TipSetKey, error) {
-	ch := make(chan types.TipSetKey, 1)
+	ch := make(chan types.TipSetKey, 16)
 	go h.watch(ctx, ch)
 	return ch, nil
 }
@@ -186,29 +186,17 @@ func (h *HeadSub) startChainHeadLoop(ctx context.Context, ch chan []*api.HeadCha
 func delaySend(ctx context.Context, ch chan types.TipSetKey, tsk types.TipSetKey) {
 	slog := log.With("tsk", tsk)
 
-	timer := time.NewTimer(5 * time.Second)
-	defer timer.Stop()
-
 	select {
 	case <-ctx.Done():
 		slog.Debug("aborted")
 		return
-
-	case <-timer.C:
-
+	case <-time.After(5 * time.Second):
 	}
-
-	wait := time.NewTimer(time.Second)
-	defer wait.Stop()
 
 	select {
 	case <-ctx.Done():
 		slog.Debug("aborted")
-
 	case ch <- tsk:
 		slog.Debug("sent")
-
-	case <-wait.C:
-		slog.Debug("out chan is full")
 	}
 }

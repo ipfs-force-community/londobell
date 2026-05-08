@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/hashicorp/go-multierror"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -28,8 +31,9 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 	modifiedCounts := map[string]int{}
 	upsertedCounts := map[string]int{}
 	totals := map[string]int{}
-	insertOps := 0
-	updateOps := 0
+	var insertOps int32
+	var updateOps int32
+	var statsMu sync.Mutex
 
 	insert := func(col string) error {
 		if len(insertDocs[col]) == 0 {
@@ -40,7 +44,7 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 			err      error
 		)
 
-		insertOps++
+		atomic.AddInt32(&insertOps, 1)
 		inserted, err = s.db.Insert(ctx, col, insertDocs[col])
 		if err != nil && strings.Contains(err.Error(), "too large") {
 			l.Warnw("batch insert contains oversized documents, retrying individually", "collection", col)
@@ -77,7 +81,9 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 		}
 
 		insertDocs[col] = insertDocs[col][:0]
+		statsMu.Lock()
 		insertedCounts[col] = insertedCounts[col] + inserted
+		statsMu.Unlock()
 		return nil
 	}
 
@@ -86,7 +92,7 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 			return nil
 		}
 
-		updateOps++
+		atomic.AddInt32(&updateOps, 1)
 		for _, doc := range updateDocs[col] {
 			// update操作不允许在一个库中重新跑之前epoch，会覆盖后面epoch的记录
 			primaryKeyValue, err := ExtractPrimaryKeyValue(doc)
@@ -131,9 +137,11 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 				}
 			}
 
+			statsMu.Lock()
 			matchedCounts[col] = matchedCounts[col] + int(res.MatchedCount)
 			modifiedCounts[col] = modifiedCounts[col] + int(res.ModifiedCount)
 			upsertedCounts[col] = upsertedCounts[col] + int(res.UpsertedCount)
+			statsMu.Unlock()
 		}
 
 		updateDocs[col] = updateDocs[col][:0]
@@ -166,16 +174,26 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 		}
 	}
 
+	var flushWg multierror.Group
 	for col := range insertDocs {
-		if err := insert(col); err != nil {
-			return err
-		}
+		col := col
+		flushWg.Go(func() error {
+			return insert(col)
+		})
+	}
+	if err := flushWg.Wait(); err != nil {
+		return err
 	}
 
+	var updateFlushWg multierror.Group
 	for col := range updateDocs {
-		if err := update(col); err != nil {
-			return err
-		}
+		col := col
+		updateFlushWg.Go(func() error {
+			return update(col)
+		})
+	}
+	if err := updateFlushWg.Wait(); err != nil {
+		return err
 	}
 
 	insertColNames := make([]string, 0, len(insertDocs))
@@ -191,7 +209,7 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 	sort.Strings(updateColNames)
 
 	logFields := make([]interface{}, 0, (len(insertColNames)+len(updateColNames))*2+2)
-	logFields = append(logFields, "insertOps", insertOps, "updateOps", updateOps)
+	logFields = append(logFields, "insertOps", atomic.LoadInt32(&insertOps), "updateOps", atomic.LoadInt32(&updateOps))
 	for _, col := range insertColNames {
 		logFields = append(logFields, col, fmt.Sprintf("%d/%d", insertedCounts[col], totals[col]))
 	}
