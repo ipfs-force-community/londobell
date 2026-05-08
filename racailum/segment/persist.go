@@ -8,6 +8,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 
@@ -222,47 +223,65 @@ func truncateOversizedDoc(doc interface{}) (interface{}, error) {
 		return nil, fmt.Errorf("unmarshal to bson.M: %w", err)
 	}
 
-	truncated := truncateLargeFields(m)
+	truncated := truncateLargeFields(m, maxFieldSize)
+
+	remarshaled, err := bson.Marshal(truncated)
+	if err != nil {
+		return nil, fmt.Errorf("remarshal truncated doc: %w", err)
+	}
+
+	if len(remarshaled) > maxBSONDocumentSize {
+		limit := maxFieldSize / 2
+		truncated = truncateLargeFields(m, limit)
+	}
 
 	truncated["TruncatedFields"] = true
 	return truncated, nil
 }
 
-func truncateLargeFields(m bson.M) bson.M {
+func truncateLargeFields(m bson.M, limit int) bson.M {
 	for key, val := range m {
 		switch v := val.(type) {
 		case []byte:
-			if len(v) > maxFieldSize {
-				m[key] = append(v[:maxFieldSize], []byte("...<truncated>")...)
+			if len(v) > limit {
+				m[key] = append(v[:limit], []byte("...<truncated>")...)
 			}
 		case string:
-			if len(v) > maxFieldSize {
-				m[key] = v[:maxFieldSize] + "...<truncated>"
+			if len(v) > limit {
+				m[key] = v[:limit] + "...<truncated>"
+			}
+		case primitive.Binary:
+			if len(v.Data) > limit {
+				m[key] = primitive.Binary{Subtype: v.Subtype, Data: append(v.Data[:limit], []byte("...<truncated>")...)}
 			}
 		case bson.M:
-			m[key] = truncateLargeFields(v)
+			m[key] = truncateLargeFields(v, limit)
 		case bson.A:
-			m[key] = truncateLargeArray(v)
+			m[key] = truncateLargeArray(v, limit)
 		}
 	}
 	return m
 }
 
-func truncateLargeArray(a bson.A) bson.A {
+func truncateLargeArray(a bson.A, limit int) bson.A {
 	for i, val := range a {
 		switch v := val.(type) {
 		case []byte:
-			if len(v) > maxFieldSize {
-				a[i] = append(v[:maxFieldSize], []byte("...<truncated>")...)
+			if len(v) > limit {
+				a[i] = append(v[:limit], []byte("...<truncated>")...)
 			}
 		case string:
-			if len(v) > maxFieldSize {
-				a[i] = v[:maxFieldSize] + "...<truncated>"
+			if len(v) > limit {
+				a[i] = v[:limit] + "...<truncated>"
+			}
+		case primitive.Binary:
+			if len(v.Data) > limit {
+				a[i] = primitive.Binary{Subtype: v.Subtype, Data: append(v.Data[:limit], []byte("...<truncated>")...)}
 			}
 		case bson.M:
-			a[i] = truncateLargeFields(v)
+			a[i] = truncateLargeFields(v, limit)
 		case bson.A:
-			a[i] = truncateLargeArray(v)
+			a[i] = truncateLargeArray(v, limit)
 		}
 	}
 	return a
