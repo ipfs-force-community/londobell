@@ -112,12 +112,16 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.MessageTrace, act, meth stri
 	msg.Detail.Method = meth
 
 	if params != nil && len(raw.Params) > 0 {
-		err := params.UnmarshalCBOR(bytes.NewReader(raw.Params))
-		if err != nil {
-			return nil, fmt.Errorf("unmarshal cbor for message params, codec %v,err: %w", raw.ParamsCodec, err)
-		}
+		if act == "evm" && meth == "InvokeContract" {
+			msg.Detail.Params = nil
+		} else {
+			err := params.UnmarshalCBOR(bytes.NewReader(raw.Params))
+			if err != nil {
+				return nil, fmt.Errorf("unmarshal cbor for message params, codec %v,err: %w", raw.ParamsCodec, err)
+			}
 
-		msg.Detail.Params = params
+			msg.Detail.Params = params
+		}
 	}
 
 	msg.Detail.PackedHeight = epoch
