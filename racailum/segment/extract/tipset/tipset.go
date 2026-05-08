@@ -1132,6 +1132,10 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 		if err := eventsWg.Wait(); err != nil {
 			return fmt.Errorf("process actor events: %w", err)
 		}
+
+		for k := range eventsCache {
+			delete(eventsCache, k)
+		}
 	}
 
 	elog.Infow("converted from raw to model", "msg", msgcnt, "exec-trace", tracecnt, "actor-message", actorMsgCnt, "create-message", createMsgCnt, "eth-hash", ethCnt, "events-root", etcnt, "explicit-message", emtCnt, "evm-initcode", initCodeCnt, "actor-event", aecnt, "miner-sector", mstCnt, "sector-claim", sctCnt)

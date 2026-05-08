@@ -34,6 +34,7 @@ type persistCtx struct {
 	log                   *zap.SugaredLogger
 	asyncPersistWaitGroup multierror.Group
 	latestDealID          int64
+	persistSem            chan struct{}
 }
 
 // rawChainIO provides ChainReadObj/ChainHasObj from the FullNode API,
@@ -127,6 +128,7 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		actorSet:     aset,
 		log:          elog,
 		latestDealID: latestDealID,
+		persistSem:   make(chan struct{}, 2),
 	}
 
 	tsDone := 0
@@ -239,7 +241,14 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 	}
 
 	if s.opts.Persist.Async {
+		select {
+		case ctx.persistSem <- struct{}{}:
+		case <-ctx.ctx.Done():
+			return ctx.ctx.Err()
+		}
+
 		ctx.asyncPersistWaitGroup.Go(func() error {
+			defer func() { <-ctx.persistSem }()
 			if err := s.insertMany(ctx.ctx, elog, docs); err != nil {
 				if nerr := common.NonCtxCanceledErr(err); nerr != nil {
 					stats.Record(ctx.ctx, metrics.ExtractError.M(1))
@@ -347,7 +356,14 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, pctx *persistCtx, heads
 	}
 
 	if s.opts.Persist.AsyncState {
+		select {
+		case pctx.persistSem <- struct{}{}:
+		case <-originCtx.Done():
+			return originCtx.Err()
+		}
+
 		pctx.asyncPersistWaitGroup.Go(func() error {
+			defer func() { <-pctx.persistSem }()
 			if err := s.insertMany(originCtx, ctx.L, docs); err != nil {
 				stats.Record(originCtx, metrics.ExtractError.M(1))
 				return fmt.Errorf("insert extracted documents from regular states: %w", err)
