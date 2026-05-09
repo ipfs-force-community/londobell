@@ -34,7 +34,7 @@ func TestExtractClaimedPowerV7(t *testing.T) {
 	mockDAL.On("ActorStore", ctx).Return(store.ActorStore(ctx, localBs), nil)
 	res := extract.NewRes(0, 0)
 	latestDealID := int64(-1)
-	ectx, err := extract.NewCtx(ctx, mockDAL, &zap.SugaredLogger{}, &actor.Set{}, latestDealID, extract.DryOptions(), nil)
+	ectx, err := extract.NewCtx(ctx, mockDAL, &zap.SugaredLogger{}, &actor.Set{}, latestDealID, extract.DryOptions(), nil, nil)
 	require.NoError(t, err)
 	headCid, _ := cid.Decode(testPowerActorCid)
 	var out power7.State

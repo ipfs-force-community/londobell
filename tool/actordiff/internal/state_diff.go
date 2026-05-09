@@ -13,7 +13,7 @@ type StructDiff struct {
 }
 
 func (sd *StructDiff) IsEmpty() bool {
-	return len(sd.Adds) == 0 && len(sd.Minuses) == 0 && len(sd.Minuses) == 0
+	return len(sd.Adds) == 0 && len(sd.Minuses) == 0 && len(sd.Changes) == 0
 }
 
 // CompareStructs compares two structs and returns their field diffs

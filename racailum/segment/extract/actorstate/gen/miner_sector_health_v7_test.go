@@ -38,7 +38,7 @@ func TestExtractMinerSectorHealthV7(t *testing.T) {
 	mockDAL := &MockDAL{}
 	mockDAL.On("ActorStore", ctx).Return(store.ActorStore(ctx, localBs), nil)
 	latestDealID := int64(-1)
-	ectx, _ := extract.NewCtx(ctx, mockDAL, &zap.SugaredLogger{}, &actor.Set{}, latestDealID, extract.DryOptions(), nil)
+	ectx, _ := extract.NewCtx(ctx, mockDAL, &zap.SugaredLogger{}, &actor.Set{}, latestDealID, extract.DryOptions(), nil, nil)
 	err = extractMinerSectorHealthV7(ectx, res, &common.ActorHead{
 		Actor: &types.Actor{Head: headerCId},
 		Addr:  addr,
