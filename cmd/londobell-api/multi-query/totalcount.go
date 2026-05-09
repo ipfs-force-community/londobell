@@ -267,7 +267,7 @@ func AddUpBlockMethodStates(ctx context.Context, log *zap.SugaredLogger, state *
 //	}
 //
 //	//todo:test
-//	file, err := os.OpenFile("/Users/zhoulin/londobell/cmd/londobell-api/aggregators/bell.txt", os.O_WRONLY|os.O_APPEND, os.ModeAppend)
+//	file, err := os.OpenFile("/home/user/londobell/cmd/londobell-api/aggregators/bell.txt", os.O_WRONLY|os.O_APPEND, os.ModeAppend)
 //	if err != nil {
 //		log.Errorf("open bell.txt failed: %v", err)
 //	}

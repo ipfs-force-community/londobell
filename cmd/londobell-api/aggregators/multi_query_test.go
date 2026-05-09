@@ -2,7 +2,7 @@ package main
 
 //func Init() {
 //	//fmt.Println(DBStateManager)
-//	fullnode.API = fullnode.NewAppropriateAPI([]util.Node{{URL: "ws://112.124.1.253:1234/rpc/v0"}})
+//	fullnode.API = fullnode.NewAppropriateAPI([]util.Node{{URL: "<LOTUS_RPC_URL>"}})
 //	err := fullnode.API.Choose(context.TODO())
 //	if err != nil {
 //		return
@@ -22,12 +22,12 @@ package main
 //
 //func MockRepoPath() dix.Option {
 //	return dix.Override(new(dep.RepoPath), func() (dep.RepoPath, error) {
-//		return dep.RepoPath("/Users/zhoulin/.multi"), nil
+//		return dep.RepoPath("/home/user/.multi"), nil
 //	})
 //}
 //
 //func MockConfig() error {
-//	cfgPath := dep.ConfigFilePath("/Users/zhoulin/.multi")
+//	cfgPath := dep.ConfigFilePath("/home/user/.multi")
 //
 //	err := os.MkdirAll(filepath.Dir(cfgPath), 0755)
 //	if err != nil {
@@ -50,11 +50,11 @@ package main
 //
 //func MockDefaultConfig() config2.Config {
 //	colds := make([]config2.DB, 0)
-//	colds = append(colds, config2.NewDB("mongodb://guest:read-only@106.15.125.51:27017/bell", "bell"))
+//	colds = append(colds, config2.NewDB("mongodb://guest:read-only@<MONGO_HOST>:27017/bell", "bell"))
 //	return config2.Config{
 //		Colds:  colds,
-//		Formal: config2.NewDB("mongodb://guest:read-only@106.15.125.51:27017/bell", "bell"),
-//		Tmp:    config2.NewDB("mongodb://192.168.1.221:27017/tmpbell", "tmpbell"),
+//		Formal: config2.NewDB("mongodb://guest:read-only@<MONGO_HOST>:27017/bell", "bell"),
+//		Tmp:    config2.NewDB("mongodb://127.0.0.1:27017/tmpbell", "tmpbell"),
 //	}
 //}
 //
@@ -156,13 +156,13 @@ package main
 //func TestLoadDataBase(t *testing.T) {
 //	//TestRefresh(t)
 //	Init()
-//	dbState, found, err := DBStateManager.Stm.LoadDataBaseState("mongodb://guest:read-only@106.15.125.51:27017/bell")
+//	dbState, found, err := DBStateManager.Stm.LoadDataBaseState("mongodb://guest:read-only@<MONGO_HOST>:27017/bell")
 //	require.NoError(t, err, "LoadDataBaseState failed")
 //	require.Equal(t, true, found)
 //
 //	fmt.Printf("dbState: %+v\n", dbState)
 //
-//	file, err := os.OpenFile("/Users/zhoulin/londobell/cmd/londobell-api/aggregators/bell.txt", os.O_WRONLY|os.O_APPEND, os.ModeAppend)
+//	file, err := os.OpenFile("/home/user/londobell/cmd/londobell-api/aggregators/bell.txt", os.O_WRONLY|os.O_APPEND, os.ModeAppend)
 //	require.NoError(t, err, "open failed")
 //	defer file.Close()
 //	_, err = io.WriteString(file, fmt.Sprintf("startEpoch: %v, endEpoch: %v, NextEpochForBlockMsgsCount: %v, BlockMsgsCount: %v\n", dbState.StartEpoch, dbState.EndEpoch, dbState.NextEpochForBlockMsgsCount, dbState.BlockMsgsCount))

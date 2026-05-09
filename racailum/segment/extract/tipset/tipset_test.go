@@ -16,14 +16,14 @@ func TestExtract(t *testing.T) {
 //
 //	ctx := context.TODO()
 //
-//	//fullnode.API = fullnode.NewAppropriateAPI([]util.Node{util.Node{URL: "ws://106.14.10.70:1234/rpc/v0"}})
+//	//fullnode.API = fullnode.NewAppropriateAPI([]util.Node{util.Node{URL: "<LOTUS_RPC_URL>"}})
 //	//err := fullnode.API.Choose(ctx)
 //	//if err != nil {
 //	//	return err
 //	//}
 //	//api := fullnode.API.GetAppropriateAPI()
 //
-//	api, _, err := client.NewFullNodeRPCV0(ctx, "ws://106.14.10.70:1234/rpc/v0", nil)
+//	api, _, err := client.NewFullNodeRPCV0(ctx, "<LOTUS_RPC_URL>", nil)
 //	if err != nil {
 //		return err
 //	}

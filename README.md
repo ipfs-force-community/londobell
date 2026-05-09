@@ -29,8 +29,8 @@ api依赖配置为config.json，配置参数--nodeconfig，具体配置如下：
 ```json
 [
     {
-            "node":"ws://192.168.200.11:1234/rpc/v0",
-            "token":"<KEY>"
+            "node":"<LOTUS_RPC_URL>",
+            "token":"<YOUR_TOKEN>"
     }
 ]
 ```

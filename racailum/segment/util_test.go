@@ -24,7 +24,7 @@ import (
 
 func TestExtractUpdateDoc(t *testing.T) {
 	ctx := context.TODO()
-	dsn := "mongodb://192.168.1.221:27017/test"
+	dsn := "mongodb://127.0.0.1:27017/test"
 	wcli, err := mgoutil.Connect(context.TODO(), dsn)
 	require.NoError(t, err)
 	wdb := wcli.Database("test")
