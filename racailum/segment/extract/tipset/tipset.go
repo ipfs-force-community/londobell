@@ -1087,7 +1087,9 @@ func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSe
 				}
 				defer eventLim.Release(ctx.C)
 
+				eventsMu.Lock()
 				events, ok := eventsCache[pe.eventsRoot]
+				eventsMu.Unlock()
 				if !ok {
 					var loadErr error
 					events, loadErr = GetEvents(ctx.C, pe.eventsRoot, ctx.D, ctx.EventsBlockstore)
