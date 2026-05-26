@@ -2,6 +2,7 @@ package aggregators
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 
@@ -84,18 +85,16 @@ func GetTraces(c *gin.Context) {
 			if params != nil {
 				err = params.UnmarshalCBOR(bytes.NewBuffer(trace.ParamsBson.Data))
 				if err != nil {
-					alog.Error(err)
-					util.ReturnOnErr(c, err)
-					return
+					trace.Params = "0x" + hex.EncodeToString(trace.ParamsBson.Data)
+				} else {
+					paramsByte, err := json.Marshal(params)
+					if err != nil {
+						alog.Error(err)
+						util.ReturnOnErr(c, err)
+						return
+					}
+					trace.Params = string(paramsByte)
 				}
-
-				paramsByte, err := json.Marshal(params)
-				if err != nil {
-					alog.Error(err)
-					util.ReturnOnErr(c, err)
-					return
-				}
-				trace.Params = string(paramsByte)
 			}
 		}
 
@@ -104,17 +103,16 @@ func GetTraces(c *gin.Context) {
 			if returns != nil {
 				err = returns.UnmarshalCBOR(bytes.NewBuffer(trace.ReturnBson.Data))
 				if err != nil {
-					alog.Error(err)
-					util.ReturnOnErr(c, err)
-					return
+					trace.Return = "0x" + hex.EncodeToString(trace.ReturnBson.Data)
+				} else {
+					returnsByte, err := json.Marshal(returns)
+					if err != nil {
+						alog.Error(err)
+						util.ReturnOnErr(c, err)
+						return
+					}
+					trace.Return = string(returnsByte)
 				}
-				returnsByte, err := json.Marshal(returns)
-				if err != nil {
-					alog.Error(err)
-					util.ReturnOnErr(c, err)
-					return
-				}
-				trace.Return = string(returnsByte)
 			}
 		}
 	}
