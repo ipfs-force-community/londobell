@@ -148,7 +148,6 @@ func NewMessage(mcid, signedCid cid.Cid, raw *types.MessageTrace, act, meth stri
 
 	if params != nil && len(raw.Params) > 0 {
 		if strings.HasSuffix(act, "/evm") && meth == "InvokeContract" {
-			msg.Detail.Params = &evmInvokeParams{Raw: raw.Params}
 		} else {
 			err := params.UnmarshalCBOR(bytes.NewReader(raw.Params))
 			if err != nil {
