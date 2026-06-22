@@ -3,11 +3,15 @@ package model
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/batch"
+	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin/v18/verifreg"
 	"github.com/filecoin-project/go-state-types/cbor"
 	"github.com/ipfs/go-cid"
 
@@ -20,6 +24,8 @@ import (
 	"github.com/ipfs-force-community/londobell/lib/mgoutil/mcodec"
 	"github.com/ipfs-force-community/londobell/lib/mir"
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
+
+	cbg "github.com/whyrusleeping/cbor-gen"
 )
 
 func init() {
@@ -78,10 +84,26 @@ func NewExecTrace(
 
 	if len(raw.MsgRct.Return) > 0 && returnObj != nil {
 		if err := returnObj.UnmarshalCBOR(bytes.NewReader(raw.MsgRct.Return)); err != nil {
-			return nil, nil, fmt.Errorf("unmarshal return: %w", err)
+			// 兼容 verifreg.ClaimAllocations 返回值的新格式
+			// 旧版 go-state-types 定义: { BatchInfo BatchReturn, ClaimedSpace big.Int }
+			// 链上实际返回(v18+): { sector_results BatchReturn, sector_claims []SectorClaimSummary }
+			if meth == "ClaimAllocations" {
+				if compatRet, compatErr := unmarshalClaimAllocationsReturnV18(raw.MsgRct.Return); compatErr == nil {
+					// 将新格式转换为旧格式,便于下游消费
+					oldRet := &verifreg.ClaimAllocationsReturn{
+						BatchInfo:    compatRet.SectorResults,
+						ClaimedSpace: compatRet.TotalClaimedSpace(),
+					}
+					me.Detail.Return = oldRet
+				} else {
+					return nil, nil, fmt.Errorf("unmarshal return: %w (also failed to decode new ClaimAllocations format: %v)", err, compatErr)
+				}
+			} else {
+				return nil, nil, fmt.Errorf("unmarshal return: %w", err)
+			}
+		} else {
+			me.Detail.Return = returnObj
 		}
-
-		me.Detail.Return = returnObj
 	}
 
 	me.genID()
@@ -260,4 +282,82 @@ func CalculateFILValue(value string) int64 {
 	}
 
 	return 0 // 如果长度不足18，返回0
+}
+
+// sectorClaimSummary 对应 builtin-actors 中的 SectorClaimSummary
+// #[serde(transparent)] 表示它就是一个 big.Int
+type sectorClaimSummary struct {
+	ClaimedSpace big.Int
+}
+
+func (t *sectorClaimSummary) MarshalCBOR(w io.Writer) error {
+	return t.ClaimedSpace.MarshalCBOR(w)
+}
+
+func (t *sectorClaimSummary) UnmarshalCBOR(r io.Reader) error {
+	return t.ClaimedSpace.UnmarshalCBOR(r)
+}
+
+// claimAllocationsReturnV18 对应链上 v18+ 的新格式 ClaimAllocationsReturn
+// struct ClaimAllocationsReturn { sector_results: BatchReturn, sector_claims: Vec<SectorClaimSummary> }
+type claimAllocationsReturnV18 struct {
+	SectorResults batch.BatchReturn
+	SectorClaims  []sectorClaimSummary
+}
+
+// TotalClaimedSpace 汇总所有 sector 的 claimed_space
+func (t *claimAllocationsReturnV18) TotalClaimedSpace() big.Int {
+	total := big.Zero()
+	for i := range t.SectorClaims {
+		total = big.Add(total, t.SectorClaims[i].ClaimedSpace)
+	}
+	return total
+}
+
+// unmarshalClaimAllocationsReturnV18 尝试用新格式解码 ClaimAllocations 返回值
+func unmarshalClaimAllocationsReturnV18(data []byte) (*claimAllocationsReturnV18, error) {
+	t := &claimAllocationsReturnV18{}
+	cr := cbg.NewCborReader(bytes.NewReader(data))
+
+	maj, extra, err := cr.ReadHeader()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
+	if maj != cbg.MajArray {
+		return nil, fmt.Errorf("cbor input should be of type array")
+	}
+	if extra != 2 {
+		return nil, fmt.Errorf("cbor input had wrong number of fields, expected 2, got %d", extra)
+	}
+
+	// sector_results (BatchReturn)
+	if err := t.SectorResults.UnmarshalCBOR(cr); err != nil {
+		return nil, fmt.Errorf("unmarshaling sector_results: %w", err)
+	}
+
+	// sector_claims ([]SectorClaimSummary)
+	maj, extra, err = cr.ReadHeader()
+	if err != nil {
+		return nil, fmt.Errorf("reading sector_claims header: %w", err)
+	}
+	if maj != cbg.MajArray {
+		return nil, fmt.Errorf("sector_claims should be of type array, got %d", maj)
+	}
+
+	if extra > 0 {
+		t.SectorClaims = make([]sectorClaimSummary, extra)
+		for i := range t.SectorClaims {
+			if err := t.SectorClaims[i].UnmarshalCBOR(cr); err != nil {
+				return nil, fmt.Errorf("unmarshaling sector_claims[%d]: %w", i, err)
+			}
+		}
+	}
+
+	return t, nil
 }
