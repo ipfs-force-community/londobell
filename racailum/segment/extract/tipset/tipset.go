@@ -1789,8 +1789,10 @@ func ethLogFromEvent(ctx *extract.Ctx, ts *types.TipSet, entries []types.EventEn
 	)
 	for _, entry := range entries {
 		// Drop events with non-raw topics to avoid mistakes.
+		// 非 raw codec 的事件(如 CBOR 编码的 Filecoin 原生 actor 事件)不是 EVM 事件,
+		// 跳过即可,无需告警。
 		if entry.Codec != cid.Raw {
-			elog.Warnw("did not expect an event entry with a non-raw codec", "codec", entry.Codec, "key", entry.Key)
+			elog.Debugw("skip event entry with non-raw codec", "codec", entry.Codec, "key", entry.Key)
 			return nil, nil, false
 		}
 		// Check if the key is t1..t4
