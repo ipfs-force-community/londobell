@@ -1950,26 +1950,20 @@ func extractDealProposal(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 
 		// get Label bytes after V8
 		if av > actors.Version8 {
-			dealProposals := []*model.NewDealProposalV8{}
 			dealProposal, err := model.NewNewDealProposalV8(id, height, providerID, clientID, *deal)
 			if err != nil {
 				return fmt.Errorf("new NewDealProposalV8 for dealID: %v failed: %v", id, err)
 			}
 
-			dealProposals = append(dealProposals, dealProposal)
-
-			for i := range dealProposals {
-				res.Docs = append(res.Docs, dealProposals[i])
-			}
+			res.Docs = append(res.Docs, dealProposal)
 
 		} else {
-			dealProposals := []*model.NewDealProposal{}
-			dealProposal, _ := model.NewNewDealProposal(id, height, providerID, clientID, *deal)
-			dealProposals = append(dealProposals, dealProposal)
-
-			for i := range dealProposals {
-				res.Docs = append(res.Docs, dealProposals[i])
+			dealProposal, err := model.NewNewDealProposal(id, height, providerID, clientID, *deal)
+			if err != nil {
+				return fmt.Errorf("new NewDealProposal for dealID: %v failed: %v", id, err)
 			}
+
+			res.Docs = append(res.Docs, dealProposal)
 		}
 	}
 
