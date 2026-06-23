@@ -73,7 +73,10 @@ func handler(v interface{}) (http.HandlerFunc, error) {
 		if reqType != nil {
 			recv := reflect.New(reqType)
 			err := json.NewDecoder(r.Body).Decode(recv.Interface())
-			maybeAbort(err)
+			if err != nil {
+				http.Error(rw, err.Error(), http.StatusBadRequest)
+				return
+			}
 
 			in = append(in, recv.Elem())
 		}
@@ -81,18 +84,13 @@ func handler(v interface{}) (http.HandlerFunc, error) {
 		out := rv.Call(in)
 		if numOut == 1 {
 			err := json.NewEncoder(rw).Encode(out[0].Interface())
-			maybeAbort(err)
+			if err != nil {
+				http.Error(rw, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 
 	}, nil
-}
-
-func maybeAbort(err error) {
-	if err == nil {
-		return
-	}
-
-	panic(err)
 }
 
 func cors(inner http.Handler) http.HandlerFunc {
