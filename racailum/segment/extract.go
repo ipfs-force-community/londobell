@@ -90,17 +90,18 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 	} else {
 		ts := tss[0]
 		version := s.dal.GetNetworkVersion(ctx, ts.Height())
-		if Actorset == nil {
+		currentActorset := loadActorSet()
+		if currentActorset == nil {
 			aset, err = actor.NewSet(ctx, s.dal.StateManager, ts, tmp)
 			if err != nil {
 				return err
 			}
-			Actorset = &ActorSet{
+			storeActorSet(&ActorSet{
 				Version: version,
 				Set:     aset,
-			}
+			})
 		} else {
-			if Actorset.Version != version {
+			if currentActorset.Version != version {
 				if s.opts.Extract.ExtractOptions.SkipExpensiveEpoch && tipset.IsExpensive(ctx, s.dal.StateManager, ts) {
 					// TODO: extract simple invoc results here
 					elog.Warn("ignore expensive epoch actor load")
@@ -109,14 +110,14 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 					if err != nil {
 						return err
 					}
-					Actorset = &ActorSet{
+					storeActorSet(&ActorSet{
 						Version: version,
 						Set:     aset,
-					}
+					})
 					elog.Infof("reload new version: %s actor", version)
 				}
 			} else {
-				aset = Actorset.Set
+				aset = currentActorset.Set
 			}
 
 		}

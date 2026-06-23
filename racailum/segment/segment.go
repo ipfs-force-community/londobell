@@ -33,7 +33,10 @@ type ActorSet struct {
 	Set     *actor.Set
 }
 
-var Actorset *ActorSet
+var (
+	Actorset   *ActorSet
+	actorsetMu sync.RWMutex
+)
 
 func NewActorSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet, allowNilChild bool) (*ActorSet, error) {
 	set, err := actor.NewSet(ctx, stm, ts, allowNilChild)
@@ -50,7 +53,21 @@ func NewActorSet(ctx context.Context, stm common.StateManager, ts *common.Linked
 }
 
 func ClearActorSet() {
+	actorsetMu.Lock()
 	Actorset = nil
+	actorsetMu.Unlock()
+}
+
+func loadActorSet() *ActorSet {
+	actorsetMu.RLock()
+	defer actorsetMu.RUnlock()
+	return Actorset
+}
+
+func storeActorSet(as *ActorSet) {
+	actorsetMu.Lock()
+	Actorset = as
+	actorsetMu.Unlock()
 }
 
 // Anchor contains most significant info about a tipset
