@@ -36,21 +36,27 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 	var statsMu sync.Mutex
 
 	insert := func(col string) error {
+		statsMu.Lock()
 		if len(insertDocs[col]) == 0 {
+			statsMu.Unlock()
 			return nil
 		}
+		docs := insertDocs[col]
+		insertDocs[col] = insertDocs[col][:0]
+		statsMu.Unlock()
+
 		var (
 			inserted int
 			err      error
 		)
 
 		atomic.AddInt32(&insertOps, 1)
-		inserted, err = s.db.Insert(ctx, col, insertDocs[col])
+		inserted, err = s.db.Insert(ctx, col, docs)
 		if err != nil && strings.Contains(err.Error(), "too large") {
 			l.Warnw("batch insert contains oversized documents, retrying individually", "collection", col)
 			var truncated int
 			inserted = 0
-			for _, doc := range insertDocs[col] {
+			for _, doc := range docs {
 				n, e := s.db.Insert(ctx, col, []interface{}{doc})
 				if e != nil {
 					if strings.Contains(e.Error(), "too large") {
@@ -81,19 +87,23 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 		}
 
 		statsMu.Lock()
-		insertDocs[col] = insertDocs[col][:0]
 		insertedCounts[col] = insertedCounts[col] + inserted
 		statsMu.Unlock()
 		return nil
 	}
 
 	update := func(col string) error {
+		statsMu.Lock()
 		if len(updateDocs[col]) == 0 {
+			statsMu.Unlock()
 			return nil
 		}
+		docs := updateDocs[col]
+		updateDocs[col] = updateDocs[col][:0]
+		statsMu.Unlock()
 
 		atomic.AddInt32(&updateOps, 1)
-		for _, doc := range updateDocs[col] {
+		for _, doc := range docs {
 			// update操作不允许在一个库中重新跑之前epoch，会覆盖后面epoch的记录
 			primaryKeyValue, err := ExtractPrimaryKeyValue(doc)
 			if err != nil {
@@ -144,9 +154,6 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 			statsMu.Unlock()
 		}
 
-		statsMu.Lock()
-		updateDocs[col] = updateDocs[col][:0]
-		statsMu.Unlock()
 		return nil
 	}
 
