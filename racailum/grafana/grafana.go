@@ -205,7 +205,10 @@ func (g *Grafana) serveQuery(ctx context.Context, req *queryReq) queryResp {
 	}
 
 	err := p.Wait()
-	maybeAbort(err)
+	if err != nil {
+		hlog.Errorf("query parallel wait failed: %s", err)
+		return queryResp{}
+	}
 
 	results := queryResp{}
 	for si := range sets {
