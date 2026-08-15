@@ -183,8 +183,16 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 		}
 	}
 
+	// 在锁内完成 map 迭代并拷贝 key，避免 flush goroutine 对 map 写入时，
+	// 主 goroutine 仍在锁外 range 迭代 map，触发 concurrent map iteration and map write
 	var flushWg multierror.Group
+	insertColNames := make([]string, 0, len(insertDocs))
+	statsMu.Lock()
 	for col := range insertDocs {
+		insertColNames = append(insertColNames, col)
+	}
+	statsMu.Unlock()
+	for _, col := range insertColNames {
 		col := col
 		flushWg.Go(func() error {
 			return insert(col)
@@ -195,7 +203,13 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 	}
 
 	var updateFlushWg multierror.Group
+	updateColNames := make([]string, 0, len(updateDocs))
+	statsMu.Lock()
 	for col := range updateDocs {
+		updateColNames = append(updateColNames, col)
+	}
+	statsMu.Unlock()
+	for _, col := range updateColNames {
 		col := col
 		updateFlushWg.Go(func() error {
 			return update(col)
@@ -203,15 +217,6 @@ func (s *Segment) insertMany(ctx context.Context, l *zap.SugaredLogger, docSets 
 	}
 	if err := updateFlushWg.Wait(); err != nil {
 		return err
-	}
-
-	insertColNames := make([]string, 0, len(insertDocs))
-	updateColNames := make([]string, 0, len(updateDocs))
-	for col := range insertDocs {
-		insertColNames = append(insertColNames, col)
-	}
-	for col := range updateDocs {
-		updateColNames = append(updateColNames, col)
 	}
 
 	sort.Strings(insertColNames)
