@@ -42,15 +42,19 @@ func CurrentSectorInitialPledge(c *gin.Context) {
 
 	if req.Epoch == 0 {
 		ts, err = api.ChainHead(ctx)
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 		req.Epoch = int64(ts.Height())
 	} else {
 		ts, err = api.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(req.Epoch), types.EmptyTSK)
-	}
-
-	if err != nil {
-		alog.Error(err)
-		util.ReturnOnErr(c, err)
-		return
+		if err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
+			return
+		}
 	}
 
 	circ, err := api.StateVMCirculatingSupplyInternal(ctx, ts.Key())
