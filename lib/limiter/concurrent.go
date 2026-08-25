@@ -32,15 +32,14 @@ func (l *Limiter) Acquire(ctx context.Context) bool {
 	}
 }
 
-// Release reduces a concurrent counter
-func (l *Limiter) Release(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return false
-
-	case <-l.ch:
-		return true
-	}
+// Release reduces a concurrent counter.
+// It always releases the token unconditionally — the previous implementation
+// selected on ctx.Done() and leaked the token when the context was canceled
+// (e.g. innerCancel() in extractRegularStates), eventually starving Acquire
+// and hanging the segment extraction with 800+ goroutines blocked on Acquire.
+func (l *Limiter) Release(_ context.Context) bool {
+	<-l.ch
+	return true
 }
 
 // NewParallel constructs a parallel executor
