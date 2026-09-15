@@ -117,6 +117,11 @@ type ActorIDsMap struct {
 
 func InitAggregators() {
 	// todo: 定期重新读取，无感知变化 or 每次变化重启
+	if pipelineV2Enabled() {
+		log.Warnf("aggregator pipeline override ENABLED (%s unset/1): blocks_for_message 使用本仓索引友好 pipeline；置 %s=0 回退上游并重启", LocalPipelineV2Env, LocalPipelineV2Env)
+	} else {
+		log.Warnf("aggregator pipeline override DISABLED (%s=0): 使用上游 londobell-aggregators 版本", LocalPipelineV2Env)
+	}
 	AddressAggregator = monitor.GetAddressAggregator()
 	AggPreNetfeeAggregator = monitor.GetAggPreNetfeeAggregator()
 	AggProNetfeeAggregator = monitor.GetAggProNetfeeAggregator()
@@ -163,7 +168,7 @@ func InitAggregators() {
 	MinedByMinerRangeAggregator = monitor.GetMinedByMinerRangeAggregator()
 	DealsByAddrAggregator = monitor.GetDealsByAddrAggregator()
 	//allMethodsAggregator = monitor.GetAllMethodsAggregator()
-	BlocksForMessageAggregator = monitor.GetBlocksForMessageAggregator()
+	BlocksForMessageAggregator = BlocksForMessagePipeline(monitor.GetBlocksForMessageAggregator())
 	CountAndMethodNameOfMessagesForBlockHeaderAggregator = monitor.GetCountAndMethodNameOfMessagesForBlockHeaderAggregator()
 	MessagesForBlockAggregator = monitor.GetMessagesForBlockAggregator()
 	CountOfMessagesForBlockHeaderByMethodNameAggregator = monitor.GetCountOfMessagesForBlockHeaderByMethodNameAggregator()
