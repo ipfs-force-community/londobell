@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"sync"
 
 	logging "github.com/ipfs/go-log/v2"
 
@@ -51,9 +52,31 @@ var AllMethodList = []string{
 	"WithdrawBalance",
 }
 
+var (
+	// scriptCache 缓存编译好的 pipeline 脚本：otto 的 *Script 只依赖 otto 运行时版本、
+	// 不绑定 VM 实例（见 otto/script.go 的注释），因此可以跨 VM 复用，省掉每次
+	// 解析 + 编译 pipeline 源码的开销。
+	scriptCache sync.Map // map[string]*otto.Script
+
+	// vmPool 复用 JS 解释器：otto.New() 会构造整套 ECMAScript 全局环境，原来
+	// 「每个请求 × 每个库」都新建一份，是聚合器内存与 CPU 的主要开销之一。
+	vmPool = sync.Pool{New: func() interface{} { return otto.New() }}
+)
+
 // Parse generates a aggregation pipeline from the given source code with context
 func Parse(ctx, src interface{}) (interface{}, error) {
-	vm := otto.New()
+	vm := vmPool.Get().(*otto.Otto)
+	defer func() {
+		// 归池前清掉 ctx：池化 VM 的全局作用域是共享的，不清会把上一个请求的参数
+		// 泄漏给下一个请求（尤其下一个请求 ctx 为 nil 时），表现为静默查错。
+		_ = vm.Set("ctx", otto.UndefinedValue())
+		vmPool.Put(vm)
+	}()
+
+	script, err := compiledScript(vm, src)
+	if err != nil {
+		return nil, fmt.Errorf("eval source: %w", err)
+	}
 
 	if ctx != nil {
 		if err := vm.Set("ctx", ctx); err != nil {
@@ -61,12 +84,28 @@ func Parse(ctx, src interface{}) (interface{}, error) {
 		}
 	}
 
-	v, err := vm.Eval(fmt.Sprintf("(%s)", src))
+	v, err := vm.Run(script)
 	if err != nil {
 		return nil, fmt.Errorf("eval source: %w", err)
 	}
 
 	return value2agg(v)
+}
+
+// compiledScript 按源码文本缓存编译结果；编译产物与 VM 实例无关，可跨 VM 复用
+func compiledScript(vm *otto.Otto, src interface{}) (*otto.Script, error) {
+	wrapped := fmt.Sprintf("(%s)", src)
+	if cached, ok := scriptCache.Load(wrapped); ok {
+		return cached.(*otto.Script), nil
+	}
+
+	script, err := vm.Compile("", wrapped)
+	if err != nil {
+		return nil, err
+	}
+
+	actual, _ := scriptCache.LoadOrStore(wrapped, script)
+	return actual.(*otto.Script), nil
 }
 
 func value2agg(v otto.Value) (interface{}, error) {
