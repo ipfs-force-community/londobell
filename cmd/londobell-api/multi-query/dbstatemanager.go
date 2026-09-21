@@ -464,9 +464,20 @@ func (dbsm *DataBaseStateManager) SetConfig(cfg config2.Config) {
 
 func (dbsm *DataBaseStateManager) UpdateDBCollectionsMap(url string, collections config2.Collections) {
 	dbsm.DBCfg.DBCollectionsConfigLk.Lock()
-	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
-
+	old, hasOld := dbsm.DBCfg.DBCollectionsMap[url]
 	dbsm.DBCfg.DBCollectionsMap[url] = collections
+	dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
+
+	// 配置刷新会替换掉旧 client，旧连接池必须关掉：原来创建 client 处的
+	// `defer client.Disconnect` 被注释掉（注释写着「todo: config更新后连接过多？」），
+	// 于是每刷新一次就多留一批连接。这里延迟关闭，让在飞的查询先跑完。
+	if hasOld && old.DB != nil && collections.DB != nil && old.DB.Client() != collections.DB.Client() {
+		oldClient := old.DB.Client()
+		go func() {
+			time.Sleep(clientDisconnectGrace)
+			_ = oldClient.Disconnect(context.Background())
+		}()
+	}
 }
 
 type Boundrary struct {
@@ -553,6 +564,32 @@ func (dbsm *DataBaseStateManager) MonitorConfig(ctx context.Context, cfgPath str
 	return nil
 }
 
+// mongo client 的池参数与超时。默认值（maxPoolSize=100、无 socket 超时、连接不回收）
+// 下，13 个库 × 每次配置刷新新建的 client 会让连接数只增不减；socket 超时给足 10 分钟
+// （单请求基线 20-35s、队列尾部 60s+），只用来兜住真正卡死的 socket。
+const (
+	mongoMaxPoolSize     = 50
+	mongoMaxConnIdleTime = 10 * time.Minute
+	mongoConnectTimeout  = 10 * time.Second
+	mongoSocketTimeout   = 10 * time.Minute
+
+	// clientDisconnectGrace 是配置刷新后旧 client 的延迟关闭时间：在飞的查询可能还要
+	// 跑几十秒，留足余量再关，避免把正在使用的连接池关掉。
+	clientDisconnectGrace = 5 * time.Minute
+)
+
+// newMongoClient 统一构造 mongo client（池参数 + 超时），避免连接无上限增长
+func newMongoClient(ctx context.Context, uri string) (*mongo.Client, error) {
+	opts := options.Client().ApplyURI(uri).
+		SetRegistry(bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{})).Build()).
+		SetMaxPoolSize(mongoMaxPoolSize).
+		SetMaxConnIdleTime(mongoMaxConnIdleTime).
+		SetConnectTimeout(mongoConnectTimeout).
+		SetSocketTimeout(mongoSocketTimeout)
+
+	return mongo.Connect(ctx, opts)
+}
+
 func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) error {
 	colds := dbsm.GetColdsCfg()
 	formal := dbsm.GetFormalCfg()
@@ -564,11 +601,10 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 			continue
 		}
 
-		client, err := mongo.Connect(ctx, options.Client().ApplyURI(db.Url()).SetRegistry(bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{})).Build()))
+		client, err := newMongoClient(ctx, db.Url())
 		if err != nil {
 			return err
 		}
-		//defer client.Disconnect(ctx) //nolint:errcheck // todo: config更新后连接过多？
 
 		database := client.Database(db.Name())
 		traceCol := database.Collection("ExecTrace")
@@ -609,11 +645,10 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		return nil
 	}
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(tmp.Url()).SetRegistry(bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{})).Build()))
+	client, err := newMongoClient(ctx, tmp.Url())
 	if err != nil {
 		return err
 	}
-	//defer client.Disconnect(ctx) //nolint:errcheck
 
 	database := client.Database(tmp.Name())
 	traceCol := database.Collection("ExecTrace")
@@ -678,11 +713,10 @@ func (dbsm *DataBaseStateManager) LoadDBStateCache(ctx context.Context) error {
 }
 
 func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collections, error) {
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(db.Url()).SetRegistry(bson.NewRegistryBuilder().RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{})).Build()))
+	client, err := newMongoClient(ctx, db.Url())
 	if err != nil {
 		return config2.Collections{}, err
 	}
-	//defer client.Disconnect(ctx) //nolint:errcheck
 	database := client.Database(db.Name())
 
 	// todo: tmp有些库没有，先new应该不要紧，不用区分tmp?
