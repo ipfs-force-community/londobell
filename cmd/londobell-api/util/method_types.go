@@ -62,6 +62,15 @@ func NewActorSet() *ActorSet {
 
 var actorSet = NewActorSet()
 
+// actorRegistry 缓存 consensus.NewActorRegistry() 的结果：注册表由编译进去的 actor
+// bundle 决定、与请求无关，且这里只做只读查表。原来 LookupMethodInfo 每次调用都重建
+// 一份，而 controller/aggregators/traces.go 是在遍历 trace 的循环里调用它 —— 一个响应
+// 有 N 条 trace 就重建 N 份；堆快照里 MakeRegistry/NewActorRegistry 长期占据存活对象
+// 前列（聚合器进程被 OOM 的元凶之一）。
+// 与 controller/adapter/mpool.go、racailum/segment/extract/actorstate/reg/std_reg.go
+// 的既有写法保持一致。
+var actorRegistry = consensus.NewActorRegistry()
+
 func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to string, Actor string) (actor.MethodInfo, error) {
 	To, err := address.NewFromString(common.AddAddressPrefix(to))
 	if err != nil {
@@ -124,8 +133,7 @@ func LookupMethodInfo(epoch abi.ChainEpoch, Method abi.MethodNum, from, to strin
 		}, nil
 	}
 
-	vma := consensus.NewActorRegistry()
-	mi, ok := vma.Methods[code][Method]
+	mi, ok := actorRegistry.Methods[code][Method]
 	if !ok {
 		return actor.MethodInfo{}, fmt.Errorf("%w: lookup method for from=%s, to=%s, code=%s, meth=%d", actor.ErrActorMethodNotFound, from, To, code, Method)
 	}
