@@ -220,7 +220,7 @@ func getSectorByDealIDResByCode(ctx context.Context, api v0api.FullNode, mact *t
 			return err
 
 		case actorstypes.Version13, actorstypes.Version14, actorstypes.Version15,
-			actorstypes.Version16, actorstypes.Version17, actorstypes.Version18:
+			actorstypes.Version16, actorstypes.Version17, actorstypes.Version18, actorstypes.Version19:
 			return getSectorNumberFromMarketDealState(ctx, api, stor, dealID, resData)
 		}
 	}

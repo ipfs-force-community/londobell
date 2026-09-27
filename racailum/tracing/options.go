@@ -3,62 +3,63 @@ package tracing
 
 import (
 	"os"
+	"strings"
 )
 
 const defaultName = "londobell"
 
+// lotus v1.37 removed the Jaeger exporter from lib/tracing; only OTLP remains
+// (lotus/lib/tracing/setup.go: SetupOTLPTracing reads these two variables).
 const (
-	envCollectorEndpoint = "LOTUS_JAEGER_COLLECTOR_ENDPOINT"
-	envAgentEndpoint     = "LOTUS_JAEGER_AGENT_ENDPOINT"
-	envAgentHost         = "LOTUS_JAEGER_AGENT_HOST"
-	envAgentPort         = "LOTUS_JAEGER_AGENT_PORT"
-	envJaegerUser        = "LOTUS_JAEGER_USERNAME"
-	envJaegerCred        = "LOTUS_JAEGER_PASSWORD"
+	envOTLPExporterEndpoint = "LOTUS_OTEL_EXPORTER_ENDPOINT"
+	envOTLPExporterInsecure = "LOTUS_OTEL_EXPORTER_INSECURE"
 )
 
+// The *Endpoint / *Host / *Port / Jaeger* config fields below are kept as-is so
+// that existing config files keep parsing. They are translated to the OTLP
+// environment variables that lotus now reads.
 func applyEnvOpts(opt *Options) {
-	if opt.CollectorEndpoint != "" {
-		if set := os.Getenv(envCollectorEndpoint); set == "" {
-			os.Setenv(envCollectorEndpoint, opt.CollectorEndpoint)
+	// CollectorEndpoint is the Jaeger collector, AgentEndpoint the Jaeger agent;
+	// both map onto the single OTLP endpoint knob.
+	endpoint := opt.CollectorEndpoint
+	if endpoint == "" {
+		endpoint = opt.AgentEndpoint
+	}
+
+	if endpoint != "" {
+		insecure := true
+		if strings.HasPrefix(endpoint, "https://") {
+			// otlptracehttp.WithEndpoint wants host:port, without a scheme.
+			endpoint = strings.TrimPrefix(endpoint, "https://")
+			insecure = false
+		}
+		endpoint = strings.TrimPrefix(endpoint, "http://")
+
+		setEnvIfUnset(envOTLPExporterEndpoint, endpoint)
+		if insecure {
+			setEnvIfUnset(envOTLPExporterInsecure, "true")
 		}
 	}
 
-	if opt.AgentEndpoint != "" {
-		if set := os.Getenv(envAgentEndpoint); set == "" {
-			os.Setenv(envAgentEndpoint, opt.AgentEndpoint)
-		}
+	if opt.Insecure {
+		setEnvIfUnset(envOTLPExporterInsecure, "true")
 	}
+}
 
-	if opt.AgentHost != "" {
-		if set := os.Getenv(envAgentHost); set == "" {
-			os.Setenv(envAgentHost, opt.AgentHost)
-		}
+func setEnvIfUnset(key, value string) {
+	if os.Getenv(key) == "" {
+		os.Setenv(key, value)
 	}
-
-	if opt.AgentPort != "" {
-		if set := os.Getenv(envAgentPort); set == "" {
-			os.Setenv(envAgentPort, opt.AgentPort)
-		}
-	}
-
-	if opt.JaegerUser != "" {
-		if set := os.Getenv(envJaegerUser); set == "" {
-			os.Setenv(envJaegerUser, opt.JaegerUser)
-		}
-	}
-
-	if opt.JaegerCred != "" {
-		if set := os.Getenv(envJaegerCred); set == "" {
-			os.Setenv(envJaegerCred, opt.JaegerCred)
-		}
-	}
-
 }
 
 type Options struct {
 	Enable  bool
 	Name    string
 	Sampler *float64
+
+	// Insecure forces plaintext OTLP export. It is implied when the endpoint
+	// carries no https:// scheme.
+	Insecure bool
 
 	CollectorEndpoint string
 	AgentEndpoint     string

@@ -1,4 +1,7 @@
 Specs v0 => v2:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
 	> miner.State
 		+ FeeDebt: big.Int
 		+ InitialPledge: big.Int
@@ -19,6 +22,9 @@ Specs v0 => v2:
 		+ UnprovenPower: miner.PowerPair
 
 Specs v2 => v3:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
 	> miner.Deadline
 		+ OptimisticPoStSubmissions: cid.Cid
 		+ OptimisticPoStSubmissionsSnapshot: cid.Cid
@@ -27,68 +33,484 @@ Specs v2 => v3:
 		- PostSubmissions: bitfield.BitField
 
 Specs v3 => v4:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
 	> miner.State
 		+ DeadlineCronActive: bool
 
 Specs v4 => v5:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
 	> miner.State
 		+ PreCommittedSectorsCleanUp: cid.Cid
 		- PreCommittedSectorsExpiry: cid.Cid
 
 Specs v5 => v6:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
 
 Specs v6 => v7:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
 	> verifreg.State
 		+ RemoveDataCapProposalIDs: cid.Cid
 	> miner.Deadline
 		+ SectorsSnapshot: cid.Cid
 
 Specs v7 => v8:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
+	> power.State
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
 	> system.State
 		+ BuiltinActors: cid.Cid
+	> miner.Deadline
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
 
 Specs v8 => v9:
 	+ datacap.State
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
 	> market.State
 		+ PendingDealAllocationIds: cid.Cid
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
+	> power.State
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
 	> verifreg.State
 		+ Allocations: cid.Cid
 		+ Claims: cid.Cid
 		+ NextAllocationId: verifreg.AllocationId
 		- VerifiedClients: cid.Cid
+	> miner.Deadline
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
 
 Specs v9 => v10:
 	+ evm.State
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
+	> datacap.State
+		> Token
+			 datacap.TokenState => datacap.TokenState
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
+	> power.State
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> verifreg.State
+		> NextAllocationId
+			 verifreg.AllocationId => verifreg.AllocationId
+	> miner.Deadline
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
 
 Specs v10 => v11:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
+	> datacap.State
+		> Token
+			 datacap.TokenState => datacap.TokenState
+	> evm.State
+		> Tombstone
+			 *evm.Tombstone => *evm.Tombstone
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
+	> power.State
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> verifreg.State
+		> NextAllocationId
+			 verifreg.AllocationId => verifreg.AllocationId
+	> miner.Deadline
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
 
 Specs v11 => v12:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
+	> datacap.State
+		> Token
+			 datacap.TokenState => datacap.TokenState
+	> evm.State
+		> Tombstone
+			 *evm.Tombstone => *evm.Tombstone
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
+	> power.State
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> verifreg.State
+		> NextAllocationId
+			 verifreg.AllocationId => verifreg.AllocationId
+	> miner.Deadline
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
 
 Specs v12 => v13:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
+	> datacap.State
+		> Token
+			 datacap.TokenState => datacap.TokenState
+	> evm.State
+		> Tombstone
+			 *evm.Tombstone => *evm.Tombstone
 	> market.State
 		+ ProviderSectors: cid.Cid
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
+	> power.State
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> verifreg.State
+		> NextAllocationId
+			 verifreg.AllocationId => verifreg.AllocationId
+	> miner.Deadline
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
 
 Specs v13 => v14:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
+	> datacap.State
+		> Token
+			 datacap.TokenState => datacap.TokenState
+	> evm.State
+		> Tombstone
+			 *evm.Tombstone => *evm.Tombstone
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
+	> power.State
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> verifreg.State
+		> NextAllocationId
+			 verifreg.AllocationId => verifreg.AllocationId
+	> miner.Deadline
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
 
 Specs v14 => v15:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
+	> datacap.State
+		> Token
+			 datacap.TokenState => datacap.TokenState
+	> evm.State
+		> Tombstone
+			 *evm.Tombstone => *evm.Tombstone
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
 	> power.State
 		+ RampDurationEpochs: uint64
 		+ RampStartEpoch: int64
 		> ThisEpochQAPowerSmoothed
 			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> verifreg.State
+		> NextAllocationId
+			 verifreg.AllocationId => verifreg.AllocationId
+	> miner.Deadline
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
 
 Specs v15 => v16:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
+	> datacap.State
+		> Token
+			 datacap.TokenState => datacap.TokenState
 	> evm.State
 		+ TransientData: *evm.TransientData
 		> Tombstone
 			 *evm.Tombstone => *evm.Tombstone
+	> miner.State
+		> VestingFunds
+			 cid.Cid => *miner.VestingFunds
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
+	> power.State
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> verifreg.State
+		> NextAllocationId
+			 verifreg.AllocationId => verifreg.AllocationId
 	> miner.Deadline
 		+ DailyFee: big.Int
 		+ LivePower: miner.PowerPair
 		> FaultyPower
 			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
 
 Specs v16 => v17:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
+	> datacap.State
+		> Token
+			 datacap.TokenState => datacap.TokenState
+	> evm.State
+		> Tombstone
+			 *evm.Tombstone => *evm.Tombstone
+		> TransientData
+			 *evm.TransientData => *evm.TransientData
+	> miner.State
+		> VestingFunds
+			 *miner.VestingFunds => *miner.VestingFunds
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
+	> power.State
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> verifreg.State
+		> NextAllocationId
+			 verifreg.AllocationId => verifreg.AllocationId
+	> miner.Deadline
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
 
 Specs v17 => v18:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
+	> datacap.State
+		> Token
+			 datacap.TokenState => datacap.TokenState
+	> evm.State
+		> Tombstone
+			 *evm.Tombstone => *evm.Tombstone
+		> TransientData
+			 *evm.TransientData => *evm.TransientData
+	> miner.State
+		> VestingFunds
+			 *miner.VestingFunds => *miner.VestingFunds
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
+	> power.State
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> verifreg.State
+		> NextAllocationId
+			 verifreg.AllocationId => verifreg.AllocationId
+	> miner.Deadline
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
+
+Specs v18 => v19:
+	> cron.State
+		> Entries
+			 []cron.Entry => []cron.Entry
+	> datacap.State
+		> Token
+			 datacap.TokenState => datacap.TokenState
+	> evm.State
+		> Tombstone
+			 *evm.Tombstone => *evm.Tombstone
+		> TransientData
+			 *evm.TransientData => *evm.TransientData
+	> market.State
+		- PendingDealAllocationIds: cid.Cid
+	> miner.State
+		> VestingFunds
+			 *miner.VestingFunds => *miner.VestingFunds
+	> multisig.State
+		> NextTxnID
+			 multisig.TxnID => multisig.TxnID
+	> power.State
+		> ThisEpochQAPowerSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> reward.State
+		+ Accrued: []reward.StreamAccrual
+		+ SWAActor: address.Address
+		+ SWATimelockEpochs: abi.ChainEpoch
+		+ StreamsRoot: cid.Cid
+		+ TotalBurnMinted: big.Int
+		+ TotalExplicitMinted: big.Int
+		+ TotalMintedReward: big.Int
+		- BaselineTotal: big.Int
+		- SimpleTotal: big.Int
+		- TotalStoragePowerReward: big.Int
+		> ThisEpochRewardSmoothed
+			 smoothing.FilterEstimate => smoothing.FilterEstimate
+	> verifreg.State
+		> NextAllocationId
+			 verifreg.AllocationId => verifreg.AllocationId
+	> miner.Deadline
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+	> miner.Partition
+		> FaultyPower
+			 miner.PowerPair => miner.PowerPair
+		> LivePower
+			 miner.PowerPair => miner.PowerPair
+		> RecoveringPower
+			 miner.PowerPair => miner.PowerPair
+		> UnprovenPower
+			 miner.PowerPair => miner.PowerPair
 

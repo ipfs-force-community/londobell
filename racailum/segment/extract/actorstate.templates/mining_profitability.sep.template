@@ -85,6 +85,11 @@ func init() {
 // see https://github.com/filecoin-project/builtin-actors/blob/v9.0.0/actors/miner/src/lib.rs#L4866-L4896
 // and https://github.com/filecoin-project/builtin-actors/blob/v9.0.0/actors/miner/src/monies.rs#L143-L157
 {{- end }}
+{{- with (eq .Ver 19) -}}
+// see https://github.com/filecoin-project/builtin-actors/blob/v19.0.0/actors/miner/src/monies.rs
+// and https://github.com/filecoin-project/builtin-actors/blob/v19.0.0/actors/reward/src/state.rs
+// FIP-0118 (nv29 Solstice): reward state field TotalStoragePowerReward was renamed to TotalMintedReward.
+{{- end }}
 func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, st *reward{{ .Ver }}.State) error {
 	blkraw, err := ctx.D.ChainBlockstore().Get(ctx.C, head.Global.Power.Head)
 	if err != nil {
@@ -154,7 +159,11 @@ func extractMiningProfitabilityV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, h
 		{{- else -}}
 		ProjectionOfFaultFee:      miner{{ .Ver }}.PledgePenaltyForContinuedFault(st.ThisEpochRewardSmoothed, pwrState.ThisEpochQAPowerSmoothed, qaPower),
 		{{- end }}
+		{{- if ge .Ver 19 }}
+		Mined:                     st.TotalMintedReward,
+		{{- else }}
 		Mined:                     st.TotalStoragePowerReward,
+		{{- end }}
 		{{- end}}
 	}
 
