@@ -1,6 +1,7 @@
 package tracing
 
 import (
+	"context"
 	"net/http"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -22,10 +23,12 @@ func Setup(opt *Options, mux *http.ServeMux) *tracesdk.TracerProvider {
 		return nil
 	}
 
-	log.Infow("try to enable jaeger exporter", "name", opt.Name)
+	log.Infow("try to enable otlp exporter", "name", opt.Name)
 
 	applyEnvOpts(opt)
-	exporter := tracing.SetupJaegerTracing(opt.Name)
+	// lotus 在 v1.37 移除了 jaeger exporter，lib/tracing 只保留 OTLP。
+	// 未设置 LOTUS_OTEL_EXPORTER_ENDPOINT 时 SetupOTLPTracing 返回 nil。
+	exporter := tracing.SetupOTLPTracing(context.Background(), opt.Name)
 	applySampler(opt)
 
 	return exporter
@@ -51,7 +54,7 @@ func applySampler(opt *Options) {
 		sampler = MixinSample(logicAnd, sampler, trace.ProbabilitySampler(f))
 	}
 	curRate = f
-	//this should override the setup inside tracing.SetupJaegerTracing
+	// 覆盖 tracing.SetupOTLPTracing 内部设置的 AlwaysSample
 	trace.ApplyConfig(trace.Config{
 		DefaultSampler: sampler,
 	})

@@ -47,7 +47,7 @@ var AllMethodList = []string{
 	"RemoveExpiredAllocations", "RemoveSigner", "RepayDebt", "ReportConsensusFault",
 	"Send", "Send(ethaccount)", "Send(placeholder)", "Settle", "SubmitWindowedPoSt", "SwapSigner",
 	"TerminateSectors", "TransferFromExported",
-	"UpdateChannelState",
+	"UpdateChannelState", "UpgradeSectorQuality",
 	"ValidateSectorStatus", "ValidateSectorStatusExported",
 	"WithdrawBalance",
 }
