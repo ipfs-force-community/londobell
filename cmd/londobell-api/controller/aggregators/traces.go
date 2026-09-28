@@ -89,11 +89,15 @@ func GetTraces(c *gin.Context) {
 				} else {
 					paramsByte, err := json.Marshal(params)
 					if err != nil {
-						alog.Error(err)
-						util.ReturnOnErr(c, err)
-						return
+						// 链上参数里可能带「非最小编码」的 bitfield（RLE+ 尾部多 0x00）：
+						// json.Marshal 会因此失败。退化为 hex 原始字节即可，
+						// 不能让一条坏数据把整段高度的查询打成 500。
+						alog.Warnf("marshal params fallback to hex (epoch=%d, method=%d, cid=%s): %v",
+							trace.Epoch, trace.Method, trace.Cid, err)
+						trace.Params = "0x" + hex.EncodeToString(trace.ParamsBson.Data)
+					} else {
+						trace.Params = string(paramsByte)
 					}
-					trace.Params = string(paramsByte)
 				}
 			}
 		}
@@ -107,11 +111,14 @@ func GetTraces(c *gin.Context) {
 				} else {
 					returnsByte, err := json.Marshal(returns)
 					if err != nil {
-						alog.Error(err)
-						util.ReturnOnErr(c, err)
-						return
+						// 同上：链上返回值里也可能带非最小编码的 bitfield。
+						// 退化为 hex 原始字节，避免整段高度查询失败。
+						alog.Warnf("marshal return fallback to hex (epoch=%d, method=%d, cid=%s): %v",
+							trace.Epoch, trace.Method, trace.Cid, err)
+						trace.Return = "0x" + hex.EncodeToString(trace.ReturnBson.Data)
+					} else {
+						trace.Return = string(returnsByte)
 					}
-					trace.Return = string(returnsByte)
 				}
 			}
 		}
