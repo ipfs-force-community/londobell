@@ -591,6 +591,10 @@ func newMongoClient(ctx context.Context, uri string) (*mongo.Client, error) {
 }
 
 func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) error {
+	// 库列表/连接即将（或刚刚）重建：先丢弃元数据缓存，让新接入的冷库无需等 TTL 就可见。
+	// 同时在飞的旧扇出会因 generation 变化而不入缓存（避免用旧 cols 的结果顶上来）。
+	metadataCache.Invalidate("db collections map reloading")
+
 	colds := dbsm.GetColdsCfg()
 	formal := dbsm.GetFormalCfg()
 	tmp := dbsm.GetTmpCfg()
