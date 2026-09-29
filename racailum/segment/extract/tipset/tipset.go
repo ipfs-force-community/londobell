@@ -372,6 +372,17 @@ func IsSimpleQAPower(flags miner19.SectorOnChainInfoFlags) bool {
 	return flags == miner19.SIMPLE_QA_POWER
 }
 
+// IsFullQaPower reports whether the sector carries the FIP-0118 FULL_QA_POWER flag, i.e. it
+// always receives maximum (10x) QA power regardless of its content.
+//
+// 为什么需要新函数：NV29（Solstice / FIP-0118）之后新扇区的 flags 是 0x3（SIMPLE|FULL），
+// IsSimpleQAPower 用的是 `flags == SIMPLE_QA_POWER` 精确比较，对 0x3 返回 false —— 语义漂移。
+// 这里保留 IsSimpleQAPower 的旧语义不动（下游 model.MinerSector.SimpleQAPower 的含义由
+// 消费方决定，属于接口约定变更），新增本函数供调用方按需切换。
+func IsFullQaPower(flags miner19.SectorOnChainInfoFlags) bool {
+	return flags&miner19.FULL_QA_POWER != 0
+}
+
 func extractExecTrace(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
 
 	_, span := trace.StartSpan(ctx.C, "extractor.extractExecTrace")

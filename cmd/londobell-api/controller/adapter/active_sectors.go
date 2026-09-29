@@ -10,14 +10,10 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 
-	"github.com/filecoin-project/go-state-types/big"
-
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/gin-gonic/gin"
-
-	sminer "github.com/filecoin-project/go-state-types/builtin/v11/miner"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -81,61 +77,45 @@ func GetActiveSectors(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-// VDCPower = VerifiedDealWeight*10 / (Expiration - Activation)
-// DCPower = DealWeight / (Expiration - Activation)
-// CCPower = ((Expiration - Activation) * sectorsize - VerifiedDealWeight - DealWeight) / (Expiration - Activation)
+// ComputeQAPower 按 NV29（Solstice / FIP-0118）口径汇总一个 miner 活跃扇区的 QA 算力与
+// VDC/DC/CC 分桶。口径实现见同包 qa_split.go（与 filscan_backend/pkg/londobell/qa_split.go 同源）。
+//
+// 老实现的两处问题（都已修）：
+//  1. 用 sminer(v11).QAPowerForSector：duration 取 Expiration-Activation，且不认
+//     FULL_QA_POWER 标志 —— NV29 之后新扇区（10x）被算成 1x，续期扇区 duration 偏大；
+//  2. adjPower 与三桶一路 .Int64() 截断（超过 9.22e18 直接溢出成负数/垃圾值），
+//     改成全程 big.Int / decimal。
 func ComputeQAPower(sectorInfos []*miner.SectorOnChainInfo, sectorSize abi.SectorSize) (model.QAPowerRes, []model.SectorOnChainInfo) {
-	var totalVDCPower, totalDCPower, totalCCPower = decimal.NewFromInt(0), decimal.NewFromInt(0), decimal.NewFromInt(0)
+	totalVDCPower, totalDCPower, totalCCPower := decimal.Zero, decimal.Zero, decimal.Zero
 	sectorExpirations := make([]model.SectorOnChainInfo, 0, len(sectorInfos))
 	for _, sectorInfo := range sectorInfos {
+		// 逐扇区切 QA / VDC / DC / CC（三桶之和恒等于该扇区 QA 算力）。
+		_, vdc, dc, cc, full := QASplit(
+			uint64(sectorSize),
+			uint64(sectorInfo.Flags),
+			int64(sectorInfo.PowerBaseEpoch),
+			int64(sectorInfo.Activation),
+			int64(sectorInfo.Expiration),
+			sectorInfo.DealWeight.Int,
+			sectorInfo.VerifiedDealWeight.Int,
+		)
+
 		sectorExpirations = append(sectorExpirations, model.SectorOnChainInfo{
 			Expiration:         sectorInfo.Expiration,
 			Activation:         sectorInfo.Activation,
 			DealWeight:         sectorInfo.DealWeight,
 			VerifiedDealWeight: sectorInfo.VerifiedDealWeight,
 			InitialPledge:      sectorInfo.InitialPledge,
+			// NV29 新增：Flags / PowerBaseEpoch 原样带出，FullQaPower 与上面的分桶口径一致
+			// （等价于 lotus miner.SectorIsFullQaPower，见 qa_split_test.go 里的对齐测试）。
+			Flags:          uint64(sectorInfo.Flags),
+			PowerBaseEpoch: sectorInfo.PowerBaseEpoch,
+			FullQaPower:    full,
 		})
 
-		duration := sectorInfo.Expiration - sectorInfo.Activation
-		VDC := big.Mul(sectorInfo.VerifiedDealWeight, big.NewInt(10))
-		DC := sectorInfo.DealWeight
-
-		rawPower := big.Mul(big.NewInt(int64(duration)), big.NewInt(int64(sectorSize)))
-		CC := big.Sub(big.Sub(rawPower, sectorInfo.VerifiedDealWeight), sectorInfo.DealWeight)
-
-		info := &sminer.SectorOnChainInfo{
-			SectorNumber:          sectorInfo.SectorNumber,
-			SealProof:             sectorInfo.SealProof,
-			SealedCID:             sectorInfo.SealedCID,
-			DealIDs:               sectorInfo.DeprecatedDealIDs,
-			Activation:            sectorInfo.Activation,
-			Expiration:            sectorInfo.Expiration,
-			DealWeight:            sectorInfo.DealWeight,
-			VerifiedDealWeight:    sectorInfo.VerifiedDealWeight,
-			InitialPledge:         sectorInfo.InitialPledge,
-			ExpectedDayReward:     big.Zero(),
-			ExpectedStoragePledge: big.Zero(),
-
-			SectorKeyCID: sectorInfo.SectorKeyCID,
-		}
-		if sectorInfo.ExpectedDayReward != nil {
-			info.ExpectedDayReward = *sectorInfo.ExpectedDayReward
-		}
-		if sectorInfo.ExpectedStoragePledge != nil {
-			info.ExpectedStoragePledge = *sectorInfo.ExpectedStoragePledge
-		}
-
-		adjPowerDecimal := decimal.NewFromInt(sminer.QAPowerForSector(sectorSize, info).Int64())
-
-		all := big.Add(CC, big.Add(VDC, DC))
-		allDecimal := decimal.NewFromInt(all.Int64())
-		VDCDecimal := decimal.NewFromInt(VDC.Int64())
-		DCDecimal := decimal.NewFromInt(DC.Int64())
-		CCDecimal := decimal.NewFromInt(CC.Int64())
-
-		totalVDCPower = totalVDCPower.Add(adjPowerDecimal.Mul(VDCDecimal.Div(allDecimal)))
-		totalDCPower = totalDCPower.Add(adjPowerDecimal.Mul(DCDecimal.Div(allDecimal)))
-		totalCCPower = totalCCPower.Add(adjPowerDecimal.Mul(CCDecimal.Div(allDecimal)))
+		totalVDCPower = totalVDCPower.Add(decimal.NewFromBigInt(vdc, 0))
+		totalDCPower = totalDCPower.Add(decimal.NewFromBigInt(dc, 0))
+		totalCCPower = totalCCPower.Add(decimal.NewFromBigInt(cc, 0))
 	}
 
 	return model.QAPowerRes{VDCPower: totalVDCPower, DCPower: totalDCPower, CCPower: totalCCPower}, sectorExpirations

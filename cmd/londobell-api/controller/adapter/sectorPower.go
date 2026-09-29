@@ -8,7 +8,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v8/miner"
+	miner19 "github.com/filecoin-project/go-state-types/builtin/v19/miner"
 	"github.com/gin-gonic/gin"
 
 	"github.com/filecoin-project/lotus/chain/types"
@@ -68,7 +68,11 @@ func GetSectorPowerInfo(c *gin.Context) {
 		return
 	}
 
-	qualityAdjPower := miner.QAPowerForWeight(size, si.Expiration-si.Activation, si.DealWeight, si.VerifiedDealWeight)
+	// NV29（Solstice / FIP-0118）口径：QAPowerForSector 认 FULL_QA_POWER 标志（恒 10x），
+	// QA 周期起点是 PowerBaseEpoch 而不是 Activation。老代码用的是 v8 的
+	// QAPowerForWeight(size, Expiration-Activation, DealWeight, VerifiedDealWeight)，
+	// 既漏了 FULL 标志，也会把续期扇区的 duration 算大。
+	qualityAdjPower := miner19.QAPowerForSector(size, si)
 	resData.Miner = maddr
 	resData.Epoch = ts.Height()
 	resData.Sector = req.Sector

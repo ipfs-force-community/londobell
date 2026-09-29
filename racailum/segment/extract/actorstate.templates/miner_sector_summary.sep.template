@@ -167,7 +167,11 @@ func extractMinerSectorSummaryV{{ .Ver }}(ctx *extract.Ctx, res *extract.Res, he
 				DealWeight:         out.DealWeight,
 				VerifiedDealWeight: out.VerifiedDealWeight,
 				InitialPledge:      out.InitialPledge,
-				{{- if ge .Ver 15 }}
+				{{- if ge .Ver 19 }}
+				// NV29（Solstice / FIP-0118）：QAPowerForSector 认 FULL_QA_POWER 标志（恒 10x），
+				// QA 周期起点是 PowerBaseEpoch 而不是 Activation。
+				QAPower:            miner{{ .Ver }}.QAPowerForSector(sectorSize, &out),
+				{{ else if ge .Ver 15 }}
 				QAPower:            miner{{ .Ver }}.QAPowerForWeight(sectorSize, out.Expiration-out.Activation, out.VerifiedDealWeight),
 				{{else if ge .Ver 8 }}
 				QAPower:            miner{{ .Ver }}.QAPowerForWeight(sectorSize, out.Expiration-out.Activation, out.DealWeight, out.VerifiedDealWeight),
