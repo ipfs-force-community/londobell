@@ -82,47 +82,34 @@ type cidAggregateFunc func(ctx context.Context, col *mongo.Collection, pipe inte
 // limit(1) 与 FindOne 的 singleBatch 语义等价，这里显式用 Find+SetLimit(1)，
 // 好处是与 explain 里验证过的「find().limit(1)」形态逐字对应，便于回归。
 func mongoCidProbe(ctx context.Context, col *mongo.Collection, field, cid string) (bool, error) {
-	cur, err := col.Find(ctx, cidProbeFilter(field, cid),
-		options.Find().SetProjection(cidProbeProjection()).SetLimit(1))
-	if err != nil {
-		return false, err
-	}
-	defer func() {
-		_ = cur.Close(ctx)
-	}()
+	// 探测也是一次出站分片查询（占用一个 mongo 连接），纳入全局闸门预算；
+	// 拿不到令牌时返回错误而不是 false（错误 ≠ 未命中）。
+	return runShardOp(ctx, func(ctx context.Context) (bool, error) {
+		cur, err := col.Find(ctx, cidProbeFilter(field, cid),
+			options.Find().SetProjection(cidProbeProjection()).SetLimit(1))
+		if err != nil {
+			return false, err
+		}
+		defer func() {
+			_ = cur.Close(ctx)
+		}()
 
-	if cur.Next(ctx) {
-		return true, nil
-	}
+		if cur.Next(ctx) {
+			return true, nil
+		}
 
-	// Next 返回 false 有两种原因：游标耗尽（= 未命中）或出错。
-	// 必须把 cur.Err() 带出去，不能把「探测失败」当成「该库没有」——
-	// 那会让接口静默返回空结果（比报错更难排查）。
-	return false, cur.Err()
+		// Next 返回 false 有两种原因：游标耗尽（= 未命中）或出错。
+		// 必须把 cur.Err() 带出去，不能把「探测失败」当成「该库没有」——
+		// 那会让接口静默返回空结果（比报错更难排查）。
+		return false, cur.Err()
+	})
 }
 
 // mongoCidAggregate 是 cidAggregateFunc 的真实实现，与 MultiTraversalQuery 中
 // 「按表名决定是否 AllowDiskUse」的处理保持一致。
+// 结果物化走全局闸门（runShardQuery），拿不到令牌时返回错误。
 func mongoCidAggregate(ctx context.Context, col *mongo.Collection, pipe interface{}, tableName string) ([]bson.M, error) {
-	var (
-		cur *mongo.Cursor
-		err error
-	)
-	if tableName == blockMessageTable {
-		cur, err = col.Aggregate(ctx, pipe, options.Aggregate().SetAllowDiskUse(true))
-	} else {
-		cur, err = col.Aggregate(ctx, pipe)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var res []bson.M
-	if err := cur.All(ctx, &res); err != nil {
-		return nil, err
-	}
-
-	return res, nil
+	return runShardQuery(ctx, col, pipe, tableName == blockMessageTable)
 }
 
 // cidCandidate 是一个「可能持有该 cid」的候选库（精确到集合）。
@@ -291,8 +278,9 @@ func probeCandidates(ctx context.Context, probe cidProbeFunc, candidates []cidCa
 
 		ewg.Go(func() error {
 			if !lim.Acquire(ctx) {
-				// ctx 已取消：与原 MultiTraversalQuery 的 limiter 处理一致，不额外报错
-				return nil
+				// ctx 已取消。原实现返回 nil（静默跳过该库 ⇒ 探测结果被静默截断），
+				// 改成显式报错：宁可失败也不把「没探到」当成「库里没有」。
+				return fmt.Errorf("acquire probe concurrency slot: %w", ctx.Err())
 			}
 			defer func() {
 				lim.Release(ctx)

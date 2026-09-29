@@ -39,6 +39,20 @@ type Config struct {
 	// 环境变量需要重启进程。
 	DisableMetaCache    bool
 	MetaCacheTTLSeconds int64
+
+	// 出站分片查询的全局并发上限与有界等待（见 multi-query/fanout_gate.go）。
+	//   ShardQueryConcurrency: 0 = 内置默认(256)；>0 = 该值；<0 = 关闭闸门(回退旧行为)。
+	//   ShardQueryWaitSeconds: 0 = 内置默认(5s)；>0 = 该秒数；<0 = 无限等待(直到请求 ctx 取消)。
+	// 拿不到令牌且等待超时会**显式报错**（绝不返回空/部分结果）。
+	// 环境变量 LONDOBELL_SHARD_QUERY_CONCURRENCY / LONDOBELL_SHARD_QUERY_WAIT_SECONDS 优先级更高。
+	// 配置文件改动经 30s 配置巡检热生效；环境变量需要重启进程。
+	ShardQueryConcurrency int
+	ShardQueryWaitSeconds int
+
+	// 扇出家族端点(trace_for_message / blocks_for_message / hash_by_messagecid /
+	// child_transfers_for_message)的请求级并发上限：0 = 关闭(默认)，>0 = 超限即 503 快速失败。
+	// 环境变量 LONDOBELL_FANOUT_REQUEST_CONCURRENCY 优先级更高。
+	FanoutRequestConcurrency int
 }
 
 type DB struct {

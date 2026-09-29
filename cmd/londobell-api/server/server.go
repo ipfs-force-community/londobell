@@ -295,9 +295,9 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/block", aggregators.GetBlock)
 		group.POST("/count_of_blockmessages", aggregators.GetCountOfBlockMessages)
 		group.POST("/traces", aggregators.GetTraces) // only tianyou
-		group.POST("/trace_for_message", aggregators.GetTraceForMessage)
+		group.POST("/trace_for_message", aggregators.FanoutRequestGate(), aggregators.GetTraceForMessage)
 		group.POST("/batch_trace_for_message", aggregators.GetBatchTraceForMessage)
-		group.POST("/child_transfers_for_message", aggregators.GetChildTransfersForMessage)
+		group.POST("/child_transfers_for_message", aggregators.FanoutRequestGate(), aggregators.GetChildTransfersForMessage)
 		group.POST("/multisig_message", aggregators.GetMultisigMessage) // only tianyou
 		group.POST("/miner_blockreward", aggregators.GetMinerBlockReward)
 		group.POST("/miners_blockreward", aggregators.GetMinersBlockReward)
@@ -336,7 +336,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/incoming_blockheader_by_cid", aggregators.GetIncomingBlockHeaderByCid)
 		group.POST("/blockheaders_by_miner", aggregators.GetBlockHeadersByMiner) // 出块列表，出块奖励额外获取
 		//group.POST("/mined_by_miner_range", aggregators.GetMinedByMinerForRange)
-		group.POST("/blocks_for_message", aggregators.GetBlocksForMessage) // todo: epoch可不要，遍历查询即可
+		group.POST("/blocks_for_message", aggregators.FanoutRequestGate(), aggregators.GetBlocksForMessage) // todo: epoch可不要，遍历查询即可
 		group.POST("/count_and_methods_of_messages_for_blockheader", aggregators.GetCountAndMethodsOfMessagesForBlockHeader)
 		group.POST("/messages_for_block", aggregators.GetMessagesForBlock)
 		group.POST("/messages_for_fund", aggregators.GetMessagesForFund)
@@ -349,7 +349,7 @@ func RegisterAggregatorsApi(router *gin.Engine) {
 		group.POST("/get_transaction_receipt_by_cid", aggregators.GetTransactionReceiptByCid)
 		group.POST("/initcode_for_evm", aggregators.GetInitCodeForEvm)
 		group.POST("/messagecid_by_hash", aggregators.GetMessageCidByHash)
-		group.POST("/hash_by_messagecid", aggregators.GetHashByMessageCid)
+		group.POST("/hash_by_messagecid", aggregators.FanoutRequestGate(), aggregators.GetHashByMessageCid)
 		group.POST("/state_final_height", aggregators.GetStateFinalHeight)
 		group.POST("/child_calls_for_message", aggregators.GetChildCallsForMessage)
 		group.POST("/events_for_actor", aggregators.GetEventsForActor)

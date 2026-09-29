@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/ipfs-force-community/londobell/lib/limiter"
 
@@ -38,12 +37,14 @@ func GetFinalHeight(ctx context.Context, cols common.Collections) (abi.ChainEpoc
 
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == "FinalHeight" {
-			cur, err := col.Aggregate(ctx, pipe)
-			if err != nil {
-				return 0, err
-			}
+			err := withShardSlot(ctx, func() error {
+				cur, err := col.Aggregate(ctx, pipe)
+				if err != nil {
+					return err
+				}
 
-			err = cur.All(ctx, &finalHeightRes)
+				return cur.All(ctx, &finalHeightRes)
+			})
 			if err != nil {
 				return 0, err
 			}
@@ -69,12 +70,14 @@ func GetStateFinalHeight(ctx context.Context, cols common.Collections) (abi.Chai
 
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == "StateFinalHeight" {
-			cur, err := col.Aggregate(ctx, pipe)
-			if err != nil {
-				return 0, err
-			}
+			err := withShardSlot(ctx, func() error {
+				cur, err := col.Aggregate(ctx, pipe)
+				if err != nil {
+					return err
+				}
 
-			err = cur.All(ctx, &finalHeightRes)
+				return cur.All(ctx, &finalHeightRes)
+			})
 			if err != nil {
 				return 0, err
 			}
@@ -95,12 +98,14 @@ func GetIncomingBlock(ctx context.Context, pipe interface{}, cols common.Collect
 	var blockHeaderRes []model.BlockHeader
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == "OrphanBlock" {
-			cur, err := col.Aggregate(ctx, pipe)
-			if err != nil {
-				return nil, err
-			}
+			err := withShardSlot(ctx, func() error {
+				cur, err := col.Aggregate(ctx, pipe)
+				if err != nil {
+					return err
+				}
 
-			err = cur.All(ctx, &blockHeaderRes)
+				return cur.All(ctx, &blockHeaderRes)
+			})
 
 			return blockHeaderRes, err
 		}
@@ -121,12 +126,14 @@ func GetStartEpochForDeal(ctx context.Context, cols common.Collections) (int64, 
 
 	for _, col := range cols.Cols {
 		if col != nil && col.Name() == "NewDealProposal" {
-			cur, err := col.Aggregate(ctx, pipe)
-			if err != nil {
-				return 0, err
-			}
+			err := withShardSlot(ctx, func() error {
+				cur, err := col.Aggregate(ctx, pipe)
+				if err != nil {
+					return err
+				}
 
-			err = cur.All(ctx, &res)
+				return cur.All(ctx, &res)
+			})
 			if err != nil {
 				return 0, err
 			}
@@ -166,7 +173,9 @@ func GetDealIDRange(ctx context.Context, cols common.Collections, startEpoch, en
 				return 0, 0, err
 			}
 
-			err = startCur.All(ctx, &startRes)
+			err = withShardSlot(ctx, func() error {
+				return startCur.All(ctx, &startRes)
+			})
 			if err != nil {
 				return 0, 0, err
 			}
@@ -182,7 +191,9 @@ func GetDealIDRange(ctx context.Context, cols common.Collections, startEpoch, en
 				return 0, 0, err
 			}
 
-			err = endCur.All(ctx, &endRes)
+			err = withShardSlot(ctx, func() error {
+				return endCur.All(ctx, &endRes)
+			})
 			if err != nil {
 				return 0, 0, err
 			}
@@ -518,6 +529,8 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 		ewg    multierror.Group
 	)
 
+	// 请求内并发上限（沿用既有 16）。注意：这只约束单个请求，跨请求的总并发由
+	// runShardQuery 里的全局闸门（fanout_gate.go）约束。
 	lim := limiter.New(16)
 
 	for i := range aggLists {
@@ -525,14 +538,14 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 		aggList := aggLists[i]
 		ewg.Go(func() error {
 			if !lim.Acquire(ctx) {
-				return nil
+				// ctx 已取消。原实现返回 nil（静默跳过该段 ⇒ 结果被静默截断），
+				// 这里改成显式报错：宁可失败也不返回不完整数据。
+				return fmt.Errorf("acquire paging concurrency slot: %w", ctx.Err())
 			}
 
 			defer func() {
 				lim.Release(ctx)
 			}()
-
-			var aggRes []bson.M
 
 			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Start: aggList.start, End: aggList.end, Skip: aggList.skip, Limit: aggList.limit, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, Sort: req.Sort, To: req.To, Addrs: req.Addrs, Addr: req.Addr}, string(aggregator)) // todo: methodName
 			if err != nil {
@@ -541,12 +554,7 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 
 			for _, col := range aggList.cols.Cols {
 				if col != nil && col.Name() == tableName {
-					cur, err := col.Aggregate(ctx, pipe)
-					if err != nil {
-						return err
-					}
-
-					err = cur.All(ctx, &aggRes)
+					aggRes, err := runShardQuery(ctx, col, pipe, false)
 					if err != nil {
 						return err
 					}
@@ -636,17 +644,18 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 		result = make([]bson.M, 0)
 	)
 
+	// 防止有分页需求的脚本。
+	// 原实现在每个 goroutine 内部写 req.Limit（同一个被闭包捕获的变量）并读它，
+	// 是既有的数据竞争（go test -race 可复现）。这里提到循环外只写一次：
+	// 该写是幂等的（写完之后 Limit != 0，条件不再成立），结果与原实现完全一致。
+	if req.Index == 0 && req.Limit == 0 {
+		req.Limit = math.MaxInt64
+	}
+
 	for i := range aggLists {
 		i := i
 		aggList := aggLists[i]
 		ewg.Go(func() error {
-			var aggRes []bson.M
-
-			// 防止有分页需求的脚本
-			if req.Index == 0 && req.Limit == 0 {
-				req.Limit = math.MaxInt64
-			}
-
 			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Addr: req.Addr, Addrs: req.Addrs, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, Cids: req.Cids, ID: req.ID, Sort: req.Sort, To: req.To, Skip: req.Index * req.Limit, Limit: req.Limit, ExpirationStartEpoch: req.ExpirationStartEpoch, ExpirationEndEpoch: req.ExpirationEndEpoch, SectorSize: req.SectorSize, TransferType: req.TransferType}, string(aggregator))
 			if err != nil {
 				return err
@@ -654,12 +663,7 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 
 			for _, col := range aggList.cols.Cols {
 				if col != nil && col.Name() == tableName {
-					cur, err := col.Aggregate(ctx, pipe)
-					if err != nil {
-						return err
-					}
-
-					err = cur.All(ctx, &aggRes)
+					aggRes, err := runShardQuery(ctx, col, pipe, false)
 					if err != nil {
 						return err
 					}
@@ -720,8 +724,6 @@ func MultiRangeQuery2(ctx context.Context, startEpoch, endEpoch int64, countUtil
 		}
 		aggList := aggLists[i]
 
-		var aggRes []bson.M
-
 		// 防止有分页需求的脚本
 		if req.Index == 0 && req.Limit == 0 {
 			req.Limit = math.MaxInt64
@@ -734,12 +736,7 @@ func MultiRangeQuery2(ctx context.Context, startEpoch, endEpoch int64, countUtil
 
 		for _, col := range aggList.cols.Cols {
 			if col != nil && col.Name() == tableName {
-				cur, err := col.Aggregate(ctx, pipe)
-				if err != nil {
-					return nil, err
-				}
-
-				err = cur.All(ctx, &aggRes)
+				aggRes, err := runShardQuery(ctx, col, pipe, false)
 				if err != nil {
 					return nil, err
 				}
@@ -775,21 +772,13 @@ func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []Cou
 	for _, countList := range priorityLists {
 		for _, col := range countList.Cols.Cols {
 			if col != nil && col.Name() == tableName {
-				var cur *mongo.Cursor
-				var err error
-				if tableName == "BlockMessage" {
-					cur, err = col.Aggregate(ctx, pipe, options.Aggregate().SetAllowDiskUse(true))
-				} else {
-					cur, err = col.Aggregate(ctx, pipe)
-				}
+				// 结果物化在全局闸门内完成（见 fanout_gate.go）
+				shardRes, err := runShardQuery(ctx, col, pipe, tableName == "BlockMessage")
 				if err != nil {
 					return nil, err
 				}
 
-				err = cur.All(ctx, &result)
-				if err != nil {
-					return nil, err
-				}
+				result = shardRes
 
 				if len(result) > 0 {
 					return result, nil
@@ -815,21 +804,12 @@ func MultiTraversalQuery(ctx context.Context, pipe interface{}, countLists []Cou
 					}
 					lock.RUnlock()
 
-					var cur *mongo.Cursor
-					var err error
-					if tableName == "BlockMessage" {
-						cur, err = col.Aggregate(ctx, pipe, options.Aggregate().SetAllowDiskUse(true))
-					} else {
-						cur, err = col.Aggregate(ctx, pipe)
-					}
+					shardRes, err := runShardQuery(ctx, col, pipe, tableName == "BlockMessage")
 					if err != nil {
 						return err
 					}
 
-					err = cur.All(ctx, &res)
-					if err != nil {
-						return err
-					}
+					res = shardRes
 
 					if len(res) > 0 {
 						lock.Lock()
@@ -865,20 +845,14 @@ func MultiUnionQuery(ctx context.Context, pipe interface{}, countLists []CountUt
 		i := i
 		countList := countLists[i]
 		ewg.Go(func() error {
-			var aggRees []bson.M
-
 			for _, col := range countList.Cols.Cols {
 				if col != nil && col.Name() == tableName {
-					cur, err := col.Aggregate(ctx, pipe)
+					aggRes, err := runShardQuery(ctx, col, pipe, false)
 					if err != nil {
 						return err
 					}
 
-					err = cur.All(ctx, &aggRees)
-					if err != nil {
-						return err
-					}
-					res[i] = aggRees
+					res[i] = aggRes
 				}
 			}
 
@@ -1005,11 +979,14 @@ func CommonCount(ctx context.Context, col *mongo.Collection, req model.CommonReq
 		return 0, err
 	}
 	var countRes []model.CountRes
-	cur, err := col.Aggregate(ctx, pipe)
-	if err != nil {
-		return 0, err
-	}
-	err = cur.All(ctx, &countRes)
+	err = withShardSlot(ctx, func() error {
+		cur, err := col.Aggregate(ctx, pipe)
+		if err != nil {
+			return err
+		}
+
+		return cur.All(ctx, &countRes)
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -1034,15 +1011,22 @@ func GetDetail(ctx context.Context, end, limit int64, countUtil CountUtil, aggre
 		return nil, err
 	}
 
-	cur, err := col1.Aggregate(ctx, pipe)
-	if err != nil {
-		log.Errorf("get detail agg failed: %w", err)
-		return nil, err
-	}
 	var aggRes []bson.M
-	err = cur.All(ctx, &aggRes)
+	err = withShardSlot(ctx, func() error {
+		cur, err := col1.Aggregate(ctx, pipe)
+		if err != nil {
+			log.Errorf("get detail agg failed: %w", err)
+			return err
+		}
+
+		if err := cur.All(ctx, &aggRes); err != nil {
+			log.Errorf("get detail all failed: %w", err)
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
-		log.Errorf("get detail all failed: %w", err)
 		return nil, err
 	}
 	return aggRes, nil
@@ -1149,6 +1133,8 @@ func MultiPagingQueryForDeal(ctx context.Context, indexReq, limitReq int64, ptyp
 		ewg    multierror.Group
 	)
 
+	// 请求内并发上限（沿用既有 16）。注意：这只约束单个请求，跨请求的总并发由
+	// runShardQuery 里的全局闸门（fanout_gate.go）约束。
 	lim := limiter.New(16)
 
 	for i := range aggLists {
@@ -1156,14 +1142,14 @@ func MultiPagingQueryForDeal(ctx context.Context, indexReq, limitReq int64, ptyp
 		aggList := aggLists[i]
 		ewg.Go(func() error {
 			if !lim.Acquire(ctx) {
-				return nil
+				// ctx 已取消。原实现返回 nil（静默跳过该段 ⇒ 结果被静默截断），
+				// 这里改成显式报错：宁可失败也不返回不完整数据。
+				return fmt.Errorf("acquire paging concurrency slot: %w", ctx.Err())
 			}
 
 			defer func() {
 				lim.Release(ctx)
 			}()
-
-			var aggRes []bson.M
 
 			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Start: aggList.start, End: aggList.end, Skip: aggList.skip, Limit: aggList.limit, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, Sort: req.Sort, To: req.To, Addrs: req.Addrs, Addr: req.Addr}, string(aggregator)) // todo: methodName
 			if err != nil {
@@ -1172,12 +1158,7 @@ func MultiPagingQueryForDeal(ctx context.Context, indexReq, limitReq int64, ptyp
 
 			for _, col := range aggList.cols.Cols {
 				if col != nil && col.Name() == tableName {
-					cur, err := col.Aggregate(ctx, pipe)
-					if err != nil {
-						return err
-					}
-
-					err = cur.All(ctx, &aggRes)
+					aggRes, err := runShardQuery(ctx, col, pipe, false)
 					if err != nil {
 						return err
 					}
