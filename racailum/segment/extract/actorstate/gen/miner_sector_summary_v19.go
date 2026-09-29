@@ -134,8 +134,10 @@ func extractMinerSectorSummaryV19(ctx *extract.Ctx, res *extract.Res, head *comm
 				DealWeight:         out.DealWeight,
 				VerifiedDealWeight: out.VerifiedDealWeight,
 				InitialPledge:      out.InitialPledge,
-				QAPower:            miner19.QAPowerForWeight(sectorSize, out.Expiration-out.Activation, out.VerifiedDealWeight),
-				Miner:              head.Addr,
+				// NV29（Solstice / FIP-0118）：QAPowerForSector 认 FULL_QA_POWER 标志（恒 10x），
+				// QA 周期起点是 PowerBaseEpoch 而不是 Activation。
+				QAPower: miner19.QAPowerForSector(sectorSize, &out),
+				Miner:   head.Addr,
 			})
 		}
 		return nil
