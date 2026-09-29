@@ -223,10 +223,12 @@ func (dbsc *DataBaseStateCache) FindAndUpdateDBState(dsn string, dbState *smodel
 		return
 	}
 
+	// 未命中分支必须在这里直接写 map：原来调用 dbsc.SetState 会再取一次同一把
+	// sync.RWMutex（Go 锁不可重入）⇒ 一旦走到这一支就永久死锁。行为不变（同样的持锁写入）。
 	// todo: blockStates is nil
 	state := &segment.State{}
 	state.SetDBState(dbState)
-	dbsc.SetState(dsn, state)
+	dbsc.states[dsn] = state
 	return
 }
 
@@ -239,9 +241,10 @@ func (dbsc *DataBaseStateCache) FindAndUpdateDealState(dsn string, dealState mod
 		return
 	}
 
+	// 同上：避免在持锁状态下再调 SetState 造成自死锁。
 	state := &segment.State{}
 	state.SetDealState(dealState)
-	dbsc.SetState(dsn, state)
+	dbsc.states[dsn] = state
 	return
 }
 

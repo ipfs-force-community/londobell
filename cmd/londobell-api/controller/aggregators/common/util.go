@@ -356,8 +356,11 @@ func GetTraceByCid(ctx context.Context, cid string) ([]model.TraceForMessageRes,
 	var traceForMessageRes []model.TraceForMessageRes
 
 	// multi dbs query
+	//
+	// 与 trace_for_message 同一条查询（同一个 aggregator、同一张表、同样的 ctx.Cid），
+	// 同样走两阶段：先用只读索引探测定位 cid 落在哪个库，再只在命中库跑完整管道。
 	{
-		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "ExecTrace")
+		multiResult, err := multiquery.MultiTraversalQueryByCid(ctx, pipe, countUtils, "ExecTrace", cid)
 		if err != nil {
 			return nil, err
 		}

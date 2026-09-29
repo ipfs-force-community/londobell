@@ -12,6 +12,8 @@ londobell数据库一般4个月左右进行分库，来避免单库数据量过�
 Colds = []
 LastModifyTime = 1695094272
 BatchSegmentInsertLimit = 16
+DisableMetaCache = false
+MetaCacheTTLSeconds = 0
 
 [Formal]
   URL = ""
@@ -24,6 +26,7 @@ BatchSegmentInsertLimit = 16
 分库数据库分为三类：Colds(冷库)、Formal(正式库)、Tmp(临时库)。冷库可以有多个，正式库和临时库只有一个。
 LastModifyTime记录该config被修改的时间戳，可以直接在config文件中更改临时库的配置，系统会每隔30s监听配置文件改动并生效。
 BatchSegmentInsertLimit指定并发对数据库进行分段状态处理时限制的并发数，默认是16。
+DisableMetaCache / MetaCacheTTLSeconds控制「各库高度区间/总条数」元数据扇出（每次统计请求都要向全部冷库+正式库+临时库问一遍哪些库有哪些高度区间、各有多少条）的短 TTL 缓存：DisableMetaCache=true 关闭缓存（回退到每个请求都重新扇出一遍），MetaCacheTTLSeconds>0 指定 TTL 秒数，两个都为默认值（false/0）时启用缓存且 TTL=30s。也可用环境变量 LONDOBELL_METADATA_CACHE_TTL（秒，<=0 关闭）与 LONDOBELL_METADATA_CACHE_DISABLED=1 覆盖（需重启进程）。
 
 - 指定存放分段状态(即dbstate)的数据库
 ```

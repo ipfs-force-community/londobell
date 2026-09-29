@@ -29,6 +29,16 @@ type Config struct {
 	Tmp                     DB
 	LastModifyTime          int64
 	BatchSegmentInsertLimit int
+
+	// 元数据扇出缓存开关与 TTL（refresh() 产出的「各库高度区间 / 各库总条数」）。
+	// 零值 = 开启缓存 + 默认 30s：配置文件里不写这两个字段就是默认行为。
+	//   DisableMetaCache=true        ⇒ 关闭缓存，回退到「每个请求都重新向全部库扇出一遍」；
+	//   MetaCacheTTLSeconds > 0      ⇒ 用该秒数做 TTL；<=0 且未 Disable ⇒ 默认 30s。
+	// 环境变量 LONDOBELL_METADATA_CACHE_TTL（秒，<=0 关闭）与
+	// LONDOBELL_METADATA_CACHE_DISABLED=1 优先级更高。配置文件改动经 30s 的配置巡检热生效，
+	// 环境变量需要重启进程。
+	DisableMetaCache    bool
+	MetaCacheTTLSeconds int64
 }
 
 type DB struct {

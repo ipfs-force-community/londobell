@@ -175,6 +175,10 @@ func RefreshFormalDataBaseState(ctx context.Context, log *zap.SugaredLogger, dbs
 	}
 	dbsm.DBStateCache.SetState(dsn, curState)
 
+	// formal 的高度区间（EndEpoch）刚刚推进：主动丢弃元数据缓存，
+	// 让新高度立刻进入各端点的查询范围，而不是等 TTL 到期。
+	metadataCache.Invalidate("formal db state refreshed")
+
 	log.Infof("RefreshFormalDataBaseState successfully, dbState.EndEpoch: %v", newState.GetEndEpoch())
 
 	return nil
@@ -294,7 +298,50 @@ func (c *ConcurrentCountUtils) AppendCountUtils(countUtil CountUtil) {
 	c.CountUtils = append(c.CountUtils, countUtil)
 }
 
-func refresh(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch, actorID, methodName string, f func(context.Context, *segment.State, common.Collections, *ConcurrentCountUtils, *abi.ChainEpoch, abi.ChainEpoch, string, string) error) ([]CountUtil, error) {
+// refreshFlavor 常量：标识「哪个 refresh 收集器」，用于元数据缓存键。
+// 与收集函数一一对应（一个 flavor 对应一个 f，一个 f 只用一个 flavor）——
+// 收集器不同 ⇒ CountUtil 里被填充的字段不同 ⇒ 结果不能混用。
+const (
+	flavorEpochRange                      = "epoch_range"
+	flavorTipSetCount                     = "tipset_count"
+	flavorDealRange                       = "deal_range"
+	flavorActorDeals                      = "actor_deals"
+	flavorBlockMsgs                       = "block_msgs"
+	flavorBlockMsgsByMethodName           = "block_msgs_by_methodname"
+	flavorActorMsgsByMethodName           = "actor_msgs_by_methodname"
+	flavorActorMsgs                       = "actor_msgs"
+	flavorActorTransferMsgs               = "actor_transfer_msgs"
+	flavorActorEvents                     = "actor_events"
+	flavorMinedMsgs                       = "mined_msgs"
+	flavorTransfersLargeAmount            = "transfers_large_amount"
+	flavorActorTransferBlockRewardMsgs    = "actor_transfer_block_reward_msgs"
+	flavorActorTransferBurnMsgs           = "actor_transfer_burn_msgs"
+	flavorActorTransferSendAndReceiveMsgs = "actor_transfer_send_and_receive_msgs"
+	flavorActorTransferSendMsgs           = "actor_transfer_send_msgs"
+	flavorActorTransferReceiveMsgs        = "actor_transfer_receive_msgs"
+)
+
+type refreshFunc func(context.Context, *segment.State, common.Collections, *ConcurrentCountUtils, *abi.ChainEpoch, abi.ChainEpoch, string, string) error
+
+// refresh 是所有元数据端点共用的入口：先查「各库高度区间/总条数」的短 TTL 缓存，
+// 未命中才真正向 colds + formal 并发扇出、再单跑 tmp（= refreshUncached）。
+// 缓存只装 refreshUncached 的返回值（CountUtil），也就是元数据本身；业务数据不经过这里。
+// 同一 key 的并发请求由 metadataCache 合并成一轮扇出；缓存关闭时直通，即完全回退旧行为。
+func refresh(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch, actorID, methodName, flavor string, f refreshFunc) ([]CountUtil, error) {
+	enabled, ttl := metaCachePolicy(dbsm.GetCfg())
+
+	return metadataCache.GetOrLoad(
+		ctx,
+		metaCacheKey(flavor, actorID, methodName, curEpoch),
+		enabled,
+		ttl,
+		func(loadCtx context.Context) ([]CountUtil, error) {
+			return refreshUncached(loadCtx, dbsm, curEpoch, actorID, methodName, f)
+		},
+	)
+}
+
+func refreshUncached(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch, actorID, methodName string, f refreshFunc) ([]CountUtil, error) {
 	colds := dbsm.GetColdsCfg()
 	formal := dbsm.GetFormalCfg()
 	tmp := dbsm.GetTmpCfg()
@@ -369,7 +416,7 @@ func refresh(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.Chain
 }
 
 func GetEpochRange(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
-	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", refreshEpochRange)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", flavorEpochRange, refreshEpochRange)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +425,7 @@ func GetEpochRange(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi
 }
 
 func GetTotalCountForTipSets(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
-	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", refreshTotalCountForTipSets)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", flavorTipSetCount, refreshTotalCountForTipSets)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +434,7 @@ func GetTotalCountForTipSets(ctx context.Context, dbsm *DataBaseStateManager, cu
 }
 
 func GetDealRange(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
-	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", refreshDealRange)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", flavorDealRange, refreshDealRange)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +452,7 @@ func GetDealRange(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.
 //}
 
 func GetTotalCountForActorDeals(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
-	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorDeals)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", flavorActorDeals, refreshTotalCountForActorDeals)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +461,7 @@ func GetTotalCountForActorDeals(ctx context.Context, actorID string, dbsm *DataB
 }
 
 func GetTotalCountForBlockMsgs(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
-	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", refreshTotalCountForBlockMsgs)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", flavorBlockMsgs, refreshTotalCountForBlockMsgs)
 	if err != nil {
 		return nil, err
 	}
@@ -427,7 +474,7 @@ func GetTotalCountForBlockMsgs(ctx context.Context, dbsm *DataBaseStateManager, 
 func GetTotalCountForBlockMsgsByMethodName(ctx context.Context, methodName string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForBlockMsgsByMethodName")
 
-	countUtils, err := refresh(ctx, dbsm, curEpoch, "", methodName, refreshTotalCountForBlockMsgsByMethodName)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, "", methodName, flavorBlockMsgsByMethodName, refreshTotalCountForBlockMsgsByMethodName)
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +486,7 @@ func GetTotalCountForBlockMsgsByMethodName(ctx context.Context, methodName strin
 func GetTotalCountForActorMsgByMethodName(ctx context.Context, actorID, methodName string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForActorMsgByMethodName")
 
-	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, methodName, refreshTotalCountForActorMsgByMethodName)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, methodName, flavorActorMsgsByMethodName, refreshTotalCountForActorMsgByMethodName)
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +518,7 @@ func GetTotalCountForActorMsgByMethodName2(ctx context.Context, actor, methodNam
 		return nil, fmt.Errorf("unknow address type for actor %v", actor)
 	}
 
-	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, methodName, refreshTotalCountForActorMsgByMethodName)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, methodName, flavorActorMsgsByMethodName, refreshTotalCountForActorMsgByMethodName)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +555,7 @@ func GetTotalCountForActorMsgs(ctx context.Context, actor string, dbsm *DataBase
 		return nil, fmt.Errorf("unknow address type for actor %v", actor)
 	}
 
-	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorMsgs)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", flavorActorMsgs, refreshTotalCountForActorMsgs)
 	if err != nil {
 		return nil, err
 	}
@@ -520,7 +567,7 @@ func GetTotalCountForActorMsgs(ctx context.Context, actor string, dbsm *DataBase
 func GetTotalCountForActorTransferMsgs(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForActorMsgs")
 
-	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorTransferMsgs)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", flavorActorTransferMsgs, refreshTotalCountForActorTransferMsgs)
 	if err != nil {
 		return nil, err
 	}
@@ -551,7 +598,7 @@ func GetTotalCountForActorEvents(ctx context.Context, actor string, dbsm *DataBa
 		return nil, fmt.Errorf("unknow address type for actor %v", actor)
 	}
 
-	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorEvents)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", flavorActorEvents, refreshTotalCountForActorEvents)
 	if err != nil {
 		return nil, err
 	}
@@ -563,7 +610,7 @@ func GetTotalCountForActorEvents(ctx context.Context, actor string, dbsm *DataBa
 func GetTotalCountForMinedMsgsMap(ctx context.Context, minerID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForMinedMsgsMap")
 
-	countUtils, err := refresh(ctx, dbsm, curEpoch, minerID, "", refreshTotalCountForMinedMsgsMap)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, minerID, "", flavorMinedMsgs, refreshTotalCountForMinedMsgsMap)
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +622,7 @@ func GetTotalCountForMinedMsgsMap(ctx context.Context, minerID string, dbsm *Dat
 func GetTotalCountForTransfersForLargeAmount(ctx context.Context, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
 	//clog := log.With("totalCount", "GetTotalCountForActorMsgs")
 
-	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", refreshTotalCountForTransfersForLargeAmount)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, "", "", flavorTransfersLargeAmount, refreshTotalCountForTransfersForLargeAmount)
 	if err != nil {
 		return nil, err
 	}
@@ -584,7 +631,7 @@ func GetTotalCountForTransfersForLargeAmount(ctx context.Context, dbsm *DataBase
 }
 
 func GetTotalCountForActorTransferBlockRewardMsgs(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
-	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorTransferBlockRewardMsgs)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", flavorActorTransferBlockRewardMsgs, refreshTotalCountForActorTransferBlockRewardMsgs)
 	if err != nil {
 		return nil, err
 	}
@@ -593,7 +640,7 @@ func GetTotalCountForActorTransferBlockRewardMsgs(ctx context.Context, actorID s
 }
 
 func GetTotalCountForActorTransferBurnMsgs(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
-	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorTransferBurnMsgs)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", flavorActorTransferBurnMsgs, refreshTotalCountForActorTransferBurnMsgs)
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +649,7 @@ func GetTotalCountForActorTransferBurnMsgs(ctx context.Context, actorID string, 
 }
 
 func GetTotalCountForActorTransferSendAndReceiveMsgs(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
-	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorTransferSendAndReceiveMsgs)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", flavorActorTransferSendAndReceiveMsgs, refreshTotalCountForActorTransferSendAndReceiveMsgs)
 	if err != nil {
 		return nil, err
 	}
@@ -611,7 +658,7 @@ func GetTotalCountForActorTransferSendAndReceiveMsgs(ctx context.Context, actorI
 }
 
 func GetTotalCountForActorTransferSendMsgs(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
-	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorTransferSendMsgs)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", flavorActorTransferSendMsgs, refreshTotalCountForActorTransferSendMsgs)
 	if err != nil {
 		return nil, err
 	}
@@ -620,7 +667,7 @@ func GetTotalCountForActorTransferSendMsgs(ctx context.Context, actorID string, 
 }
 
 func GetTotalCountForActorTransferReceiveMsgs(ctx context.Context, actorID string, dbsm *DataBaseStateManager, curEpoch abi.ChainEpoch) ([]CountUtil, error) {
-	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", refreshTotalCountForActorTransferReceiveMsgs)
+	countUtils, err := refresh(ctx, dbsm, curEpoch, actorID, "", flavorActorTransferReceiveMsgs, refreshTotalCountForActorTransferReceiveMsgs)
 	if err != nil {
 		return nil, err
 	}
