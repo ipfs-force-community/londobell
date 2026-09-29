@@ -179,6 +179,65 @@ func TestMultiTraversalQueryByCidAgainstMongo(t *testing.T) {
 		}
 	})
 
+	// ---- 1b. 旧路径的成本画像：逐库一次完整管道在未命中库上的真实计划 ----------------
+	//
+	// 这条子测试回答「旧路径每库几次寻道」：ExecTrace 的管道 $match 是
+	// {$and:[{IsBlock:true},{$or:[{Cid:X},{SignedCid:X}]}]} ⇒ 计划是 SUBPLAN 下挂两个
+	// IXSCAN（Cid_1 / SignedCid_1），未命中库上每个分支各 seek 一次 = 每库 2 次寻道，
+	// 11 个冷库就是 22 次 —— 这正是「22 次寻道/请求」的来源，而单键等值的 EthHash
+	// 管道（hash_by_messagecid）每库只有 1 次寻道。
+	t.Run("legacy_pipeline_seek_profile", func(t *testing.T) {
+		pipe, err := util.Parse(map[string]interface{}{"Cid": fakeCid}, probeJsPipe)
+		if err != nil {
+			t.Fatalf("parse pipeline: %v", err)
+		}
+
+		// 与 MultiTraversalQuery 在冷库上发出的命令同形：aggregate + pipeline。
+		// 管道里有 $lookup/$unwind，mongo 的 explain 因此返回 stages 形态
+		// （stages[0].$cursor 里才是 queryPlanner/executionStats）。
+		var raw bson.M
+		if err := client.Database(libReal).RunCommand(ctx, bson.D{
+			{Key: "explain", Value: bson.D{
+				{Key: "aggregate", Value: "ExecTrace"},
+				{Key: "pipeline", Value: pipe},
+				{Key: "cursor", Value: bson.M{}},
+			}},
+			{Key: "verbosity", Value: "executionStats"},
+		}).Decode(&raw); err != nil {
+			t.Fatalf("explain aggregate: %v", err)
+		}
+		if ok, _ := raw["ok"].(float64); ok != 1 {
+			t.Fatalf("explain aggregate rejected: %v", raw)
+		}
+
+		cursorStage := cursorStageOf(t, raw)
+
+		queryPlanner, _ := cursorStage["queryPlanner"].(bson.M)
+		plan, err := json.Marshal(queryPlanner["winningPlan"])
+		if err != nil {
+			t.Fatalf("marshal winning plan: %v", err)
+		}
+
+		stats, _ := cursorStage["executionStats"].(bson.M)
+		keys, _ := stats["totalKeysExamined"].(int32)
+		docs, _ := stats["totalDocsExamined"].(int32)
+		execStages, _ := stats["executionStages"].(bson.M)
+		seeks := countIndexSeeks(execStages)
+
+		t.Logf("legacy ExecTrace pipeline on a NON-owner library: keysExamined=%d docsExamined=%d indexSeeks=%d winningPlan=%s",
+			keys, docs, seeks, plan)
+
+		// $or 的两个分支各 seek 一次（Cid_1 / SignedCid_1）：这就是 11 个冷库 = 22 次寻道的来源。
+		// 对照：EthHash（hash_by_messagecid）的 $match 是单键等值，每库只有 1 次寻道 ——
+		// 所以「22 次寻道」这个数字属于 ExecTrace，不属于 hash_by_messagecid。
+		if seeks != 2 {
+			t.Fatalf("legacy ExecTrace pipeline should seek once per $or branch (2), got %d: %s", seeks, plan)
+		}
+		if keys != 0 || docs != 0 {
+			t.Fatalf("legacy ExecTrace pipeline on a non-owner library examined keys=%d docs=%d, want 0/0", keys, docs)
+		}
+	})
+
 	// ---- 2. 假命中继续 + 管道只在命中库执行 -----------------------------------------
 	t.Run("false_hit_falls_through_and_pipeline_runs_only_on_the_owning_library", func(t *testing.T) {
 		snapshot := profileSnapshot(ctx, t, client, libs)

@@ -830,6 +830,18 @@ func GetCidFromEthHash(ctx context.Context, hash string) (string, error) {
 	return getCidByHashRes[0].Cid, nil
 }
 
+// GetEthHashByCid 用消息 cid 反查 eth tx hash（/aggregators/hash_by_messagecid 的实现）。
+//
+// 入参只有 cid、没有高度：cid 与「一个 DSN 一段高度区间」的分片模型之间没有任何映射关系，
+// 所以只能靠索引探测定位库。管道（pool-monitor/hash_by_messagecid.js）是
+// {$match:{Cid:ctx.Cid}} + {$project:{_id:0,Hash:"$_id"}}，投影要取文档 _id
+// （eth hash 存在 _id 上）⇒ 非覆盖，命中的库必须 FETCH 文档。
+//
+// 因此这里走两阶段：先用 find({Cid:X},{_id:0,Cid:1}).limit(1) 覆盖索引探测
+// （EthHash 上生产索引是 Cid_1_Epoch_1，复合前缀可服务该查询且能覆盖该投影）
+// 定位 cid 落在哪个库，再只在命中库上跑原来的完整管道 —— 返回结果与
+// MultiTraversalQuery 完全一致（同一个管道、同一张表、同样的 cid），
+// 只是不再让 11 个冷库各跑一次完整管道 + 各 FETCH 一次文档。
 func GetEthHashByCid(ctx context.Context, mcidStr string) (string, error) {
 	// f4 & other
 
@@ -847,7 +859,7 @@ func GetEthHashByCid(ctx context.Context, mcidStr string) (string, error) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiTraversalQuery(ctx, pipe, countUtils, "EthHash")
+		multiResult, err := multiquery.MultiTraversalQueryByCidOnTable(ctx, pipe, countUtils, "EthHash", mcidStr, multiquery.EthHashCidProbeFields)
 		if err != nil {
 			return "", err
 		}

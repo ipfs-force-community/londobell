@@ -43,6 +43,21 @@ const (
 // SignedCid_1 只有 1.5GB，用兜底。
 var CidProbeFields = []string{probeFieldCid, probeFieldSignedCid}
 
+// EthHashCidProbeFields 是「消息 cid 落在哪个库」在 EthHash 集合上的探测键字段顺序。
+//
+// 与 ExecTrace 不同，EthHash 的管道（pool-monitor/hash_by_messagecid.js：
+// {$match:{Cid:ctx.Cid}} + {$project:{_id:0,Hash:"$_id"}}）只按 Cid 匹配，落库形态只有一种，
+// 不存在 SignedCid 那种备用字段 —— 只探 Cid 一个键就够，多探一次只有成本没有收益。
+//
+// 覆盖性说明：EthHash 上没有 Cid 单键索引，生产索引是 Cid_1_Epoch_1（sparse 复合索引）。
+// 复合索引的前缀可以服务「只按 Cid 等值」的查询，而覆盖投影只要求「投影里出现的字段都在
+// 同一个索引里」（{Cid:1,Epoch:1} 含 Cid），所以 find({Cid:X},{_id:0,Cid:1}).limit(1)
+// 依然能拿到 PROJECTION_COVERED（keysExamined=1、docsExamined=0）。
+// 这一点必须用 explain 在真实冷库上复核（见 ethhash_cid_traversal_mongo_test.go 的
+// probe_plan_is_projection_covered 子测试），并且要求 EthHash.Cid 是标量字段：
+// 数组字段上的 multikey 索引不能覆盖查询。
+var EthHashCidProbeFields = []string{probeFieldCid}
+
 // cidProbeFilter 构造探测用的单键过滤器。
 //
 // 只允许单键：
@@ -196,7 +211,27 @@ func cidCandidates(countLists []CountUtil, tableName string) []cidCandidate {
 // 返回值、错误语义与 MultiTraversalQuery 保持完全一致（返回管道原始 []bson.M），
 // 调用方（trace_for_message 等）的响应结构与前端契约不变。
 func MultiTraversalQueryByCid(ctx context.Context, pipe interface{}, countLists []CountUtil, tableName, cid string) ([]bson.M, error) {
-	return traversalQueryByCid(ctx, mongoCidProbe, mongoCidAggregate, pipe, countLists, tableName, cid, CidProbeFields)
+	return MultiTraversalQueryByCidOnTable(ctx, pipe, countLists, tableName, cid, CidProbeFields)
+}
+
+// MultiTraversalQueryByCidOnTable 是两阶段查询的通用入口：先只读覆盖索引探测定位 cid 落在哪个库，
+// 再只在命中库上跑完整管道。MultiTraversalQueryByCid 与 /aggregators/hash_by_messagecid
+// （EthHash）走的就是这一套编排，区别只在集合名与探测键字段。
+//
+// probeFields 必须满足三条硬约束（否则探测会比原管道更贵或漏命中）：
+//  1. 每个字段在该集合上都有可用索引，且「单键等值」能命中它（复合索引前缀也算）；
+//  2. 投影 {_id:0, Cid:1} 对该索引是覆盖的 —— 投影里的字段必须都在同一个索引里，
+//     否则计划退化成 FETCH，冷盘上又要读文档页；
+//  3. 探测键必须是「管道 $match 里等值条件的子集」：探测只看这些键，管道可能还有别的条件，
+//     所以允许「探测命中但管道为空」，由 aggregateOnHits 继续试下一个候选库。
+//
+// 调用方按集合的落库形态传字段：ExecTrace 用 CidProbeFields（Cid → SignedCid），
+// EthHash 用 EthHashCidProbeFields（只有 Cid）。
+//
+// 返回值、错误语义与 MultiTraversalQuery 保持一致（返回管道原始 []bson.M）。
+func MultiTraversalQueryByCidOnTable(ctx context.Context, pipe interface{}, countLists []CountUtil,
+	tableName, cid string, probeFields []string) ([]bson.M, error) {
+	return traversalQueryByCid(ctx, mongoCidProbe, mongoCidAggregate, pipe, countLists, tableName, cid, probeFields)
 }
 
 // traversalQueryByCid 是两阶段查询的编排本体，探测/聚合以函数注入，便于单测。
