@@ -55,12 +55,29 @@ type Config struct {
 	FanoutRequestConcurrency int
 
 	// 单请求「结果集/响应体」字节上限（见 multi-query/common/result_size.go）。
-	//   MaxResultBytes: 0 = 内置默认(16 MiB)；>0 = 该字节数；<0 = 关闭上限(回退旧行为)。
-	// 任何一次 `cur.All()` 物化累计超过上限即**显式报错**（*ResultTooLargeError，
-	// util.ReturnOnErr 映射成 HTTP 5xx），绝不静默截断、绝不返回部分数据。
-	// 环境变量 LONDOBELL_MAX_RESULT_BYTES（字节，<=0 关闭）优先级更高。
-	// 配置文件改动经 30s 配置巡检热生效；环境变量需要重启进程。
-	MaxResultBytes int64
+	// 分**两档**：查询类与元数据类。两档各自独立取值、独立来源，同一次
+	// ApplyResultSizePolicy 一起落定。
+	//
+	//   MaxResultBytes（查询类：shard_query / query / response:* 等扇出与请求驱动的物化）
+	//     0 = 内置默认(16 MiB)；>0 = 该字节数；<0 = 关闭上限(回退旧行为)。
+	//
+	//   MetadataMaxResultBytes（元数据类：metadata / segment_state，即进程启动与状态
+	//   刷新必须全量加载的元数据）
+	//     0 = 内置默认(256 MiB)；>0 = 该字节数；<0 = 关闭上限。
+	//     为什么单独一档：元数据是**启动自身依赖**的数据，用查询档的 16 MiB 去卡它会让
+	//     进程起不来（2026-09-30 实测：启动加载 segment_state = 16,777,354 字节，
+	//     被 16 MiB 默认上限拒掉 ⇒ 聚合器 exit 1 崩溃循环）。元数据随链增长
+	//     （actor/method 数量），所以默认值取实测值的 ~16×。
+	//
+	// 任何一次 `cur.All()` 物化累计超过**该 op 所属档**的上限即**显式报错**
+	// （*ResultTooLargeError，util.ReturnOnErr 映射成 HTTP 5xx），绝不静默截断、
+	// 绝不返回部分数据；累计达到上限的 80% 会打一条 warn 日志（可观测告警）。
+	// 环境变量 LONDOBELL_MAX_RESULT_BYTES / LONDOBELL_METADATA_MAX_RESULT_BYTES
+	// （字节，<=0 关闭）优先级更高。
+	// 配置文件改动经 30s 配置巡检热生效（无需环境变量、无需重启）；环境变量需要重启进程。
+	// 生效值与来源在启动/每次热重载时打一行 `result size policy applied: ...` 日志。
+	MaxResultBytes         int64
+	MetadataMaxResultBytes int64
 }
 
 type DB struct {

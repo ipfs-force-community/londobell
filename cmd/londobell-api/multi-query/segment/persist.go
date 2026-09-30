@@ -466,7 +466,11 @@ func (s *Segment) GetBlockStates(ctx context.Context, dsn string) ([]model.Segme
 
 	var res []model.SegmentState
 	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
-		return nil, nil
+		// 必须上报错误：原来这里是 `return nil, nil`，会把「元数据物化失败」
+		// 伪装成「这个库没有 BlockState」，调用方拿着空元数据继续跑 ——
+		// 与「绝不静默返回部分/空结果」的原则冲突（也正是启动期元数据超限
+		// 会被静默吞掉的那条路径）。
+		return nil, err
 	}
 
 	return res, nil
