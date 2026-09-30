@@ -312,8 +312,12 @@ type shardQueryRunner func(ctx context.Context, col *mongo.Collection, pipe inte
 // shardQueryFunc 是当前使用的分片查询实现。测试可临时替换（务必用 defer 还原）。
 var shardQueryFunc shardQueryRunner = mongoShardQuery
 
-// mongoShardQuery 是真实实现：聚合 + cur.All 全量物化。
+// mongoShardQuery 是真实实现：聚合 + 全量物化。
 // AllowDiskUse 的口径与原实现一致（BlockMessage 需要）。
+//
+// 物化走 common.BoundedAll（= cur.All 的带上限替代）：语义逐字节一致（含顺序），
+// 但累计 BSON 字节超过 MaxResultBytes 时返回 *common.ResultTooLargeError ——
+// 这是**显式错误**，绝不会返回被截断的部分结果。上限<=0 时完全回退 cur.All 行为。
 func mongoShardQuery(ctx context.Context, col *mongo.Collection, pipe interface{}, allowDiskUse bool) ([]bson.M, error) {
 	var (
 		cur *mongo.Cursor
@@ -329,7 +333,7 @@ func mongoShardQuery(ctx context.Context, col *mongo.Collection, pipe interface{
 	}
 
 	var res []bson.M
-	if err := cur.All(ctx, &res); err != nil {
+	if err := common.BoundedAll(ctx, cur, &res, "shard_query"); err != nil {
 		return nil, err
 	}
 

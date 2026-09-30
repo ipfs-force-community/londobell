@@ -801,7 +801,7 @@ func GetAllBlockMethodNamesMap(ctx context.Context, startEpoch, endEpoch abi.Cha
 				return nil, err
 			}
 
-			err = cur.All(ctx, &allBlockMethodNamesRes)
+			err = common.BoundedAll(ctx, cur, &allBlockMethodNamesRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return nil, err
@@ -917,7 +917,7 @@ func GetAllActorMethods(ctx context.Context, startEpoch, endEpoch abi.ChainEpoch
 				return nil, err
 			}
 
-			err = cur.All(ctx, &allMethodsForActorRes)
+			err = common.BoundedAll(ctx, cur, &allMethodsForActorRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return nil, err
@@ -951,7 +951,7 @@ func GetAllActorsMethods(ctx context.Context, startEpoch, endEpoch abi.ChainEpoc
 				return nil, err
 			}
 
-			err = cur.All(ctx, &allActorsMethodsRes)
+			err = common.BoundedAll(ctx, cur, &allActorsMethodsRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return nil, err
@@ -985,7 +985,7 @@ func GetAllActorsMsgsCount(ctx context.Context, startEpoch, endEpoch abi.ChainEp
 				return nil, err
 			}
 
-			err = cur.All(ctx, &allActorsMsgsCountRes)
+			err = common.BoundedAll(ctx, cur, &allActorsMsgsCountRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return nil, err
@@ -1019,7 +1019,7 @@ func GetAllActorsTransferMsgsCount(ctx context.Context, startEpoch, endEpoch abi
 				return nil, err
 			}
 
-			err = cur.All(ctx, &allActorsTransferMsgsCountRes)
+			err = common.BoundedAll(ctx, cur, &allActorsTransferMsgsCountRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return nil, err
@@ -1053,7 +1053,7 @@ func GetAllMinersMinedCount(ctx context.Context, startEpoch, endEpoch abi.ChainE
 				return nil, err
 			}
 
-			err = cur.All(ctx, &allMinersMinedCount)
+			err = common.BoundedAll(ctx, cur, &allMinersMinedCount, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return nil, err
@@ -1675,7 +1675,7 @@ func GetTipSetStates(ctx context.Context, state *segment.State, cols common.Coll
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -1765,7 +1765,7 @@ func GetBlockMethodStates(ctx context.Context, state *segment.State, cols common
 				return nil, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return nil, err
@@ -1819,7 +1819,7 @@ func GetAllBlockMethodNames(ctx context.Context, state *segment.State, cols comm
 				return nil, err
 			}
 
-			err = cur.All(ctx, &allBlockMethodNamesRes)
+			err = common.BoundedAll(ctx, cur, &allBlockMethodNamesRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return nil, err
@@ -1857,7 +1857,7 @@ func GetActorStates(ctx context.Context, state *segment.State, cols common.Colle
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -1904,7 +1904,7 @@ func GetActorMethodStates(ctx context.Context, state *segment.State, cols common
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -1952,7 +1952,7 @@ func GetAllActorMethodStates(ctx context.Context, state *segment.State, cols com
 				return nil, err
 			}
 
-			err = cur.All(ctx, &allMethodsForActorRes)
+			err = common.BoundedAll(ctx, cur, &allMethodsForActorRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return nil, err
@@ -1994,7 +1994,7 @@ func GetActorTransferStates(ctx context.Context, state *segment.State, cols comm
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -2037,7 +2037,7 @@ func GetActorEventStates(ctx context.Context, state *segment.State, cols common.
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -2084,7 +2084,7 @@ func GetMinedStates(ctx context.Context, state *segment.State, cols common.Colle
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -2132,7 +2132,7 @@ func GetLargeAmountTransferStates(ctx context.Context, state *segment.State, col
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -2176,7 +2176,7 @@ func GetDealActorStates(ctx context.Context, state *segment.State, cols common.C
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -2223,7 +2223,7 @@ func GetActorTransferBlockRewardStates(ctx context.Context, state *segment.State
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -2270,7 +2270,7 @@ func GetActorTransferBurnStates(ctx context.Context, state *segment.State, cols 
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -2317,7 +2317,7 @@ func GetActorTransferSendAndReceiveStates(ctx context.Context, state *segment.St
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -2364,7 +2364,7 @@ func GetActorTransferSendStates(ctx context.Context, state *segment.State, cols 
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err
@@ -2411,7 +2411,7 @@ func GetActorTransferReceiveStates(ctx context.Context, state *segment.State, co
 				return 0, err
 			}
 
-			err = cur.All(ctx, &countRes)
+			err = common.BoundedAll(ctx, cur, &countRes, "metadata")
 			if err != nil {
 				//log.Errorf("cur.All for all actors failed, lastHeightForAllActors: %v, finalHeight: %v, err: %v", lastHeightForAllActors, finalHeight, err)
 				return 0, err

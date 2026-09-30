@@ -60,7 +60,7 @@ func GetBlockHeaderByCid(c *gin.Context) {
 		}
 
 		raw := multiResult
-		rawByte, err := json.Marshal(raw)
+		rawByte, err := util.MarshalBounded(raw, "response:blockheader_by_cid")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
