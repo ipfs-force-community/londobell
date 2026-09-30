@@ -43,7 +43,7 @@ func GetFinalHeight(ctx context.Context, cols common.Collections) (abi.ChainEpoc
 					return err
 				}
 
-				return cur.All(ctx, &finalHeightRes)
+				return common.BoundedAll(ctx, cur, &finalHeightRes, "query")
 			})
 			if err != nil {
 				return 0, err
@@ -76,7 +76,7 @@ func GetStateFinalHeight(ctx context.Context, cols common.Collections) (abi.Chai
 					return err
 				}
 
-				return cur.All(ctx, &finalHeightRes)
+				return common.BoundedAll(ctx, cur, &finalHeightRes, "query")
 			})
 			if err != nil {
 				return 0, err
@@ -104,7 +104,7 @@ func GetIncomingBlock(ctx context.Context, pipe interface{}, cols common.Collect
 					return err
 				}
 
-				return cur.All(ctx, &blockHeaderRes)
+				return common.BoundedAll(ctx, cur, &blockHeaderRes, "query")
 			})
 
 			return blockHeaderRes, err
@@ -132,7 +132,7 @@ func GetStartEpochForDeal(ctx context.Context, cols common.Collections) (int64, 
 					return err
 				}
 
-				return cur.All(ctx, &res)
+				return common.BoundedAll(ctx, cur, &res, "query")
 			})
 			if err != nil {
 				return 0, err
@@ -174,7 +174,7 @@ func GetDealIDRange(ctx context.Context, cols common.Collections, startEpoch, en
 			}
 
 			err = withShardSlot(ctx, func() error {
-				return startCur.All(ctx, &startRes)
+				return common.BoundedAll(ctx, startCur, &startRes, "query")
 			})
 			if err != nil {
 				return 0, 0, err
@@ -192,7 +192,7 @@ func GetDealIDRange(ctx context.Context, cols common.Collections, startEpoch, en
 			}
 
 			err = withShardSlot(ctx, func() error {
-				return endCur.All(ctx, &endRes)
+				return common.BoundedAll(ctx, endCur, &endRes, "query")
 			})
 			if err != nil {
 				return 0, 0, err
@@ -985,7 +985,7 @@ func CommonCount(ctx context.Context, col *mongo.Collection, req model.CommonReq
 			return err
 		}
 
-		return cur.All(ctx, &countRes)
+		return common.BoundedAll(ctx, cur, &countRes, "query")
 	})
 	if err != nil {
 		return 0, err
@@ -1019,7 +1019,7 @@ func GetDetail(ctx context.Context, end, limit int64, countUtil CountUtil, aggre
 			return err
 		}
 
-		if err := cur.All(ctx, &aggRes); err != nil {
+		if err := common.BoundedAll(ctx, cur, &aggRes, "query"); err != nil {
 			log.Errorf("get detail all failed: %w", err)
 			return err
 		}

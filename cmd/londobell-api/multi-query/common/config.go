@@ -53,6 +53,14 @@ type Config struct {
 	// child_transfers_for_message)的请求级并发上限：0 = 关闭(默认)，>0 = 超限即 503 快速失败。
 	// 环境变量 LONDOBELL_FANOUT_REQUEST_CONCURRENCY 优先级更高。
 	FanoutRequestConcurrency int
+
+	// 单请求「结果集/响应体」字节上限（见 multi-query/common/result_size.go）。
+	//   MaxResultBytes: 0 = 内置默认(16 MiB)；>0 = 该字节数；<0 = 关闭上限(回退旧行为)。
+	// 任何一次 `cur.All()` 物化累计超过上限即**显式报错**（*ResultTooLargeError，
+	// util.ReturnOnErr 映射成 HTTP 5xx），绝不静默截断、绝不返回部分数据。
+	// 环境变量 LONDOBELL_MAX_RESULT_BYTES（字节，<=0 关闭）优先级更高。
+	// 配置文件改动经 30s 配置巡检热生效；环境变量需要重启进程。
+	MaxResultBytes int64
 }
 
 type DB struct {

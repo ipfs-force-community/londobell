@@ -57,7 +57,7 @@ func GetTipSet(c *gin.Context) {
 		}
 
 		raw := multiResult
-		rawByte, err := json.Marshal(raw)
+		rawByte, err := util.MarshalBounded(raw, "response:tipset")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)

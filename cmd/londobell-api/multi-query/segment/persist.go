@@ -446,7 +446,7 @@ func (s *Segment) GetDBState(ctx context.Context, dsn string) (*model.DBState, b
 	}
 
 	var res []*model.DBState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, false, err
 	}
 
@@ -465,7 +465,7 @@ func (s *Segment) GetBlockStates(ctx context.Context, dsn string) ([]model.Segme
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, nil
 	}
 
@@ -479,7 +479,7 @@ func (s *Segment) GetBlockMethodStates(ctx context.Context, dsn string, methodNa
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, err
 	}
 
@@ -493,7 +493,7 @@ func (s *Segment) GetAllBlockMethodStates(ctx context.Context, dsn string) ([]mo
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, err
 	}
 
@@ -507,7 +507,7 @@ func (s *Segment) GetActorStates(ctx context.Context, dsn string, actorID string
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, err
 	}
 
@@ -521,7 +521,7 @@ func (s *Segment) GetAllActorStates(ctx context.Context, dsn string) ([]model.Se
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, err
 	}
 
@@ -535,7 +535,7 @@ func (s *Segment) GetActorMethodStates(ctx context.Context, dsn string, actorID 
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, err
 	}
 
@@ -549,7 +549,7 @@ func (s *Segment) GetAllActorMethodStates(ctx context.Context, dsn string) ([]mo
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, err
 	}
 
@@ -563,7 +563,7 @@ func (s *Segment) GetActorTransferStates(ctx context.Context, dsn string, actorI
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, err
 	}
 
@@ -577,7 +577,7 @@ func (s *Segment) GetAllActorTransferStates(ctx context.Context, dsn string) ([]
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, err
 	}
 
@@ -591,7 +591,7 @@ func (s *Segment) GetMinedStates(ctx context.Context, dsn string, actorID string
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, err
 	}
 
@@ -609,7 +609,7 @@ func (s *Segment) GetAllMinedStates(ctx context.Context, dsn string) ([]model.Se
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, err
 	}
 
@@ -627,7 +627,7 @@ func (s *Segment) GetLargeAmountTransferStates(ctx context.Context, dsn string) 
 	}
 
 	var res []model.SegmentState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return nil, err
 	}
 
@@ -698,7 +698,7 @@ func (s *Segment) GetDealState(ctx context.Context, dsn string) (model.DealState
 	}
 
 	var res []model.DealState
-	if err = cur.All(ctx, &res); err != nil {
+	if err = common.BoundedAll(ctx, cur, &res, "segment_state"); err != nil {
 		return model.DealState{}, false, err
 	}
 

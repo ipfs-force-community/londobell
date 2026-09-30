@@ -57,8 +57,30 @@ func (dbsm *DataBaseStateManager) GetState(ctx context.Context, dsn string) (*se
 }
 
 // 从数据库获取数据,刷新缓存
+//
+// 这条路径（Segment.GetState）会对元数据 mongo 顺序发 7 次无界 find（DBState /
+// BlockState / BlockMethodState / ActorState / ActorMethodState / ActorTransferState /
+// MinedState / LargeAmountTransferState），事故堆快照里
+// `Cursor.All ← segment.GetAllActorMethodStates ← GetState ← RefreshState`
+// 就是最大分配点之一，而它**不在**出站分片查询闸门的覆盖范围内。
+//
+// 这里把整轮元数据刷新放进同一个全局闸门（withShardSlot）：一次刷新占一个令牌，
+// 因此「全进程在飞的元数据刷新轮数」被钉在闸门上限内。拿不到令牌时显式报错
+// （*FanoutSaturatedError），绝不返回半份 state。
+//
+// 注意：调用方（refreshUncached）是先 GetState、后做业务扇出，两者不嵌套，
+// 因此不会出现「持有令牌再等第二个令牌」的自锁。
 func (dbsm *DataBaseStateManager) RefreshState(ctx context.Context, dsn string) (*segment.State, bool, error) {
-	state, found, err := dbsm.Segment.GetState(ctx, dsn)
+	var (
+		state *segment.State
+		found bool
+		err   error
+	)
+
+	err = withShardSlot(ctx, func() error {
+		state, found, err = dbsm.Segment.GetState(ctx, dsn)
+		return err
+	})
 	if err != nil {
 		return nil, false, err
 	}
@@ -461,9 +483,10 @@ func (dbsm *DataBaseStateManager) SetConfig(cfg config2.Config) {
 
 	dbsm.DBCfg.Cfg = cfg
 
-	// 配置热重载：同步落定出站分片查询闸门（fanout_gate.go）。
+	// 配置热重载：同步落定出站分片查询闸门（fanout_gate.go）与单请求结果集字节上限。
 	ApplyShardGatePolicy(cfg)
 	ApplyFanoutRequestGatePolicy(cfg)
+	common.ApplyResultSizePolicy(cfg)
 }
 
 func (dbsm *DataBaseStateManager) UpdateDBCollectionsMap(url string, collections config2.Collections) {
@@ -500,6 +523,7 @@ func FirstLoad(ctx context.Context, dbsm *DataBaseStateManager) error {
 	cfg := dbsm.GetCfg()
 	ApplyShardGatePolicy(cfg)
 	ApplyFanoutRequestGatePolicy(cfg)
+	common.ApplyResultSizePolicy(cfg)
 
 	if err := dbsm.LoadDBCollectionsMap(ctx); err != nil {
 		return err
@@ -783,7 +807,7 @@ func GetTipSetStartEpoch(ctx context.Context, cols config2.Collections) (abi.Cha
 				return 0, err
 			}
 
-			err = cur.All(ctx, &boundaryRes)
+			err = common.BoundedAll(ctx, cur, &boundaryRes, "boundary")
 			if err != nil {
 				return 0, err
 			}
@@ -816,7 +840,7 @@ func GetEndEpoch(ctx context.Context, cols config2.Collections) (abi.ChainEpoch,
 			if err != nil {
 				return 0, err
 			}
-			err = cur.All(ctx, &finalHeightRes)
+			err = common.BoundedAll(ctx, cur, &finalHeightRes, "boundary")
 			if err != nil {
 				return 0, err
 			}
