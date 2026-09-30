@@ -460,6 +460,10 @@ func (dbsm *DataBaseStateManager) SetConfig(cfg config2.Config) {
 	defer dbsm.DBCfg.DBCollectionsConfigLk.Unlock()
 
 	dbsm.DBCfg.Cfg = cfg
+
+	// 配置热重载：同步落定出站分片查询闸门（fanout_gate.go）。
+	ApplyShardGatePolicy(cfg)
+	ApplyFanoutRequestGatePolicy(cfg)
 }
 
 func (dbsm *DataBaseStateManager) UpdateDBCollectionsMap(url string, collections config2.Collections) {
@@ -491,6 +495,12 @@ type DealRange struct {
 }
 
 func FirstLoad(ctx context.Context, dbsm *DataBaseStateManager) error {
+	// 出站分片查询闸门（fanout_gate.go）：启动时按配置/环境变量落定一次，
+	// 之后配置热重载经 SetConfig 再落定。
+	cfg := dbsm.GetCfg()
+	ApplyShardGatePolicy(cfg)
+	ApplyFanoutRequestGatePolicy(cfg)
+
 	if err := dbsm.LoadDBCollectionsMap(ctx); err != nil {
 		return err
 	}
