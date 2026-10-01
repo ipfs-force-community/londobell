@@ -1646,6 +1646,53 @@ func refreshTotalCountForActorTransferReceiveMsgs(ctx context.Context, state *se
 	}
 }
 
+// tipsetSegmentCountTTL 单段 tipset 计数缓存的有效期。
+//
+// 为什么敢用长 TTL：Formal/Cold 分段的 [start, end) 来自分段元数据、闭合后不再变化
+// （见 refreshTotalCountForTipSets：三个分支里只有 Tmp 会 SetStartEpoch/SetEndEpoch），
+// 所以历史区间的条数是个定值，重算结果必然相同。缓存键里带上区间本身，
+// 万一区间真变了键就跟着变，不会拿旧区间的数字冒充新区间 —— 天然自愈。
+const tipsetSegmentCountTTL = time.Hour
+
+type tipsetSegmentCountEntry struct {
+	count     int64
+	storedAt  time.Time
+	expiresAt time.Time
+}
+
+// tipsetSegmentCountCache key: "dsn|start|end" → tipsetSegmentCountEntry
+var tipsetSegmentCountCache sync.Map
+
+// tipsetSegmentCountKey 组装分段计数缓存键，并判断该段是否可缓存。
+//
+// 为什么必须加这层缓存（2026-10-01 /tipset/chain 事故）：
+// 该计数走「$match {_id 区间} + $group {_id:0, Count:{$sum:1}}」，mongo 必须扫完整段的索引键
+// （cali 实测 keysExamined=2434325），单次 **22.8 秒**；
+// 而上游 multi-query/metadata_cache.go 那层 30 秒 TTL 缓存的键里含 curEpoch
+// （calibnet 每 ~30 秒就变一次），对「不可变的历史区间」等于没有缓存
+// ⇒ 每个 epoch 都为同一个历史区间重扫一遍，页面常年 24 秒起、还伴随内存峰值。
+// 这里按不可变区间缓存，把重复代价降到 O(1)，只让真正变化的 Tmp 段走实时查询。
+func tipsetSegmentCountKey(state *segment.State) (string, bool) {
+	if state.GetDType() == smodel.Tmp {
+		// Tmp 段的 end 每 epoch 前进（endEpoch = curEpoch+1），区间一直在动；
+		// 且它的区间很短，实测只要亚毫秒，不掺和缓存。
+		return "", false
+	}
+	return fmt.Sprintf("%s|%d|%d", state.GetDSN(), int64(state.GetStartEpoch()), int64(state.GetEndEpoch())), true
+}
+
+func storeTipsetSegmentCount(cacheable bool, key string, count int64) {
+	if !cacheable {
+		return
+	}
+	now := time.Now()
+	tipsetSegmentCountCache.Store(key, tipsetSegmentCountEntry{
+		count:     count,
+		storedAt:  now,
+		expiresAt: now.Add(tipsetSegmentCountTTL),
+	})
+}
+
 func GetTipSetStates(ctx context.Context, state *segment.State, cols common.Collections, methodName string) (int64, error) {
 	rlog := log.With("query", "GetTipSetStates")
 
@@ -1657,6 +1704,19 @@ func GetTipSetStates(ctx context.Context, state *segment.State, cols common.Coll
 
 	if endEpoch <= startEpoch {
 		return 0, nil
+	}
+
+	// 命中不可变区间缓存就直接返回，不再向 mongo 发那条 22.8 秒的全段扫描。
+	cacheKey, cacheable := tipsetSegmentCountKey(state)
+	if cacheable {
+		if v, ok := tipsetSegmentCountCache.Load(cacheKey); ok {
+			if entry, ok := v.(tipsetSegmentCountEntry); ok && time.Now().Before(entry.expiresAt) {
+				rlog.Infof("tipset segment count cache hit: dsn=%v range=[%v, %v) count=%v cached_ago=%v saved=%v",
+					state.GetDSN(), startEpoch, endEpoch, entry.count,
+					time.Since(entry.storedAt).Truncate(time.Millisecond), time.Since(start).Truncate(time.Microsecond))
+				return entry.count, nil
+			}
+		}
 	}
 
 	var countRes []model.CountRes
@@ -1681,11 +1741,13 @@ func GetTipSetStates(ctx context.Context, state *segment.State, cols common.Coll
 				return 0, err
 			}
 
-			if len(countRes) == 0 {
-				return 0, nil
+			count := int64(0)
+			if len(countRes) > 0 {
+				count = countRes[0].Count
 			}
-
-			return countRes[0].Count, nil
+			// 空结果也照存：不可变区间的 0 同样是定值，避免每次都白扫一遍。
+			storeTipsetSegmentCount(cacheable, cacheKey, count)
+			return count, nil
 		}
 	}
 
