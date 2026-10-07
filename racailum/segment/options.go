@@ -1,6 +1,8 @@
 package segment
 
 import (
+	"time"
+
 	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/ipfs-force-community/londobell/racailum/segment/aggregate"
@@ -17,6 +19,16 @@ type extractOptions struct {
 
 	TipSetPartSizeLimit int
 
+	// 作业级超时与重试。
+	// 背景（2026-10-08 主网事故）：单个 tipset 的抽取内部要走节点 RPC，而 go-jsonrpc
+	// 在连接异常时会卡在等 nil channel 上永不返回；原实现给作业的 context 只有 cancel
+	// 没有 deadline，于是一次卡死 = 整批永久停摆、游标不动、进程却"看着还活着"。
+	// 现在每次尝试都有独立 deadline，超时即放弃该次尝试并重试；重试用尽返回错误，
+	// 上层（Run 循环）会在下一个 tipset 到来时按游标整段重跑，实现自愈。
+	TipSetJobTimeout time.Duration
+	StateJobTimeout  time.Duration
+	JobRetry         int
+
 	ExtractOptions extract.Options
 
 	OnlyExtractState bool
@@ -26,6 +38,9 @@ type persistOptions struct {
 	Async            bool
 	AsyncState       bool
 	BatchInsertLimit int
+
+	// 落库等待上限：Mongo 写入挂住时同样不能永久等待（异步等待与同步插入都受它约束）。
+	WaitTimeout time.Duration
 }
 
 // Options for segment
@@ -52,6 +67,12 @@ func DefaultOptions() Options {
 
 			TipSetPartSizeLimit: 16,
 
+			// 20 分钟对「日边界全量 actor 余额」那类重 tipset 留了约 3 倍余量
+			// （线上实测该 tipset 约 6~8 分钟）；重试 1 次 = 最多 2 次尝试。
+			TipSetJobTimeout: 20 * time.Minute,
+			StateJobTimeout:  5 * time.Minute,
+			JobRetry:         1,
+
 			ExtractOptions:   extract.DefaultOptions(),
 			OnlyExtractState: false,
 		},
@@ -60,6 +81,7 @@ func DefaultOptions() Options {
 			Async:            true,
 			AsyncState:       false,
 			BatchInsertLimit: 4 << 10,
+			WaitTimeout:      10 * time.Minute,
 		},
 
 		AllToCheckTableList: []string{
@@ -109,6 +131,42 @@ func StateJobLimit(limit int) OptionFn {
 	return func(opt *Options) {
 		if limit > 0 {
 			opt.Extract.StateJobLimit = limit
+		}
+	}
+}
+
+// TipSetJobTimeout override the per-tipset job timeout by the given positive duration
+func TipSetJobTimeout(d time.Duration) OptionFn {
+	return func(opt *Options) {
+		if d > 0 {
+			opt.Extract.TipSetJobTimeout = d
+		}
+	}
+}
+
+// StateJobTimeout override the per-regular-state job timeout by the given positive duration
+func StateJobTimeout(d time.Duration) OptionFn {
+	return func(opt *Options) {
+		if d > 0 {
+			opt.Extract.StateJobTimeout = d
+		}
+	}
+}
+
+// JobRetry override the per-job retry count (non-negative)
+func JobRetry(n int) OptionFn {
+	return func(opt *Options) {
+		if n >= 0 {
+			opt.Extract.JobRetry = n
+		}
+	}
+}
+
+// PersistWaitTimeout override the persist wait timeout by the given positive duration
+func PersistWaitTimeout(d time.Duration) OptionFn {
+	return func(opt *Options) {
+		if d > 0 {
+			opt.Persist.WaitTimeout = d
 		}
 	}
 }

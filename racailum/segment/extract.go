@@ -55,6 +55,141 @@ func (cio *rawChainIO) ChainPutObj(ctx context.Context, blk bf.Block) error {
 	return nil
 }
 
+// jobRetryBackoff 是作业重试前的固定退避（变量形式便于测试缩短）。
+var jobRetryBackoff = 3 * time.Second
+
+// extractJobTimeoutErr 表示「作业在 deadline 内没有返回」这一类错误。
+type extractJobTimeoutErr struct {
+	what    string
+	timeout time.Duration
+}
+
+func (e *extractJobTimeoutErr) Error() string {
+	return fmt.Sprintf("%s: extract job timeout after %s", e.what, e.timeout)
+}
+
+// extractJobWithTimeout 以「单次尝试带 deadline + 失败重试」执行一个抽取作业。
+//
+// 为什么要在独立 goroutine 里跑并「超时即放弃」而不是只给 context 加 deadline：
+// 挂死点位于 go-jsonrpc 客户端内部（等一个永不送达的响应 / nil channel），它不保证
+// 响应 context 取消，所以必须允许放弃该次尝试。被放弃的 goroutine 会泄漏，但有上限
+// （重试次数 × 并发作业数），且它只写自己那份 *extract.Res，不与成功的那次共享状态。
+//
+// 重试用尽后返回错误，上层（Segment.Extract → RaCailum.Run 循环）会在下一个 tipset
+// 到来时按已提交的 final_height 整段重跑，因此这里不需要更复杂的恢复逻辑。
+func (s *Segment) extractJobWithTimeout(
+	parent context.Context,
+	timeout time.Duration,
+	attempts int,
+	elog *zap.SugaredLogger,
+	what string,
+	fn func(ctx context.Context) (*extract.Res, error),
+) (*extract.Res, error) {
+	if attempts < 1 {
+		attempts = 1
+	}
+	if timeout <= 0 {
+		timeout = 20 * time.Minute
+	}
+
+	type jobResult struct {
+		res *extract.Res
+		err error
+	}
+
+	var lastErr error
+	for i := 1; i <= attempts; i++ {
+		if err := parent.Err(); err != nil {
+			return nil, err
+		}
+
+		jobCtx, cancel := context.WithTimeout(parent, timeout)
+		done := make(chan jobResult, 1) // 缓冲 1：即使本次尝试被放弃，其 goroutine 也不会阻塞
+		go func() {
+			res, err := fn(jobCtx)
+			done <- jobResult{res: res, err: err}
+		}()
+
+		var (
+			res     *extract.Res
+			err     error
+			expired bool
+		)
+		select {
+		case r := <-done:
+			res, err = r.res, r.err
+		case <-jobCtx.Done():
+			expired = true
+			err = &extractJobTimeoutErr{what: what, timeout: timeout}
+		}
+		cancel()
+
+		if err == nil {
+			return res, nil
+		}
+		if parent.Err() != nil {
+			return nil, parent.Err()
+		}
+
+		lastErr = err
+		if expired {
+			stats.Record(parent, metrics.ExtractError.M(1))
+		}
+		if i < attempts {
+			elog.Warnw("extract job failed, will retry",
+				"what", what, "attempt", i, "of", attempts,
+				"timeout", timeout.String(), "expired", expired, "err", err)
+			select {
+			case <-time.After(jobRetryBackoff):
+			case <-parent.Done():
+				return nil, parent.Err()
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("extract job failed after %d attempt(s): %w", attempts, lastErr)
+}
+
+// waitAsyncPersist 等待异步落库完成，超过 timeout 视为失败。
+// 与作业超时同理：Mongo 写入挂住时不能永久等待（否则整批静默停摆）。
+//
+// 注意：multierror.Group.Wait() 返回具体类型 *multierror.Error，nil 值装进 error 接口后
+// 不再等于 nil（typed-nil），所以这里用具体类型接收、显式判空后再返回。
+func waitAsyncPersist(g *multierror.Group, timeout time.Duration) error {
+	if timeout <= 0 {
+		if e := g.Wait(); e != nil {
+			return e
+		}
+		return nil
+	}
+
+	done := make(chan *multierror.Error, 1)
+	go func() { done <- g.Wait() }()
+
+	select {
+	case e := <-done:
+		if e == nil {
+			return nil
+		}
+		return e
+	case <-time.After(timeout):
+		return fmt.Errorf("async persist wait timeout after %s", timeout)
+	}
+}
+
+// insertManyWithTimeout 同步落库，带超时（Mongo driver 会响应 context 取消）。
+func (s *Segment) insertManyWithTimeout(ctx context.Context, l *zap.SugaredLogger, docSets [][]common.Document) error {
+	timeout := s.opts.Persist.WaitTimeout
+	if timeout <= 0 {
+		return s.insertMany(ctx, l, docSets)
+	}
+
+	tctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return s.insertMany(tctx, l, docSets)
+}
+
 func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet, tmp bool) error {
 	ctx, span := trace.StartSpan(ctx, "segment.ExtractTipSets")
 	defer span.End()
@@ -151,7 +286,7 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		elog.Infow("part done", "done-parts", partDone, "done-tss", tsDone)
 	}
 
-	if err := pctx.asyncPersistWaitGroup.Wait(); err != nil {
+	if err := waitAsyncPersist(&pctx.asyncPersistWaitGroup, s.opts.Persist.WaitTimeout); err != nil {
 		return fmt.Errorf("error occurs in async persist: %s", err)
 	}
 
@@ -222,9 +357,17 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 				regCap = 700000
 			}
 
-			res := extract.NewRes(4096, regCap)
-
-			err = ets.Extract(ectx, res, ts, tmp)
+			// 每个 tipset 作业独立超时 + 重试：节点 RPC 卡死不再让整批永久停摆。
+			res, err := s.extractJobWithTimeout(innerCtx, s.opts.Extract.TipSetJobTimeout, s.opts.Extract.JobRetry+1, elog,
+				fmt.Sprintf("tipset %d", ts.Height()), func(jobCtx context.Context) (*extract.Res, error) {
+					jctx := *ectx
+					jctx.C = jobCtx
+					jres := extract.NewRes(4096, regCap)
+					if err := ets.Extract(&jctx, jres, ts, tmp); err != nil {
+						return nil, err
+					}
+					return jres, nil
+				})
 			if err != nil {
 				return common.NonCtxCanceledErr(err)
 			}
@@ -250,7 +393,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 
 		ctx.asyncPersistWaitGroup.Go(func() error {
 			defer func() { <-ctx.persistSem }()
-			if err := s.insertMany(ctx.ctx, elog, docs); err != nil {
+			if err := s.insertManyWithTimeout(ctx.ctx, elog, docs); err != nil {
 				if nerr := common.NonCtxCanceledErr(err); nerr != nil {
 					stats.Record(ctx.ctx, metrics.ExtractError.M(1))
 					elog.Errorf("insert extracted documents from tipsets: %s", err)
@@ -261,7 +404,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 			return nil
 		})
 	} else {
-		if err := s.insertMany(ctx.ctx, elog, docs); err != nil {
+		if err := s.insertManyWithTimeout(ctx.ctx, elog, docs); err != nil {
 			return fmt.Errorf("insert extracted documents from tipsets: %w", err)
 		}
 	}
@@ -335,9 +478,16 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, pctx *persistCtx, heads
 				}
 			}()
 
-			res := extract.NewRes(8, 0)
-
-			err = east.ExtractRegular(ctx, res, head)
+			res, err := s.extractJobWithTimeout(innerCtx, s.opts.Extract.StateJobTimeout, s.opts.Extract.JobRetry+1, ctx.L,
+				fmt.Sprintf("regular state #%d", hi), func(jobCtx context.Context) (*extract.Res, error) {
+					jctx := *ctx
+					jctx.C = jobCtx
+					jres := extract.NewRes(8, 0)
+					if err := east.ExtractRegular(&jctx, jres, head); err != nil {
+						return nil, err
+					}
+					return jres, nil
+				})
 			if err != nil {
 				return common.NonCtxCanceledErr(err)
 			}
@@ -372,7 +522,7 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, pctx *persistCtx, heads
 			return nil
 		})
 	} else {
-		if err := s.insertMany(originCtx, ctx.L, docs); err != nil {
+		if err := s.insertManyWithTimeout(originCtx, ctx.L, docs); err != nil {
 			return fmt.Errorf("insert extracted documents from regular states: %w", err)
 		}
 	}
