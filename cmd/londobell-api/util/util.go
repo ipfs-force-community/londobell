@@ -29,11 +29,14 @@ const (
 
 // filfox: AddLockedFund
 // todo: update upgrade
+// NV29 (FIP-0118) 起奖励 actor 新增一组 FRC-0042 导出方法（名字以 go-state-types
+// v0.19.0 builtin/v19/reward/methods.go 的 MethodMeta.Name 为准，含 Exported 后缀）。
+// 这些消息本身照常入库，但方法筛选下拉与按方法聚合桶只认本表，故须补齐。
 // Other is ""
 var AllMethodList = []string{
 	"AddBalance", "AddVerifiedClient", "AllowanceExported", "Approve", "AuthenticateMessage",
-	"Cancel", "CancelExported", "ChangeBeneficiary", "ChangeMultiaddrs", "ChangeOwnerAddress", "ChangePeerID",
-	"ChangeWorkerAddress", "Collect", "CompactPartitions", "CompactSectorNumbers", "ConfirmChangeWorkerAddress",
+	"Cancel", "CancelExported", "CancelPendingExported", "ChangeBeneficiary", "ChangeMultiaddrs", "ChangeOwnerAddress", "ChangePeerID",
+	"ChangeWorkerAddress", "ClaimExported", "Collect", "CompactPartitions", "CompactSectorNumbers", "ConfirmChangeWorkerAddress",
 	"ConfirmUpdateWorkerKey", "Constructor", "ControlAddresses", "CreateExternal", "CreateMiner",
 	"DeclareFaults", "DeclareFaultsRecovered", "DisputeWindowedPoSt",
 	"Exec", "ExtendClaimTerms", "ExtendSectorExpiration", "ExtendSectorExpiration2",
@@ -44,8 +47,8 @@ var AllMethodList = []string{
 	"PreCommitSector", "PreCommitSectorBatch", "PreCommitSectorBatch2", "Propose", "ProveCommitAggregate",
 	"ProveCommitSector", "ProveCommitSectors3", "ProveCommitSectorsNI", "ProveReplicaUpdates", "ProveReplicaUpdates2",
 	"ProveReplicaUpdates3", "PubkeyAddress", "PublishStorageDeals",
-	"RemoveExpiredAllocations", "RemoveSigner", "RepayDebt", "ReportConsensusFault",
-	"Send", "Send(ethaccount)", "Send(placeholder)", "Settle", "SubmitWindowedPoSt", "SwapSigner",
+	"RegisterStreamExported", "RemoveExpiredAllocations", "RemoveSigner", "RemoveStreamExported", "RepayDebt", "ReplaceAddressExported", "ReportConsensusFault",
+	"Send", "Send(ethaccount)", "Send(placeholder)", "SetDistributionExported", "SetSharesExported", "SetWeightRecordsExported", "Settle", "StepWeightRecordsExported", "SubmitWindowedPoSt", "SwapSigner",
 	"TerminateSectors", "TransferFromExported",
 	"UpdateChannelState", "UpgradeSectorQuality",
 	"ValidateSectorStatus", "ValidateSectorStatusExported",
