@@ -256,6 +256,7 @@ func RegisterAdapterApi(router *gin.Engine) {
 	group := router.Group("/adapter").Use()
 	{
 		group.POST("/actor", adapter.GetActorInfo)
+		group.POST("/reward_stream_ledger", adapter.GetRewardStreamLedger) // f02 奖励流账本（NV29/FIP-0118，契约 D）
 		group.POST("/actors", adapter.GetActorsInfo)
 		group.POST("/actor_ids", adapter.GetActorIDs)
 		group.POST("/epoch", adapter.GetEpochInfo)
