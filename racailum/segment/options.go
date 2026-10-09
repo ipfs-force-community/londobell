@@ -81,7 +81,11 @@ func DefaultOptions() Options {
 			Async:            true,
 			AsyncState:       false,
 			BatchInsertLimit: 4 << 10,
-			WaitTimeout:      10 * time.Minute,
+			// 60 分钟（原 10 分钟）：线上实测「日边界全量 actor」那类重批的落库尾巴会超过 10 分钟
+			// （2026-10-09 主网：2053 高度的大批跑到 128/129 分片时被 10 分钟上限作废，整批重来，
+			//  而重试区间的上沿随链头增长 ⇒ 结构上永远追不上，实测 16.6 小时内 32 次全败）。
+			// 抽取侧的「作业卡死」仍由 TipSetJobTimeout / StateJobTimeout 兜住，这里放宽的只是落库等待。
+			WaitTimeout: 60 * time.Minute,
 		},
 
 		AllToCheckTableList: []string{
