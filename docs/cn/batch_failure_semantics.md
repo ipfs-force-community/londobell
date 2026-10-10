@@ -50,7 +50,7 @@
 
 同源不同相：不是缺块，是 mongo 写入打满超时。
 
-- `failed to persist tipset: error occurs in async persist: connection(172.31.34.38:27017) incomplete read of message header: context deadline exceeded`
+- `failed to persist tipset: error occurs in async persist: connection(<mongo-host>:27017) incomplete read of message header: context deadline exceeded`
 - 2026-10-09：2053 高度 = 129 个 part 的大批，两次尝试各跑满约 2 小时，**都在 `done-parts=128/129` 时被作废**；
   16.6 小时内 32 次全败（起点固定 6438943、上沿 6439170→6439797 一路涨）。
 - 2026-10-11：同一形态复发（03:22 / 04:38），区间 `[6444712, 6444952]` 重抽 3 轮，每轮 1h16m~1h22m。
@@ -121,7 +121,8 @@
 被登记的坏 part 需要一条自动回填路径，否则新机制等于把「整批停摆」换成「静默数据洞」（这正是用户明确否掉过的形态）。
 
 现有可复用的两件：
-- **heal**（`/home/ubuntu/heal/heal`）已经从公网取回缺失块并写回本地 blockstore，验证过 40 秒/洞、0 失败；
+- **heal**（部署方自运维工具，不在本仓）已经从公网取回缺失块并写回本地 blockstore，验证过 40 秒/洞、0 失败；
+  它是补 blockstore 缺块的前置手段，本仓需要补的是「已登记的坏 part」这一层。
 - 回填成功后，`chain.sync_skipped_parts` 里对应的 `healed_at` 被置上，同时 **把该区间的数据重抽提交**。
 
 ⇒ 顺序是「登记 → 提交好部分 → heal/回填 → 补齐坏部分 → 台账销项」。
