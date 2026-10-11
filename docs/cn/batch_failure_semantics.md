@@ -477,6 +477,21 @@ type extractOptions struct {
 
 **为什么只对主 `bell` 开**：撞洞并卡住的批次循环是主 `bell` 的（其 config `OnlyExtractState = false`，状态抽取在它的 part 里跑）。`statebell` 是另一路（`OnlyExtractState = true`、独立 repo/mongo），`tmpbell` 是近链头 tmp 路径。灰度的原则是**一次只动一条路径**，等 ③ 有结论再评估是否扩到 `statebell`。
 
+**⚠ 前置：必须先验「分类器认不认真实故障文本」**，否则开关可能永远空转、且无人发现。
+`classifyPartFailure` 是纯子串匹配 ⇒ 直接把它的规则拿去数真实日志，等价于把分类器跑在真实文本上：
+
+| 子串（= 分类器规则） | cali（全部日志） | 主网（近 6 份日志） |
+|---|---|---|
+| `ipld: could not find` / `failed to load hamt node` / `failed to load state tree`（**state 类，可登记**） | **372 / 360 / 360** | 54 / 12 / 12 |
+| `not minimally encoded` / `failed to unmarshal`（data 类，可登记） | 0 / 0 | 0 / 0 |
+| `async persist wait timeout` / `context deadline exceeded`（传输类，**设计上不可登记**） | 0 / 0 | 11 / 74 |
+
+cali 真实报错原文（多行，尾段）：
+`… tipset execution failed: making vm: creating fvm opts: loading state tree: failed to load state tree <cid>: failed to load hamt node: blockstore get: ipld: could not find <cid>`
+⇒ cali 的故障形态**正中 state 类**（三个子串全中），开关不是空转；且 cali 上 data 类与传输类各 0 ⇒「只开 state」正好够。
+
+⇒ **主网要分清两件事**：它近期的失败里**传输类占多数**（74 次 `context deadline exceeded` + 11 次 `async persist wait timeout`，即 B 档治理的那一类），这类**故意不可登记**（瞬时故障不该固化成永久洞）；`state` 类在主网确实也发生（12 次 `failed to load hamt node`）。**所以开 `state` 对主网有用，但别指望它治主网那次落库超时事故**——那是另一条线（作业 deadline + B 档调参）治的。
+
 **验收四条（撞洞时逐条核对，缺一条都算没生效）**：
 1. `SkippedPart` 集合出现台账行；重复撞同一洞时 `attempts` 递增，而**不是**新增行；
 2. `final_height` 停在洞前，**绝不越过**；
