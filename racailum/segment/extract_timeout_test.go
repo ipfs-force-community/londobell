@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"go.uber.org/zap"
 
 	"github.com/ipfs-force-community/londobell/racailum/segment/extract"
@@ -103,23 +102,31 @@ func TestExtractJobWithTimeout_ParentCanceled(t *testing.T) {
 	}
 }
 
-// 异步落库等待同样必须有上限：Mongo 写入挂住时不能永久等待。
-func TestWaitAsyncPersist_Timeout(t *testing.T) {
-	var g multierror.Group
-	g.Go(func() error {
+// 异步落库等待同样必须有上限：Mongo 写入挂住时不能永久等待，且超时要**按 part 归属**
+// （不再是「整批一个合并错误」——见 async_persist_test.go 与 §8.2 注入口 ②）。
+func TestAsyncPersistTracker_WaitTimeoutAttributesToPart(t *testing.T) {
+	var tr asyncPersistTracker
+	tr.Go(10, 11, func() error {
 		select {} // 永不完成
 	})
 
-	if err := waitAsyncPersist(&g, 40*time.Millisecond); err == nil {
-		t.Fatal("等待挂住时必须报错，实际返回 nil")
+	fails := tr.wait(40 * time.Millisecond)
+	if len(fails) != 1 {
+		t.Fatalf("等待挂住时应按 part 归因出 1 个失败，实际 %d", len(fails))
+	}
+	if fails[0].FromEpoch != 10 || fails[0].ToEpoch != 11 {
+		t.Fatalf("超时应归属到 part [10,11]，实际 [%d,%d]", fails[0].FromEpoch, fails[0].ToEpoch)
+	}
+	if fails[0].Err == nil {
+		t.Fatal("超时归属必须带错误")
 	}
 }
 
-func TestWaitAsyncPersist_OK(t *testing.T) {
-	var g multierror.Group
-	g.Go(func() error { return nil })
+func TestAsyncPersistTracker_WaitOK(t *testing.T) {
+	var tr asyncPersistTracker
+	tr.Go(10, 11, func() error { return nil })
 
-	if err := waitAsyncPersist(&g, time.Second); err != nil {
-		t.Fatalf("正常完成不应报错，实际 %v", err)
+	if fails := tr.wait(time.Second); len(fails) != 0 {
+		t.Fatalf("正常完成不应有失败归属，实际 %+v", fails)
 	}
 }

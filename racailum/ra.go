@@ -84,6 +84,45 @@ func (b *roundBackoffState) success() {
 	b.consecutive = 0
 }
 
+// recordRoundSuccess 记一轮「抽完 / 只发布了前缀」的指标（与改动前的成功分支完全一致）。
+// 之所以截断轮也走它：截断轮本轮确实抽完并发布了前缀，只是水位停在阻断面之前——指标口径
+// 不变可避免引入新的告警面；「水位停住」这一真实降级由 AlertOutdatedFinalHeight 独立告警。
+func recordRoundSuccess(ctx context.Context, estart time.Time, ts *types.TipSet) {
+	stats.Record(ctx, metrics.ExtractError.M(0))
+	stats.Record(ctx, metrics.TipSetHeight.M(int64(ts.Height())))
+	stats.Record(ctx, metrics.ExtractDuration.M(metrics.SinceInMilliseconds(estart)))
+}
+
+// backoffBeforeNextRound 记一次「本轮需要重做」并按其指数退避等待；返回 false 表示循环应退出
+// （ctx 被取消或 doneCh 关闭）。
+//
+// 失败轮与「被阻断面截断轮」共用同一条退避曲线：两者下一轮都会在同一位置重做整段，白跑成本
+// 相同（实测 cali 每轮白跑 826 个高度）。只有成功一轮（整批抽完、无阻断）才复位。
+//
+// 退避期间仍可被 ctx 取消 / doneCh 关闭打断，避免关不干净；AlertOutdatedFinalHeight
+// 独立在跑，告警不会哑掉。
+func backoffBeforeNextRound(ctx context.Context, doneCh <-chan struct{}, b *roundBackoffState, reason string) bool {
+	d := b.fail()
+	if d <= 0 {
+		// 配置异常（非正）⇒ 不退避，与改动前等价，绝不卡死循环。
+		return true
+	}
+
+	log.Warnw("backing off before next extract round",
+		"reason", reason, "consecutive", b.consecutive, "backoff", d.String())
+
+	select {
+	case <-time.After(d):
+		return true
+	case <-ctx.Done():
+		log.Info("quit head-change loop during backoff")
+		return false
+	case <-doneCh:
+		log.Info("quit head-change loop during backoff")
+		return false
+	}
+}
+
 // SegmentConfig contains info about a segment
 type SegmentConfig struct {
 	DSN     string
@@ -298,7 +337,9 @@ HEAD_LOOP:
 
 			log.Infow("incoming tipset", "tsk", tsk, "height", ts.Height())
 			estart := time.Now()
-			if err := r.Extract(ctx, ts); err != nil {
+			outcome, err := r.activeSeg.ExtractRound(ctx, ts)
+			switch {
+			case err != nil:
 				log.Errorf("failed to persist tipset: %s", err)
 				stats.Record(ctx, metrics.ExtractError.M(1))
 
@@ -306,26 +347,23 @@ HEAD_LOOP:
 				// 失败轮都在已知会失败的高度上白跑（实测 cali 每轮白跑 826 个高度并持续消耗 mongo 算力），
 				// 退避不减少失败次数，但能把无效消耗降到接近 0。
 				// 注意：退避只影响「抽下一轮」，不动提交语义、不改 FinalHeight —— 水位仍停在洞前。
-				if d := backoff.fail(); d > 0 {
-					log.Warnw("extract round failed, backing off before next round",
-						"consecutive-failures", backoff.consecutive, "backoff", d.String())
-					// 退避期间仍可被 ctx 取消或 doneCh 关闭打断，避免关不干净。
-					// 退避期间 AlertOutdatedFinalHeight 独立在跑，告警不会哑掉。
-					select {
-					case <-time.After(d):
-					case <-ctx.Done():
-						log.Info("quit head-change loop during backoff")
-						return
-					case <-doneCh:
-						log.Info("quit head-change loop during backoff")
-						return
-					}
+				if !backoffBeforeNextRound(ctx, doneCh, &backoff, "extract round failed") {
+					return
 				}
-			} else {
+
+			case outcome.Truncated:
+				// 本轮被阻断面截断（部分成功）：水位只推到阻断面之前，下一轮必然在同一阻断面重做整段。
+				// 不退避 ⇒ 每 MinPeriod（约 20s）白抽一遍整段（实测 cali 每轮白跑 826 个高度）。
+				// 指标按「抽完一轮」口径照记（与改动前一致，避免引入新告警面）；
+				// 刻意**不打** "failed to persist tipset"——运维告警按它 grep，截断不是持久化失败。
+				recordRoundSuccess(ctx, estart, ts)
+				if !backoffBeforeNextRound(ctx, doneCh, &backoff, "extract round truncated by blocking boundary") {
+					return
+				}
+
+			default:
 				backoff.success()
-				stats.Record(ctx, metrics.ExtractError.M(0))
-				stats.Record(ctx, metrics.TipSetHeight.M(int64(ts.Height())))
-				stats.Record(ctx, metrics.ExtractDuration.M(metrics.SinceInMilliseconds(estart)))
+				recordRoundSuccess(ctx, estart, ts)
 			}
 			log.Infow("done tipset extracting", "tsk", tsk, "height", ts.Height(), "elapsed", time.Now().Sub(estart).String())
 		}

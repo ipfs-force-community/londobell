@@ -3,6 +3,8 @@ package segment
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
 	"go.opencensus.io/stats"
@@ -30,12 +32,12 @@ import (
 )
 
 type persistCtx struct {
-	ctx                   context.Context
-	actorSet              *actor.Set
-	log                   *zap.SugaredLogger
-	asyncPersistWaitGroup multierror.Group
-	latestDealID          int64
-	persistSem            chan struct{}
+	ctx          context.Context
+	actorSet     *actor.Set
+	log          *zap.SugaredLogger
+	asyncPersist asyncPersistTracker
+	latestDealID int64
+	persistSem   chan struct{}
 }
 
 // rawChainIO provides ChainReadObj/ChainHasObj from the FullNode API,
@@ -151,31 +153,159 @@ func (s *Segment) extractJobWithTimeout(
 	return nil, fmt.Errorf("extract job failed after %d attempt(s): %w", attempts, lastErr)
 }
 
-// waitAsyncPersist 等待异步落库完成，超过 timeout 视为失败。
-// 与作业超时同理：Mongo 写入挂住时不能永久等待（否则整批静默停摆）。
+// partPersistFailure 是「一次异步落库作业失败/超时」的 **part 归属**：哪个 part 的落库没成。
+// 区间就是该 part 的 [FromEpoch,ToEpoch]，供上层把它转成阻断面（BlockedByPersistFailure）。
+type partPersistFailure struct {
+	FromEpoch abi.ChainEpoch
+	ToEpoch   abi.ChainEpoch
+	Err       error
+}
+
+// asyncPersistJob 是异步落库作业在 tracker 里的登记项：区间（part 归属）+ 完成状态与结果。
+type asyncPersistJob struct {
+	from     abi.ChainEpoch
+	to       abi.ChainEpoch
+	finished bool
+	err      error
+}
+
+// asyncPersistTracker 追踪一个批次的异步落库作业，并保留每个作业的 part 归属。
 //
-// 注意：multierror.Group.Wait() 返回具体类型 *multierror.Error，nil 值装进 error 接口后
-// 不再等于 nil（typed-nil），所以这里用具体类型接收、显式判空后再返回。
-func waitAsyncPersist(g *multierror.Group, timeout time.Duration) error {
+// 它取代裸的 multierror.Group，理由（docs/cn/batch_failure_semantics.md §8.2 注入口 ②）：
+// 裸 Group 只给出一个**合并**错误、无法归因到哪个 part，于是「落库超时」不能成为阻断面，
+// 只能整批作废——正是主网 2026-10-12 事故（`error occurs in async persist ... context
+// deadline exceeded`）放大成整批重跑的根因。带 part 归属后，失败 part 之前的连续前缀仍可
+// 安全发布，失败处成为阻断面、下一轮重做。
+//
+// 并发口径：Go() 只在 part 循环（单 goroutine、顺序）里被调用，wait() 在循环结束之后才
+// 调用，二者不重叠（multierror.Group 的 Wait 与 Go 不能重叠）；每个 job 的完成状态由 mu
+// 保护，超时归因时读到的是前后一致的快照。
+type asyncPersistTracker struct {
+	mu    sync.Mutex
+	group multierror.Group
+	jobs  []*asyncPersistJob
+}
+
+// Go 登记并启动一次异步落库作业；[from,to] 是该作业的 part 归属，失败/超时时据此归因。
+func (t *asyncPersistTracker) Go(from, to abi.ChainEpoch, fn func() error) {
+	job := &asyncPersistJob{from: from, to: to}
+
+	t.mu.Lock()
+	t.jobs = append(t.jobs, job)
+	t.mu.Unlock()
+
+	t.group.Go(func() error {
+		err := fn()
+		t.mu.Lock()
+		job.finished = true
+		job.err = err
+		t.mu.Unlock()
+		return err
+	})
+}
+
+// wait 等待所有作业结束（或超过 timeout），返回**按 part 归属**的失败清单。
+//
+// 语义相对旧 waitAsyncPersist（返回一个合并 error）的变化，正是本改动的主旨：
+//   - 每个元素带自己的 part 区间，调用方据此把它当阻断面，而不是把整批作废；
+//   - timeout <= 0 ⇒ 不设等待上限（等价旧行为：一直等 group 结束）；
+//   - timeout > 0 且超时 ⇒ **仍未完成**的作业全部按「等待超时」归因（它们的 part 即阻断面）：
+//     这些 part 的数据尚未落库成功，绝不能被前缀提交越过。
+//
+// Mongo 写入挂住时不能永久等待（否则整批静默停摆）；超时后残留的 goroutine 有上限
+// （作业数），与旧实现同口径。
+func (t *asyncPersistTracker) wait(timeout time.Duration) []partPersistFailure {
+	timedOut := false
 	if timeout <= 0 {
-		if e := g.Wait(); e != nil {
-			return e
+		t.group.Wait()
+	} else {
+		done := make(chan struct{})
+		go func() {
+			t.group.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(timeout):
+			timedOut = true
 		}
+	}
+
+	timeoutErr := fmt.Errorf("async persist wait timeout after %s", timeout)
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	var out []partPersistFailure
+	for _, job := range t.jobs {
+		switch {
+		case job.err != nil:
+			out = append(out, partPersistFailure{FromEpoch: job.from, ToEpoch: job.to, Err: job.err})
+		case timedOut && !job.finished:
+			out = append(out, partPersistFailure{FromEpoch: job.from, ToEpoch: job.to, Err: timeoutErr})
+		}
+	}
+	return out
+}
+
+// partPersistFailuresToBlocking 把「按 part 归属的异步落库失败/超时」转成阻断面。
+//
+// 每个失败 part 转成一个 PartFailure（Kind=BlockedByPersistFailure）：**不写台账**——它是
+// 「下一轮要重做」而非永久的洞。类别用 classifyErr 复用与「part 抽取失败」同一份判据
+// （异步落库失败几乎必然是 transport 类 ⇒ 不可登记，故不会写成洞）。
+func partPersistFailuresToBlocking(fails []partPersistFailure) []PartFailure {
+	if len(fails) == 0 {
 		return nil
 	}
 
-	done := make(chan *multierror.Error, 1)
-	go func() { done <- g.Wait() }()
-
-	select {
-	case e := <-done:
-		if e == nil {
-			return nil
-		}
-		return e
-	case <-time.After(timeout):
-		return fmt.Errorf("async persist wait timeout after %s", timeout)
+	out := make([]PartFailure, 0, len(fails))
+	for _, pf := range fails {
+		class, _ := classifyErr(pf.Err)
+		out = append(out, PartFailure{
+			FromEpoch: pf.FromEpoch,
+			ToEpoch:   pf.ToEpoch,
+			Class:     class,
+			ErrDigest: truncateErrDigest(pf.Err.Error()),
+			Kind:      BlockedByPersistFailure,
+		})
 	}
+	return out
+}
+
+// asyncPersistOutcome 决定异步落库收尾的处置（纯函数，便于表驱动单测）：
+//
+//   - 无失败 ⇒ (nil, nil)：与旧实现「此时返回 nil error」一致，行为不变；
+//   - 主路径（tmp=false）⇒ 转为阻断面 (blocking, nil)：失败 part 之前的连续前缀仍可发布，
+//     失败处成为阻断面、下一轮重做——这是对主网 2026-10-12 事故的真修复；
+//   - tmp 路径（tmp=true）⇒ (nil, fatalError)：**有意不改**（§8.11）。tmp 路径不走
+//     commitPrefix，且 ExtractToTemporaryDB 会把段上界推到整批末，阻断面在那里无人消费、
+//     反而会越过失败 part 推进边界 ⇒ 恢复旧行为：异步落库失败仍整批弃（fail-closed）。
+func asyncPersistOutcome(tmp bool, fails []partPersistFailure) (blocking []PartFailure, fatal error) {
+	if len(fails) == 0 {
+		return nil, nil
+	}
+	if tmp {
+		return nil, fmt.Errorf("error occurs in async persist: %s", summarizePartPersistFailures(fails))
+	}
+	return partPersistFailuresToBlocking(fails), nil
+}
+
+// summarizePartPersistFailures 把异步落库失败压成一行摘要（供 tmp 路径的错误正文）。
+func summarizePartPersistFailures(fails []partPersistFailure) string {
+	parts := make([]string, 0, len(fails))
+	for _, f := range fails {
+		parts = append(parts, fmt.Sprintf("[%d-%d:%v]", f.FromEpoch, f.ToEpoch, f.Err))
+	}
+	return strings.Join(parts, ",")
+}
+
+// partRange 返回 part 的 [起, 止] 高度；空 part 返回 (0,0)（调用方保证非空）。
+func partRange(part []*common.LinkedTipSet) (abi.ChainEpoch, abi.ChainEpoch) {
+	if len(part) == 0 {
+		return 0, 0
+	}
+	return part[0].Height(), part[len(part)-1].Height()
 }
 
 // insertManyWithTimeout 同步落库，带超时（Mongo driver 会响应 context 取消）。
@@ -197,10 +327,14 @@ func (s *Segment) insertManyWithTimeout(ctx context.Context, l *zap.SugaredLogge
 // （BlockedByHole / BlockedByPersistFailure）；失败 part **不写台账**，它只是「下一轮要重做」。
 //
 // ★ 错误契约（阻断面语义）：
-//   - 真正的致命错误（actor set / dealID 加载失败、台账写失败、异步落库失败）⇒ 返回
-//     (failures, err)，err 非 nil。上层 `Segment.Extract` 照旧整批弃、不动水位。
+//   - 真正的致命错误（actor set / dealID 加载失败、台账写失败）⇒ 返回 (failures, err)，
+//     err 非 nil。上层 `Segment.Extract` 照旧整批弃、不动水位。
 //   - 某个 part 抽取失败（任何类别）⇒ **不再致命**：它的起始高度作为一条阻断面记入 failures，
 //     返回 (failures, nil)，由上层只发布「第一个阻断面之前的连续前缀」。
+//   - **异步落库失败/超时**（`Persist.Async=true`，含主网 2026-10-12 的
+//     `error occurs in async persist ... context deadline exceeded`）⇒ 同样**不再致命**：
+//     按 part 归属转成阻断面记入 failures（见 asyncPersistOutcome / partPersistFailuresToBlocking）。
+//     **例外**：tmp 路径（tmp=true，ExtractToTemporaryDB）有意不改，仍整批弃（fail-closed）。
 //
 // **返回 nil error 不代表无阻断**——调用方必须检查 failures 是否为空，并据此计算「连续前缀」
 // 后再决定发布到哪里（见 prefix_commit.go 的 commitPrefix / firstBlockingBoundary /
@@ -312,11 +446,14 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		return failures, rerr
 	}
 
-	// 到这里要么全成功、要么只有「已登记」的洞；两种情况下都已提交过前缀 part 的异步
-	// 落库，需要收尾。异步落库失败同样属致命：整批弃、不动水位。
-	if werr := waitAsyncPersist(&pctx.asyncPersistWaitGroup, s.opts.Persist.WaitTimeout); werr != nil {
-		return failures, fmt.Errorf("error occurs in async persist: %s", werr)
+	// 异步落库收尾：失败/超时按 part 归属（§8.2 注入口 ②）。
+	// 主路径转为阻断面（失败 part 之前的连续前缀照常发布）；tmp 路径保持旧行为（整批弃）——
+	// 判定与理由见 asyncPersistOutcome。
+	blocking, aerr := asyncPersistOutcome(tmp, pctx.asyncPersist.wait(s.opts.Persist.WaitTimeout))
+	if aerr != nil {
+		return failures, aerr
 	}
+	failures = append(failures, blocking...)
 
 	if len(failures) == 0 {
 		elog.Info("all parts done")
@@ -325,7 +462,7 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 			"blockedBy", summarizeFailures(failures))
 	}
 
-	// ★ 契约：返回的 failures = 阻断清单 = 已登记的洞 ∪ 失败 part（各类别，含传输类/超时）。
+	// ★ 契约：返回的 failures = 阻断清单 = 已登记的洞 ∪ 失败 part ∪ 异步落库失败 part。
 	// 返回 nil error 只表示「循环本身没有致命失败」，不代表无阻断——由上层 Segment.Extract
 	// 按「连续前缀」决定发布到哪里（见 prefix_commit.go 的 commitPrefix）。唯一仍会在此
 	// return error 的是「台账写失败」那条铁律（不可登记的 part 失败不再致命）。
@@ -556,7 +693,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 		return fmt.Errorf("extract part: %w", err)
 	}
 
-	if err := s.persistPartDocs(ctx, elog, docs, persist); err != nil {
+	if err := s.persistPartDocs(ctx, elog, part, docs, persist); err != nil {
 		return err
 	}
 
@@ -575,7 +712,7 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 	ectx.C = ctx.ctx
 	for rhi := range regulars {
 		if rheads := regulars[rhi]; len(rheads) > 0 {
-			if err := s.extractRegularStates(ectx, ctx, rheads); err != nil {
+			if err := s.extractRegularStates(ectx, ctx, part, rheads); err != nil {
 				return fmt.Errorf("#%d regular heads: %w", rhi, err)
 			}
 		}
@@ -587,9 +724,12 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 // persistPartDocs 把 part 的抽取结果落库。
 //
 // persist=false ⇒ 只记一条日志、直接丢弃（既不调 insertManyWithTimeout、也不进
-// asyncPersistWaitGroup）——这是「坏 part 之后只抽取、不落库」的落点，目的是让写进
+// asyncPersistTracker）——这是「坏 part 之后只抽取、不落库」的落点，目的是让写进
 // mongo 的可见区间始终连续（docs/cn/batch_failure_semantics.md §8.3）。
-func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, docs [][]common.Document, persist bool) error {
+//
+// 异步路径把 part 的 [起,止] 一并登记进 tracker：落库失败/超时时，交回上层的失败清单带
+// part 归属，从而能成为阻断面而不是整批作废（§8.2 注入口 ②）。
+func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, part []*common.LinkedTipSet, docs [][]common.Document, persist bool) error {
 	if !persist {
 		elog.Infow("part extracted but not persisted (persist=false: skipped after a recorded failure)")
 		return nil
@@ -602,7 +742,8 @@ func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, docs
 			return ctx.ctx.Err()
 		}
 
-		ctx.asyncPersistWaitGroup.Go(func() error {
+		from, to := partRange(part)
+		ctx.asyncPersist.Go(from, to, func() error {
 			defer func() { <-ctx.persistSem }()
 			if err := s.insertManyWithTimeout(ctx.ctx, elog, docs); err != nil {
 				if nerr := common.NonCtxCanceledErr(err); nerr != nil {
@@ -624,7 +765,7 @@ func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, docs
 	return nil
 }
 
-func (s *Segment) extractRegularStates(ctx *extract.Ctx, pctx *persistCtx, heads []*common.ActorHead) error {
+func (s *Segment) extractRegularStates(ctx *extract.Ctx, pctx *persistCtx, part []*common.LinkedTipSet, heads []*common.ActorHead) error {
 	if len(heads) == 0 {
 		return nil
 	}
@@ -710,7 +851,8 @@ func (s *Segment) extractRegularStates(ctx *extract.Ctx, pctx *persistCtx, heads
 			return originCtx.Err()
 		}
 
-		pctx.asyncPersistWaitGroup.Go(func() error {
+		from, to := partRange(part)
+		pctx.asyncPersist.Go(from, to, func() error {
 			defer func() { <-pctx.persistSem }()
 			if err := s.insertMany(originCtx, ctx.L, docs); err != nil {
 				stats.Record(originCtx, metrics.ExtractError.M(1))

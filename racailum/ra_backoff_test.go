@@ -1,6 +1,7 @@
 package racailum
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -84,5 +85,52 @@ func TestRoundBackoffState_ResetOnSuccess(t *testing.T) {
 	}
 	if got := b.fail(); got != 5*time.Minute {
 		t.Fatalf("复位后的第一次失败退避 = %s, want %s", got, 5*time.Minute)
+	}
+}
+
+// backoffBeforeNextRound 是 Run 循环里「失败轮 / 被阻断面截断轮」的共用退避入口。
+// 覆盖三件事：①到期后返回 true（继续循环）；②ctx 取消 ⇒ false（退出循环）；
+// ③doneCh 关闭 ⇒ false。后两者用长退避时长确保 select 命中的是取消而非 time.After（确定性）。
+func TestBackoffBeforeNextRound_WaitsThenContinues(t *testing.T) {
+	b := roundBackoffState{initial: 2 * time.Millisecond, max: 2 * time.Millisecond}
+
+	start := time.Now()
+	if !backoffBeforeNextRound(context.Background(), make(chan struct{}), &b, "test") {
+		t.Fatal("未被取消时应返回 true 以继续循环")
+	}
+	if elapsed := time.Since(start); elapsed < 1*time.Millisecond {
+		t.Fatalf("应真的等待了退避时长，实际仅 %s", elapsed)
+	}
+	if b.consecutive != 1 {
+		t.Fatalf("一次退避后 consecutive 应为 1，实际 %d", b.consecutive)
+	}
+}
+
+func TestBackoffBeforeNextRound_CtxCanceledStopsLoop(t *testing.T) {
+	b := roundBackoffState{initial: time.Hour, max: time.Hour}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if backoffBeforeNextRound(ctx, make(chan struct{}), &b, "test") {
+		t.Fatal("ctx 已取消时应返回 false 退出循环")
+	}
+}
+
+func TestBackoffBeforeNextRound_DoneChStopsLoop(t *testing.T) {
+	b := roundBackoffState{initial: time.Hour, max: time.Hour}
+	done := make(chan struct{})
+	close(done)
+
+	if backoffBeforeNextRound(context.Background(), done, &b, "test") {
+		t.Fatal("doneCh 关闭时应返回 false 退出循环")
+	}
+}
+
+// 配置异常（退避时长非正）⇒ 不退避、立即返回 true，绝不卡死循环（与改动前等价）。
+func TestBackoffBeforeNextRound_NoBackoffWhenConfiguredZero(t *testing.T) {
+	b := roundBackoffState{initial: 0, max: 0}
+
+	if !backoffBeforeNextRound(context.Background(), make(chan struct{}), &b, "test") {
+		t.Fatal("退避时长为 0 时应立即返回 true")
 	}
 }

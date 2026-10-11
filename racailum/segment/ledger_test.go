@@ -206,9 +206,10 @@ func TestPersistPartDocs_PersistFalseSkipsWrites(t *testing.T) {
 		persistSem: make(chan struct{}, 2),
 	}
 	docs := [][]common.Document{{&fakeDoc{}}}
+	part := mkTSS(t, 10, 11)
 
 	// persist=false：不得有任何落库调用。
-	if err := s.persistPartDocs(pctx, pctx.log, docs, false); err != nil {
+	if err := s.persistPartDocs(pctx, pctx.log, part, docs, false); err != nil {
 		t.Fatalf("persist=false 不应报错: %v", err)
 	}
 	if fake.insertCalls != 0 || fake.updateCalls != 0 {
@@ -216,11 +217,11 @@ func TestPersistPartDocs_PersistFalseSkipsWrites(t *testing.T) {
 	}
 
 	// persist=true（异步路径）：必须落库。
-	if err := s.persistPartDocs(pctx, pctx.log, docs, true); err != nil {
+	if err := s.persistPartDocs(pctx, pctx.log, part, docs, true); err != nil {
 		t.Fatalf("persist=true 不应报错: %v", err)
 	}
-	if err := waitAsyncPersist(&pctx.asyncPersistWaitGroup, time.Second); err != nil {
-		t.Fatalf("等待异步落库失败: %v", err)
+	if fails := pctx.asyncPersist.wait(time.Second); len(fails) != 0 {
+		t.Fatalf("等待异步落库不应有失败归属: %+v", fails)
 	}
 	if fake.insertCalls == 0 {
 		t.Fatalf("persist=true 应至少落库一次，实际 insert=%d", fake.insertCalls)
