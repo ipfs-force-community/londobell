@@ -465,14 +465,31 @@ type extractOptions struct {
 **启用方式**：把 `[Segment.Extract] SkippableErrorClasses` 配成 `["state"]`（先只开 state）。
 **不配这个键 = 完全维持现状**——这是本改动最重要的安全属性：回退是改配置，不是回滚二进制。
 
-### 8.12 灰度步骤（动手前逐条确认）
+### 8.12 灰度步骤与执行记录
 
-1. 在 cali 构建并入二进制（`--tags=bundle,calibnet`），**先不配 `SkippableErrorClasses`**——观察一周退避与进度日志无异常；
-2. 配 `SkippableErrorClasses = ["state"]`，等下一次撞洞，验收四条：
-   ① `SkippedPart` 出现台账行且 `attempts` 递增而非新增行；② `final_height` 停在洞前、**绝不越过**；
-   ③ **日志里同一轮出现多个不同高度的 `extract job failed`**（本次改动的核心行为）；
-   ④ heal 补齐后水位自然追平、台账行出现 `healed_at`；
-3. cali 稳定后再评估开 `data` 类、再评估主网（**避开追赶期**）。
+**cali 执行记录（2026-10-11）**
+
+| 步骤 | 时间 | 结果 |
+|---|---|---|
+| ① 只换二进制、**不配** `SkippableErrorClasses`（零行为变化） | 12:48 | 完成。构建用 `make build-bell-calib`（bell 必须在目标主机上编，cgo + filecoin-ffi），产物版本串 `1.37.0+calibnet+git.d37ba7bb`、不含 `+mainnet+`；**5 个共用该二进制的 supervisor 程序**（`bell`/`statebell`/`tmpbell`/`fix-actormessage`/`fix-actormessage-tmp`）全部停 → 原子 `install` → 起。复核：版本串对上、水位 4145568→4145589 在涨、错误分桶（`extract job failed`/`could not find`/`failed to persist`/`panic`）全 0、回滚锚点 `deploy-bak/bell.bak-20261011-124840` 与换装前 sha 一致 |
+| ② 配 `SkippableErrorClasses = ["state"]`（**只对主 `bell`**） | 13:12 | 完成。配置备份 `deploy-bak/bell-config.bak-20261011-131248`；重启后 `bell=RUNNING`、键仍在且未被注释（⇒ bell 启动**不**重写 config，手加的键不会被洗掉）；水位 4145610 在涨、ERROR=0 |
+| ③ 等下一次撞洞验收四条 | 待发生 | 见下 |
+
+**为什么只对主 `bell` 开**：撞洞并卡住的批次循环是主 `bell` 的（其 config `OnlyExtractState = false`，状态抽取在它的 part 里跑）。`statebell` 是另一路（`OnlyExtractState = true`、独立 repo/mongo），`tmpbell` 是近链头 tmp 路径。灰度的原则是**一次只动一条路径**，等 ③ 有结论再评估是否扩到 `statebell`。
+
+**验收四条（撞洞时逐条核对，缺一条都算没生效）**：
+1. `SkippedPart` 集合出现台账行；重复撞同一洞时 `attempts` 递增，而**不是**新增行；
+2. `final_height` 停在洞前，**绝不越过**；
+3. 日志里**同一轮出现多个不同高度**的 `extract job failed`——这是本次改动的核心行为（一轮暴露全部洞，取代「撞一个停一次」）；
+4. heal 补齐后水位自然追平、台账行出现 `healed_at`。
+
+**⚠ 坑一：启用开关的键在生成的配置模板里找不到。** `bell cfg init` 产出的模板里**没有** `SkippableErrorClasses`，因为编码器不输出值为 `nil` 的 slice（同段 `AllToCheckTableList` 有非空默认值才渲染）。**这不等于配了不生效**——实测 `[Segment.Extract] SkippableErrorClasses = ["state"]` 解码为 `[state]`，且负对照（赋成字符串）报
+`incompatible types: TOML value has type string; destination has type slice`，证明键确实绑定到字段。
+⇒ 该键必须**手工加在 `[Segment.Extract]` 段头之后**，别在模板里找它。
+
+**⚠ 坑二：主机自己的仓库可能比现役二进制还旧。** cali bell 主机的 `/root/shuqi/londobell` 停在
+`1af5aca3`（NV29 合并），而现役二进制是 `e419c1ad`（其下游）——**从主机 master 直接编会静默回退已上线的修复**。
+⇒ 一律 `cp -a` 出副本、检出目标提交、核对 ffi gitlink（必须与树里已装的 `libfilcrypto.a` 一致，否则版本串会骗人）后再编。cali 是 x86_64。
 
 ### 8.13 三项前置求证（2026-10-11 已完成，结论如下）
 
