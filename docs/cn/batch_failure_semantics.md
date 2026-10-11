@@ -484,7 +484,9 @@ type extractOptions struct {
 |---|---|---|
 | ① 只换二进制、**不配** `SkippableErrorClasses`（零行为变化） | 12:48 | 完成。构建用 `make build-bell-calib`（bell 必须在目标主机上编，cgo + filecoin-ffi），产物版本串 `1.37.0+calibnet+git.d37ba7bb`、不含 `+mainnet+`；**5 个共用该二进制的 supervisor 程序**（`bell`/`statebell`/`tmpbell`/`fix-actormessage`/`fix-actormessage-tmp`）全部停 → 原子 `install` → 起。复核：版本串对上、水位 4145568→4145589 在涨、错误分桶（`extract job failed`/`could not find`/`failed to persist`/`panic`）全 0、回滚锚点 `deploy-bak/bell.bak-20261011-124840` 与换装前 sha 一致 |
 | ② 配 `SkippableErrorClasses = ["state"]`（**只对主 `bell`**） | 13:12 | 完成。配置备份 `deploy-bak/bell-config.bak-20261011-131248`；重启后 `bell=RUNNING`、键仍在且未被注释（⇒ bell 启动**不**重写 config，手加的键不会被洗掉）；水位 4145610 在涨、ERROR=0 |
-| ③ 等下一次撞洞验收四条 | 待发生 | 见下 |
+| ③ 换到分支 tip（含 heal 闭环 + 跨洞防护） | 15:05 | 完成。`make build-bell-calib` 产物 `+git.2f808878`、不含主网标记；5 个共用实例停→原子换→起；复核 `/proc/<pid>/exe` 全指新件、回滚锚点 `deploy-bak/bell.bak-20261011-150533`（sha 与换装前一致）、配置未被改写、错误分桶全 0、`reconcile healed parts failed` = 0 |
+| ④ 装上「四判据检测器」（不需要真洞就能看状态） | 15:01 | 完成。`/opt/filscan-holewatch/holewatch.sh` + 一行 crontab（每 5 分钟）；只读 bell 日志 + 聚合器水位；指标推**独立 job 组** `filscan_holewatch_cali`（避免同名族 HELP/TYPE 不一致打断整个 `/metrics` gather）。自检三档：现役日志（未撞过洞）/ **历史真实缺块日志（c3=1，证明判据在真实数据上有效）**/ 合成日志（c1=c2=c3=1）。实测 cron 已在 15:05:02 自行跑过一次 |
+| ⑤ 等下一次撞洞验收四条 | 待发生 | 见下。**注意：这不阻塞任何事**——承重机制已在真库上逐条验证过（见 §8.14 与下方「真库验证」），撞洞只是最后的线上确认 |
 
 **为什么只对主 `bell` 开**：撞洞并卡住的批次循环是主 `bell` 的（其 config `OnlyExtractState = false`，状态抽取在它的 part 里跑）。`statebell` 是另一路（`OnlyExtractState = true`、独立 repo/mongo），`tmpbell` 是近链头 tmp 路径。灰度的原则是**一次只动一条路径**，等 ③ 有结论再评估是否扩到 `statebell`。
 
