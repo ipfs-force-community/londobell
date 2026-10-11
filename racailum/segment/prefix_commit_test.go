@@ -219,3 +219,26 @@ func TestCommitPrefix_StateOnlyPublishesPrefixViaStateHeight(t *testing.T) {
 		t.Fatalf("应走 SaveStateFinalHeight 且收到前缀末 21，实际 used=%v height=%d", shUsed, shHeight)
 	}
 }
+
+// TestPrefixLenBeforeFirstHole_ExportedWrapper 锁住导出包装与内部实现同源。
+// 存在的理由：ra.go 的离线抽取路径（WalkExtract）跨包复用这条判据，
+// 若包装与内部实现漂移，离线路径就会绕开「绝不跨洞」这条红线。
+func TestPrefixLenBeforeFirstHole_ExportedWrapper(t *testing.T) {
+	tss := mkTSS(t, 100, 101, 102, 103)
+
+	cases := []struct {
+		name  string
+		fails []PartFailure
+		want  int
+	}{
+		{"无洞取整批", nil, 4},
+		{"洞在批首取 0", []PartFailure{{FromEpoch: 100, ToEpoch: 100}}, 0},
+		{"洞在中间取洞前高度数", []PartFailure{{FromEpoch: 102, ToEpoch: 102}}, 2},
+		{"多个洞取最早", []PartFailure{{FromEpoch: 103, ToEpoch: 103}, {FromEpoch: 101, ToEpoch: 101}}, 1},
+	}
+	for _, c := range cases {
+		if got := PrefixLenBeforeFirstHole(tss, c.fails); got != c.want {
+			t.Fatalf("%s: PrefixLenBeforeFirstHole = %d, want %d", c.name, got, c.want)
+		}
+	}
+}

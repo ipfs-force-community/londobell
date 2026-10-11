@@ -224,11 +224,21 @@ func (r *RaCailum) WalkExtract(ctx context.Context, from types.TipSetKey, hi abi
 
 	tipsets = tipsets[1:]
 
-	if _, err := r.activeSeg.ExtractTipSets(ctx, tipsets, false); err != nil {
-		return err
+	fails, ferr := r.activeSeg.ExtractTipSets(ctx, tipsets, false)
+	if ferr != nil {
+		return ferr
 	}
 
-	if err := r.activeSeg.Aggregate(ctx, tipsets); err != nil {
+	// ★ 与 Segment.Extract 同一条红线（docs/cn/batch_failure_semantics.md §8.3）：
+	// 离线抽取路径也必须只聚合「洞之前的连续前缀」。这条路径虽然不动水位/边界，
+	// 但**跨洞聚合**出来的派生表同样是「接口 200 + 无错日志 + 错误数值」。
+	// 洞在批首时没有任何可安全聚合的部分，直接拒绝，而不是拿整段去聚合。
+	prefixLen := segment.PrefixLenBeforeFirstHole(tipsets, fails)
+	if prefixLen == 0 {
+		return fmt.Errorf("offline extract blocked by hole(s) before any contiguous prefix")
+	}
+
+	if err := r.activeSeg.Aggregate(ctx, tipsets[:prefixLen]); err != nil {
 		return err
 	}
 	return nil

@@ -427,7 +427,54 @@ type extractOptions struct {
 3. cali 稳定后再开 `data` 类；
 4. **主网最后上**，且必须避开追赶期。
 
-### 8.11 三项前置求证（2026-10-11 已完成，结论如下）
+### 8.11 实现现状（2026-10-11，分支 `feat/bell-batch-failure-semantics`）
+
+三段已全部实现在同一分支上，**均未合入 master、未部署、未启用任何 skippable 类**。
+
+| 段 | commit | 内容 |
+|---|---|---|
+| 1 | `0685d783` | 配置项 `RoundBackoffInitial/Max`（5m/30m）+ `ra.go` 轮间指数退避（纯函数 `nextBackoff`，配置异常退化为「不退避」）+ `extract.go` part 失败错误带进度 |
+| 2 | `694ed4fd` | `failure_class.go`（分类器，**默认不可登记**）+ `options.go` 的 `SkippableErrorClasses`（**默认空**）/`MaxUnpublishedRange`（2000）+ `partRunner`（登记 + 后续 part 只抽取不落库 + 护栏）+ `ledger.go`/`model/skipped_part.go` 台账 |
+| 3 | `58dabf8e` | `prefix_commit.go`（`prefixLenBeforeFirstHole` + `commitPrefix` 单一发布咽喉）+ `Segment.Extract` 只推前缀 |
+
+**契约变更（第 3 段）**：`ExtractTipSets` 的返回值语义变为
+「**返回 nil error 不代表没有洞**」——已登记的洞通过 `failures` 返回，
+由上层决定发布到前缀末。只有**致命错误**（不可登记类 / 台账写失败 / 异步落库失败）才返回非 nil error。
+
+**已覆盖的发布路径**：
+
+- ✅ `Segment.Extract`（daemon 主路径）——`commitPrefix` 只喂前缀给 `Aggregate` /
+  `SaveFinalHeight`(或 `SaveStateFinalHeight`) / `updateBoundary`；
+- ✅ `RaCailum.WalkExtract`（**离线抽取路径**，`bell offline extractor`）——
+  子代理主动上报了这条路径会跨洞聚合，已修：同样只聚合前缀，洞在批首则直接拒绝。
+  导出包装 `PrefixLenBeforeFirstHole` 保证两条路径复用同一份判据、不会漂移。
+
+**尚未覆盖（有意保留 + 一处遗留）**：
+
+- ⚠️ `Segment.ExtractToTemporaryDB`（tmp 路径）**未改**：有洞时仍整批弃。tmp 是近链头读路径，
+  语义不同，改它需要单独评估。
+- ⚠️ **遗留**：`RaCailum.Aggregate(lo, hi)`（RPC 手动触发聚合）接受任意区间，
+  不查台账 ⇒ 运维若对一个跨洞区间手动触发聚合，仍会产出跨洞派生表。
+  **这是既有风险**（改动前洞两边的数据也可能都已落库），但本改动让「洞」从异常态变成已知常态，
+  使该路径更值得防。建议后续给它加台账校验，或在使用手册里写死禁令——**待拍板**。
+
+**台账**：集合 `SkippedPart`，去重靠 `_id = "<from>-<to>"`，
+依赖 `lib/mgoutil/docdb.go:23` 的 `options.Update().SetUpsert(true)`（已核实），
+**无需额外建索引/集合**（mongo 首次写入自动建集合）。
+
+**启用方式**：把 `[Segment.Extract] SkippableErrorClasses` 配成 `["state"]`（先只开 state）。
+**不配这个键 = 完全维持现状**——这是本改动最重要的安全属性：回退是改配置，不是回滚二进制。
+
+### 8.12 灰度步骤（动手前逐条确认）
+
+1. 在 cali 构建并入二进制（`--tags=bundle,calibnet`），**先不配 `SkippableErrorClasses`**——观察一周退避与进度日志无异常；
+2. 配 `SkippableErrorClasses = ["state"]`，等下一次撞洞，验收四条：
+   ① `SkippedPart` 出现台账行且 `attempts` 递增而非新增行；② `final_height` 停在洞前、**绝不越过**；
+   ③ **日志里同一轮出现多个不同高度的 `extract job failed`**（本次改动的核心行为）；
+   ④ heal 补齐后水位自然追平、台账行出现 `healed_at`；
+3. cali 稳定后再评估开 `data` 类、再评估主网（**避开追赶期**）。
+
+### 8.13 三项前置求证（2026-10-11 已完成，结论如下）
 
 **① 段边界 `hi-epoch` 与发布水位 `final_height` 的关系 —— 稳态下完全相等。**
 

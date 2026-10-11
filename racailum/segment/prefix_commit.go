@@ -57,6 +57,15 @@ func prefixLenBeforeFirstHole(tss []*common.LinkedTipSet, fails []PartFailure) i
 	return n
 }
 
+// PrefixLenBeforeFirstHole 是 prefixLenBeforeFirstHole 的导出包装。
+// 存在的理由：ra.go 的离线抽取路径（RaCailum.WalkExtract）也必须遵守同一条
+// 「绝不跨洞」判据（见 docs/cn/batch_failure_semantics.md §8.3），
+// 而它不在 segment 包内，需要有个导出的入口复用同一份逻辑——
+// 复制一份判据到那边迟早会漂移。
+func PrefixLenBeforeFirstHole(tss []*common.LinkedTipSet, fails []PartFailure) int {
+	return prefixLenBeforeFirstHole(tss, fails)
+}
+
 // commitPrefix 承载「连续前缀提交」这段控制流：算前缀 → **只把前缀**交给依赖。
 //
 // ★ 正确性红线（docs/cn/batch_failure_semantics.md §8.3）：Aggregate 与
