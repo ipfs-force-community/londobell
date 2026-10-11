@@ -288,11 +288,12 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 
 	fails, ferr := s.ExtractTipSets(ctx, tipsets, false)
 	if ferr != nil {
-		return ferr // 致命错误：整批弃、不动水位
+		return ferr // 真正的致命错误（actor set / dealID 加载、台账写失败等）：整批弃、不动水位
 	}
 
-	// 只把「洞之前的连续前缀」交给聚合与水位推进（★ 红线，见 prefix_commit.go / §8.3）。
-	// 无洞时 prefix = 整批，行为与改动前一致；洞在批首（prefixLen==0）时不发布、不动水位。
+	// 只把「第一个阻断面之前的连续前缀」交给聚合与水位推进（★ 红线，见 prefix_commit.go / §8.3）。
+	// 无阻断时 prefix = 整批，行为与改动前一致；阻断面在批首（prefixLen==0）时不发布、不动水位。
+	// 阻断面在批中 ⇒ 只推前缀末；两种情况**都不算致命失败**（部分成功 / 下一轮从阻断面续跑）。
 	if perr := commitPrefix(ctx, tipsets, fails, prefixCommitDeps{
 		aggregate:        func(c context.Context, p []*common.LinkedTipSet) error { return s.Aggregate(c, p) },
 		saveFinalHeight:  func(c context.Context, h *common.LinkedTipSet) error { return s.SaveFinalHeight(c, h) },
@@ -301,16 +302,16 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		onlyExtractState: s.opts.Extract.OnlyExtractState,
 		saveStateEnabled: s.opts.Extract.ExtractOptions.EnabelExtract.EnableExtractState,
 	}); perr != nil {
-		// 发布未落地（洞在批首 ⇒ 水位未前移）：没有「新越过的水位」可用来对账，直接返回。
+		// 发布本身落地失败（Aggregate / SaveFinalHeight / updateBoundary 报错）：真正的致命错误。
 		return perr
 	}
 
 	// ★ 台账 heal 闭环（healed_at 的唯一写入路径；§8.4 / §8.9 验收第 4 条）：发布成功后
 	// 对账一次，把「已被本实例已发布水位越过末端」的洞标记为已修复。
 	//
-	// 位置理由：只有在 commitPrefix 返回 nil 时本轮的发布才真正落地（Aggregate +
-	// SaveFinalHeight/SaveStateFinalHeight + updateBoundary 全部成功），此刻「本实例已发布的
-	// 最终水位」就是刚发布的前缀末高度。洞的愈合恰恰发生在**干净轮次**——本轮整批成功、
+	// 位置理由：只有在 commitPrefix 返回 nil 且本轮真的前移了水位时（prefixLen > 0），本轮的
+	// 发布才真正落地（Aggregate + SaveFinalHeight/SaveStateFinalHeight + updateBoundary 全部成功），
+	// 此刻「本实例已发布的最终水位」就是刚发布的前缀末高度。洞的愈合恰恰发生在**干净轮次**——本轮整批成功、
 	// 前缀 = 整批，水位一举越过此前登记的洞末端——所以本对账必须**每轮**都尝试，而不是只在
 	// 「本轮有洞」时尝试，否则洞永远等不到被销项。（前缀高度用与 commitPrefix 同一份纯函数
 	// prefixLenBeforeFirstHole 复算取得，不改 prefix_commit.go 的签名。）

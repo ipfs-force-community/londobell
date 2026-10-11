@@ -21,6 +21,18 @@ const (
 	FailureClassUnknown   = "unknown"
 )
 
+// 阻断面来源（PartFailure.Kind 的取值）。
+//
+// 阻断面 = 本轮「不能越过、下一轮必须重做的起始高度」，其来源 = 已登记的洞 ∪ 失败 part。
+// 二者都进阻断清单，但处置不同：洞写台账（等 heal 闭环销项），失败 part 不写台账（下一轮重做）。
+const (
+	// BlockedByHole：可登记类别且已写入台账的洞（既有语义不变，仍由 heal 闭环销项）。
+	BlockedByHole = "hole"
+	// BlockedByPersistFailure：不可登记 / 未开启的 part 失败（含传输类、超时、未知）。
+	// 不写台账——它是「下一轮要重做」，不是永久的洞；只作为本轮发布的截断点。
+	BlockedByPersistFailure = "persist-failure"
+)
+
 // maxErrDigestLen 是错误摘要的保留上限。台账是给人看/给机器归因用的，
 // 不需要（也不应该）把可能长达数百 KB 的 mongo 批量写错误原文存进去。
 const maxErrDigestLen = 500
@@ -33,6 +45,12 @@ type PartFailure struct {
 	ErrDigest string         // 错误摘要（截断，勿存超长）
 	CID       string         // 从错误文本里提的根 CID，提不到则空
 	Attempts  int            // 观察到的尝试次数（分类时为 1，台账里累加）
+
+	// Kind 标注该失败作为「阻断面」时的来源：BlockedByHole（已登记台账的洞）或
+	// BlockedByPersistFailure（未登记的失败 part，下一轮重做）。它不是写入台账的字段子集
+	// （台账只认可登记的洞）。零值按 BlockedByHole 处理，使既有只填 Class/区间按字面量
+	// 构造的 PartFailure 语义不变。
+	Kind string
 }
 
 // classifyPartFailure 对一次 part 失败做分类。

@@ -2,7 +2,8 @@ package segment
 
 import (
 	"context"
-	"fmt"
+
+	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/ipfs-force-community/londobell/common"
 )
@@ -25,32 +26,27 @@ type prefixCommitDeps struct {
 	saveStateEnabled bool
 }
 
-// prefixLenBeforeFirstHole 返回 tss 中「首个洞之前」的连续高度数（即安全可发布的前缀长度）。
+// prefixLenBeforeFirstHole 返回 tss 中「首个阻断面之前」的连续高度数（即安全可发布的前缀长度）。
 //
-// 洞的定位：取 fails 里 FromEpoch 最小者的起点作为首个洞的起点；前缀 = tss 中高度
-// **严格小于**该起点的高度数。tss 按高度单调递增，所以这等价于「洞之前那一段连续 tipset
-// 的数量」。fails 为空 ⇒ 无洞 ⇒ 返回 len(tss)（整批都是前缀）。
+// 阻断面的定位：取 fails（= 已登记的洞 ∪ 失败 part）里 FromEpoch 最小者的起点作为首个阻断面的
+// 起点（见 firstBlockingBoundary）；前缀 = tss 中高度**严格小于**该起点的高度数。tss 按高度
+// 单调递增，所以这等价于「阻断面之前那一段连续 tipset 的数量」。fails 为空 ⇒ 无阻断 ⇒
+// 返回 len(tss)（整批都是前缀）。
 //
 // 为什么以高度（唯一业务键）而不是「失败 part 在 tss 里的下标」为准：partRunner 记录的
 // 是 part 的 [FromEpoch,ToEpoch]，part 边界与 tss 下标只是间接关系，用高度最稳。
 //
-// 纯函数：只读入参、无副作用，便于表驱动单测。
+// 纯函数：只读入参、无副作用，便于表驱动单测。与 firstBlockingBoundary 同源（都从同一份
+// fails 取最早起点），避免两处判据各写一份而漂移。
 func prefixLenBeforeFirstHole(tss []*common.LinkedTipSet, fails []PartFailure) int {
-	if len(fails) == 0 {
+	b, ok := firstBlockingBoundary(fails)
+	if !ok {
 		return len(tss)
-	}
-
-	// 最早就出现的洞的起点（也叫「首个洞」）。
-	first := fails[0].FromEpoch
-	for _, f := range fails[1:] {
-		if f.FromEpoch < first {
-			first = f.FromEpoch
-		}
 	}
 
 	n := 0
 	for _, ts := range tss {
-		if ts.Height() < first {
+		if ts.Height() < b.FromEpoch {
 			n++
 		}
 	}
@@ -66,18 +62,68 @@ func PrefixLenBeforeFirstHole(tss []*common.LinkedTipSet, fails []PartFailure) i
 	return prefixLenBeforeFirstHole(tss, fails)
 }
 
+// BlockingBoundary 描述本轮最早的「阻断面」：本轮**不能越过**、下一轮必须重做的起始高度。
+// 它的来源只有两类（见 PartFailure.Kind）：已登记的洞（BlockedByHole）与失败 part
+// （BlockedByPersistFailure）。
+type BlockingBoundary struct {
+	FromEpoch abi.ChainEpoch // 阻断面起始高度（part / 洞的起始高度）
+	ToEpoch   abi.ChainEpoch // 阻断面结束高度
+	Kind      string         // BlockedByHole | BlockedByPersistFailure
+}
+
+// firstBlockingBoundary 是「求第一个阻断面」的纯函数：从失败清单（= 已登记的洞 ∪ 失败 part）
+// 里取起始高度最小的一个。清单为空 ⇒ ok=false（无阻断，整批可发布）。
+//
+// 不假设入参有序：逐个取高度最小者。Kind 为空的旧式字面量按 BlockedByHole 处理
+// （既有只按 Class/区间构造 PartFailure 的调用方语义不变）。
+func firstBlockingBoundary(fails []PartFailure) (BlockingBoundary, bool) {
+	if len(fails) == 0 {
+		return BlockingBoundary{}, false
+	}
+
+	best := fails[0]
+	for _, f := range fails[1:] {
+		if f.FromEpoch < best.FromEpoch {
+			best = f
+		}
+	}
+
+	kind := best.Kind
+	if kind == "" {
+		kind = BlockedByHole
+	}
+	return BlockingBoundary{FromEpoch: best.FromEpoch, ToEpoch: best.ToEpoch, Kind: kind}, true
+}
+
+// FirstBlockingBoundary 是 firstBlockingBoundary 的导出包装，便于跨包复用与测试
+// （口径同 PrefixLenBeforeFirstHole）。
+func FirstBlockingBoundary(fails []PartFailure) (BlockingBoundary, bool) {
+	return firstBlockingBoundary(fails)
+}
+
 // commitPrefix 承载「连续前缀提交」这段控制流：算前缀 → **只把前缀**交给依赖。
 //
 // ★ 正确性红线（docs/cn/batch_failure_semantics.md §8.3）：Aggregate 与
 // SaveFinalHeight/SaveStateFinalHeight 都必须只吃前缀；updateBoundary 同理只推前缀末。
 //
-// 兼容性红线：无洞时（fails 为空）prefixLen == len(tss) ⇒ prefix 就是整批，行为与改动前
-// 完全一致。洞在批首（prefixLen == 0）时不发布任何部分、返回 error（保持不动水位）。
+// 阻断面语义：前缀 = 第一个阻断面（已登记的洞 ∪ 失败 part）之前那一段连续 tipset。
+//
+//   - 无阻断时（fails 为空）prefixLen == len(tss) ⇒ prefix 就是整批，行为与改动前完全一致；
+//   - 阻断面在批中 ⇒ 只发布 [批首, 阻断面-1]，水位只前移到前缀末，后续即使有已成功的 part
+//     也绝不跨越阻断面发布（**本轮不算致命失败**，算部分成功）；
+//   - 阻断面就在批首（prefixLen == 0）⇒ 不发布、水位不动，同样**不算致命失败**：下一轮会从
+//     同一位置续跑。
+//
+// 返回非 nil error 只表示「发布本身落地失败」（Aggregate / SaveFinalHeight / updateBoundary
+// 报错），那是真正的致命错误，由上层整批弃。
 func commitPrefix(ctx context.Context, tss []*common.LinkedTipSet, fails []PartFailure, deps prefixCommitDeps) error {
 	prefixLen := prefixLenBeforeFirstHole(tss, fails)
+
 	if prefixLen == 0 {
-		// 洞就在批首：没有任何「连续、可安全发布」的部分，保持不动水位（与现状一致）。
-		return fmt.Errorf("batch head blocked by hole(s): %s", summarizeFailures(fails))
+		// 阻断面就在批首：没有任何「连续、可安全发布」的部分。不发布、水位不动，
+		// 但**不是致命失败**——下一轮从同一位置续跑（这是本次改动相对「整批作废」的关键区别）。
+		logBlockedBeforePublish(tss, fails)
+		return nil
 	}
 
 	prefix := tss[:prefixLen]
@@ -103,5 +149,45 @@ func commitPrefix(ctx context.Context, tss []*common.LinkedTipSet, fails []PartF
 		return err
 	}
 
+	logPublishedPrefix(tss, head, fails)
+
 	return nil
+}
+
+// logPublishedPrefix 记录一次成功的前缀发布（可观测性，便于主网排障）：
+//   - INFO：range / publishedTo / blockedBy / blockedAt；
+//   - 若本轮被阻断面截断（存在阻断面），再补一条 WARN 说明「本轮被阻断面截断，水位停在 X」。
+func logPublishedPrefix(tss []*common.LinkedTipSet, head *common.LinkedTipSet, fails []PartFailure) {
+	b, blocked := firstBlockingBoundary(fails)
+	if !blocked {
+		log.Infow("published contiguous prefix to batch end",
+			"range", common.FormatTipSetEpochRange(tss),
+			"publishedTo", int64(head.Height()),
+			"blockedBy", "none")
+		return
+	}
+
+	log.Infow("published contiguous prefix truncated by blocking boundary",
+		"range", common.FormatTipSetEpochRange(tss),
+		"publishedTo", int64(head.Height()),
+		"blockedBy", b.Kind, "blockedAt", int64(b.FromEpoch))
+
+	log.Warnw("round truncated by blocking boundary, watermark stopped",
+		"watermark", int64(head.Height()),
+		"blockedBy", b.Kind, "blockedAt", int64(b.FromEpoch),
+		"range", common.FormatTipSetEpochRange(tss))
+}
+
+// logBlockedBeforePublish 记录「阻断面就在批首、本轮什么都没发布、水位不动」的情形。
+func logBlockedBeforePublish(tss []*common.LinkedTipSet, fails []PartFailure) {
+	if len(tss) == 0 {
+		return
+	}
+	b, blocked := firstBlockingBoundary(fails)
+	if !blocked {
+		return
+	}
+	log.Warnw("batch head blocked by blocking boundary, nothing published, watermark unchanged",
+		"range", common.FormatTipSetEpochRange(tss),
+		"blockedBy", b.Kind, "blockedAt", int64(b.FromEpoch))
 }

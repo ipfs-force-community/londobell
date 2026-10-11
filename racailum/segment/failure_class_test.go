@@ -173,14 +173,15 @@ func TestClassifyPartFailure_JobTimeoutTypeIsTransport(t *testing.T) {
 	}
 }
 
-// config 为空（默认）时：part 失败必须整批作废，且一行台账都不写。
-func TestPartRunner_EmptySkippableClassesKeepsStatusQuo(t *testing.T) {
+// config 为空（默认）时：state 类失败**不登记**（该类别未开启），但它的起始高度仍是阻断面——
+// 本轮从它之前截断、下一轮重做；不再整批作废。
+func TestPartRunner_EmptySkippableClassesBlocksWithoutRecording(t *testing.T) {
 	tss := mkTSS(t, 100, 101, 102)
 
 	var recordCalls int
 	r := &partRunner{
 		partSizeLimit: 1,
-		skippable:     nil, // 默认 = 完全维持现状
+		skippable:     nil, // 默认 = 不登记、不跳过
 		log:           zap.NewNop().Sugar(),
 		extractPart: func(part []*common.LinkedTipSet, persist bool) error {
 			if part[0].Height() == 101 {
@@ -192,14 +193,17 @@ func TestPartRunner_EmptySkippableClassesKeepsStatusQuo(t *testing.T) {
 	}
 
 	failures, err := r.run(tss)
-	if err == nil {
-		t.Fatal("SkippableErrorClasses 为空时，part 失败必须整批作废（返回 error）")
+	if err != nil {
+		t.Fatalf("part 失败不再致命（它是阻断面），不应返回 error，实际 %v", err)
 	}
-	if len(failures) != 0 {
-		t.Fatalf("不应登记任何 failure，实际 %d", len(failures))
+	if len(failures) != 1 || failures[0].FromEpoch != 101 {
+		t.Fatalf("应记录 1 个阻断面 @101，实际 %+v", failures)
+	}
+	if failures[0].Kind != BlockedByPersistFailure {
+		t.Fatalf("未开启的可登记类应标记为 persist-failure，实际 %q", failures[0].Kind)
 	}
 	if recordCalls != 0 {
-		t.Fatalf("不应写任何台账行，实际写 %d 次", recordCalls)
+		t.Fatalf("未开启的类别不应写台账，实际写 %d 次", recordCalls)
 	}
 }
 
@@ -236,6 +240,9 @@ func TestPartRunner_RecordedFailureReturnsFailuresWithNilErrorAndDisablesPersist
 	}
 	if failures[0].Class != FailureClassState || failures[0].FromEpoch != 101 || failures[0].ToEpoch != 101 {
 		t.Fatalf("登记内容不符：%+v", failures[0])
+	}
+	if failures[0].Kind != BlockedByHole {
+		t.Fatalf("可登记类应标记为 hole，实际 %q", failures[0].Kind)
 	}
 	// persist 只对「失败 part 及其之前」为 true：h100、h101 为 true，h102~h104 为 false。
 	want := []bool{true, true, false, false, false}
@@ -370,8 +377,9 @@ func TestPartRunner_LedgerWriteFailureAborts(t *testing.T) {
 	}
 }
 
-// 只是配置开启了 state，但错误实际是 transport：仍必须整批作废。
-func TestPartRunner_TransportNeverSkippedEvenWhenClassEnabled(t *testing.T) {
+// transport 类：既不登记台账（不可登记），也不再整批作废——它是阻断面（persist-failure），
+// 本轮从它之前截断、下一轮重做。
+func TestPartRunner_TransportIsBlockingBoundaryNotRecorded(t *testing.T) {
 	tss := mkTSS(t, 600, 601)
 
 	var recordCalls int
@@ -388,11 +396,18 @@ func TestPartRunner_TransportNeverSkippedEvenWhenClassEnabled(t *testing.T) {
 		record: func(pf PartFailure) error { recordCalls++; return nil },
 	}
 
-	if _, err := r.run(tss); err == nil {
-		t.Fatal("transport 类必须整批作废，即便配置里（误）写了 transport")
+	failures, err := r.run(tss)
+	if err != nil {
+		t.Fatalf("transport 类不再整批作废（它是阻断面），不应返回 error，实际 %v", err)
+	}
+	if len(failures) != 1 || failures[0].FromEpoch != 601 || failures[0].Class != FailureClassTransport {
+		t.Fatalf("应记录 1 个 transport 阻断面 @601，实际 %+v", failures)
+	}
+	if failures[0].Kind != BlockedByPersistFailure {
+		t.Fatalf("transport 阻断面应标记为 persist-failure，实际 %q", failures[0].Kind)
 	}
 	if recordCalls != 0 {
-		t.Fatalf("transport 不得登记，实际写 %d 次", recordCalls)
+		t.Fatalf("transport 不得登记台账，实际写 %d 次", recordCalls)
 	}
 }
 

@@ -191,16 +191,20 @@ func (s *Segment) insertManyWithTimeout(ctx context.Context, l *zap.SugaredLogge
 	return s.insertMany(tctx, l, docSets)
 }
 
-// ExtractTipSets 抽取给定 tipset 区间的数据，返回**已登记的 part 失败清单**与 error。
+// ExtractTipSets 抽取给定 tipset 区间的数据，返回**阻断清单**与 error。
 //
-// ★ 错误契约（第 3 段）：
-//   - 致命错误（不可登记的 part 失败、台账写失败、异步落库失败）⇒ 返回 (failures, err)，
-//     err 非 nil。上层 `Segment.Extract` 照旧整批弃、不动水位。
-//   - 仅「已登记的洞」⇒ 返回 (failures, nil)：failures 非空但 err 为 nil。
+// 阻断清单 = 已登记的洞 ∪ 失败 part（任何类别，含传输类 / 超时）。每个元素用 Kind 标注来源
+// （BlockedByHole / BlockedByPersistFailure）；失败 part **不写台账**，它只是「下一轮要重做」。
 //
-// **返回 nil error 不代表无洞**——调用方必须检查 failures 是否为空，并据此计算「连续前缀」
-// 后再决定发布到哪里（见 prefix_commit.go 的 commitPrefix / prefixLenBeforeFirstHole）。
-// 这正是第 2 段（当时还没改发布逻辑，只能靠「有登记就报错」当安全阀）与本段的区别。
+// ★ 错误契约（阻断面语义）：
+//   - 真正的致命错误（actor set / dealID 加载失败、台账写失败、异步落库失败）⇒ 返回
+//     (failures, err)，err 非 nil。上层 `Segment.Extract` 照旧整批弃、不动水位。
+//   - 某个 part 抽取失败（任何类别）⇒ **不再致命**：它的起始高度作为一条阻断面记入 failures，
+//     返回 (failures, nil)，由上层只发布「第一个阻断面之前的连续前缀」。
+//
+// **返回 nil error 不代表无阻断**——调用方必须检查 failures 是否为空，并据此计算「连续前缀」
+// 后再决定发布到哪里（见 prefix_commit.go 的 commitPrefix / firstBlockingBoundary /
+// prefixLenBeforeFirstHole）。这正是相对旧契约（有洞即报错、整批弃）的区别。
 func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet, tmp bool) ([]PartFailure, error) {
 	ctx, span := trace.StartSpan(ctx, "segment.ExtractTipSets")
 	defer span.End()
@@ -280,8 +284,10 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 
 	// 把 part 循环抽到 partRunner：依赖全部经字段注入，生产路径注入真实的
 	// extractPart / 台账写入 / 护栏取值；单测注入假实现，从而在不连链、不连 mongo 的
-	// 前提下验证「分类 → 登记 → 继续（只抽取不落库）」与「登记过的洞不再当 error 返回、
-	// 发布决策交给上层」这两条契约。
+	// 前提下验证「分类 → 登记或标记阻断面 → 继续（只抽取不落库）」这条契约：
+	//   - 可登记类：写台账成为「洞」；
+	//   - 不可登记类（传输/超时/未知）与未开启类：不写台账，作为「失败 part 阻断面」；
+	// 二者都进阻断清单返回，发布决策（只推第一个阻断面之前的前缀）交给上层。
 	runner := &partRunner{
 		partSizeLimit:  s.opts.Extract.TipSetPartSizeLimit,
 		skippable:      s.opts.Extract.SkippableErrorClasses,
@@ -315,13 +321,14 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 	if len(failures) == 0 {
 		elog.Info("all parts done")
 	} else {
-		elog.Warnw("all parts done with recorded holes (publish decision deferred to Segment.Extract)",
-			"holes", summarizeFailures(failures))
+		elog.Warnw("all parts done with blocking boundaries (publish decision deferred to Segment.Extract)",
+			"blockedBy", summarizeFailures(failures))
 	}
 
-	// ★ 契约（第 3 段）：返回 (failures, nil) 时 failures 可能非空 —— 表示本轮有「已登记
-	// 的洞」，但循环本身没有致命失败。**返回 nil error 不代表无洞**；调用方必须据 failures
-	// 计算「连续前缀」，只把前缀交给 Aggregate / SaveFinalHeight（见 prefix_commit.go）。
+	// ★ 契约：返回的 failures = 阻断清单 = 已登记的洞 ∪ 失败 part（各类别，含传输类/超时）。
+	// 返回 nil error 只表示「循环本身没有致命失败」，不代表无阻断——由上层 Segment.Extract
+	// 按「连续前缀」决定发布到哪里（见 prefix_commit.go 的 commitPrefix）。唯一仍会在此
+	// return error 的是「台账写失败」那条铁律（不可登记的 part 失败不再致命）。
 	return failures, nil
 }
 
@@ -405,21 +412,27 @@ func (r *partRunner) run(tss []*common.LinkedTipSet) ([]PartFailure, error) {
 		err := r.extractPart(part, persist)
 		if err != nil {
 			pf, recordable := classifyPartFailure(part, err)
-			if !recordable || !classEnabled(pf.Class, r.skippable) {
-				// 不可登记，或该类未被开启：保持现状——立即整批作废。
-				return failures, fmt.Errorf("extract part %d/%d failed (range %s, completed %d/%d): %w",
-					partDone+1, partTotal, common.FormatTipSetEpochRange(part), partDone, partTotal, err)
+			if recordable && classEnabled(pf.Class, r.skippable) {
+				// 可登记类别且已开启：写台账，成为一个「洞」（既有语义不变）。
+				// 铁律：台账写不进去就不允许跳过。写失败 ⇒ 整批作废（真正的致命错误，保持现状）。
+				if rerr := r.record(pf); rerr != nil {
+					return failures, fmt.Errorf("extract part %d/%d failed and ledger write failed (range %s, completed %d/%d): %v; original error: %w",
+						partDone+1, partTotal, common.FormatTipSetEpochRange(part), partDone, partTotal, rerr, err)
+				}
+				pf.Kind = BlockedByHole
+				failures = append(failures, pf)
+				r.log.Warnw("part failure recorded as hole, continuing with persist disabled",
+					"class", pf.Class, "from", int64(pf.FromEpoch), "to", int64(pf.ToEpoch), "cid", pf.CID)
+			} else {
+				// 不可登记（传输类 / 超时 / 未知）或该类未开启：**不写台账**——它是「下一轮要重做」，
+				// 不是永久的洞；但它的起始高度就是一个阻断面：本轮从它之前截断发布、水位停在前缀末，
+				// 之后即使还有已成功的 part 也绝不跨越它发布（见 commitPrefix / firstBlockingBoundary）。
+				// 不再整批作废——这正是本段要消灭「一个坏 part 拖垮整批」的落点。
+				pf.Kind = BlockedByPersistFailure
+				failures = append(failures, pf)
+				r.log.Warnw("part failure is a blocking boundary (not recorded), continuing with persist disabled",
+					"class", pf.Class, "from", int64(pf.FromEpoch), "to", int64(pf.ToEpoch), "err", pf.ErrDigest)
 			}
-
-			// 铁律：台账写不进去就不允许跳过。写失败 ⇒ 按不可登记处理。
-			if rerr := r.record(pf); rerr != nil {
-				return failures, fmt.Errorf("extract part %d/%d failed and ledger write failed (range %s, completed %d/%d): %v; original error: %w",
-					partDone+1, partTotal, common.FormatTipSetEpochRange(part), partDone, partTotal, rerr, err)
-			}
-
-			failures = append(failures, pf)
-			r.log.Warnw("part failure recorded, continuing with persist disabled",
-				"class", pf.Class, "from", int64(pf.FromEpoch), "to", int64(pf.ToEpoch), "cid", pf.CID)
 		} else {
 			r.log.Infow("part done", "done-parts", partDone+1, "done-tss", tsDone+len(part), "persisted", persist)
 		}
@@ -428,9 +441,9 @@ func (r *partRunner) run(tss []*common.LinkedTipSet) ([]PartFailure, error) {
 		partDone++
 	}
 
-	// ★ 契约（第 3 段）：已登记的洞**不再**当 error 返回。返回 nil error 只表示「循环本身
-	// 没有致命失败」，不代表无洞——由上层 Segment.Extract 按「连续前缀」决定发布到哪里。
-	// 致命失败（不可登记类、台账写失败）在上面的循环里已经 return，不会走到这里。
+	// ★ 契约：阻断清单（已登记的洞 ∪ 失败 part）**不再**当 error 返回。返回 nil error 只表示
+	// 「循环本身没有致命失败」，不代表无阻断——由上层 Segment.Extract 按「连续前缀」决定发布到
+	// 哪里。唯一仍会在循环里 return error 的是「台账写失败」那条铁律。
 	return failures, nil
 }
 

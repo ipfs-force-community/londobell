@@ -168,10 +168,11 @@ func TestCommitPrefix_NoHolesPublishesWholeBatch(t *testing.T) {
 	}
 }
 
-// 洞在批首：没有任何可安全发布的部分 ⇒ 返回 error、不调用任何发布依赖（不动水位）。
+// 阻断面在批首：没有任何可安全发布的部分 ⇒ 不调用任何发布依赖（不动水位），
+// 且**不算致命失败**（返回 nil，下一轮从阻断面续跑）。
 func TestCommitPrefix_HoleAtHeadPublishesNothing(t *testing.T) {
 	tss := mkTSS(t, 10, 11, 12)
-	fails := []PartFailure{{FromEpoch: 10, ToEpoch: 11, Class: FailureClassState}}
+	fails := []PartFailure{{FromEpoch: 10, ToEpoch: 11, Class: FailureClassState, Kind: BlockedByHole}}
 
 	var calls int
 	deps := prefixCommitDeps{
@@ -181,11 +182,11 @@ func TestCommitPrefix_HoleAtHeadPublishesNothing(t *testing.T) {
 		updateBoundary:  func(_ context.Context, _ *common.LinkedTipSet) error { calls++; return nil },
 	}
 
-	if err := commitPrefix(context.Background(), tss, fails, deps); err == nil {
-		t.Fatal("洞在批首必须返回 error（保持不动水位）")
+	if err := commitPrefix(context.Background(), tss, fails, deps); err != nil {
+		t.Fatalf("阻断面在批首不算致命失败，应返回 nil，实际 %v", err)
 	}
 	if calls != 0 {
-		t.Fatalf("洞在批首不应调用任何发布依赖，实际调用 %d 次", calls)
+		t.Fatalf("阻断面在批首不应调用任何发布依赖，实际调用 %d 次", calls)
 	}
 }
 
