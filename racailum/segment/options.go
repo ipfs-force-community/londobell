@@ -32,6 +32,15 @@ type extractOptions struct {
 	ExtractOptions extract.Options
 
 	OnlyExtractState bool
+
+	// 轮间退避（§8.6）：某轮失败后不再「下个 tipset（约 30 秒）到来即重跑整段」，
+	// 而是按指数退避等待，成功一轮立即复位。理由：失败轮都在已知会失败的高度上白跑
+	// ——实测 cali 每轮白跑 826 个高度、并持续消耗 2 核 mongo 的算力。退避不减少
+	// 失败次数，但能把无效消耗降到接近 0。
+	// 这两个字段只是为了把退避曲线可配置化，默认值与改动前的「无等待」相比更保守
+	// （更保守 = 失败时少空转），且不含任何「跳过/degraded」语义。
+	RoundBackoffInitial time.Duration // 默认 5m
+	RoundBackoffMax     time.Duration // 默认 30m
 }
 
 type persistOptions struct {
@@ -75,6 +84,12 @@ func DefaultOptions() Options {
 
 			ExtractOptions:   extract.DefaultOptions(),
 			OnlyExtractState: false,
+
+			// 退避曲线：5m → 10m → 20m → 上限 30m（见 §8.6）。取值的根据是
+			// 「配置默认值必须与现状等价或更保守」——失败轮每轮都会在已知失败的高度上
+			// 白跑数十分钟，退避正是用来砍掉这段无效消耗，故上限取到 30m 而非更短。
+			RoundBackoffInitial: 5 * time.Minute,
+			RoundBackoffMax:     30 * time.Minute,
 		},
 
 		Persist: persistOptions{
@@ -171,6 +186,24 @@ func PersistWaitTimeout(d time.Duration) OptionFn {
 	return func(opt *Options) {
 		if d > 0 {
 			opt.Persist.WaitTimeout = d
+		}
+	}
+}
+
+// RoundBackoffInitial override the inter-round backoff initial duration by the given positive duration
+func RoundBackoffInitial(d time.Duration) OptionFn {
+	return func(opt *Options) {
+		if d > 0 {
+			opt.Extract.RoundBackoffInitial = d
+		}
+	}
+}
+
+// RoundBackoffMax override the inter-round backoff upper bound by the given positive duration
+func RoundBackoffMax(d time.Duration) OptionFn {
+	return func(opt *Options) {
+		if d > 0 {
+			opt.Extract.RoundBackoffMax = d
 		}
 	}
 }

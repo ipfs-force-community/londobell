@@ -267,6 +267,12 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		persistSem:   make(chan struct{}, 2),
 	}
 
+	limit := s.opts.Extract.TipSetPartSizeLimit
+	partTotal := 0
+	if limit > 0 {
+		partTotal = (size + limit - 1) / limit
+	}
+
 	tsDone := 0
 	partDone := 0
 	for tsDone < size {
@@ -278,7 +284,13 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 
 		part := tss[start:end]
 		if err := s.extractPart(pctx, part, tmp); err != nil {
-			return err
+			// 出错时把进度带进 error：任一部分失败仍返回 error（整批作废语义不变），
+			// 但错误信息里要能看出「已经推进到哪」——线上事故里正是靠着
+			// 「done-parts=128/129」才知道 99.2% 的工作已经做完。
+			// 这里补的是「失败 part 的序号 / 总 part 数 / 已完成 part 数 / 失败 part 的高度区间」，
+			// 以便失败时不必翻日志也能定位进度与洞的位置。
+			return fmt.Errorf("extract part %d/%d failed (range %s, completed %d/%d): %w",
+				partDone+1, partTotal, common.FormatTipSetEpochRange(part), partDone, partTotal, err)
 		}
 
 		tsDone += len(part)
