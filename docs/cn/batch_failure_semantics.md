@@ -127,7 +127,7 @@
 
 | 方案 | 水位怎么推 | 正确性 | cali 昨晚的实际收益 |
 |---|---|---|---|
-| **安全版（本设计采用）** | 只推到连续前缀，遇洞停住 | ✅ 洞永远不会被跨过发布，派生表不可能被污染 | 恢复 884/3487 高度（约 7 小时，而非 31.5 小时） |
+| **安全版（本设计采用）** | 只推到连续前缀，遇洞停住 | ✅ 洞永远不会被跨过发布，派生表不可能被污染 | **原写「884/3487 高度」有误，已更正——见 §8.0：单靠前缀提交收益≈0，真正的杠杆是「登记后继续往后抽」** |
 | ~~激进版~~ | 跨过洞继续往后发布 | ❌ 洞两侧派生值错误，须等回填后**重算**才恢复 | 31.5 小时全恢复 |
 
 激进版要成立，前提是先证明「回填 → 重算所有跨洞派生表」这条闭环能自动跑通。
@@ -183,3 +183,222 @@ bell 是被害者也是修复对象，这个自相矛盾要解掉。
    长时间不愈合的区间要不要告警、要不要升级为人工介入，需要规则。
 4. **calibnet 与 mainnet 的构建标签不同**（`--tags=calibnet` / 主网标签），
    改动必须两网分别构建、分别发布，且**不能在另一网正追赶时换件**。
+
+---
+
+## 八、实现规格（可照着写代码）
+
+> 行号对应 2026-10-11 的仓内 HEAD（`londobell` master）。
+
+### 8.0 先更正一条收益口径（§5.3 的表）
+
+§5.3 写「安全版可恢复 884/3487 高度」，**这个数字的推导有误，须按机制重算**。
+
+实测 cali 那批：区间 `[4140557, 4144044]`、`TipSetPartSizeLimit = 16`（`done-parts: 1 → done-tss: 16`），
+**首个洞 4140561 落在第 1 个 part 内（批内第 5 个高度）**。
+
+⇒ 若按 **part 粒度**取「连续前缀」，前缀 = **0 个 part**，一个高度都恢复不了；
+若按 **tipset 粒度**，前缀 = 4 个高度，也约等于 0。
+**「只推连续前缀」这一条本身几乎不产生收益。**
+
+真正的杠杆在另一半——**「登记坏 part 后继续往后抽」**：
+
+| 机制 | 作用 |
+|---|---|
+| 只想推前缀、遇洞即停 | 收益 ≈ 0（洞在批首时前缀为空） |
+| **继续往后抽并逐个登记** | bell 在**同一轮**内撞出**所有**洞 ⇒ heal 一次拿到全部 CID、一轮修完 |
+
+原流程是「撞一个洞 → 整批弃 → heal 修 1 个 → 再撞下一个」，6 个洞 ⇒ 6 轮 × (1~3 小时)；
+改成继续往后抽以后，**6 个洞在同一轮内全部暴露**，heal 一轮修完。
+⇒ 这才是 31.5 小时 → 小时级的来源。**两条必须一起做，单独做「前缀提交」没有意义。**
+
+### 8.1 控制流事实（已逐行核对）
+
+`Segment.Extract`（`segment.go:231–314`）：
+
+```
+lo = bound.Lo;  hi = bound.Hi
+tipsets = ExtractLinkedTipSets(cs, rawts, &hi)   // 区间 (hi, rawts]
+tipsets = tipsets[1:]                            // 去掉 hi 自身
+按 Confidence 裁掉尾部未确认的
+ExtractTipSets(ctx, tipsets, false)   ← ① 批抽取，这里失败 = 整批弃
+Aggregate(ctx, tipsets)               ← ② 跨高度聚合（必须只喂前缀）
+SaveFinalHeight(tipsets[len-1])       ← ③ 对外发布水位
+updateBoundary(tipsets[len-1], nil)   ← ④ 段边界前移
+```
+
+`ExtractTipSets`（`extract.go:193–295`）：
+
+```
+for tsDone < size {
+    part := tss[tsDone : tsDone+TipSetPartSizeLimit]
+    if err := s.extractPart(pctx, part, tmp); err != nil { return err }   ← 注入口 ①
+    tsDone += len(part); partDone++
+}
+if err := waitAsyncPersist(&pctx.asyncPersistWaitGroup, WaitTimeout); err != nil {  ← 注入口 ②
+    return fmt.Errorf("error occurs in async persist: %s", err)
+}
+```
+
+`extractPart`（`extract.go:297–428`）：part 内每个 tipset 一个 goroutine，结果落到 `docs[ti]`；
+`ewg.Wait()` 返回**首个**错误；随后 `insertManyWithTimeout(docs)`（`Persist.Async=true` 时进 `asyncPersistWaitGroup`）。
+
+`Aggregate`（`aggregate/aggregate.go:86–141`）：**逐 tipset 独立**跑各 source 的 mongo pipeline
+（`for ti := range tss`）⇒ **传入前缀切片是安全的**，不会跨洞计算。
+
+### 8.2 改动一：失败分类 + 登记 + 继续（`extract.go`）
+
+**注入口 ①** 由「return err」改为「分类 → 可跳过则登记并继续」：
+
+```go
+var failures []PartFailure
+for tsDone < size {
+    part := tss[tsDone : tsDone+s.opts.Extract.TipSetPartSizeLimit]
+    if err := s.extractPart(pctx, part, tmp); err != nil {
+        if pf, ok := classifyPartFailure(part, err); ok {
+            failures = append(failures, pf)   // 登记，不中断
+            // 注意：continue 而不是 return
+        } else {
+            return err                        // 传输级：保持现状，整批弃
+        }
+    } else { ... }
+    tsDone += len(part); partDone++
+}
+```
+
+**注入口 ②** 目前 `waitAsyncPersist` 只返回一个合并错误，**无法归因到哪个 part**。
+必须改为按 part 收集：把 `asyncPersistWaitGroup.Go(...)` 的闭包捕获该 part 的序号与区间，
+失败时写入一个 `chan partPersistErr`；`waitAsyncPersist` 改为「等全部 goroutine 结束后读该 chan」。
+否则「落库超时的 part」无法登记，而这正是主网那类故障的形态。
+
+**分类器**（新增，建议放 `racailum/segment/failure_class.go`）：
+
+| 判据（按 `err.Error()` 子串匹配） | 类别 | 处置 |
+|---|---|---|
+| `ipld: could not find`、`failed to load hamt node`、`failed to load state tree` | `state` | 登记 + 继续 |
+| `not minimally encoded`、`failed to unmarshal`、业务码非 0 | `data` | 登记 + 继续 |
+| `extract job timeout`（`*extractJobTimeoutErr`） | `transport` | 不登记，整批弃 |
+| `async persist wait timeout`、`context deadline exceeded`、`connection ... incomplete read` | `transport` | 不登记，整批弃 |
+| 其余（未知） | `unknown` | **默认整批弃**（保守：宁可停，不可静默跳） |
+
+**要点**：默认分支必须是「弃」不是「跳」。分类器的白名单越窄越好。
+`*extractJobTimeoutErr` 用 `errors.As` 判类型，不要靠字符串。
+
+### 8.3 改动二：提交只推「连续前缀」（`segment.go`）
+
+`ExtractTipSets` 的返回值从 `error` 改为 `(PartFailures, error)`（或经 `Segment` 上的字段回传）。
+
+```go
+// segment.go Extract() 内，拿到 fails 之后：
+prefixLen := computePrefix(tipsets, fails)   // 连续成功的高度数
+if prefixLen == 0 {
+    return fmt.Errorf("batch head blocked by hole(s): %v", fails)  // 保持现状：不动水位
+}
+
+prefix := tipsets[:prefixLen]
+if err := s.Aggregate(ctx, prefix); err != nil { return err }   // ★ 只喂前缀
+... SaveFinalHeight(ctx, prefix[prefixLen-1])                   // ★ 只推前缀末
+if err := s.updateBoundary(ctx, prefix[prefixLen-1], nil); err != nil { return err }
+// 坏 part 已登记；下一轮从这里继续，撞同一洞 → 命中台账 → 不重复登记
+```
+
+**★ 两处是正确性红线**：`Aggregate` 与 `SaveFinalHeight` 都必须只吃前缀。
+漏掉 `Aggregate` 这一处，就等于**跨洞发布派生表**（200 + 无错日志 + 错数值）。
+
+**注**：继续往后抽的那些 part，其文档已写进 mongo 但水位没推过去。
+对外不可见（聚合器只读 ≤ `final_height`），下一轮从新边界重抽时被 `epochValue >= existingEpoch`
+幂等覆盖。**这一点必须在实施时用只读查询复核一次**（确认聚合器确实不读超水位数据）。
+
+### 8.4 改动三：登记台账（新增集合）
+
+写到 bell 的写库（与 `FinalHeight` 同库），命名随本仓风格：
+
+```
+集合 SkippedPart {
+  from_epoch  int64     // part 起始高度
+  to_epoch    int64     // part 结束高度
+  error_class string    // data | state
+  err_digest  string    // 错误摘要（截断，勿存超长）
+  cid         string    // 从错误文本提取的根 CID（提不到则空）
+  attempts    int
+  first_seen  time
+  last_seen   time
+  healed_at   time|null
+}
+唯一索引 (from_epoch, to_epoch)
+```
+
+**铁律（照抄上游）**：**台账写不进去就不允许跳过**——写失败则按原逻辑整批弃，
+否则就变成静默跳洞（用户明确否掉过的形态）。
+重复命中同一区间时只更新 `last_seen` / `attempts`，不插新行。
+
+### 8.5 改动四：护栏（防洞不愈合时无限前进）
+
+继续往后抽有个必然副作用：**洞不愈合时，bell 会一路抽到链头**，
+未发布区间无限增长、mongo 里堆积不可见的文档。
+
+护栏：新增 `MaxUnpublishedRange`（高度）。当 `链头 − final_height > 阈值` 时
+**停止继续往后抽**、只登记并告警。建议初始值取 **2000 高度**（约 17 小时）。
+
+### 8.6 改动五：轮间退避（`ra.go` Run）
+
+现状（`ra.go:220`）：失败后**不等待**，下个 tipset（约 30 秒）到来即重跑整段，
+每轮都在已知会失败的高度上白跑。
+
+改为指数退避：`5min → 10min → 20min`，上限 30min；成功一轮后立即复位。
+接入点：`Run` 循环里 `r.Extract` 返回 error 的分支。
+**注意**：退避期间 `AlertOutdatedFinalHeight`（`ra.go:233`）仍在跑，告警不会哑掉。
+
+### 8.7 配置项（`options.go`）
+
+```go
+type extractOptions struct {
+    ... 既有 ...
+    // 失败分级：可登记并继续的错误类别（默认仅 state/data）
+    SkippableErrorClasses []string      // 默认 {"state","data"}
+    // 护栏：未发布区间上限，超过即停手告警
+    MaxUnpublishedRange   abi.ChainEpoch // 默认 2000
+    // 轮间退避
+    RoundBackoffInitial   time.Duration  // 默认 5m
+    RoundBackoffMax       time.Duration  // 默认 30m
+}
+```
+**默认值必须与现状等价或更保守**：`SkippableErrorClasses` 上线初期建议先配成**空**
+（= 完全维持现状），确认链路无误后再开——这样灰度回退是改配置而不是回滚二进制。
+
+### 8.8 测试计划
+
+| 层 | 用例 |
+|---|---|
+| 单元 | `classifyPartFailure`：上表每一行一个正例 + 一个「未知错误必须归为弃」的反例 |
+| 单元 | `computePrefix`：失败在第 0 / 中间 / 最后一个 part；多个失败；无失败 |
+| 单元 | 台账重复命中：同区间两次只更新 `last_seen`，不新增行 |
+| 单元 | 护栏：未发布区间超阈值时停止继续抽 |
+| 集成（假 dal，不连链） | 让第 k 个 part 固定失败 ⇒ 断言：台账有行；`Aggregate` 收到的切片**等于前缀**；`SaveFinalHeight`/`updateBoundary` 收到前缀末 |
+| 回归 | 既有 `extract_timeout_test.go` 必须继续通过：**超时仍属 transport、仍整批弃** |
+| 回归 | `WaitTimeout` 超时仍整批弃（不因新逻辑被误判为可跳过） |
+
+### 8.9 验收判据（上线后看这几个，不看「进程 RUNNING」）
+
+1. **台账出现行**：撞洞后 `SkippedPart` 有记录，且 `attempts` 随轮次增长而非新增行；
+2. **水位停而不退**：`final_height` 停在洞前（**绝不越过洞**）；
+3. **同一轮暴露多个洞**（本次改动的核心行为）：日志中出现**多个不同高度**的
+   `extract job failed`，而不是每轮只报一个；
+4. **补齐后自然追平**：heal 修完 → 下一轮 `final_height` 前移、台账行出现 `healed_at`；
+5. 单测与集成测试全绿。
+
+### 8.10 上线顺序
+
+1. **只上「退避 + 可观测日志」**（§8.6），`SkippableErrorClasses = {}`——零语义变化，先验证观测面；
+2. 开 `state` 类，**cali 先行**，观察一个完整的洞周期（撞洞 → 登记 → 继续 → heal → 追平）；
+3. cali 稳定后再开 `data` 类；
+4. **主网最后上**，且必须避开追赶期。
+
+### 8.11 实施时必须先确认的三项（本次未取证完）
+
+1. **`final_height` 与段边界 `Hi` 的差值**：cali 事故时 `final_height=4138552`
+   而批起点是 4140557（差 1004）——这说明水位与边界并非同步推进。
+   若二者可长期不同步，则「前缀提交」的收益口径要按**边界**算而不是按水位算。**先查清再动手。**
+2. **聚合器是否真的只读 ≤ `final_height` 的数据**（§8.3 的注）。这是「继续往后抽」不泄漏的前提。
+3. **`insertMany` 的幂等保护覆盖范围**（`persist.go:112–140` 的 `epochValue >= existingEpoch`）
+   对「已写入但未发布」的那些 part 是否同样成立。
