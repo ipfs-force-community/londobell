@@ -286,31 +286,21 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		return nil
 	}
 
-	if _, err := s.ExtractTipSets(ctx, tipsets, false); err != nil {
-		return err
+	fails, ferr := s.ExtractTipSets(ctx, tipsets, false)
+	if ferr != nil {
+		return ferr // 致命错误：整批弃、不动水位
 	}
 
-	if err := s.Aggregate(ctx, tipsets); err != nil {
-		return err
-	}
-
-	if s.opts.Extract.OnlyExtractState {
-		if s.opts.Extract.ExtractOptions.EnabelExtract.EnableExtractState {
-			if err := s.SaveStateFinalHeight(ctx, tipsets[len(tipsets)-1]); err != nil {
-				return err
-			}
-		}
-	} else {
-		if err := s.SaveFinalHeight(ctx, tipsets[len(tipsets)-1]); err != nil {
-			return err
-		}
-	}
-
-	if err := s.updateBoundary(ctx, tipsets[len(tipsets)-1], nil); err != nil {
-		return err
-	}
-
-	return nil
+	// 只把「洞之前的连续前缀」交给聚合与水位推进（★ 红线，见 prefix_commit.go / §8.3）。
+	// 无洞时 prefix = 整批，行为与改动前一致；洞在批首（prefixLen==0）时不发布、不动水位。
+	return commitPrefix(ctx, tipsets, fails, prefixCommitDeps{
+		aggregate:        func(c context.Context, p []*common.LinkedTipSet) error { return s.Aggregate(c, p) },
+		saveFinalHeight:  func(c context.Context, h *common.LinkedTipSet) error { return s.SaveFinalHeight(c, h) },
+		saveStateHeight:  func(c context.Context, h *common.LinkedTipSet) error { return s.SaveStateFinalHeight(c, h) },
+		updateBoundary:   func(c context.Context, h *common.LinkedTipSet) error { return s.updateBoundary(c, h, nil) },
+		onlyExtractState: s.opts.Extract.OnlyExtractState,
+		saveStateEnabled: s.opts.Extract.ExtractOptions.EnabelExtract.EnableExtractState,
+	})
 }
 
 func (s *Segment) ExtractToTemporaryDB(ctx context.Context, rawts *types.TipSet) error {

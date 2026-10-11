@@ -191,6 +191,16 @@ func (s *Segment) insertManyWithTimeout(ctx context.Context, l *zap.SugaredLogge
 	return s.insertMany(tctx, l, docSets)
 }
 
+// ExtractTipSets 抽取给定 tipset 区间的数据，返回**已登记的 part 失败清单**与 error。
+//
+// ★ 错误契约（第 3 段）：
+//   - 致命错误（不可登记的 part 失败、台账写失败、异步落库失败）⇒ 返回 (failures, err)，
+//     err 非 nil。上层 `Segment.Extract` 照旧整批弃、不动水位。
+//   - 仅「已登记的洞」⇒ 返回 (failures, nil)：failures 非空但 err 为 nil。
+//
+// **返回 nil error 不代表无洞**——调用方必须检查 failures 是否为空，并据此计算「连续前缀」
+// 后再决定发布到哪里（见 prefix_commit.go 的 commitPrefix / prefixLenBeforeFirstHole）。
+// 这正是第 2 段（当时还没改发布逻辑，只能靠「有登记就报错」当安全阀）与本段的区别。
 func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet, tmp bool) ([]PartFailure, error) {
 	ctx, span := trace.StartSpan(ctx, "segment.ExtractTipSets")
 	defer span.End()
@@ -270,8 +280,8 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 
 	// 把 part 循环抽到 partRunner：依赖全部经字段注入，生产路径注入真实的
 	// extractPart / 台账写入 / 护栏取值；单测注入假实现，从而在不连链、不连 mongo 的
-	// 前提下验证「分类 → 登记 → 继续（只抽取不落库）」与「只要登记过失败就必返回 error」
-	// 这两条红线。
+	// 前提下验证「分类 → 登记 → 继续（只抽取不落库）」与「登记过的洞不再当 error 返回、
+	// 发布决策交给上层」这两条契约。
 	runner := &partRunner{
 		partSizeLimit:  s.opts.Extract.TipSetPartSizeLimit,
 		skippable:      s.opts.Extract.SkippableErrorClasses,
@@ -290,29 +300,34 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 
 	failures, rerr := runner.run(tss)
 
-	// 硬失败（不可登记的 part 失败）：保持改动前的现状——立即整批作废，不等异步落库。
-	// 判据是「有 error 且没有任何登记」，据此把「登记后仍必须报错」的路径区分出来。
-	if rerr != nil && len(failures) == 0 {
+	// 致命错误（不可登记的 part 失败 / 台账写失败）：保持改动前的现状——立即整批作废、
+	// 不动水位（上层据此整批弃）。
+	if rerr != nil {
 		return failures, rerr
 	}
 
-	// 到这里要么全成功、要么有「已登记」的 part 失败；两种情况下都已提交过前缀 part 的
-	// 异步落库，需要收尾（与改动前一致）。返回值随后按是否有登记决定：runner 已保证
-	// 只要有登记就返回非 nil error，这里只是把它连同落库错误一起透出。
+	// 到这里要么全成功、要么只有「已登记」的洞；两种情况下都已提交过前缀 part 的异步
+	// 落库，需要收尾。异步落库失败同样属致命：整批弃、不动水位。
 	if werr := waitAsyncPersist(&pctx.asyncPersistWaitGroup, s.opts.Persist.WaitTimeout); werr != nil {
-		if rerr == nil {
-			return failures, fmt.Errorf("error occurs in async persist: %s", werr)
-		}
-		return failures, fmt.Errorf("%v; error occurs in async persist: %s", rerr, werr)
+		return failures, fmt.Errorf("error occurs in async persist: %s", werr)
 	}
 
-	elog.Info("all parts done")
-	return failures, rerr
+	if len(failures) == 0 {
+		elog.Info("all parts done")
+	} else {
+		elog.Warnw("all parts done with recorded holes (publish decision deferred to Segment.Extract)",
+			"holes", summarizeFailures(failures))
+	}
+
+	// ★ 契约（第 3 段）：返回 (failures, nil) 时 failures 可能非空 —— 表示本轮有「已登记
+	// 的洞」，但循环本身没有致命失败。**返回 nil error 不代表无洞**；调用方必须据 failures
+	// 计算「连续前缀」，只把前缀交给 Aggregate / SaveFinalHeight（见 prefix_commit.go）。
+	return failures, nil
 }
 
 // partRunner 承载 ExtractTipSets 的 part 循环。依赖注入式的字段让它可被单测覆盖，
 // 而不必构造真实的 Segment / 链 / mongo。之所以单独成类型而不用 Segment 上的方法：
-// 这样循环的控制流（分类、登记、继续、护栏、必报错）能被独立、确定性地测到。
+// 这样循环的控制流（分类、登记、继续、护栏、返回登记清单）能被独立、确定性地测到。
 type partRunner struct {
 	partSizeLimit  int
 	skippable      []string
@@ -413,14 +428,9 @@ func (r *partRunner) run(tss []*common.LinkedTipSet) ([]PartFailure, error) {
 		partDone++
 	}
 
-	if len(failures) > 0 {
-		// ★ 本段没有改发布逻辑（那是第 3 段）：只要本轮有 part 被登记，就必须返回非 nil
-		// error。否则上层 Extract 会拿整段去 Aggregate + SaveFinalHeight ⇒ 跨洞发布
-		// （200 + 无错日志 + 错数值），正是本设计要禁止的形态。
-		return failures, fmt.Errorf("batch completed with %d recorded part failure(s): %s; refusing to advance watermark across holes",
-			len(failures), summarizeFailures(failures))
-	}
-
+	// ★ 契约（第 3 段）：已登记的洞**不再**当 error 返回。返回 nil error 只表示「循环本身
+	// 没有致命失败」，不代表无洞——由上层 Segment.Extract 按「连续前缀」决定发布到哪里。
+	// 致命失败（不可登记类、台账写失败）在上面的循环里已经 return，不会走到这里。
 	return failures, nil
 }
 

@@ -203,9 +203,9 @@ func TestPartRunner_EmptySkippableClassesKeepsStatusQuo(t *testing.T) {
 	}
 }
 
-// 安全红线：即便某个 part 被成功登记，本轮仍必须返回非 nil error（否则上层会跨洞发布）。
+// 第 3 段契约：已登记的洞**不再**当 error 返回（返回 (failures, nil)，发布决策交给上层）；
 // 同时验证：失败 part 之后的 part 一律以 persist=false 抽取（不落库）。
-func TestPartRunner_RecordedFailureStillReturnsErrorAndDisablesPersist(t *testing.T) {
+func TestPartRunner_RecordedFailureReturnsFailuresWithNilErrorAndDisablesPersist(t *testing.T) {
 	tss := mkTSS(t, 100, 101, 102, 103, 104)
 
 	var recordCalls int
@@ -225,8 +225,8 @@ func TestPartRunner_RecordedFailureStillReturnsErrorAndDisablesPersist(t *testin
 	}
 
 	failures, err := r.run(tss)
-	if err == nil {
-		t.Fatal("登记了失败也必须返回非 nil error（防跨洞发布）")
+	if err != nil {
+		t.Fatalf("已登记的洞不应再返回 error（发布决策交给上层），实际 %v", err)
 	}
 	if len(failures) != 1 {
 		t.Fatalf("应登记恰好 1 个 failure，实际 %d", len(failures))
@@ -249,7 +249,7 @@ func TestPartRunner_RecordedFailureStillReturnsErrorAndDisablesPersist(t *testin
 	}
 }
 
-// 一轮内暴露多个洞：登记多个 failure 后仍需报错，且中间不重复登记。
+// 一轮内暴露多个洞：登记多个 failure；第 3 段起不再返回 error（发布决策交给上层）。
 func TestPartRunner_RecordsMultipleHolesInOneRound(t *testing.T) {
 	tss := mkTSS(t, 200, 201, 202, 203, 204, 205)
 
@@ -269,8 +269,8 @@ func TestPartRunner_RecordsMultipleHolesInOneRound(t *testing.T) {
 	}
 
 	failures, err := r.run(tss)
-	if err == nil {
-		t.Fatal("有登记就必须报错")
+	if err != nil {
+		t.Fatalf("已登记的洞不应返回 error，实际 %v", err)
 	}
 	if len(failures) != 2 || recordCalls != 2 {
 		t.Fatalf("期望一轮内登记 2 个洞（failures=%d recordCalls=%d）", len(failures), recordCalls)
@@ -299,8 +299,8 @@ func TestPartRunner_GuardStopsFurtherExtraction(t *testing.T) {
 	}
 
 	failures, err := r.run(tss)
-	if err == nil {
-		t.Fatal("有登记就必须报错")
+	if err != nil {
+		t.Fatalf("已登记的洞不应返回 error，实际 %v", err)
 	}
 	if len(failures) != 1 {
 		t.Fatalf("应登记 1 个洞，实际 %d", len(failures))
@@ -332,8 +332,8 @@ func TestPartRunner_GuardDisabledWhenRangeUnknown(t *testing.T) {
 		unpublishedRange: func() (abi.ChainEpoch, bool) { return 0, false }, // 取不到
 	}
 
-	if _, err := r.run(tss); err == nil {
-		t.Fatal("有登记就必须报错")
+	if _, err := r.run(tss); err != nil {
+		t.Fatalf("已登记的洞不应返回 error，实际 %v", err)
 	}
 	if calls != 3 {
 		t.Fatalf("取不到水位时护栏不应拦，extractPart 期望被调 3 次，实际 %d", calls)
