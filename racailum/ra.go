@@ -252,6 +252,16 @@ func (r *RaCailum) Aggregate(ctx context.Context, lo, hi *types.TipSet) error {
 		return fmt.Errorf("load tipsets: %w", err)
 	}
 
+	// ★ 跨洞防护（docs/cn/batch_failure_semantics.md §8.11 的遗留项）：
+	// 手动聚合是运维对任意区间触发，若 [lo,hi] 覆盖到台账里已登记且未修复的洞，
+	// 跨洞聚合出的派生表同样是「接口 200 + 无错日志 + 错误数值」——正是本改造要消灭的形态。
+	// 台账查询失败 ⇒ 失败关闭（不知道有没有洞时放行 = 赌数据正确性）；
+	// 查到洞 ⇒ 拒绝并回带洞的区间（让运维知道该先 heal 哪一段），**不自动截断到前缀**
+	// ——静默给一半结果同样会被误读为聚合成功。
+	if err := segment.CheckNoCrossHoleAggregation(ctx, r.activeSeg.RegisteredHolesInRange, loEpoch, hi.Height()); err != nil {
+		return err
+	}
+
 	return r.activeSeg.Aggregate(ctx, tss)
 }
 
