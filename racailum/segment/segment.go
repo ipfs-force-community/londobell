@@ -293,14 +293,47 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 
 	// 只把「洞之前的连续前缀」交给聚合与水位推进（★ 红线，见 prefix_commit.go / §8.3）。
 	// 无洞时 prefix = 整批，行为与改动前一致；洞在批首（prefixLen==0）时不发布、不动水位。
-	return commitPrefix(ctx, tipsets, fails, prefixCommitDeps{
+	if perr := commitPrefix(ctx, tipsets, fails, prefixCommitDeps{
 		aggregate:        func(c context.Context, p []*common.LinkedTipSet) error { return s.Aggregate(c, p) },
 		saveFinalHeight:  func(c context.Context, h *common.LinkedTipSet) error { return s.SaveFinalHeight(c, h) },
 		saveStateHeight:  func(c context.Context, h *common.LinkedTipSet) error { return s.SaveStateFinalHeight(c, h) },
 		updateBoundary:   func(c context.Context, h *common.LinkedTipSet) error { return s.updateBoundary(c, h, nil) },
 		onlyExtractState: s.opts.Extract.OnlyExtractState,
 		saveStateEnabled: s.opts.Extract.ExtractOptions.EnabelExtract.EnableExtractState,
-	})
+	}); perr != nil {
+		// 发布未落地（洞在批首 ⇒ 水位未前移）：没有「新越过的水位」可用来对账，直接返回。
+		return perr
+	}
+
+	// ★ 台账 heal 闭环（healed_at 的唯一写入路径；§8.4 / §8.9 验收第 4 条）：发布成功后
+	// 对账一次，把「已被本实例已发布水位越过末端」的洞标记为已修复。
+	//
+	// 位置理由：只有在 commitPrefix 返回 nil 时本轮的发布才真正落地（Aggregate +
+	// SaveFinalHeight/SaveStateFinalHeight + updateBoundary 全部成功），此刻「本实例已发布的
+	// 最终水位」就是刚发布的前缀末高度。洞的愈合恰恰发生在**干净轮次**——本轮整批成功、
+	// 前缀 = 整批，水位一举越过此前登记的洞末端——所以本对账必须**每轮**都尝试，而不是只在
+	// 「本轮有洞」时尝试，否则洞永远等不到被销项。（前缀高度用与 commitPrefix 同一份纯函数
+	// prefixLenBeforeFirstHole 复算取得，不改 prefix_commit.go 的签名。）
+	//
+	// 「每轮最多一次」：Extract 每次调用只会执行到这里一次，此处也只调一次
+	// ReconcileHealedParts（内部是一条 updateMany），绝不在 partRunner 里按 part 调。
+	//
+	// 「失败不影响批次」：发布已完成、数据是对的，对账只是台账销项；失败只记一条日志，
+	// 绝不返回 error（与「台账写不进去就不允许跳过」那条铁律不同——那针对的是危险的「跳过」
+	// 动作，销项失败不危险，不该把已正确的一批判成失败、拖住水位）。
+	if prefixLen := prefixLenBeforeFirstHole(tipsets, fails); prefixLen > 0 {
+		// 只有「本轮真的前移了本实例负责的水位」才谈得上证明：statebell 在 EnableExtractState
+		// 关闭时不会前移任何水位（见 commitPrefix），此时前缀末并非水位，不能拿它对账。
+		if !s.opts.Extract.OnlyExtractState || s.opts.Extract.ExtractOptions.EnabelExtract.EnableExtractState {
+			watermark := tipsets[prefixLen-1].Height()
+			if herr := s.ReconcileHealedParts(ctx, watermark, healClassesFor(s.opts.Extract.OnlyExtractState)); herr != nil {
+				log.Warnw("reconcile healed parts failed; batch unaffected",
+					"watermark", int64(watermark), "err", herr.Error())
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *Segment) ExtractToTemporaryDB(ctx context.Context, rawts *types.TipSet) error {

@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 
+	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/racailum/segment/model"
 )
 
@@ -152,5 +153,139 @@ func CheckNoCrossHoleAggregation(ctx context.Context, query func(context.Context
 		return fmt.Errorf("cross-hole aggregation refused: range [%d,%d] covers registered unhealed hole [%d,%d] (class=%s); heal it before aggregating",
 			lo, hi, h.FromEpoch, h.ToEpoch, h.Class)
 	}
+	return nil
+}
+
+// healClassesFor 返回本实例有权为其「背书已修复」的错误类别，即它实际抽取过的类别。
+//
+//   - 主 bell（onlyExtractState == false）做全量抽取 ⇒ 对 state 与 data 两类洞都背书；
+//   - statebell（onlyExtractState == true）只抽状态、只前移状态水位 ⇒ 只对 state 类背书。
+//
+// 为什么必须区分：heal 判据用的是「本实例已发布的水位越过了洞末端」，而水位只证明
+// 「本实例抽取过的数据被重抽且落库成功」。statebell 的水位前移**不代表** data 数据被抽过，
+// 拿它去证明一个 data 洞已修复是越权证明。
+func healClassesFor(onlyExtractState bool) []string {
+	if onlyExtractState {
+		return []string{FailureClassState}
+	}
+	return []string{FailureClassState, FailureClassData}
+}
+
+// reconcileCandidateLimit 是单轮对账最多处理的候选行数上限。取保守值：一轮抓不满时下一轮
+// （水位不变）会继续处理剩余候选，不会有洞被漏掉；上限只为避免在异常大的台账上单轮耗尽内存。
+const reconcileCandidateLimit = 1000
+
+// healCandidateFinder 是「拉取本轮对账候选」的注入点类型：查写库、解到 []model.SkippedPart。
+type healCandidateFinder func(ctx context.Context, db common.DocumentDB, filter bson.M, limit int64) ([]model.SkippedPart, error)
+
+// findHealCandidates 是 healCandidateFinder 的默认实现：直接查写库。
+//
+// 抽成函数变量是为了单测能注入可控候选集与错误（口径同 CheckNoCrossHoleAggregation 的 query
+// 回调注入）——mongo-driver v1.5.0 无 NewCursorFromDocuments，单测无法凭空造出可被 cursor.All
+// 解码的 *mongo.Cursor，只能把这步 Find+All 整体做成注入点。
+var findHealCandidates healCandidateFinder = func(ctx context.Context, db common.DocumentDB, filter bson.M, limit int64) ([]model.SkippedPart, error) {
+	cursor, err := db.Find(ctx, model.SkippedPartCollection(), filter, options.Find().SetLimit(limit))
+	if err != nil {
+		return nil, err
+	}
+	if cursor == nil {
+		// MultiDB 在没有任何可写库时会返回 (nil, nil)——这不是「没有候选」，是「查不到」。
+		return nil, fmt.Errorf("find skipped part candidates: nil cursor")
+	}
+	var rows []model.SkippedPart
+	if err := cursor.All(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("decode skipped part candidates: %w", err)
+	}
+	return rows, nil
+}
+
+// ReconcileHealedParts 把台账里「已被本实例已发布的最终水位越过末端」的洞标记为已修复
+// （$set healed_at = now）。这是 model.SkippedPart.HealedAt 的唯一写入路径——补上台账的
+// heal 闭环（见 docs/cn/batch_failure_semantics.md §8.4 的 healed_at 字段与 §8.9 验收第 4 条）。
+//
+// 判据（单一、可证）：本实例**已发布的最终水位** watermark 越过洞的末端（to_epoch ≤ watermark）。
+// 水位只在本轮真的抽取**并落库成功**之后才前移（见 prefix_commit.go 的 commitPrefix：
+// 先 Aggregate、再 SaveFinalHeight / SaveStateFinalHeight），所以「to_epoch ≤ watermark」
+// 本身就等价于「这段数据已重抽且正确」——不需要（也无法）另读数据本身来复核。
+//
+// classes 是本实例负责（= 实际抽取过）的类别，只有这些类别的洞才由本实例背书；取值见 healClassesFor。
+//
+// 只判「尚未修复」的行（healed_at 为 null 或字段缺失）：已在更早轮次被标记的洞保留其**首次**
+// heal 时间，不被本轮覆盖（「何时缓和」比「最后一次复核缓和」更有信息量）。
+//
+// 实现形状：**先按 predicate 查候选（只读），再对每个候选按 _id 逐个 $set healed_at**。
+// 绝不用「无等值条件的一条 updateMany」：底层 DocumentDB.Update 恒带 Upsert=true
+// （lib/mgoutil/docdb.go 的 NewMgoDocDB：updateOpt = options.Update().SetUpsert(true)），
+// 而无等值条件的 filter 一旦在某一轮没有任何匹配行，就会 upsert 出一行垃圾台账（只有
+// _id + healed_at，缺 from/to/class），每轮 +1 行、约 1000 行/天。稳态（台账里没有未修复的洞）
+// 下「无匹配」正是每轮的形状 ⇒ 必须先查候选，候选为空就直接返回、零写入。
+//
+// 边界（与 recordSkippedPart / RegisteredHolesInRange 同口径）：
+//   - watermark ≤ 0 ⇒ 直接 return nil（no-op）：「非正水位」不是「越过了洞」，不能误伤；
+//   - db == nil ⇒ 返回 error：写库不可用必须能被发现（调用方据此只记日志、不影响批次）；
+//   - classes 为空 ⇒ return nil：没有可背书的类别，不把「谁都没抽过的洞」错标为已修复；
+//   - 候选查询报错 / 拿不到游标 ⇒ 返回 error（与 RegisteredHolesInRange 同口径：写库不可用
+//     要能被发现）；无候选 ⇒ 直接 return nil（零写入）。
+func (s *Segment) ReconcileHealedParts(ctx context.Context, watermark abi.ChainEpoch, classes []string) error {
+	if watermark <= 0 {
+		// 非正水位（0 / 负数）绝不代表「越过洞末端」，直接不动台账。
+		return nil
+	}
+	if s.db == nil {
+		return fmt.Errorf("reconcile healed parts: write db is nil")
+	}
+	if len(classes) == 0 {
+		return nil
+	}
+
+	// 与旧「一条 updateMany」完全相同的三条件 predicate：未修复 + 水位越过洞末端 + 类别在册。
+	predicate := bson.M{
+		// healed_at 为 null 或字段缺失 ⇒ 尚未修复（recordSkippedPart 首次插入写的就是 nil）。
+		// 已被 heal 的行不被命中 ⇒ 不覆盖首次 heal 时间。
+		"healed_at": nil,
+		// 已发布水位越过洞末端 ⇒ 该段数据已重抽且落库成功。
+		"to_epoch": bson.M{"$lte": watermark},
+		// 只对本实例负责（实际抽取过）的类别背书。
+		"error_class": bson.M{"$in": classes},
+	}
+
+	candidates, err := findHealCandidates(ctx, s.db, predicate, reconcileCandidateLimit)
+	if err != nil {
+		return fmt.Errorf("reconcile healed parts: list candidates (watermark %d, classes %v): %w", watermark, classes, err)
+	}
+	if len(candidates) == 0 {
+		// ★ 关键：无候选 ⇒ 零写入。这条 return 让稳态（台账里没有未修复的洞）不再产生任何
+		// Update 调用，从而根治「无匹配 filter 的 upsert 每轮插一行垃圾台账」的缺陷。
+		return nil
+	}
+
+	now := time.Now()
+	for _, c := range candidates {
+		update := bson.M{
+			"$set": bson.M{"healed_at": now},
+			// 双保险：万一在「查候选」与「逐 _id 更新」之间该行被删/被改（竞态）而触发 upsert，
+			// 插进去的也必须是一行**完整正确**的台账行，而不是只有 _id + healed_at 的垃圾行。
+			"$setOnInsert": bson.M{
+				"from_epoch":  c.FromEpoch,
+				"to_epoch":    c.ToEpoch,
+				"error_class": c.ErrorClass,
+			},
+		}
+		if _, err := s.db.Update(ctx, model.SkippedPartCollection(), bson.M{"_id": c.ID}, update); err != nil {
+			return fmt.Errorf("reconcile healed part %s: %w", c.ID, err)
+		}
+	}
+
+	// 真的销项了（healedCount > 0）才打这条 Info，且**正文含 "healed"**：主机上的四判据检测器
+	// 就是 grep bell 日志里的 "healed" 来判「验收第 4 条 heal 闭环」。无候选的常规轮次在上面
+	// 已经 return，绝不打 —— 否则检测器会天天报假阳性。
+	log.Infow("skipped part ledger reconciled: holes healed",
+		"watermark", int64(watermark), "classes", classes, "healed", len(candidates))
+
+	if len(candidates) >= reconcileCandidateLimit {
+		log.Warnw("reconcile healed parts reached candidate limit; more may remain next round",
+			"watermark", int64(watermark), "classes", classes, "limit", reconcileCandidateLimit)
+	}
+
 	return nil
 }
