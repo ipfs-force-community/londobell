@@ -453,10 +453,21 @@ type extractOptions struct {
 
 - ⚠️ `Segment.ExtractToTemporaryDB`（tmp 路径）**未改**：有洞时仍整批弃。tmp 是近链头读路径，
   语义不同，改它需要单独评估。
-- ⚠️ **遗留**：`RaCailum.Aggregate(lo, hi)`（RPC 手动触发聚合）接受任意区间，
-  不查台账 ⇒ 运维若对一个跨洞区间手动触发聚合，仍会产出跨洞派生表。
-  **这是既有风险**（改动前洞两边的数据也可能都已落库），但本改动让「洞」从异常态变成已知常态，
-  使该路径更值得防。建议后续给它加台账校验，或在使用手册里写死禁令——**待拍板**。
+- ⚠️ **遗留（已修，2026-10-11）**：`RaCailum.Aggregate(lo, hi)`（手动触发聚合）接受任意区间、原先不查台账 ⇒ 跨洞触发会产出跨洞派生表。已加防护（`segment.CheckNoCrossHoleAggregation` + `RegisteredHolesInRange`）：查到未修复的洞 ⇒ **拒绝并回带洞区间**（不自动截断到前缀）；**台账查询失败 ⇒ 失败关闭**。实测校准：
+  - 真库上跑同形 filter（只读）⇒ 无报错、`hits=0`、集合尚未创建 ⇒ **今天不会误拦**；
+  - **仓内暂无调用方**（`grep` 全仓无 `Aggregate(ctx, lo, hi)` 的调用点）⇒ 属防御性加固，不是当前线上风险，**不必为它单独换件**，随下一次换件一起上。
+
+**发布路径全覆盖核查（改动是否真的堵住了所有口子）** —— 所有「会把数据发布出去」的路径：
+
+| 路径 | 是否覆盖 | 手段 |
+|---|---|---|
+| `Segment.Extract`（daemon 主路径） | ✅ | 发布全走 `commitPrefix`，只吃洞前前缀；洞在批首不发布、不动水位 |
+| `RaCailum.WalkExtract`（离线抽取） | ✅ | 复用 `PrefixLenBeforeFirstHole`；洞在批首直接拒绝 |
+| `RaCailum.Aggregate`（手动触发） | ✅ | 聚合前查台账，覆盖到未修复洞即拒绝（fail-closed） |
+| `Segment.ExtractToTemporaryDB`（tmp 路径） | ➖ 有意不改 | 有洞仍整批弃；tmp 是近链头读路径，语义不同，单独评估 |
+| `grafana` / `persist` / 控制器里的 `*.Aggregate(...)` | ✅ 无关 | 都是 mongo 读侧聚合（取数/统计），不是发布写入 |
+
+⇒ 判据：改完必须 `grep` 出**所有** `Aggregate(` 调用点逐个定性（发布写入 / 只读取数），只改一条会漏（本次就在离线路径上漏过一次）。
 
 **台账**：集合 `SkippedPart`，去重靠 `_id = "<from>-<to>"`，
 依赖 `lib/mgoutil/docdb.go:23` 的 `options.Update().SetUpsert(true)`（已核实），
