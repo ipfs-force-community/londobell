@@ -224,7 +224,7 @@ func (r *RaCailum) WalkExtract(ctx context.Context, from types.TipSetKey, hi abi
 
 	tipsets = tipsets[1:]
 
-	if err := r.activeSeg.ExtractTipSets(ctx, tipsets, false); err != nil {
+	if _, err := r.activeSeg.ExtractTipSets(ctx, tipsets, false); err != nil {
 		return err
 	}
 

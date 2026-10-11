@@ -11,6 +11,7 @@ import (
 
 	"go.opencensus.io/trace"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
 	bf "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
@@ -190,12 +191,12 @@ func (s *Segment) insertManyWithTimeout(ctx context.Context, l *zap.SugaredLogge
 	return s.insertMany(tctx, l, docSets)
 }
 
-func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet, tmp bool) error {
+func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet, tmp bool) ([]PartFailure, error) {
 	ctx, span := trace.StartSpan(ctx, "segment.ExtractTipSets")
 	defer span.End()
 
 	if len(tss) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	elog := log.With("range", common.FormatTipSetEpochRange(tss))
@@ -215,12 +216,12 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 	if !tmp {
 		aset, err = actor.NewSet(ctx, s.dal.StateManager, tss[size-1], tmp)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		latestDealID, err = s.GetLatestDealID(ctx)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		ts := tss[0]
@@ -229,7 +230,7 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		if currentActorset == nil {
 			aset, err = actor.NewSet(ctx, s.dal.StateManager, ts, tmp)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			storeActorSet(&ActorSet{
 				Version: version,
@@ -243,7 +244,7 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 				} else {
 					aset, err = actor.NewSet(ctx, s.dal.StateManager, tss[0], tmp)
 					if err != nil {
-						return err
+						return nil, err
 					}
 					storeActorSet(&ActorSet{
 						Version: version,
@@ -267,46 +268,182 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		persistSem:   make(chan struct{}, 2),
 	}
 
-	limit := s.opts.Extract.TipSetPartSizeLimit
-	partTotal := 0
-	if limit > 0 {
-		partTotal = (size + limit - 1) / limit
+	// 把 part 循环抽到 partRunner：依赖全部经字段注入，生产路径注入真实的
+	// extractPart / 台账写入 / 护栏取值；单测注入假实现，从而在不连链、不连 mongo 的
+	// 前提下验证「分类 → 登记 → 继续（只抽取不落库）」与「只要登记过失败就必返回 error」
+	// 这两条红线。
+	runner := &partRunner{
+		partSizeLimit:  s.opts.Extract.TipSetPartSizeLimit,
+		skippable:      s.opts.Extract.SkippableErrorClasses,
+		maxUnpublished: s.opts.Extract.MaxUnpublishedRange,
+		log:            elog,
+		extractPart: func(part []*common.LinkedTipSet, persist bool) error {
+			return s.extractPart(pctx, part, tmp, persist)
+		},
+		record: func(pf PartFailure) error {
+			return s.recordSkippedPart(ctx, elog, pf)
+		},
+		unpublishedRange: func() (abi.ChainEpoch, bool) {
+			return s.unpublishedRange(ctx, tss[size-1])
+		},
 	}
 
+	failures, rerr := runner.run(tss)
+
+	// 硬失败（不可登记的 part 失败）：保持改动前的现状——立即整批作废，不等异步落库。
+	// 判据是「有 error 且没有任何登记」，据此把「登记后仍必须报错」的路径区分出来。
+	if rerr != nil && len(failures) == 0 {
+		return failures, rerr
+	}
+
+	// 到这里要么全成功、要么有「已登记」的 part 失败；两种情况下都已提交过前缀 part 的
+	// 异步落库，需要收尾（与改动前一致）。返回值随后按是否有登记决定：runner 已保证
+	// 只要有登记就返回非 nil error，这里只是把它连同落库错误一起透出。
+	if werr := waitAsyncPersist(&pctx.asyncPersistWaitGroup, s.opts.Persist.WaitTimeout); werr != nil {
+		if rerr == nil {
+			return failures, fmt.Errorf("error occurs in async persist: %s", werr)
+		}
+		return failures, fmt.Errorf("%v; error occurs in async persist: %s", rerr, werr)
+	}
+
+	elog.Info("all parts done")
+	return failures, rerr
+}
+
+// partRunner 承载 ExtractTipSets 的 part 循环。依赖注入式的字段让它可被单测覆盖，
+// 而不必构造真实的 Segment / 链 / mongo。之所以单独成类型而不用 Segment 上的方法：
+// 这样循环的控制流（分类、登记、继续、护栏、必报错）能被独立、确定性地测到。
+type partRunner struct {
+	partSizeLimit  int
+	skippable      []string
+	maxUnpublished abi.ChainEpoch
+	log            *zap.SugaredLogger
+
+	// extractPart 抽一个 part；persist=false 表示只抽取、不落库。
+	extractPart func(part []*common.LinkedTipSet, persist bool) error
+	// record 把失败登记进台账；返回 error 时该 part 按「不可登记」处理（铁律）。
+	record func(pf PartFailure) error
+	// unpublishedRange 取「链头 − 已发布水位」；ok=false 表示取不到（护栏不生效）。
+	unpublishedRange func() (abi.ChainEpoch, bool)
+}
+
+// classEnabled 判断某个错误类别是否被配置为「可登记并继续」。
+// 空配置 = 完全维持现状（不登记、不跳过）。
+func classEnabled(class string, skippable []string) bool {
+	for _, c := range skippable {
+		if c == class {
+			return true
+		}
+	}
+	return false
+}
+
+// guardExceeded 判定护栏是否已触发。护栏只在「已经进入只抽取不落库模式」后才被询问；
+// 且取不到水位、或阈值非正时都不拦（宁可停在这里，也不拿不确定的值提前停手）。
+func (r *partRunner) guardExceeded() bool {
+	if r.maxUnpublished <= 0 || r.unpublishedRange == nil {
+		return false
+	}
+	v, ok := r.unpublishedRange()
+	if !ok {
+		return false
+	}
+	return v > r.maxUnpublished
+}
+
+func (r *partRunner) run(tss []*common.LinkedTipSet) ([]PartFailure, error) {
+	size := len(tss)
+	if size == 0 {
+		return nil, nil
+	}
+
+	limit := r.partSizeLimit
+	if limit <= 0 {
+		limit = size
+	}
+	partTotal := (size + limit - 1) / limit
+
+	var failures []PartFailure
 	tsDone := 0
 	partDone := 0
 	for tsDone < size {
 		start := tsDone
-		end := start + s.opts.Extract.TipSetPartSizeLimit
+		end := start + limit
 		if end > size {
 			end = size
 		}
-
 		part := tss[start:end]
-		if err := s.extractPart(pctx, part, tmp); err != nil {
-			// 出错时把进度带进 error：任一部分失败仍返回 error（整批作废语义不变），
-			// 但错误信息里要能看出「已经推进到哪」——线上事故里正是靠着
-			// 「done-parts=128/129」才知道 99.2% 的工作已经做完。
-			// 这里补的是「失败 part 的序号 / 总 part 数 / 已完成 part 数 / 失败 part 的高度区间」，
-			// 以便失败时不必翻日志也能定位进度与洞的位置。
-			return fmt.Errorf("extract part %d/%d failed (range %s, completed %d/%d): %w",
-				partDone+1, partTotal, common.FormatTipSetEpochRange(part), partDone, partTotal, err)
+
+		// 一旦有 part 失败被登记，后续 part 只抽取、不落库：坏 part 之后的数据一律
+		// 不得写进 mongo，否则客户端用显式区间就能读到「跨洞的两侧数据」（聚合器不按
+		// 水位拦截区间查询，见 docs/cn/batch_failure_semantics.md §8.3）。
+		persist := len(failures) == 0
+
+		// 护栏（§8.5）：已在「只抽取不落库」模式下且未发布区间超阈值 ⇒ 停止继续往后抽，
+		// 否则洞不愈合时 bell 会一路抽到链头、mongo 里堆积不可见文档。
+		if !persist && r.guardExceeded() {
+			r.log.Warnw("stop extracting further parts: unpublished range would exceed MaxUnpublishedRange",
+				"max-unpublished", int64(r.maxUnpublished), "done-parts", partDone, "part-total", partTotal)
+			break
+		}
+
+		err := r.extractPart(part, persist)
+		if err != nil {
+			pf, recordable := classifyPartFailure(part, err)
+			if !recordable || !classEnabled(pf.Class, r.skippable) {
+				// 不可登记，或该类未被开启：保持现状——立即整批作废。
+				return failures, fmt.Errorf("extract part %d/%d failed (range %s, completed %d/%d): %w",
+					partDone+1, partTotal, common.FormatTipSetEpochRange(part), partDone, partTotal, err)
+			}
+
+			// 铁律：台账写不进去就不允许跳过。写失败 ⇒ 按不可登记处理。
+			if rerr := r.record(pf); rerr != nil {
+				return failures, fmt.Errorf("extract part %d/%d failed and ledger write failed (range %s, completed %d/%d): %v; original error: %w",
+					partDone+1, partTotal, common.FormatTipSetEpochRange(part), partDone, partTotal, rerr, err)
+			}
+
+			failures = append(failures, pf)
+			r.log.Warnw("part failure recorded, continuing with persist disabled",
+				"class", pf.Class, "from", int64(pf.FromEpoch), "to", int64(pf.ToEpoch), "cid", pf.CID)
+		} else {
+			r.log.Infow("part done", "done-parts", partDone+1, "done-tss", tsDone+len(part), "persisted", persist)
 		}
 
 		tsDone += len(part)
 		partDone++
-		elog.Infow("part done", "done-parts", partDone, "done-tss", tsDone)
 	}
 
-	if err := waitAsyncPersist(&pctx.asyncPersistWaitGroup, s.opts.Persist.WaitTimeout); err != nil {
-		return fmt.Errorf("error occurs in async persist: %s", err)
+	if len(failures) > 0 {
+		// ★ 本段没有改发布逻辑（那是第 3 段）：只要本轮有 part 被登记，就必须返回非 nil
+		// error。否则上层 Extract 会拿整段去 Aggregate + SaveFinalHeight ⇒ 跨洞发布
+		// （200 + 无错日志 + 错数值），正是本设计要禁止的形态。
+		return failures, fmt.Errorf("batch completed with %d recorded part failure(s): %s; refusing to advance watermark across holes",
+			len(failures), summarizeFailures(failures))
 	}
 
-	elog.Info("all parts done")
-	return nil
+	return failures, nil
 }
 
-func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp bool) error {
+// unpublishedRange 计算「链头 − 已发布水位」。
+//
+// head 取当前批的最高 tipset：批区间是 (final_height, 链头]，所以它是本轮能看到的最高高度。
+// 水位从 FinalHeight 读（读库 s.rdb）。任何一步取不到（读库未配置、查询失败）都返回
+// ok=false——护栏宁可不生效，也不拿不确定的值去拦（详见提交说明里的不确定项）。
+func (s *Segment) unpublishedRange(ctx context.Context, head *common.LinkedTipSet) (abi.ChainEpoch, bool) {
+	if head == nil || s.rdb == nil {
+		return 0, false
+	}
+	fh, err := s.GetFinalHeight(ctx)
+	if err != nil {
+		return 0, false
+	}
+	if head.Height() <= fh {
+		return 0, true
+	}
+	return head.Height() - fh, true
+}
+
+func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp bool, persist bool) error {
 	if len(part) == 0 {
 		return nil
 	}
@@ -396,6 +533,45 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 		return fmt.Errorf("extract part: %w", err)
 	}
 
+	if err := s.persistPartDocs(ctx, elog, docs, persist); err != nil {
+		return err
+	}
+
+	// 只抽取不落库时，regular states 同样不抽取、不落库：它的产物也是要写 mongo 的数据，
+	// 一并丢弃才能保证「坏 part 之后的可见区间为空」。
+	if !persist {
+		return nil
+	}
+
+	// temporary db don't need to store state datas
+	if tmp {
+		return nil
+	}
+
+	// reset context
+	ectx.C = ctx.ctx
+	for rhi := range regulars {
+		if rheads := regulars[rhi]; len(rheads) > 0 {
+			if err := s.extractRegularStates(ectx, ctx, rheads); err != nil {
+				return fmt.Errorf("#%d regular heads: %w", rhi, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// persistPartDocs 把 part 的抽取结果落库。
+//
+// persist=false ⇒ 只记一条日志、直接丢弃（既不调 insertManyWithTimeout、也不进
+// asyncPersistWaitGroup）——这是「坏 part 之后只抽取、不落库」的落点，目的是让写进
+// mongo 的可见区间始终连续（docs/cn/batch_failure_semantics.md §8.3）。
+func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, docs [][]common.Document, persist bool) error {
+	if !persist {
+		elog.Infow("part extracted but not persisted (persist=false: skipped after a recorded failure)")
+		return nil
+	}
+
 	if s.opts.Persist.Async {
 		select {
 		case ctx.persistSem <- struct{}{}:
@@ -415,25 +591,11 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 
 			return nil
 		})
-	} else {
-		if err := s.insertManyWithTimeout(ctx.ctx, elog, docs); err != nil {
-			return fmt.Errorf("insert extracted documents from tipsets: %w", err)
-		}
-	}
-
-	// temporary db don't need to store state datas
-	if tmp {
 		return nil
 	}
 
-	// reset context
-	ectx.C = ctx.ctx
-	for rhi := range regulars {
-		if rheads := regulars[rhi]; len(rheads) > 0 {
-			if err := s.extractRegularStates(ectx, ctx, rheads); err != nil {
-				return fmt.Errorf("#%d regular heads: %w", rhi, err)
-			}
-		}
+	if err := s.insertManyWithTimeout(ctx.ctx, elog, docs); err != nil {
+		return fmt.Errorf("insert extracted documents from tipsets: %w", err)
 	}
 
 	return nil

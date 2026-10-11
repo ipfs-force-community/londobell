@@ -286,7 +286,7 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 		return nil
 	}
 
-	if err := s.ExtractTipSets(ctx, tipsets, false); err != nil {
+	if _, err := s.ExtractTipSets(ctx, tipsets, false); err != nil {
 		return err
 	}
 
@@ -342,7 +342,7 @@ func (s *Segment) ExtractToTemporaryDB(ctx context.Context, rawts *types.TipSet)
 	// extract (hi, rawts]
 	tipsets = tipsets[1:]
 
-	if err := s.ExtractTipSets(ctx, tipsets, tmp); err != nil {
+	if _, err := s.ExtractTipSets(ctx, tipsets, tmp); err != nil {
 		return err
 	}
 	if err := s.updateBoundary(ctx, tipsets[len(tipsets)-1], nil); err != nil {
