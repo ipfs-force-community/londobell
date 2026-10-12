@@ -747,3 +747,35 @@ config sha 837813b210d184a2e67602834d5d5af8122ecb271a909375298dd2f68e088d89（**
 ⚠️ **附带脚枪（必须记）**：`44019e3f` 是 `b201e376` 的后代，即**主网新件里也含改动 4 的代码**。
 在主网当前配置（`ActorBalanceTicks=240000`，tick 永不触发）下它是**惰性无害**的；
 **但若将来把 `ActorBalanceTicks` 调小，必须先上读取侧（前向填充）**，否则余额查询会出现空白。
+
+#### 8.15.9 `f7c45e7e`：ActorAddress 从「每小时全量重发」改成「只发增量 + 落库成功才记账」
+
+**问题（实测）**：`extractActorAddress`（`tipset.go:1585`）每小时 tick（`ActorAddressTicks` 默认 1 ×
+`Interval` 120 = 每 120 epoch）遍历 init 地址映射产出 ~384 万条 `ActorAddress` 文档；
+该集合 insert-only、`_id`=ActorID、驱动 `SetOrdered(false)` 且静默吞掉重复键 ⇒ **99.9995% 是重复键空转**。
+代价：落库 **424~456 秒（p50=435s，65 个样本，无快样本）**，而抽取本身只 13.9 秒。
+批次级：含整点 tick 的批次 p50=605s vs 不含 p50=166s ⇒ 差额 ≈440s 全是它。
+
+**决定性旁证（这条最值钱，别再试调参）**：10-11 把 `BatchInsertLimit` 4096→512（批小 8 倍），
+`insertOps` 从 950 涨到 7520 而耗时几乎不变（425→445s）⇒ 成本随「尝试写入的文档条数」走，不随往返次数走。
+
+**做法**：门控与遍历不变（仍每小时、仍走 ~384 万条），只把「尚未写过」的 ActorID 出成文档；
+并补「**落库成功才记账**」交握（发射进 per-part pending → insert 无错则 Commit 转 seen →
+失败/超时/取消/抽取阶段出错则 Discard 让下一轮重发）。零值语义有意为 `full`：状态为空必须退化成旧的全量行为，绝不静默跳过。
+
+★ **sethead 回滚的结论（为什么不能用游标）**：`cmd/bell/set_head.go:27` 把 ActorAddress 当 **epoch** 集合，
+回滚执行 `DeleteMany({Epoch:{$gt:head}})`；这类被删的行可以是**任意 ActorID**（重放被回滚的 epoch 会以原始、较小的
+ID 重建 actor，这些 ID 全在水位线以下）⇒ 游标永远不会重发 ⇒ **静默永久空洞**。持久化游标更差（sethead 同样不知道它）。
+故选进程内集合，运维规则：**sethead 之后重启 bell，下一个 tick 自愈**。
+（另一处删除路径 `Segment.DeleteItemsByEpoch`（`persist.go:405-450`）同样纯按 epoch 键，无 id 键删除路径。）
+
+**代价**：内存 3.85e6 条 ≈ **144 MiB**（实测 39.3 字节/条）；每次进程启动首个 tick 走一次全量 ≈435 秒
+（日志 `mode=full, emitted≈385万`，与平常 tick 不会混淆）。稳态 `mode=incremental`、`emitted` 个位数（主网实测 18 条/小时）。
+
+**状态**：已在分支实现并自测（`build` rc=0、三包 `-race` rc=0、`gofmt` 干净、`go vet` rc=0；
+新增用例覆盖「失败⇒下一轮重发」「成功⇒不再重发」「同 part 并发 exactly-once」「sethead 回滚需重启」等）。
+**未部署**，待 cali 灰度确认「`mode=incremental` 且 emitted 为个位数」。
+
+**监视口径（零新增埋点，可直接做告警）**：① 单条 `documents inserted and updated` 里
+`insertOps ≥ 5000`，或 `ActorAddress: n/N` 满足 `N ≥ 1e6 且 n/N < 1%`；
+② 同一轮已打 `actor set reused`（可排除 actor set 重建）而 `tipsets extracting done` 耗时 > 5 分钟。
