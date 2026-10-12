@@ -1203,3 +1203,56 @@ func (a ActorBalanceTask) Calc(ctx *syncer.Context) (err error) {
 范围内快照期 / 范围内非快照期 / 早于最早覆盖期 / 无库均覆盖）与
 `TestPlanBalanceQueryUpperBoundIsLastCoveredEpoch`；`go build ./cmd/londobell-api/...` rc=0、
 `go test -count=1 -race ./cmd/londobell-api/controller/aggregators/` rc=0、`gofmt -l` 干净。
+
+#### 8.16.12 午夜余额快照探针已装（10-12 17:37，用户拍板后）
+
+**装在哪**：`backend-new01` 上**已在跑**的 `/opt/filscan-metrics-bridge/push_metrics.sh`（每分钟，cron），
+追加约 20 行。**没有新增组件、没有新增主机、没有新增脚本**。备份
+`push_metrics.sh.bak-20261012-173722`；插入用「写临时文件 + `os.replace`」原子替换（该脚本每分钟被 cron 拉起，
+原地截断写有被读成半截的风险）；`bash -n` 通过；手动跑一次 `OK lines=78 http=202`。
+
+**推的三个指标**（`job=filscan_metrics` / `instance=backend-new01`）：
+
+| 指标 | 含义 |
+|---|---|
+| `filscan_balance_snapshot_epoch` | 最近一个**已过**的本零时期（`E0 = 2160 + 2880·⌊(已发布高度−2160)/2880⌋`） |
+| `filscan_balance_snapshot_rows` | 该期的富豪榜返回条数（正常 1000） |
+| `filscan_balance_snapshot_probe_ok` | `1` = 条数 ≥1000 **且** `榜单(E0)` 与 `榜单(E0−1)` 不逐字节相同 |
+
+**为什么口径用「已发布高度」而不是墙钟**：写侧把每期数据写进 `ActorBalanceTop` 是**在发布之前**完成的
+⇒ 用已发布高度推出的零时期一定已经写过 ⇒ **本探针没有「先问后写」窗口**（§8.16.10 里那个窗口说的是
+后端消费者用「链上日界」当钟，两回事）。
+
+**为什么还要比 `榜单(E0)` 与 `榜单(E0−1)`**：榜单管道按 `Epoch` **精确匹配**，而请求期会被规范化回退到
+「不晚于它的最近零时期」⇒ 若 `E0` 那一期其实没写成，`E0` 与 `E0−1` 会回退到**同一个更早的期** ⇒ 两个响应
+**逐字节相同**。这样连「静默回退」都能抓到，而不只是「空榜」。（代价：真遇到「榜单一天没变」会误报，
+但余额每天都在变，实际不可能。）
+
+**实测初值**（装完即读网关）：`epoch=6447600`（与 PG 游标一致）、`rows=1000`、`probe_ok=1`。
+
+**★ 顺带发现一个新集合的历史边界**：初始化时探 `榜单(E0−1)` 得到 **0 条**——因为 `E0−1` 回退到上一个零时期
+`6444720`，而**那一期只有旧表有数据、`ActorBalanceTop` 还没有** ⇒ 新集合的历史**从切换点 `6447600` 才开始**。
+对现有消费者无影响（它只问当天那一期），但这是要记住的口径边界：**切换点之前的富豪榜历史查询会返回空**。
+
+**告警规则（待上海侧加，`assistant` 够不到）**：从内网只能连到 `:9091`（推送网关）与 `:9093`（Alertmanager），
+Prometheus `:9090` 与 Grafana `:3000` 不通 ⇒ 规则要加在 Prometheus 的规则文件里：
+
+```yaml
+- alert: filscan余额快照未写成
+  expr: filscan_balance_snapshot_probe_ok != 1
+  for: 30m
+  labels: {severity: critical}
+  annotations:
+    summary: "午夜余额快照未写成（probe_ok={{ $value }}）"
+    description: "最近一个已过零时期的富豪榜条数为 {{ with query \"filscan_balance_snapshot_rows\" }}{{ . | first | value }}{{ end }} 条；probe_ok=0 表示该期读不出榜（写失败或回退到了上一期）。"
+
+- alert: filscan富豪榜下游未跟进
+  expr: (filscan_committed_height - on(instance) filscan_table_cursor_height{table="chain.rich_actors"}) > 4320
+  for: 2h
+  labels: {severity: warning}
+  annotations:
+    summary: "PG chain.rich_actors 游标已越过一个日界仍未跟进"
+    description: "游标落后已发布高度 {{ $value }} 个高度（自然值在 0~2880 之间往复，>4320 说明漏了一期）。"
+```
+
+（第二条用的是**本来就存在**的指标，只是补一条规则；阈值取 4320 = 1.5 个日界，避开每天正常的 0~2880 往复。）
