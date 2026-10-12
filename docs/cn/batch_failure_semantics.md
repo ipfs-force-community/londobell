@@ -604,3 +604,93 @@ updateMany(predicate, {$set:{healed_at}}, {upsert:true}) => matched=0 modified=0
 它的 upsert 恰是设计意图；同一方法用在对账上就成了 bug。**回归测试要钉的是「无候选 ⇒ 一次 Update 都不发生」。**
 
 ⇒ 至此 §8.9 验收第 4 条（heal 闭环）从「无法成立」变为**可测**。
+
+### 8.15 2026-10-12：三个新改动，与一个推翻上线计划的事实
+
+**判决句先行**：`fe652669`（阻断面截断发布 + 异步落库按 part 归属化）**已上主网并验证发布**；
+`b201e376`（ActorBalance 只写变化 + 读取侧前向填充）在 cali 双向验证完毕，**但决定不推主网**（见 8.15.1）；
+`44019e3f`（actor set 缓存）在 cali 灰度。
+
+#### 8.15.1 ★ 主网的常规 tick 根本不触发 ⇒ 满量快照只有「零时」一次
+
+主网主 bell 的 `/root/.bell/config`：`ActorBalanceTicks = 240000`、`Interval = 120`
+⇒ 常规 tick 周期 = 240000 × 120 = **2880 万 epoch（约 400 天）⇒ 永不触发**。
+日志佐证：主网所有 `actor balanced extracted` 的 epoch **全部 ≡ 2160 (mod 2880)**（本地午夜零时）；
+`ActorBalance` 集合里存在的 epoch 也只有 ≡2160 那一批（约 459 天、间隔 2880）。
+
+⇒ 两条推论：
+
+1. **满量快照每天一次**（本地午夜），不是每 12 小时一次。主网下一次 ≈ `6450214`。
+2. **`b201e376` 的写入侧改动在主网上是死代码**——它只在 tick 生效，而主网 tick 不触发；
+   零时那一次它按设计**仍写全量**（richlist 与批量消费者依赖全量快照）。
+   ⇒ 故 `b201e376` 与读取侧**不推主网**：零收益却要担「必须与读取侧同时上、否则余额查空」的耦合。
+   留在 cali 作试验床（cali 的 tick 会触发，正好持续验证这条路径），并作为将来「让零时那次也变便宜」的底座。
+
+#### 8.15.2 主网现在真正扛住满量快照的两件事（含一处推算，未实测）
+
+| 防护 | 依据 |
+|---|---|
+| 冷索引清理（21+4 个，索引 722.7→422.7GB） | 单批插入 1566ms → **300~500ms**（慢查询 6h 总量降 16 倍）；据此推算零时那次 384 万行 ≈ **19 分钟** |
+| 已上主网的 `fe652669` | 万一再被阻，水位推到阻断面并发布其前的连续前缀，站点不整段停更，且下一轮自动重抽自愈 |
+
+⚠️ 「19 分钟」是**推算不是实测**：清理后尚未经历过零时那次写入（上一次是 10-12 00:00，早于清理）。
+
+#### 8.15.3 `b201e376` 的关键实测（cali 双向验证）
+
+**写入侧**——用一个过去的 tick epoch `4147200` 强制触发（`bell offline extractor --local=false`，
+复制 tmpbell repo 到 /tmp 绕开 repo 锁，只抽 1 个 epoch，写临时库不碰生产库）：
+
+```
+tipset/tipset.go:1375  actor balanced extracted
+{"epoch":"4147200","mode":"changed","rows":34,"considered":199501,"terminated":0,"prev":"4146934"}
+```
+
+⇒ `mode=changed`；写 **34 行**而非 384 万行（**降幅约 11 万倍**，实测变化率 0.017%）；
+`prev=4146934` 正是算出来的上一期零时全量（`4146934 ≡ 2614 (mod 2880)`，cali 的零时残差是 2614，主网是 2160）。
+
+**两条否证**（省掉后来者弯路）：tmp 路径永远验不到 ActorBalance
+（`extractActorBalance` 首句就 `if tmp { return nil }`）；`statebell` 也不写它
+（其配置 `EnableExtractActorBalance=false` 且 `ActorBalanceTicks=240000`）。
+
+**读取侧**——cali `londobell-api-aggregators` 换到 `b201e376`：
+
+| 请求 epoch | 换前 | 换后 |
+|---|---|---|
+| `4147200`（快照期） | 有数据 | **逐字节相同**（无回归） |
+| `4148003` / `4147800` / `4148150`（非快照期） | `data:null` | 返回最近一期余额（前向填充生效） |
+| `5000000`（超链头） | — | `null`（越界保护） |
+
+richlist：`start=4147200` 与 `start=4148150` 返回字节数相同（70873）⇒ 仍取最近全量快照，语义未变。
+
+#### 8.15.4 主网前向填充查询的执行计划（只读实测）
+
+查询形状（`balance_forward_fill.go` 原文）：`$match{Epoch:{$gte:StartEpoch,$lt:EndEpoch}, Addr}` → `$sort{Epoch:-1}` → `$limit 1`。
+
+```
+计划：LIMIT <- FETCH <- IXSCAN[Epoch_1_Addr_1] direction=backward，无 COLLSCAN、无阻塞 SORT
+indexBounds 把 Addr 当等值推进 Epoch 区间内 ⇒ 是 seek，不是范围扫
+三个用例（最近在变 / 最远回看 / 不存在的地址）：0~4ms，keysExamined 1~2，docsExamined 0~1
+```
+
+集合现状：17.06 亿文档 / 589.5GB / 索引 193GB（`_id_` 118.9GB、`Epoch_1_Addr_1` 29.95GB、`Epoch_1_Balance_-1_Code_1` 44.2GB）。
+
+★ **唯一风险边界**：`Epoch_1_Addr_1` 是 **sparse** 索引 ⇒ **任何丢掉 `Epoch` 条件的 `ActorBalance` 查询会退化成 589GB 全扫**（已实测）。
+读取侧永远带 `Epoch` 区间 ⇒ 安全；**将来新增查询必须带 `Epoch` 条件**。
+代价是 O(窗口内不同 epoch 数) 次索引 seek（约 1ms/个）；今天窗口内只有 1 个 epoch，最坏 1~2 个。
+`{Addr:1,Epoch:-1}` 理论更优（不存在的地址也只需一次 seek），但收益为零 ⇒ **不建**（另建约 30~45GB、多小时）。
+
+#### 8.15.5 `44019e3f`：actor set 不再每轮重建
+
+实测依据与修法见技能 `filscan-data-pipeline-ops/references/bell-actor-set-rebuild-cost.md`。
+**关键否定**：持续刷的 `code not found ... exists in init state` WARN **几乎不花钱**（else 分支只打一行日志），
+它不是吞吐瓶颈；真正贵的是**每轮重建**（单次 3分13秒~8分00秒，占一轮 1/3~1/2，而 actor 数 25 分钟只涨 7 个）。
+修法复用仓内已有缓存机器（网络版本作 key + 30 轮/2000 epoch 有界兜底），未动数据语义；
+连带修掉 `loadActorSet` 返回缓存原指针、调用方锁外读可变字段的 data race。
+
+#### 8.15.6 教训：同一个坑两次都踩在「没量清楚就归因」
+
+1. 把「删除冷索引」说成放行了卡住的批次——实际发布**早于**删索引 2 分钟（时间戳一查就穿）。
+2. 把「聚合阶段静默」当成卡死——同一阶段历史耗时 24 秒到 6 分 46 秒都有（聚合器只在跑完打一行）。
+
+**规矩**：先拿时间戳与历史同类耗时对齐再下结论；**日志静默不等于卡死**；删除/变更与现象同时出现时，
+先排时间先后再谈因果。
