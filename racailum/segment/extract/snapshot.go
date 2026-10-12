@@ -16,15 +16,22 @@ import (
 // Background: bell.ActorBalance is the biggest write hotspot on mainnet
 // (1.706e9 documents / 589.5GB). Every tick used to write a full snapshot
 // (~3.84e6 rows) while only ~0.1% of actors actually change between two
-// snapshots. The zero-hour snapshot stays full (the readers anchor on it);
-// the regular ticks now only write the actors whose Balance or Code changed
-// since the previous snapshot.
+// snapshots.
 //
-// Invariant the readers rely on: every ActorBalance row-set written between
-// two consecutive full snapshots is a *delta* on top of the last full
-// snapshot. A reader that forward-fills (Epoch <= X, latest row wins) is
-// therefore correct, but the richlist reader (which needs one epoch with the
-// *whole* set) must query a full-snapshot epoch.
+// 2026-10-12: the daily full snapshot is gone. The zero hour used to write
+// every actor; it now writes only the actors whose Balance or Code changed
+// since the previous snapshot, exactly like a regular tick — the zero hour is
+// still a *snapshot* epoch, it is just no longer a *full* one. No ActorBalance
+// epoch carries the whole actor set any more. The richlist's "one epoch with
+// the whole set" need is served by a separate, tiny daily top-N collection
+// (model.ActorBalanceTop) built during the very same state-tree traversal.
+//
+// Invariant the readers rely on: every ActorBalance row-set is a *delta* on top
+// of the row-set written at the previous snapshot epoch. A reader that
+// forward-fills (scan back from X, newest row wins) is therefore correct.
+// ActorBalanceFull survives only as the re-anchor path: when there is no
+// determinable base (first snapshot, or a snapshot epoch was skipped) the
+// writer still emits the whole set so a delta chain never starts from nothing.
 
 // epochsPerDay is the number of Filecoin epochs in a local day:
 // 24h * 60m * 60s / 30s. The zero-hour cadence repeats on this period.
@@ -37,10 +44,12 @@ type ActorBalanceMode int
 const (
 	// ActorBalanceSkip: this epoch is not a snapshot epoch at all.
 	ActorBalanceSkip ActorBalanceMode = iota
-	// ActorBalanceFull: write every actor (the zero-hour snapshot).
+	// ActorBalanceFull: write every actor. Only used when there is no delta
+	// base to diff against, so the delta chain gets a starting row-set.
 	ActorBalanceFull
 	// ActorBalanceChanged: write only the actors whose Balance/Code changed
-	// since PrevHeight.
+	// since PrevHeight. This is now the mode of *every* snapshot epoch,
+	// including the zero hour.
 	ActorBalanceChanged
 )
 
@@ -152,25 +161,23 @@ type ActorBalanceWritePlan struct {
 //
 // Rules, in order:
 //   - extraction disabled -> skip
-//   - zero hour -> full (byte-for-byte the legacy snapshot)
-//   - not a regular tick -> skip
+//   - neither the zero hour nor a regular tick -> skip
 //   - no determinable previous snapshot, or the previous snapshot is a whole
 //     tick interval (or more) back -> full. A whole-interval gap means the
-//     previous row-set is itself a delta with no recent full snapshot behind
-//     it, so there is no base to diff against; also, with zero-hour
-//     extraction switched off there is no full snapshot at all, and this
-//     falls back to the legacy "full every tick" behaviour.
+//     previous row-set is itself a delta with no recent base behind it, so
+//     there is no base to diff against; also, with zero-hour extraction
+//     switched off there is no base at all and this falls back to the legacy
+//     "full every tick" behaviour.
 //   - otherwise -> changed, diffing against PrevHeight.
+//
+// The zero hour has no special case left: it is a snapshot epoch like any
+// other and writes only the actors that changed (2026-10-12).
 func PlanActorBalanceWrite(height abi.ChainEpoch, ticks int, interval abi.ChainEpoch, zeroHour, enabled bool) ActorBalanceWritePlan {
 	if !enabled {
 		return ActorBalanceWritePlan{Mode: ActorBalanceSkip}
 	}
 
-	if common.IsZeroHour(zeroHour, height) {
-		return ActorBalanceWritePlan{Mode: ActorBalanceFull}
-	}
-
-	if !IsTickEpoch(ticks, interval, height) {
+	if !IsSnapshotEpoch(ticks, interval, zeroHour, height) {
 		return ActorBalanceWritePlan{Mode: ActorBalanceSkip}
 	}
 
@@ -186,29 +193,47 @@ func PlanActorBalanceWrite(height abi.ChainEpoch, ticks int, interval abi.ChainE
 	return ActorBalanceWritePlan{Mode: ActorBalanceChanged, PrevHeight: prev}
 }
 
-// LatestFullSnapshotHeight returns the greatest epoch <= height that carries a
-// FULL ActorBalance row-set: a zero hour while zero-hour extraction is on.
+// IsTopSnapshotEpoch reports whether the daily top-N richlist snapshot is
+// written at height: the local midnight, when zero-hour ActorBalance extraction
+// is enabled. The top-N snapshot is strictly daily (one row-set per day), which
+// is why this is the successor of "the zero hour has a full ActorBalance
+// row-set" — that is no longer true, so the richlist's anchor moved here.
+func IsTopSnapshotEpoch(zeroHour bool, height abi.ChainEpoch) bool {
+	return common.IsZeroHour(zeroHour, height)
+}
+
+// EffectiveActorBalanceTopN returns the configured daily top-N size, falling
+// back to DefaultActorBalanceTopN when unset (<= 0). A config file written
+// before the field existed decodes to 0, and 0 must mean "the default", never
+// "write nothing".
+func EffectiveActorBalanceTopN(n int) int {
+	if n > 0 {
+		return n
+	}
+
+	return DefaultActorBalanceTopN
+}
+
+// LatestTopSnapshotHeight returns the greatest epoch <= height that carries a
+// daily top-N richlist snapshot, i.e. the latest local midnight.
 //
-// The richlist reader needs exactly this epoch (a forward-fill would mix a
-// delta into a "whole set at one epoch" query and silently drop actors).
+// This replaced LatestFullSnapshotHeight: no ActorBalance epoch carries a full
+// actor set any more, so the richlist anchors on the top-N collection instead.
+// It takes no tick/interval because the top-N cadence does not depend on them.
 //
-// With zero-hour extraction off there is no full snapshot, so this degrades to
-// the latest tick epoch, which is precisely where PlanActorBalanceWrite falls
-// back to full writes in that configuration.
-func LatestFullSnapshotHeight(height abi.ChainEpoch, ticks int, interval abi.ChainEpoch, zeroHour bool) (abi.ChainEpoch, bool) {
+// ok is false when no top-N snapshot can exist at/below height (zero-hour
+// extraction off, or height below the first midnight); callers then fall back
+// to querying the requested epoch alone.
+func LatestTopSnapshotHeight(height abi.ChainEpoch, zeroHour bool) (abi.ChainEpoch, bool) {
 	if height < 0 {
 		return 0, false
 	}
 
-	if zeroHour {
-		return latestZeroHourAtOrBefore(height)
+	if !zeroHour {
+		return 0, false
 	}
 
-	if tick := TickInterval(ticks, interval); tick > 0 {
-		return height - height%tick, true
-	}
-
-	return height, true
+	return latestZeroHourAtOrBefore(height)
 }
 
 // ActorBalanceNeedsWrite is the "only write on change" predicate.

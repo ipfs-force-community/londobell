@@ -1204,10 +1204,11 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	defer span.End()
 	height := ts.Height()
 
-	// Snapshot cadence: the zero hour keeps writing the full snapshot (the
-	// readers anchor on it, byte-for-byte the legacy behaviour); a regular tick
-	// now only writes the actors whose Balance/Code changed since the previous
-	// snapshot. Every other epoch writes nothing.
+	// Snapshot cadence: every snapshot epoch — the regular tick *and* the zero
+	// hour — writes only the actors whose Balance/Code changed since the
+	// previous snapshot. Every other epoch writes nothing. There is no full
+	// ActorBalance row-set any more; the richlist's whole-set read is served by
+	// the daily top-N collection, which is filled from this same walk below.
 	plan := extract.PlanActorBalanceWrite(
 		height,
 		ctx.Opts.StateRegular.ActorBalanceTicks,
@@ -1282,12 +1283,9 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		if err != nil {
 			return nil, fmt.Errorf("generate regular id: %w", err)
 		}
-		actType := builtin2.ActorNameByCode(act.Code)
-		actTypes := strings.Split(actType, "/")
-		if len(actTypes) > 1 {
-			actType = actTypes[len(actTypes)-1]
-		} else {
-			elog.Warnf("actor %s acttype out of design", actType)
+		actType, ok := actorBalanceCode(act)
+		if !ok {
+			elog.Warnf("actor %s acttype out of design", builtin2.ActorNameByCode(act.Code))
 		}
 
 		return &model.ActorBalance{
@@ -1303,6 +1301,29 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		}, nil
 	}
 
+	// The same walk already visits every actor, so the daily richlist snapshot
+	// is built here rather than in a second state-tree pass. The heap only runs
+	// on the daily (zero-hour) epoch; every other snapshot walks the tree for
+	// the delta alone.
+	var topBalances *extract.TopBalances
+	if extract.IsTopSnapshotEpoch(ctx.Opts.ZeroHourExtract.ActorBalance, height) {
+		topBalances = extract.NewTopBalances(extract.EffectiveActorBalanceTopN(ctx.Opts.ActorBalanceTopN))
+	}
+
+	observe := func(addr address.Address, act *types.Actor) {
+		if topBalances == nil || !topBalances.WouldKeep(addr, act.Balance) {
+			return
+		}
+
+		code, _ := actorBalanceCode(act)
+		topBalances.Add(extract.TopBalanceCandidate{
+			Addr:    addr,
+			Balance: act.Balance,
+			Code:    code,
+			Head:    act.Head,
+		})
+	}
+
 	considered := 0
 	terminated := 0
 	actorBalance := make([]*model.ActorBalance, 0)
@@ -1311,6 +1332,7 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	case extract.ActorBalanceFull:
 		err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
 			considered++
+			observe(addr, act)
 			row, err := rowFor(addr, act, tree, true)
 			if err != nil {
 				return err
@@ -1324,6 +1346,7 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	default: // extract.ActorBalanceChanged
 		err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
 			considered++
+			observe(addr, act)
 			old, err := stateActorOrNil(prevTree, addr)
 			if err != nil {
 				return fmt.Errorf("load previous state for %s: %w", addr, err)
@@ -1372,9 +1395,52 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		res.Docs = append(res.Docs, actorBalance[i])
 	}
 
-	elog.Infow("actor balanced extracted", "mode", plan.Mode.String(), "rows", len(actorBalance), "considered", considered, "terminated", terminated, "prev", plan.PrevHeight)
+	// Daily richlist snapshot: the N largest balances seen during this walk, in
+	// exact order (balance desc, address asc), into their own tiny collection.
+	// Nothing here is sampled or approximated — an actor is only absent because
+	// N strictly better ones were seen.
+	topRows := 0
+	if topBalances != nil {
+		rows := topBalances.Sorted()
+		for rank := range rows {
+			c := rows[rank]
+			id, err := actorstate.GenRegularHeadID(c.Head, c.Addr, height)
+			if err != nil {
+				return fmt.Errorf("generate top balance id: %w", err)
+			}
+
+			res.Docs = append(res.Docs, &model.ActorBalanceTop{
+				ActorStateExBasic: model.ActorStateExBasic{
+					ID:    id,
+					Path:  []cid.Cid{c.Head},
+					Addr:  c.Addr,
+					Epoch: height,
+				},
+				Balance: c.Balance,
+				Code:    c.Code,
+				Rank:    rank + 1,
+			})
+		}
+		topRows = len(rows)
+	}
+
+	elog.Infow("actor balanced extracted", "mode", plan.Mode.String(), "rows", len(actorBalance), "considered", considered, "terminated", terminated, "prev", plan.PrevHeight, "top", topRows)
 
 	return nil
+}
+
+// actorBalanceCode reduces a builtin actor name ("fil/9/storageminer") to the
+// short code ActorBalance / ActorBalanceTop rows carry ("storageminer"). ok is
+// false when the name had no "/" (an out-of-design actor name).
+func actorBalanceCode(act *types.Actor) (string, bool) {
+	name := builtin2.ActorNameByCode(act.Code)
+
+	parts := strings.Split(name, "/")
+	if len(parts) > 1 {
+		return parts[len(parts)-1], true
+	}
+
+	return name, false
 }
 
 // stateActorOrNil loads an actor from a state tree, mapping "not found" to a

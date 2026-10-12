@@ -120,6 +120,7 @@ func DefaultOptions() Options {
 
 		AllToCheckTableList: []string{
 			"ActorBalance",
+			"ActorBalanceTop",
 			"ActorState",
 			"Allocations",
 			"ClaimedPower",
