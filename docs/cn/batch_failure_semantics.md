@@ -1106,3 +1106,51 @@ COLLSCAN = 无
 ⇒ 一个现成端点、一个现成脚本、一条现成规则，覆盖写侧与读侧两侧。
 
 **状态**：机制类改动，**待用户拍板后再动手**。在它落地前，今晚这次增量午夜的成败没有自动告警兜底。
+
+#### 8.16.10 ★ 真正的下游消费者找到了（我先前一度判断成「没有消费者」，是错的）
+
+**先说错在哪**：我在聚合器日志里看到 `/aggregators/balance` 与 `/aggregators/richlist` 的调用**全部来自 127.0.0.1**
+（我自己的探针），就一度认为这两个接口没有生产消费者。**错在取样窗口**：那份日志只覆盖 10:03–16:44（约 7 小时），
+而真消费者的调用**每天只在日界那一刻发生一次**，7 小时窗口里当然看不到。
+
+**真消费者**（后端仓库 `filscan-backend-push`，现役二进制 `/root/filscan-syncer`）
+`modules/syncer/calculator/rich-list-task/actor_balance_task.go`（109 行，全文已读）：
+
+```go
+func (a ActorBalanceTask) Calc(ctx *syncer.Context) (err error) {
+    if ctx.Empty() { return }
+    currentDay := chain.CurrentEpoch().CurrentDay()
+    if currentDay == ctx.Epoch() {                      // 只在「日界」这一期动手（一天一次）
+        filters := types.Filters{Index: 0, Limit: 1000, Start: &currentDay}
+        richList, err = a.getRichList(ctx, filters)     // → ctx.Agg().RichList(...) = 聚合器 :1237
+        if richList == nil || richList.TotalCount == 0 {
+            err = mix.Warnf("获取富豪榜为空")              // 空榜 = 只告警、不写
+            return
+        }
+        actorBalanceList = a.toActorsBalance(richList, currentDay)
+        a.save(...)                                     // → PG chain.rich_actors（CreateInBatches 1000）
+    }
+}
+```
+
+（`getRichList` → `ctx.Agg().RichList`；`sync.toml` 的 `agg_address = http://172.31.38.30:1237` 就是本次改动的那个接口；
+`RollBack` 会 `delete from chain.rich_actors where epoch >= ?`。）
+
+**三个结论**
+
+1. **改动 7 与这个消费者完全兼容**：它只要**前 1000 行**（`Limit: 1000`），新集合每天写 10000 行 ⇒ **10 倍余量**。
+   换句话说，**过去每天写 384 万行，这个唯一真消费者只用得到其中 1000 行** —— 那 1.3GB/天确实近乎全废。
+2. **「先补写新集合、再换读侧」的顺序是对的**：若那一期新集合为空，它会 `warn("获取富豪榜为空")` 然后
+   **什么都不写**（PG 榜当天就缺）——cali 灰度里出现的空榜就是这个形状。
+3. **A 项（前向填充下界=0、冷 0.94s）至此结案**：`balance` 接口在生产**没有真实消费者**
+   （整份日志 66 次调用全部来自 127.0.0.1，是探针），而真消费者读的是 `ActorBalanceTop`
+   ⇒ 前向填充的冷代价**不落在任何用户路径上** ⇒ **不建** `{Addr:1,Epoch:-1}` 索引，将来有消费者出现再议。
+
+**残留风险（今晚日界）**：消费者的调用发生在**日界那一刻**，而写侧把该期数据写进 `ActorBalanceTop` 是在那之后
+（一轮批次处理完）⇒ 存在一个「先问后写」的时序窗口。两层缓解：
+
+1. 聚合器的榜单查询会回退到「不晚于该期的最近一期」⇒ 拿不到就返回**上一期**的榜（非空，但日期标成新的一天），
+   比空榜好，且次日自愈；
+2. `chain.rich_actors` **本来就有** `filscan_table_cursor_height` / `filscan_table_lag_height` 指标
+   （游标现停在 `6447600`，即上一个日界）⇒ 「游标是否越过了最近的日界」本身就是可告警的信号
+   ⇒ §8.16.9 那条拟议的探针（盯写侧）与这条（盯消费侧）合起来才覆盖两端。
