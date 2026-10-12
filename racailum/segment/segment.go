@@ -304,6 +304,8 @@ func New(ctx context.Context, name string, opts Options, aggopt aggregate.Option
 		rdb:  rdoc,
 		agg:  agg,
 		mgr:  mgr,
+
+		actorAddressState: extract.NewActorAddressWriteState(),
 	}
 
 	seg.bound.Boundary = bound
@@ -332,6 +334,13 @@ type Segment struct {
 		sync.RWMutex
 		Boundary
 	}
+
+	// actorAddressState is the process-local "already emitted ActorID" set that
+	// makes the hourly ActorAddress tick incremental. It lives on the Segment
+	// (not on a Ctx, which is rebuilt for every part) so it survives across
+	// parts and rounds; it is empty on process start, which is what turns the
+	// first tick into a full pass. Rationale and cost in extract/actor_address.go.
+	actorAddressState *extract.ActorAddressWriteState
 
 	dal struct {
 		common.ChainStore

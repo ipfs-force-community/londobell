@@ -1601,7 +1601,6 @@ func extractActorAddress(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	if err != nil {
 		return fmt.Errorf("load state tree for %s: %w", root, err)
 	}
-	actorAddresses := []*model.ActorAddress{}
 	iact, err := tree.GetActor(_init.Address)
 	if err != nil {
 		return fmt.Errorf("failed to load init actor: %w", err)
@@ -1612,6 +1611,7 @@ func extractActorAddress(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		return fmt.Errorf("failed to load init actor state: %w", err)
 	}
 	robustMap := make(map[address.Address][]address.Address)
+	ids := make([]abi.ActorID, 0)
 	err = ist.ForEachActor(func(id abi.ActorID, addr address.Address) error {
 		idAddr, err := address.NewIDAddress(uint64(id))
 		if err != nil {
@@ -1619,6 +1619,7 @@ func extractActorAddress(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 		}
 
 		robustMap[idAddr] = append(robustMap[idAddr], addr)
+		ids = append(ids, id)
 
 		return nil
 	})
@@ -1627,26 +1628,53 @@ func extractActorAddress(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	}
 
 	elog := ctx.L.With("epoch", height)
-	elog.Infow("actor address extracted")
-	for actorID, addresses := range robustMap {
-		actorAddress := &model.ActorAddress{ActorID: actorID, Epoch: ts.Height()}
-		for _, addr := range addresses {
+
+	// ActorAddress rows are insert-once: Epoch is frozen at the first insert
+	// and re-sending a row is a no-op the driver silently swallows. Emit only
+	// the ActorIDs this process has not written yet; that is observationally
+	// identical to the legacy "re-send all ~3.84e6 rows every hour" while
+	// dropping the ~435s/tick insert down to the handful of genuinely new
+	// actors. The state is process-local and explained (restart cost, sethead
+	// rollback) in extract/actor_address.go.
+	//
+	// The emitted IDs go into this part's *pending* bucket, not straight into
+	// "seen": they only count as written once the part's insert is confirmed
+	// (Segment.persistPartDocs Commits the part on success, Discards it on
+	// failure/timeout so the next round re-emits). File every emission under
+	// the part, including the throwaway one a non-persisting caller uses.
+	part := ctx.ActorAddressPart
+	if part == nil {
+		state := ctx.ActorAddressState
+		if state == nil {
+			state = extract.NewActorAddressWriteState()
+		}
+		part = state.BeginPart()
+	}
+	emitted, mode := part.Filter(ids)
+
+	for _, id := range emitted {
+		idAddr, err := address.NewIDAddress(uint64(id))
+		if err != nil {
+			return fmt.Errorf("failed to write to addr map: %w", err)
+		}
+
+		actorAddress := &model.ActorAddress{ActorID: idAddr, Epoch: height}
+		for _, addr := range robustMap[idAddr] {
 			switch addr.Protocol() {
 			case address.SECP256K1, address.Actor, address.BLS:
 				actorAddress.RobustAddress = addr
 			case address.Delegated:
 				actorAddress.DelegatedAddress = addr
 			default:
-				return fmt.Errorf("invalid address for %v, addr: %v, protocol: %v", actorID, addr, addr.Protocol())
+				return fmt.Errorf("invalid address for %v, addr: %v, protocol: %v", idAddr, addr, addr.Protocol())
 			}
 		}
 
-		actorAddresses = append(actorAddresses, actorAddress)
+		res.Docs = append(res.Docs, actorAddress)
 	}
 
-	for i := range actorAddresses {
-		res.Docs = append(res.Docs, actorAddresses[i])
-	}
+	total := len(ids)
+	elog.Infow("actor address extracted", "mode", mode.String(), "emitted", len(emitted), "skipped", total-len(emitted), "total", total, "pending", part.Pending())
 
 	return nil
 }

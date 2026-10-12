@@ -628,6 +628,26 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 		return err
 	}
 
+	// Only a persisting part advances the process-local "already written
+	// ActorID" set. A part run with persist=false (§8.3: extracted but dropped
+	// after a recorded failure) keeps its own throwaway state, so the ActorIDs
+	// it would have written are NOT marked as done -- otherwise the re-run that
+	// eventually persists them would emit nothing and the rows would be lost
+	// until a restart. Dry runs (a different Segment / DryOptions) never touch
+	// this state either. See extract/actor_address.go.
+	//
+	// A persisting part also opens a per-part *pending* bucket. extractActorAddress
+	// files every ActorID it emits under it; the IDs are only promoted to "seen"
+	// once this part's persistence is confirmed (persistPartDocs). A failed /
+	// timed-out / never-attempted persist Discards the bucket, so the next round
+	// re-emits those ActorIDs instead of silently skipping them until a restart.
+	var aaPart *extract.ActorAddressPart
+	if persist {
+		aaPart = s.actorAddressState.BeginPart()
+		ectx.ActorAddressState = s.actorAddressState
+		ectx.ActorAddressPart = aaPart
+	}
+
 	var ewg multierror.Group
 	lim := limiter.New(s.opts.Extract.TipSetJobLimit)
 
@@ -690,10 +710,15 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 	}
 
 	if err := ewg.Wait(); err != nil {
+		if aaPart != nil {
+			// The part's docs never reach mongo: drop the pending ActorIDs so a
+			// later re-run re-emits them instead of skipping them until restart.
+			aaPart.Discard()
+		}
 		return fmt.Errorf("extract part: %w", err)
 	}
 
-	if err := s.persistPartDocs(ctx, elog, part, docs, persist); err != nil {
+	if err := s.persistPartDocs(ctx, elog, part, docs, persist, aaPart); err != nil {
 		return err
 	}
 
@@ -729,7 +754,12 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 //
 // 异步路径把 part 的 [起,止] 一并登记进 tracker：落库失败/超时时，交回上层的失败清单带
 // part 归属，从而能成为阻断面而不是整批作废（§8.2 注入口 ②）。
-func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, part []*common.LinkedTipSet, docs [][]common.Document, persist bool) error {
+//
+// aaPart 是本次 part 的 ActorAddress pending 桶（见 extract/actor_address.go）。
+// 落库成功 ⇒ Commit（pending 升格为已写、下一轮不再重发）；失败 / 超时 / ctx 取消 ⇒
+// Discard（pending 丢弃、下一轮重发）；persist=false ⇒ 压根没开桶（aaPart==nil），
+// 不记账。这条交握正是「同一条 ActorID 只有在其行真的落地之后才算发过」。
+func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, part []*common.LinkedTipSet, docs [][]common.Document, persist bool, aaPart *extract.ActorAddressPart) error {
 	if !persist {
 		elog.Infow("part extracted but not persisted (persist=false: skipped after a recorded failure)")
 		return nil
@@ -739,18 +769,29 @@ func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, part
 		select {
 		case ctx.persistSem <- struct{}{}:
 		case <-ctx.ctx.Done():
+			if aaPart != nil {
+				aaPart.Discard() // never scheduled ⇒ rows not written ⇒ re-emit next round
+			}
 			return ctx.ctx.Err()
 		}
 
 		from, to := partRange(part)
 		ctx.asyncPersist.Go(from, to, func() error {
 			defer func() { <-ctx.persistSem }()
-			if err := s.insertManyWithTimeout(ctx.ctx, elog, docs); err != nil {
+			err := s.insertManyWithTimeout(ctx.ctx, elog, docs)
+			if err != nil {
+				// Not confirmed written (transport error, timeout, or ctx cancel):
+				// drop the part's pending ActorIDs so the next round re-emits them.
+				if aaPart != nil {
+					aaPart.Discard()
+				}
 				if nerr := common.NonCtxCanceledErr(err); nerr != nil {
 					stats.Record(ctx.ctx, metrics.ExtractError.M(1))
 					elog.Errorf("insert extracted documents from tipsets: %s", err)
 					return nerr
 				}
+			} else if aaPart != nil {
+				aaPart.Commit() // the rows landed ⇒ they count as written
 			}
 
 			return nil
@@ -759,7 +800,13 @@ func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, part
 	}
 
 	if err := s.insertManyWithTimeout(ctx.ctx, elog, docs); err != nil {
+		if aaPart != nil {
+			aaPart.Discard()
+		}
 		return fmt.Errorf("insert extracted documents from tipsets: %w", err)
+	}
+	if aaPart != nil {
+		aaPart.Commit()
 	}
 
 	return nil

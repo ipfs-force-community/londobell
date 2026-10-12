@@ -209,7 +209,7 @@ func TestPersistPartDocs_PersistFalseSkipsWrites(t *testing.T) {
 	part := mkTSS(t, 10, 11)
 
 	// persist=false：不得有任何落库调用。
-	if err := s.persistPartDocs(pctx, pctx.log, part, docs, false); err != nil {
+	if err := s.persistPartDocs(pctx, pctx.log, part, docs, false, nil); err != nil {
 		t.Fatalf("persist=false 不应报错: %v", err)
 	}
 	if fake.insertCalls != 0 || fake.updateCalls != 0 {
@@ -217,7 +217,7 @@ func TestPersistPartDocs_PersistFalseSkipsWrites(t *testing.T) {
 	}
 
 	// persist=true（异步路径）：必须落库。
-	if err := s.persistPartDocs(pctx, pctx.log, part, docs, true); err != nil {
+	if err := s.persistPartDocs(pctx, pctx.log, part, docs, true, nil); err != nil {
 		t.Fatalf("persist=true 不应报错: %v", err)
 	}
 	if fails := pctx.asyncPersist.wait(time.Second); len(fails) != 0 {
