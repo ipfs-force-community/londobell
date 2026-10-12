@@ -362,10 +362,20 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		err          error
 	)
 	if !tmp {
-		aset, err = actor.NewSet(ctx, s.dal.StateManager, tss[size-1], tmp)
+		// 非 tmp 路径复用与 tmp 同一套缓存（segment.Actorset + actorsetMu + storeActorSet），
+		// 而不是每轮从最新 tipset 的状态根从头重建 actor set（实测单次重建 3分13秒~8分00秒，
+		// 占一轮的 1/3~1/2）。缓存 key = 网络版本，另有有界兜底失效（见 acquireActorSet）。
+		ts := tss[size-1]
+		version := s.dal.GetNetworkVersion(ctx, ts.Height())
+
+		var why actorSetInvalidation
+		aset, why, err = acquireActorSet(version, ts.Height(), func() (*actor.Set, error) {
+			return actor.NewSet(ctx, s.dal.StateManager, ts, tmp)
+		})
 		if err != nil {
 			return nil, err
 		}
+		logActorSetOutcome(elog, why, version, ts.Height())
 
 		latestDealID, err = s.GetLatestDealID(ctx)
 		if err != nil {
@@ -374,38 +384,28 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 	} else {
 		ts := tss[0]
 		version := s.dal.GetNetworkVersion(ctx, ts.Height())
-		currentActorset := loadActorSet()
-		if currentActorset == nil {
-			aset, err = actor.NewSet(ctx, s.dal.StateManager, ts, tmp)
+
+		// 「版本变化」与「有界兜底失效」都要重建，但只有前者才套昂贵 epoch 守卫（保留原行为）：
+		// 升级边界恰落在昂贵 epoch 时，宁可沿用旧集合（同版本内本来也是复用的）也不做那次重载。
+		// 有界兜底是例行维护性重建，不受该守卫影响。
+		if cacheWhy := actorSetInvalidationOf(loadActorSet(), version, ts.Height()); cacheWhy == actorSetVersionChanged &&
+			s.opts.Extract.ExtractOptions.SkipExpensiveEpoch && tipset.IsExpensive(ctx, s.dal.StateManager, ts) {
+			// TODO: extract simple invoc results here
+			elog.Warn("ignore expensive epoch actor load")
+			// 保持原行为：不重建，aset 仍为 nil。
+		} else {
+			var why actorSetInvalidation
+			aset, why, err = acquireActorSet(version, ts.Height(), func() (*actor.Set, error) {
+				return actor.NewSet(ctx, s.dal.StateManager, ts, tmp)
+			})
 			if err != nil {
 				return nil, err
 			}
-			storeActorSet(&ActorSet{
-				Version: version,
-				Set:     aset,
-			})
-		} else {
-			if currentActorset.Version != version {
-				if s.opts.Extract.ExtractOptions.SkipExpensiveEpoch && tipset.IsExpensive(ctx, s.dal.StateManager, ts) {
-					// TODO: extract simple invoc results here
-					elog.Warn("ignore expensive epoch actor load")
-				} else {
-					aset, err = actor.NewSet(ctx, s.dal.StateManager, tss[0], tmp)
-					if err != nil {
-						return nil, err
-					}
-					storeActorSet(&ActorSet{
-						Version: version,
-						Set:     aset,
-					})
-					elog.Infof("reload new version: %s actor", version)
-				}
-			} else {
-				aset = currentActorset.Set
+			if why == actorSetVersionChanged {
+				elog.Infof("reload new version: %s actor", version)
 			}
-
+			logActorSetOutcome(elog, why, version, ts.Height())
 		}
-
 	}
 
 	pctx := &persistCtx{

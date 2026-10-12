@@ -3,6 +3,7 @@ package segment
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,11 +31,14 @@ func TestExtractJobWithTimeout_HangIsAbandonedAndRetried(t *testing.T) {
 	timeout := 40 * time.Millisecond
 	attempts := 2
 
-	var calls int
+	// 用原子计数：作业被超时放弃后其 goroutine 仍一直活着（select{} 永不返回），会与
+	// 测试线程（以及后续尝试新建的 goroutine）并发读写同一个 calls；非原子会触发 -race
+	// （这是本测试自身的账，与生产路径无关）。断言保持不变。
+	var calls atomic.Int64
 	start := time.Now()
 	_, err := s.extractJobWithTimeout(context.Background(), timeout, attempts, zap.NewNop().Sugar(), "hang",
 		func(_ context.Context) (*extract.Res, error) {
-			calls++
+			calls.Add(1)
 			select {} // 永不返回，也不理会 ctx
 		})
 	elapsed := time.Since(start)
@@ -42,8 +46,8 @@ func TestExtractJobWithTimeout_HangIsAbandonedAndRetried(t *testing.T) {
 	if err == nil {
 		t.Fatal("作业卡死时必须报错，实际返回 nil")
 	}
-	if calls != attempts {
-		t.Fatalf("期望尝试 %d 次，实际 %d 次", attempts, calls)
+	if got := calls.Load(); got != int64(attempts) {
+		t.Fatalf("期望尝试 %d 次，实际 %d 次", attempts, got)
 	}
 	if limit := timeout*time.Duration(attempts) + jobRetryBackoff*time.Duration(attempts-1) + 2*time.Second; elapsed > limit {
 		t.Fatalf("耗时 %s 超出上限 %s（说明没有按超时放弃）", elapsed, limit)

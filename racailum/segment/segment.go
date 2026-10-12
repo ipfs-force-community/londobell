@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/trace"
+	"go.uber.org/zap"
 
 	"github.com/ipfs-force-community/londobell/common"
 	"github.com/ipfs-force-community/londobell/lib/mgoutil"
@@ -31,12 +32,172 @@ var log = logging.Logger("segment")
 type ActorSet struct {
 	Version network.Version
 	Set     *actor.Set
+
+	// 有界兜底失效的账面（见 actorSetReuseBudget / actorSetEpochWindow）：
+	Reuses  int            // 自构建以来被复用的轮数；每复用一次 +1，重建时归零
+	BuiltAt abi.ChainEpoch // 构建该集合时所用的 tipset 高度
 }
 
 var (
 	Actorset   *ActorSet
 	actorsetMu sync.RWMutex
 )
+
+// 有界兜底失效参数（两个条件取先到者）：
+//
+//	actorSetReuseBudget —— 同一网络版本内，缓存最多被复用多少轮；
+//	actorSetEpochWindow —— 距构建的链上高度推进上限。
+//
+// 为什么需要：缓存 key 取网络版本（见 acquireActorSet），它覆盖了 actor code 变更的真实来源
+// ——网络升级迁移（实测不同版本会改 code、同版本内几乎不变）。但「actor 仍在集合里、code 变了」
+// 不会产生 MISS：actor.Set.LookupMethodInfo 只在集合里查不到该地址时才回落 stm.LoadActor 并
+// 把 code 回写（actor/set.go:169-186），集合里查得到就直接用旧 code ⇒ 静默出错的窗口。
+// 下面两个窗口把「沿用旧 code 的最长时间」钉住，是一条**保险**，正常情况下不触发。
+//
+// 取值依据（实测：单次重建 3分13秒~8分00秒；一轮抽取 2分29秒~15分55秒、21~25 tipset/轮）：
+//   - 兜底窗口越大，重建越少、分摊开销越低，但沿用旧 code 的最长时间越长。
+//   - 升级间隔以周计 ⇒ 兜底窗口只要远小于升级间隔即安全：actorSetEpochWindow=2000 epoch
+//     （≈16.7h 链时）远小于任何升级间隔。
+//   - actorSetReuseBudget=30 轮（按实测 ~22 tipset/轮 ≈ 660 epoch ≈ 5.5h 链时）在正常节奏下
+//     先生效 ⇒ 约每 5~6 小时重建一次，分摊到每轮 ≈ 6~16 秒（一轮的 2~8%），远优于「每轮重建」。
+//   - 轮次预算同时兜住「轮很小、很频繁」这种 epoch 窗口迟迟不生效的形态（此时按轮数兜底）。
+const (
+	actorSetReuseBudget = 30
+	actorSetEpochWindow = 2000
+)
+
+// actorSetInvalidation 说明当前缓存相对期望版本为何不可复用（决定是否重建）。
+type actorSetInvalidation int
+
+const (
+	actorSetValid           actorSetInvalidation = iota // 命中缓存，可复用
+	actorSetMissing                                     // 无缓存
+	actorSetVersionChanged                              // 网络版本变化（升级迁移）
+	actorSetBudgetExhausted                             // 复用轮数达上界（有界兜底）
+	actorSetWindowExceeded                              // 距构建已超 epoch 窗口（有界兜底）
+)
+
+func (w actorSetInvalidation) String() string {
+	switch w {
+	case actorSetMissing:
+		return "missing"
+	case actorSetVersionChanged:
+		return "version-changed"
+	case actorSetBudgetExhausted:
+		return "budget-exhausted"
+	case actorSetWindowExceeded:
+		return "epoch-window-exceeded"
+	default:
+		return "valid"
+	}
+}
+
+// actorSetSnapshot 是缓存条目的只读快照。Reuses/BuiltAt 会在锁内被改动，故禁止在锁外直接读
+// Actorset 的字段——一律经本快照，避免 data race。
+type actorSetSnapshot struct {
+	exists  bool
+	version network.Version
+	reuses  int
+	builtAt abi.ChainEpoch
+}
+
+// actorSetSnapshotLocked 取缓存快照；调用方必须已持有 actorsetMu（读或写锁均可）。
+func actorSetSnapshotLocked() actorSetSnapshot {
+	if Actorset == nil {
+		return actorSetSnapshot{}
+	}
+	return actorSetSnapshot{
+		exists:  true,
+		version: Actorset.Version,
+		reuses:  Actorset.Reuses,
+		builtAt: Actorset.BuiltAt,
+	}
+}
+
+// loadActorSet 在锁内取缓存快照（无缓存时 exists=false）。注意：它返回的是**快照**而非原指针
+// ——原实现返回原指针，会让调用方在锁外读可变字段（Reuses），是与并发写并发的 data race。
+func loadActorSet() actorSetSnapshot {
+	actorsetMu.RLock()
+	defer actorsetMu.RUnlock()
+	return actorSetSnapshotLocked()
+}
+
+// actorSetInvalidationOf 是复用判定的纯函数（无全局状态、无锁），便于表驱动测试各失效边界。
+// 只有「缓存存在 && 版本一致 && 复用轮数未达预算 && 距构建未超 epoch 窗口」同时成立才可复用。
+func actorSetInvalidationOf(snap actorSetSnapshot, want network.Version, nowEpoch abi.ChainEpoch) actorSetInvalidation {
+	switch {
+	case !snap.exists:
+		return actorSetMissing
+	case snap.version != want:
+		return actorSetVersionChanged
+	case snap.reuses >= actorSetReuseBudget:
+		return actorSetBudgetExhausted
+	case nowEpoch-snap.builtAt >= actorSetEpochWindow:
+		return actorSetWindowExceeded
+	default:
+		return actorSetValid
+	}
+}
+
+// acquireActorSet 为本次抽取取一个 actor set（tmp 与非 tmp 路径共用这一套，不另起第二套缓存）：
+//
+//   - 命中缓存 ⇒ 复用并把复用计数 +1（省下 3~8 分钟的「状态树 384 万条 + init address_map 386 万条」
+//     从头重建）；这正是本次改动的目的：非 tmp 路径不再每轮重建。
+//   - 未命中 ⇒ 调 build 重建，把新集合写回缓存（计数归零、记录构建高度 builtAt）。
+//
+// 返回的 why 说明**本次为何走到重建**（actorSetValid 表示命中复用），供调用方打可区分的日志。
+//
+// 并发：判定（读版本 + 判预算/窗口）与「占用一次复用额度」同处一把 actorsetMu 写锁内，原子。
+// 重建放在锁外——单次重建 3~8 分钟，占着全局锁会让其它抽取轮次整段阻塞；并发重建最多多做一次
+// 无用功（后写者的集合同样正确），不会产出错误结果。
+func acquireActorSet(want network.Version, builtAt abi.ChainEpoch, build func() (*actor.Set, error)) (*actor.Set, actorSetInvalidation, error) {
+	actorsetMu.Lock()
+	why := actorSetInvalidationOf(actorSetSnapshotLocked(), want, builtAt)
+	if why == actorSetValid {
+		Actorset.Reuses++ // 与上面的判定同处一把写锁内，读-改-写原子
+		set := Actorset.Set
+		actorsetMu.Unlock()
+		return set, actorSetValid, nil
+	}
+	actorsetMu.Unlock()
+
+	set, err := build()
+	if err != nil {
+		return nil, why, err
+	}
+
+	storeActorSet(&ActorSet{Version: want, Set: set, BuiltAt: builtAt})
+	return set, why, nil
+}
+
+// logActorSetOutcome 打出 actor set 缓存的可区分日志：
+//   - 命中复用 ⇒ "actor set reused"；
+//   - 因有界兜底（预算 / epoch 窗口）重建 ⇒ "actor set cache invalidated, rebuilding"；
+//   - 其余重建（无缓存 / 版本变化）不额外打日志——构建本身由 actor.NewSet 的
+//     "actor set load" / "actor set loaded" 这对 INFO 覆盖（构建耗时靠它量）。
+//
+// 注意：这里不触碰 LookupMethodInfo 的 "code not found ... exists in init state" WARN 级别
+// ——那是另一件事，本次不改。
+func logActorSetOutcome(l *zap.SugaredLogger, why actorSetInvalidation, version network.Version, epoch abi.ChainEpoch) {
+	switch why {
+	case actorSetValid:
+		l.Infow("actor set reused", "key", version, "epoch", epoch)
+	case actorSetBudgetExhausted, actorSetWindowExceeded:
+		l.Infow("actor set cache invalidated, rebuilding", "key", version, "epoch", epoch, "reason", why.String())
+	}
+}
+
+func ClearActorSet() {
+	actorsetMu.Lock()
+	Actorset = nil
+	actorsetMu.Unlock()
+}
+
+func storeActorSet(as *ActorSet) {
+	actorsetMu.Lock()
+	Actorset = as
+	actorsetMu.Unlock()
+}
 
 func NewActorSet(ctx context.Context, stm common.StateManager, ts *common.LinkedTipSet, allowNilChild bool) (*ActorSet, error) {
 	set, err := actor.NewSet(ctx, stm, ts, allowNilChild)
@@ -49,25 +210,8 @@ func NewActorSet(ctx context.Context, stm common.StateManager, ts *common.Linked
 	return &ActorSet{
 		Version: version,
 		Set:     set,
+		BuiltAt: ts.Height(),
 	}, nil
-}
-
-func ClearActorSet() {
-	actorsetMu.Lock()
-	Actorset = nil
-	actorsetMu.Unlock()
-}
-
-func loadActorSet() *ActorSet {
-	actorsetMu.RLock()
-	defer actorsetMu.RUnlock()
-	return Actorset
-}
-
-func storeActorSet(as *ActorSet) {
-	actorsetMu.Lock()
-	Actorset = as
-	actorsetMu.Unlock()
 }
 
 // Anchor contains most significant info about a tipset
