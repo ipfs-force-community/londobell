@@ -1203,7 +1203,19 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(ts.Height())))
 	defer span.End()
 	height := ts.Height()
-	if !common.IsZeroHour(ctx.Opts.ZeroHourExtract.ActorBalance, height) && !extract.IsExtract(ctx.Opts.StateRegular.ActorBalanceTicks, ctx, height) || !ctx.Opts.EnabelExtract.EnableExtractActorBalance {
+
+	// Snapshot cadence: the zero hour keeps writing the full snapshot (the
+	// readers anchor on it, byte-for-byte the legacy behaviour); a regular tick
+	// now only writes the actors whose Balance/Code changed since the previous
+	// snapshot. Every other epoch writes nothing.
+	plan := extract.PlanActorBalanceWrite(
+		height,
+		ctx.Opts.StateRegular.ActorBalanceTicks,
+		ctx.Opts.StateRegular.Interval,
+		ctx.Opts.ZeroHourExtract.ActorBalance,
+		ctx.Opts.EnabelExtract.EnableExtractActorBalance,
+	)
+	if plan.Mode == extract.ActorBalanceSkip {
 		return nil
 	}
 
@@ -1212,7 +1224,6 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	if err != nil {
 		return fmt.Errorf("load state tree for %s: %w", root, err)
 	}
-	actorBalance := []*model.ActorBalance{}
 	iact, err := tree.GetActor(_init.Address)
 	if err != nil {
 		return fmt.Errorf("failed to load init actor: %w", err)
@@ -1238,19 +1249,38 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 	}
 
 	elog := ctx.L.With("epoch", height)
-	elog.Infow("actor balanced extracted")
-	err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
-		addresses := []address.Address{addr, robustMap[addr]}
+
+	// The tree the previous snapshot was taken against. Only the "changed" mode
+	// needs it; several failure modes (nil full node, missing tipset, missing
+	// state) make us fall back to the full snapshot rather than guess.
+	var prevTree *state.StateTree
+	if plan.Mode == extract.ActorBalanceChanged {
+		prevTree, err = loadActorBalancePrevTree(ctx, plan.PrevHeight)
+		if err != nil {
+			elog.Warnw("actor balance: no previous snapshot tree, falling back to full", "prev", plan.PrevHeight, "err", err)
+			plan.Mode = extract.ActorBalanceFull
+		}
+	}
+
+	// rowFor builds one ActorBalance row. allowUndefRobust keeps the full path
+	// byte-for-byte identical to the legacy snapshot (it always emitted
+	// [addr, robustMap[addr]]); the new tombstone path drops the undefined
+	// robust address of an actor that is no longer in the tree.
+	rowFor := func(addr address.Address, act *types.Actor, resolveTree *state.StateTree, allowUndefRobust bool) (*model.ActorBalance, error) {
+		addresses := []address.Address{addr}
+		if robust := robustMap[addr]; allowUndefRobust || !robust.Empty() {
+			addresses = append(addresses, robust)
+		}
 		if builtin2.IsAccountActor(act.Code) {
-			pubAddr, err := vm.ResolveToDeterministicAddr(tree, store, addr)
+			pubAddr, err := vm.ResolveToDeterministicAddr(resolveTree, store, addr)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			addresses = append(addresses, pubAddr)
 		}
 		id, err := actorstate.GenRegularHeadID(act.Head, addr, height)
 		if err != nil {
-			return fmt.Errorf("generate regular id: %w", err)
+			return nil, fmt.Errorf("generate regular id: %w", err)
 		}
 		actType := builtin2.ActorNameByCode(act.Code)
 		actTypes := strings.Split(actType, "/")
@@ -1260,7 +1290,7 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 			elog.Warnf("actor %s acttype out of design", actType)
 		}
 
-		actorBalance = append(actorBalance, &model.ActorBalance{
+		return &model.ActorBalance{
 			ActorStateExBasic: model.ActorStateExBasic{
 				ID:    id,
 				Path:  []cid.Cid{act.Head},
@@ -1270,18 +1300,120 @@ func extractActorBalance(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTi
 			Addresses: addresses,
 			Balance:   act.Balance,
 			Code:      actType,
+		}, nil
+	}
+
+	considered := 0
+	terminated := 0
+	actorBalance := make([]*model.ActorBalance, 0)
+
+	switch plan.Mode {
+	case extract.ActorBalanceFull:
+		err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
+			considered++
+			row, err := rowFor(addr, act, tree, true)
+			if err != nil {
+				return err
+			}
+			actorBalance = append(actorBalance, row)
+			return nil
 		})
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("walk through all actors: %w", err)
+		if err != nil {
+			return fmt.Errorf("walk through all actors: %w", err)
+		}
+	default: // extract.ActorBalanceChanged
+		err = tree.ForEach(func(addr address.Address, act *types.Actor) error {
+			considered++
+			old, err := stateActorOrNil(prevTree, addr)
+			if err != nil {
+				return fmt.Errorf("load previous state for %s: %w", addr, err)
+			}
+			if !extract.ActorBalanceNeedsWrite(old, act) {
+				return nil
+			}
+			row, err := rowFor(addr, act, tree, true)
+			if err != nil {
+				return err
+			}
+			actorBalance = append(actorBalance, row)
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("walk through changed actors: %w", err)
+		}
+
+		// Actors present in the previous snapshot but gone now are not visited
+		// above; write an explicit zero-balance row so the readers' forward-fill
+		// tombstones them instead of returning a stale balance forever.
+		err = prevTree.ForEach(func(addr address.Address, oldAct *types.Actor) error {
+			cur, err := stateActorOrNil(tree, addr)
+			if err != nil {
+				return fmt.Errorf("load current state for %s: %w", addr, err)
+			}
+			if cur != nil {
+				return nil
+			}
+			terminated++
+			drained := *oldAct
+			drained.Balance = abi.NewTokenAmount(0)
+			row, err := rowFor(addr, &drained, prevTree, false)
+			if err != nil {
+				return err
+			}
+			actorBalance = append(actorBalance, row)
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("walk through terminated actors: %w", err)
+		}
 	}
 
 	for i := range actorBalance {
 		res.Docs = append(res.Docs, actorBalance[i])
 	}
 
+	elog.Infow("actor balanced extracted", "mode", plan.Mode.String(), "rows", len(actorBalance), "considered", considered, "terminated", terminated, "prev", plan.PrevHeight)
+
 	return nil
+}
+
+// stateActorOrNil loads an actor from a state tree, mapping "not found" to a
+// nil actor (StateTree.GetActor returns types.ErrActorNotFound).
+func stateActorOrNil(tree *state.StateTree, addr address.Address) (*types.Actor, error) {
+	act, err := tree.GetActor(addr)
+	if err != nil {
+		if errors.Is(err, types.ErrActorNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return act, nil
+}
+
+// loadActorBalancePrevTree resolves the state tree the previous ActorBalance
+// snapshot was taken against, i.e. the parent state of the tipset at
+// prevHeight (same convention as root := ts.ParentState() above).
+func loadActorBalancePrevTree(ctx *extract.Ctx, prevHeight abi.ChainEpoch) (*state.StateTree, error) {
+	if ctx.FullNode == nil {
+		return nil, fmt.Errorf("full node api is not available")
+	}
+	api := ctx.FullNode.GetAppropriateAPI()
+	if api == nil {
+		return nil, fmt.Errorf("full node api is not available")
+	}
+
+	prevTs, err := api.ChainGetTipSetByHeight(ctx.C, prevHeight, types.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("load tipset at %d: %w", prevHeight, err)
+	}
+
+	prevTree, err := ctx.D.StateTree(prevTs.ParentState())
+	if err != nil {
+		return nil, fmt.Errorf("load state tree at %d: %w", prevHeight, err)
+	}
+
+	return prevTree, nil
 }
 
 func extractActorHead(ctx *extract.Ctx, res *extract.Res, ts *common.LinkedTipSet, tmp bool) error {
