@@ -1075,3 +1075,34 @@ COLLSCAN = 无
 - 换件后（`df409fdb`）实测：`start=6450480` ⇒ **返回了数据**（`Epoch` 回显 6450480、余额取最近一期）。
 - 影响：为链上尚未发生的期数给出余额（越界保护丢失）。**修法**：以换件前实现的语义为准恢复上界保护 +
   表驱动测试钉住 4 个边界（未来期 / 恰好等于上界 / 上界之内 / 极早期）。在修好并上线前，这个口径是**歪的**。
+
+#### 8.16.9 今晚的监控盲区（已查明，修法已拟定，待批）
+
+**今晚 00:00 是主网第一次「增量午夜」**（`6450480`）。现有全部信号都**跟着链走**，因此对「抽了但写了 0 行」这类
+**静默失败**没有保护：
+
+| 信号 | 覆盖 | 为什么盖不到 |
+|---|---|---|
+| `filscan_delay_second` / `filscan_final_height_lag_heights` / 高度差告警 | 链头与水位差 | 午夜写失败时水位照常推进 |
+| `filscan_committed_height` + `probe_ok`（10-09 补的） | bell 主库**已提交水位** | 同上，是水位不是内容 |
+| `filscan_log_error_events{pattern="failed_to_persist"}`（主网 bell 主机日志桥） | 落库报错 | 静默失败不报错 |
+| `filscan_table_lag_height` 一族 | **只覆盖后端 PG 表**（`chain.*` / `fevm.*` / `pros.*`） | mongo 的 `ActorBalance` / `ActorBalanceTop` 不在其中 |
+
+**与 10-09 那次 16.6 小时停摆是同一形状**：那次探针读的是**活跃指针**（贴着链头）而不是已提交水位，
+于是水位冻结时它读成「落后约 0」，规则整场没响。两次的教训一致：**要盯内容，不要只盯指针**。
+
+**拟定的修法（复用已有链路，不新增组件、不新增主机）**
+
+1. 在**已在跑**的 `/opt/filscan-metrics-bridge/push_metrics.sh`（`backend-new01`，每分钟，已经在推
+   `filscan_committed_height`）里追加约 10 行：算出「最近一个已过的本地午夜 epoch」（主网残差 2160，
+   用同脚本已取的 aggregator `final_height` 推），POST aggregator **现成**的 `/aggregators/richlist`，
+   推两个指标：`filscan_balance_snapshot_epoch`（那一期）与 `filscan_balance_snapshot_rows`（返回条数）。
+2. 告警规则：`rows ≥ 1000` 且「该 epoch 距今 ≤ 1 天」，否则报「午夜余额快照没写成」。
+3. 落地方式照 10-09 那次 committed 补丁的先例：备份 → 锚点插入 → `bash -n` → 手动跑一次 → 回读确认
+   既有指标仍在。
+
+**为什么用 richlist 而不是新查 mongo**：`backend-new01` 够不到 mongo 主机，但它够得到聚合器；
+而「那一期的榜能不能读出来」本身就是「那一期有没有写成」的等价判据（富豪榜现在读的就是 `ActorBalanceTop`）
+⇒ 一个现成端点、一个现成脚本、一条现成规则，覆盖写侧与读侧两侧。
+
+**状态**：机制类改动，**待用户拍板后再动手**。在它落地前，今晚这次增量午夜的成败没有自动告警兜底。
