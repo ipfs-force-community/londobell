@@ -50,6 +50,19 @@ func GetBalance(c *gin.Context) {
 
 	var balanceRes []model.BalanceRes
 
+	// Answer only the epochs this instance has published. A request past the
+	// top of that range is out of bounds and must answer data:null — never the
+	// newest written balance carried forward onto an epoch that has not
+	// happened. The pre-change reader got this for free from its forward-fill
+	// window bound; see planBalanceQuery for why that no longer works and what
+	// the answerable range is.
+	plan := planBalanceQuery(req.StartEpoch, countUtils)
+	if !plan.Answerable {
+		alog.Debugf("balance request epoch %d outside answerable range, returning null", req.StartEpoch)
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
 	// multi dbs query
 	{
 		// There is no longer any epoch carrying a full ActorBalance row-set (the
@@ -59,9 +72,7 @@ func GetBalance(c *gin.Context) {
 		// forward-fill over a short window would silently return nothing for it.
 		// The pipeline keeps its Epoch range, so this stays an index seek on
 		// Epoch_1_Addr_1 rather than a collection scan.
-		fromEpoch := actorBalanceForwardFillStartEpoch()
-
-		multiResult, err := multiquery.MultiRangeQuery(ctx, fromEpoch, req.StartEpoch+1, countUtils, common2.BalanceForwardFillPipeline(common2.BalanceAggregator), req, "ActorBalance")
+		multiResult, err := multiquery.MultiRangeQuery(ctx, plan.FromEpoch, plan.ToEpoch, countUtils, common2.BalanceForwardFillPipeline(common2.BalanceAggregator), req, "ActorBalance")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
