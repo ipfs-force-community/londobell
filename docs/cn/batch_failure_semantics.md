@@ -1074,7 +1074,8 @@ COLLSCAN = 无
 - 换件前（`b201e376`）实测：`start=6450480`（当时链路头约 6449xxx，属未来期）⇒ `data:null`；§8.15.10 记录在案。
 - 换件后（`df409fdb`）实测：`start=6450480` ⇒ **返回了数据**（`Epoch` 回显 6450480、余额取最近一期）。
 - 影响：为链上尚未发生的期数给出余额（越界保护丢失）。**修法**：以换件前实现的语义为准恢复上界保护 +
-  表驱动测试钉住 4 个边界（未来期 / 恰好等于上界 / 上界之内 / 极早期）。在修好并上线前，这个口径是**歪的**。
+  表驱动测试钉住 4 个边界（未来期 / 恰好等于上界 / 上界之内 / 极早期）。~~在修好并上线前，这个口径是**歪的**。~~
+  ⇒ **已于同一日 17:17 修复并上主网，见 §8.16.11。**
 
 #### 8.16.9 今晚的监控盲区（已查明，修法已拟定，待批）
 
@@ -1154,3 +1155,51 @@ func (a ActorBalanceTask) Calc(ctx *syncer.Context) (err error) {
 2. `chain.rich_actors` **本来就有** `filscan_table_cursor_height` / `filscan_table_lag_height` 指标
    （游标现停在 `6447600`，即上一个日界）⇒ 「游标是否越过了最近的日界」本身就是可告警的信号
    ⇒ §8.16.9 那条拟议的探针（盯写侧）与这条（盯消费侧）合起来才覆盖两端。
+
+#### 8.16.11 越界回归已修复并上主网（10-12 17:17，只换读侧）
+
+**§8.16.8 里那条「口径是歪的」到此刻解除。**
+
+**修法**：显式恢复上界，判据落在「请求 epoch」上、与窗口无关。新增
+`cmd/londobell-api/controller/aggregators/balance_answerable.go`（纯函数 `planBalanceQuery`
+⇒ `{FromEpoch, ToEpoch, Answerable}`）：可回答范围 = 本实例各库声明 epoch 范围的并集
+`[min(Start), max(End)-1]`；范围外 ⇒ HTTP 200 + `data:null`（不查询、不报错）；范围内的窗口
+（`FromEpoch = actorBalanceForwardFillStartEpoch() = 0`、`ToEpoch = start + 1`）**逐字节未动**。
+提交 `2cd69ab2`。
+
+**原保护的真相（有 diff 证据）**：它从来不是一条独立判据，而是「前向填充窗口下界」的**副作用**——
+换件前窗口 = `[不晚于 start 的最近本地午夜, start+1)`；`start` 一旦越过已发布范围上方的第一个午夜，
+整个窗口就落在数据之上 ⇒ 查空 ⇒ `null`。改动 7 把下界改成 0（对下界而言是对的）⇒ 窗口覆盖全链
+⇒ 未来期匹配到最新已写行并回填 ⇒ 保护随下界一起丢了。
+（关键 diff：`-fromEpoch, ok := latestActorBalanceFullSnapshotEpoch(req.StartEpoch)` /
+`+fromEpoch := actorBalanceForwardFillStartEpoch()`；同一次改动还删掉了
+`latestActorBalanceFullSnapshotEpoch` 与 `rextract.LatestFullSnapshotHeight`。）
+
+**两处有意偏离换件前实现（子代理举证、我拍板保留）**
+
+1. **严格化**：换前的保护在「链头与其后第一个本地午夜之间」会放行（例如 `head+1` 会返回余额），
+   那是窗口算术的副作用而非口径。现在任何超出已覆盖范围的 epoch 一律 `null`。依据：`balance`
+   接口在生产没有真实消费者（见 §8.16.10），且「为尚未发生的期数给出余额」本身不该被支持。
+2. **极早期数保持前向填充**（换前是「精确一期」）：这是改动 7 有意修的「长期没动过的地址查余额查空」，保留。
+
+**A/B（两网都做，直证）**
+
+| 用例 | 换前 | 换后 |
+|---|---|---|
+| 未来期（主网 `H+10000`、cali `H+10000`） | **返回数据（缺陷）** | `data:null` ✓（另测 `H+1`、`H+120` 亦 null） |
+| 范围内整日期（主网 `6447600` / cali `4148960`） | 有数据 | `cmp` **逐字节相同** |
+| 范围内非整日期（主网 `6448320` / cali `4146960`） | 有数据 | `cmp` **逐字节相同** |
+| 低于范围（`start=0`） | null | null（相同） |
+| `/ping` `/version` `/final_height` `/richlist` | — | 形态不变（richlist 仍 75546 字节 / 1000 条 / 0.045s） |
+
+- cali：`2cd69ab2`（sha `f45f903f…`），只换聚合器那一个程序；281 秒窗口水位在涨、panic/ERROR 0。
+- 主网：`2cd69ab2`（sha `af6a2af9…`，version `1.37.0+mainnet+git.2cd69ab2`），**只换聚合器那一个程序**；
+  换后 8 分钟窗口 0 ERROR / 0 panic，水位续涨，其余程序未动；备份
+  `/root/deploy-bak/londobell-api-aggregators.bak-20261012-171714`。
+- 自查澄清：换件报告里那句「换前同一小时 762 条 ERROR」是**伪阳性**（INFO 行里含 `errors=0` 字样）；
+  我抽样复核最近 3000 行：真 ERROR **0** 条、伪阳性 5 条；换后全量计数 ERROR=0 / panic=0。
+
+**测试**（提交内）：`TestPlanBalanceQueryAnswerableRange`（7 子例：未来刚过顶 / 未来隔一天 / 恰好等于上界 /
+范围内快照期 / 范围内非快照期 / 早于最早覆盖期 / 无库均覆盖）与
+`TestPlanBalanceQueryUpperBoundIsLastCoveredEpoch`；`go build ./cmd/londobell-api/...` rc=0、
+`go test -count=1 -race ./cmd/londobell-api/controller/aggregators/` rc=0、`gofmt -l` 干净。
