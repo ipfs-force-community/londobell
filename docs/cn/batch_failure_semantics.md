@@ -1268,36 +1268,38 @@ Prometheus `:9090` 与 Grafana `:3000` 不通 ⇒ 规则要加在 Prometheus 的
 **不需要跨 job 做 `on(instance)` 拼接**（原来那版把桥推的 `filscan_committed_height` 与 exporter 的
 `filscan_table_cursor_height` 相减，两者**没有共同标签**，实际会算不出东西）。阈值仍取 4320 = 1.5 个日界。
 
-#### 8.16.13 COLLSCAN 日指标改口径：把「自己人噪音」摘出去（10-13）
-
-10-13 上午告警 `filscan夜间COLLSCAN回归` 响起（`filscan_collscan_24h` 达 22079，阈值 500）。**这不是索引修复回退**：
-按同口径复算近 24 小时，mongod 慢查询里 `planSummary` 含 COLLSCAN 的共 **17859** 条，其中
-
-| 来源 | 条数 |
-|---|---|
-| `tmpbell.ActorMessage` / `tmpbell.Message`（我们验证用的临时库） | 17790 |
-| `bell.OrphanBlock`（探针建索引时的对照查询） | 55 |
-| `bell.ActorBalance`（无界 countDocuments 手工查询） | 13 |
-| 其它 | 1 |
-
-且**客户端 100% 是回环（127.0.0.1/::1）或缺失**（全部来自我们在 mongo 本机敲的 shell）。
-**应用侧真实 COLLSCAN = 0 条。**
-
-**改法（不抬阈值、不改判据、不隐藏原始值）**：`/opt/filscan-mongo-triage/collscan_daily.sh` 里把计数拆成三条指标：
-
-| 指标 | 口径 |
-|---|---|
-| `filscan_collscan_24h` | **只算应用客户端**（客户端非回环非空、且 ns 不以 `tmpbell.` 开头）——**名字不变 ⇒ 上海侧规则一行都不用改** |
-| `filscan_collscan_24h_all` | 总条数（与原口径一致） |
-| `filscan_collscan_24h_excluded` | 被排除的自己人条数 |
-
-最长耗时同样拆为 `filscan_collscan_max_ms` / `filscan_collscan_max_ms_all`；脚本头部注释写清新口径与理由。
-改完立即手动跑一次，让被污染的指标当场纠正（告警随之自解）。
-
-**纪律**：这类「探针污染自己指标」的坑会反复出现——凡是**在数据库/服务本机敲的命令行查询**，都要
-假定它会进日志、进指标；写计数口径时先按「客户端是不是回环」分一次，再按临时库前缀分一次。
-
 **第三条是为 2026-10-19 NV29 激活准备的**（主网激活高度 6470279 ≈ 10-19 20:59:30 CST）。它要的四个指标
 （`filscan_nv29_epoch` / `filscan_latest_height` / `filscan_reward_stream_service_24h` / `filscan_reward_stream_active`）
 2026-10-13 已加进同一个指标桥（每分钟，`job=filscan_metrics`/`instance=backend-new01`），数据取自本机 API 的
 `TotalIndicators`。`filscan_reward_stream_active` 用**字符串判零**得出 1/0，避免把 attoFIL 大数转浮点后比较。
+
+#### 8.16.13 COLLSCAN 日指标改口径：按真实客户端归属拆分（10-13）
+
+10-13 上午告警 `filscan夜间COLLSCAN回归` 响起（`filscan_collscan_24h` 达 22079，阈值 500）。复算后**以噪音为主，但夹杂一条真实低效**。
+
+**取证的方法（坑在这里）**：mongod 的慢查询行（`c:COMMAND`/`c:WRITE`、`msg:"Slow query"`）**没有任何客户端地址字段** ——
+既无 `attr.remote`、也无顶层 `remote`/`client`，只有 `ctx:"connNNNN"`。客户端地址只出现在 `c:NETWORK` 行
+（`"Connection accepted"` 的 `attr.remote` + `attr.connectionId`）。⇒ **必须先用 `ctx ↔ connectionId` 建映射再归类**：
+直接去慢查询行上读「客户端字段」，拿到的是「字段不存在」，会把 100% 的行都错判成「本地/无客户端」。
+（本次就先踩了这个坑、据此下了错误结论，随后被实测纠正。）
+
+关联后近 24h 的真实分布（共 17594 条）：
+
+| 客户端 | 条数 | 性质 |
+|---|---|---|
+| `172.31.38.30`（主网聚合器/适配器主机） | 16569 | 验证用临时库（按集合统计 `tmpbell.*` = 17527 条） |
+| `172.31.36.19` | 1016 | 其中 **53 条是 `bell.OrphanBlock` 的真实全表扫**（61.8 万文档、单次≈1.1s、约每 25 分钟一次） |
+| `127.0.0.1`（本机 shell 探针） | 9 | 运维探针 |
+
+**改法（不抬阈值、不隐藏原始值）**：`filscan_collscan_24h` = **只算应用/服务客户端**
+（排除回环/缺失客户端 **且** 排除 `tmpbell.*` 临时库）——**名字不变 ⇒ 上海侧规则一行都不用改**；
+另推 `filscan_collscan_24h_all`（总数）与 `filscan_collscan_24h_excluded`（被排除数）；最长耗时同样拆 `_max_ms` / `_max_ms_all`。
+改完立即手动跑一次，让被污染的指标当场纠正（告警随之自解）。
+
+`bell.OrphanBlock` 那 53 条**不算自己人**——它是真实服务查询，所以并行修根因：给它建 `{Checked:1, Epoch:1}`
+（10-12 实测 615k docs / 7154ms 全表扫 → IXSCAN `docsExamined=50` / `execMs=1`，≈7145 倍提速；当时只当实验做完就
+`dropIndex` 回滚、**没留在生产**，本次真正建上）。
+
+**两条纪律**：①凡是在数据库/服务**本机**敲的命令行查询都会进日志、进指标 ⇒ 写计数口径时先按「客户端是不是回环」
+分一次、再按临时库前缀分一次；②**归类前先确认真实字段存在**，别把「字段不存在」当成「值是空的」——
+这次就是被后者骗了一轮。
