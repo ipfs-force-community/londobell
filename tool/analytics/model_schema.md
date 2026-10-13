@@ -24,6 +24,20 @@
 }
 ```
 
+### ActorBalanceTop
+
+```
+{
+	"Addr": "address.Address",
+	"Balance": "big.Int",
+	"Code": "string",
+	"Epoch": "abi.ChainEpoch",
+	"Path": "[]cid.Cid",
+	"Rank": "int",
+	"_id": "cid.Cid"
+}
+```
+
 ### ActorEvent
 
 ```
