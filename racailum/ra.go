@@ -28,6 +28,101 @@ var log = logging.Logger("racailum")
 const DefaultHTTPListenAddr = ":15002"
 const DefaultRPCListenAddr = "/ip4/127.0.0.1/tcp/12345"
 
+// nextBackoff 计算「连续失败 consecutive 次后」该等待的轮间退避时长（纯函数）。
+//
+// 为什么抽成纯函数：退避是「不睡眠就无法观察」的时序逻辑，抽出来后可脱离时钟、
+// 用表驱动单测锁住曲线与封顶，避免为了测一条曲线去起整个 Run 循环。
+//
+// 曲线：consecutive 从 1 开始 ⇒ 1 → initial，之后每多一次失败翻倍，直到 max 封顶。
+//
+//	nextBackoff(1, 5m, 30m) = 5m
+//	nextBackoff(2, 5m, 30m) = 10m
+//	nextBackoff(3, 5m, 30m) = 20m
+//	nextBackoff(4, 5m, 30m) = 30m
+//	nextBackoff(n>=4, 5m, 30m) = 30m
+//
+// 边界：consecutive < 1 视为 1（第一次失败）；initial/max 非正视为配置异常，
+// 退化为「不退避」（返回 0），与改动前的行为等价——绝不因配置把循环卡死。
+func nextBackoff(consecutive int, initial, max time.Duration) time.Duration {
+	if initial <= 0 || max <= 0 {
+		return 0
+	}
+	if consecutive < 1 {
+		consecutive = 1
+	}
+
+	d := initial
+	for i := 1; i < consecutive; i++ {
+		if d >= max {
+			break
+		}
+		d *= 2
+	}
+	if d > max {
+		d = max
+	}
+	return d
+}
+
+// roundBackoffState 是 Run 循环持有的轮间退避状态：失败递增、成功复位。
+// 抽成独立对象是为了让「成功一轮立即复位」这条调用方逻辑也有自动化覆盖
+// ——否则只能起整个 Run 循环（依赖 cs/tsCh）才能验证复位。
+type roundBackoffState struct {
+	initial     time.Duration
+	max         time.Duration
+	consecutive int
+}
+
+// fail 记一次失败并返回本次该退避的时长（由 nextBackoff 按曲线算出）。
+func (b *roundBackoffState) fail() time.Duration {
+	b.consecutive++
+	return nextBackoff(b.consecutive, b.initial, b.max)
+}
+
+// success 记一次成功：连续失败计数归零，下一次失败重新从 initial 起算。
+func (b *roundBackoffState) success() {
+	b.consecutive = 0
+}
+
+// recordRoundSuccess 记一轮「抽完 / 只发布了前缀」的指标（与改动前的成功分支完全一致）。
+// 之所以截断轮也走它：截断轮本轮确实抽完并发布了前缀，只是水位停在阻断面之前——指标口径
+// 不变可避免引入新的告警面；「水位停住」这一真实降级由 AlertOutdatedFinalHeight 独立告警。
+func recordRoundSuccess(ctx context.Context, estart time.Time, ts *types.TipSet) {
+	stats.Record(ctx, metrics.ExtractError.M(0))
+	stats.Record(ctx, metrics.TipSetHeight.M(int64(ts.Height())))
+	stats.Record(ctx, metrics.ExtractDuration.M(metrics.SinceInMilliseconds(estart)))
+}
+
+// backoffBeforeNextRound 记一次「本轮需要重做」并按其指数退避等待；返回 false 表示循环应退出
+// （ctx 被取消或 doneCh 关闭）。
+//
+// 失败轮与「被阻断面截断轮」共用同一条退避曲线：两者下一轮都会在同一位置重做整段，白跑成本
+// 相同（实测 cali 每轮白跑 826 个高度）。只有成功一轮（整批抽完、无阻断）才复位。
+//
+// 退避期间仍可被 ctx 取消 / doneCh 关闭打断，避免关不干净；AlertOutdatedFinalHeight
+// 独立在跑，告警不会哑掉。
+func backoffBeforeNextRound(ctx context.Context, doneCh <-chan struct{}, b *roundBackoffState, reason string) bool {
+	d := b.fail()
+	if d <= 0 {
+		// 配置异常（非正）⇒ 不退避，与改动前等价，绝不卡死循环。
+		return true
+	}
+
+	log.Warnw("backing off before next extract round",
+		"reason", reason, "consecutive", b.consecutive, "backoff", d.String())
+
+	select {
+	case <-time.After(d):
+		return true
+	case <-ctx.Done():
+		log.Info("quit head-change loop during backoff")
+		return false
+	case <-doneCh:
+		log.Info("quit head-change loop during backoff")
+		return false
+	}
+}
+
 // SegmentConfig contains info about a segment
 type SegmentConfig struct {
 	DSN     string
@@ -168,11 +263,21 @@ func (r *RaCailum) WalkExtract(ctx context.Context, from types.TipSetKey, hi abi
 
 	tipsets = tipsets[1:]
 
-	if err := r.activeSeg.ExtractTipSets(ctx, tipsets, false); err != nil {
-		return err
+	fails, ferr := r.activeSeg.ExtractTipSets(ctx, tipsets, false)
+	if ferr != nil {
+		return ferr
 	}
 
-	if err := r.activeSeg.Aggregate(ctx, tipsets); err != nil {
+	// ★ 与 Segment.Extract 同一条红线（docs/cn/batch_failure_semantics.md §8.3）：
+	// 离线抽取路径也必须只聚合「洞之前的连续前缀」。这条路径虽然不动水位/边界，
+	// 但**跨洞聚合**出来的派生表同样是「接口 200 + 无错日志 + 错误数值」。
+	// 洞在批首时没有任何可安全聚合的部分，直接拒绝，而不是拿整段去聚合。
+	prefixLen := segment.PrefixLenBeforeFirstHole(tipsets, fails)
+	if prefixLen == 0 {
+		return fmt.Errorf("offline extract blocked by hole(s) before any contiguous prefix")
+	}
+
+	if err := r.activeSeg.Aggregate(ctx, tipsets[:prefixLen]); err != nil {
 		return err
 	}
 	return nil
@@ -186,6 +291,16 @@ func (r *RaCailum) Aggregate(ctx context.Context, lo, hi *types.TipSet) error {
 		return fmt.Errorf("load tipsets: %w", err)
 	}
 
+	// ★ 跨洞防护（docs/cn/batch_failure_semantics.md §8.11 的遗留项）：
+	// 手动聚合是运维对任意区间触发，若 [lo,hi] 覆盖到台账里已登记且未修复的洞，
+	// 跨洞聚合出的派生表同样是「接口 200 + 无错日志 + 错误数值」——正是本改造要消灭的形态。
+	// 台账查询失败 ⇒ 失败关闭（不知道有没有洞时放行 = 赌数据正确性）；
+	// 查到洞 ⇒ 拒绝并回带洞的区间（让运维知道该先 heal 哪一段），**不自动截断到前缀**
+	// ——静默给一半结果同样会被误读为聚合成功。
+	if err := segment.CheckNoCrossHoleAggregation(ctx, r.activeSeg.RegisteredHolesInRange, loEpoch, hi.Height()); err != nil {
+		return err
+	}
+
 	return r.activeSeg.Aggregate(ctx, tss)
 }
 
@@ -195,6 +310,11 @@ func (r *RaCailum) DryState(ctx context.Context, ts *common.LinkedTipSet, allowN
 }
 
 func (r *RaCailum) Run(ctx context.Context, doneCh <-chan struct{}, tsCh <-chan types.TipSetKey) {
+	// 轮间退避状态：跨 tipset 事件保留，失败递增、成功复位。
+	backoff := roundBackoffState{
+		initial: r.cfg.Segment.Extract.RoundBackoffInitial,
+		max:     r.cfg.Segment.Extract.RoundBackoffMax,
+	}
 HEAD_LOOP:
 	for {
 		select {
@@ -217,13 +337,33 @@ HEAD_LOOP:
 
 			log.Infow("incoming tipset", "tsk", tsk, "height", ts.Height())
 			estart := time.Now()
-			if err := r.Extract(ctx, ts); err != nil {
+			outcome, err := r.activeSeg.ExtractRound(ctx, ts)
+			switch {
+			case err != nil:
 				log.Errorf("failed to persist tipset: %s", err)
 				stats.Record(ctx, metrics.ExtractError.M(1))
-			} else {
-				stats.Record(ctx, metrics.ExtractError.M(0))
-				stats.Record(ctx, metrics.TipSetHeight.M(int64(ts.Height())))
-				stats.Record(ctx, metrics.ExtractDuration.M(metrics.SinceInMilliseconds(estart)))
+
+				// 失败一轮后按指数退避等待（§8.6），而不是「下个 tipset（约 30 秒）到来即重跑整段」：
+				// 失败轮都在已知会失败的高度上白跑（实测 cali 每轮白跑 826 个高度并持续消耗 mongo 算力），
+				// 退避不减少失败次数，但能把无效消耗降到接近 0。
+				// 注意：退避只影响「抽下一轮」，不动提交语义、不改 FinalHeight —— 水位仍停在洞前。
+				if !backoffBeforeNextRound(ctx, doneCh, &backoff, "extract round failed") {
+					return
+				}
+
+			case outcome.Truncated:
+				// 本轮被阻断面截断（部分成功）：水位只推到阻断面之前，下一轮必然在同一阻断面重做整段。
+				// 不退避 ⇒ 每 MinPeriod（约 20s）白抽一遍整段（实测 cali 每轮白跑 826 个高度）。
+				// 指标按「抽完一轮」口径照记（与改动前一致，避免引入新告警面）；
+				// 刻意**不打** "failed to persist tipset"——运维告警按它 grep，截断不是持久化失败。
+				recordRoundSuccess(ctx, estart, ts)
+				if !backoffBeforeNextRound(ctx, doneCh, &backoff, "extract round truncated by blocking boundary") {
+					return
+				}
+
+			default:
+				backoff.success()
+				recordRoundSuccess(ctx, estart, ts)
 			}
 			log.Infow("done tipset extracting", "tsk", tsk, "height", ts.Height(), "elapsed", time.Now().Sub(estart).String())
 		}

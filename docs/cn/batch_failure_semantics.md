@@ -427,7 +427,99 @@ type extractOptions struct {
 3. cali 稳定后再开 `data` 类；
 4. **主网最后上**，且必须避开追赶期。
 
-### 8.11 三项前置求证（2026-10-11 已完成，结论如下）
+### 8.11 实现现状（2026-10-11，分支 `feat/bell-batch-failure-semantics`）
+
+三段已全部实现在同一分支上，**均未合入 master、未部署、未启用任何 skippable 类**。
+
+| 段 | commit | 内容 |
+|---|---|---|
+| 1 | `0685d783` | 配置项 `RoundBackoffInitial/Max`（5m/30m）+ `ra.go` 轮间指数退避（纯函数 `nextBackoff`，配置异常退化为「不退避」）+ `extract.go` part 失败错误带进度 |
+| 2 | `694ed4fd` | `failure_class.go`（分类器，**默认不可登记**）+ `options.go` 的 `SkippableErrorClasses`（**默认空**）/`MaxUnpublishedRange`（2000）+ `partRunner`（登记 + 后续 part 只抽取不落库 + 护栏）+ `ledger.go`/`model/skipped_part.go` 台账 |
+| 3 | `58dabf8e` | `prefix_commit.go`（`prefixLenBeforeFirstHole` + `commitPrefix` 单一发布咽喉）+ `Segment.Extract` 只推前缀 |
+
+**契约变更（第 3 段）**：`ExtractTipSets` 的返回值语义变为
+「**返回 nil error 不代表没有洞**」——已登记的洞通过 `failures` 返回，
+由上层决定发布到前缀末。只有**致命错误**（不可登记类 / 台账写失败 / 异步落库失败）才返回非 nil error。
+
+**已覆盖的发布路径**：
+
+- ✅ `Segment.Extract`（daemon 主路径）——`commitPrefix` 只喂前缀给 `Aggregate` /
+  `SaveFinalHeight`(或 `SaveStateFinalHeight`) / `updateBoundary`；
+- ✅ `RaCailum.WalkExtract`（**离线抽取路径**，`bell offline extractor`）——
+  子代理主动上报了这条路径会跨洞聚合，已修：同样只聚合前缀，洞在批首则直接拒绝。
+  导出包装 `PrefixLenBeforeFirstHole` 保证两条路径复用同一份判据、不会漂移。
+
+**尚未覆盖（有意保留 + 一处遗留）**：
+
+- ⚠️ `Segment.ExtractToTemporaryDB`（tmp 路径）**未改**：有洞时仍整批弃。tmp 是近链头读路径，
+  语义不同，改它需要单独评估。
+- ⚠️ **遗留（已修，2026-10-11）**：`RaCailum.Aggregate(lo, hi)`（手动触发聚合）接受任意区间、原先不查台账 ⇒ 跨洞触发会产出跨洞派生表。已加防护（`segment.CheckNoCrossHoleAggregation` + `RegisteredHolesInRange`）：查到未修复的洞 ⇒ **拒绝并回带洞区间**（不自动截断到前缀）；**台账查询失败 ⇒ 失败关闭**。实测校准：
+  - 真库上跑同形 filter（只读）⇒ 无报错、`hits=0`、集合尚未创建 ⇒ **今天不会误拦**；
+  - **仓内暂无调用方**（`grep` 全仓无 `Aggregate(ctx, lo, hi)` 的调用点）⇒ 属防御性加固，不是当前线上风险，**不必为它单独换件**，随下一次换件一起上。
+
+**发布路径全覆盖核查（改动是否真的堵住了所有口子）** —— 所有「会把数据发布出去」的路径：
+
+| 路径 | 是否覆盖 | 手段 |
+|---|---|---|
+| `Segment.Extract`（daemon 主路径） | ✅ | 发布全走 `commitPrefix`，只吃洞前前缀；洞在批首不发布、不动水位 |
+| `RaCailum.WalkExtract`（离线抽取） | ✅ | 复用 `PrefixLenBeforeFirstHole`；洞在批首直接拒绝 |
+| `RaCailum.Aggregate`（手动触发） | ✅ | 聚合前查台账，覆盖到未修复洞即拒绝（fail-closed） |
+| `Segment.ExtractToTemporaryDB`（tmp 路径） | ➖ 有意不改 | 有洞仍整批弃；tmp 是近链头读路径，语义不同，单独评估 |
+| `grafana` / `persist` / 控制器里的 `*.Aggregate(...)` | ✅ 无关 | 都是 mongo 读侧聚合（取数/统计），不是发布写入 |
+
+⇒ 判据：改完必须 `grep` 出**所有** `Aggregate(` 调用点逐个定性（发布写入 / 只读取数），只改一条会漏（本次就在离线路径上漏过一次）。
+
+**台账**：集合 `SkippedPart`，去重靠 `_id = "<from>-<to>"`，
+依赖 `lib/mgoutil/docdb.go:23` 的 `options.Update().SetUpsert(true)`（已核实），
+**无需额外建索引/集合**（mongo 首次写入自动建集合）。
+
+**启用方式**：把 `[Segment.Extract] SkippableErrorClasses` 配成 `["state"]`（先只开 state）。
+**不配这个键 = 完全维持现状**——这是本改动最重要的安全属性：回退是改配置，不是回滚二进制。
+
+### 8.12 灰度步骤与执行记录
+
+**cali 执行记录（2026-10-11）**
+
+| 步骤 | 时间 | 结果 |
+|---|---|---|
+| ① 只换二进制、**不配** `SkippableErrorClasses`（零行为变化） | 12:48 | 完成。构建用 `make build-bell-calib`（bell 必须在目标主机上编，cgo + filecoin-ffi），产物版本串 `1.37.0+calibnet+git.d37ba7bb`、不含 `+mainnet+`；**5 个共用该二进制的 supervisor 程序**（`bell`/`statebell`/`tmpbell`/`fix-actormessage`/`fix-actormessage-tmp`）全部停 → 原子 `install` → 起。复核：版本串对上、水位 4145568→4145589 在涨、错误分桶（`extract job failed`/`could not find`/`failed to persist`/`panic`）全 0、回滚锚点 `deploy-bak/bell.bak-20261011-124840` 与换装前 sha 一致 |
+| ② 配 `SkippableErrorClasses = ["state"]`（**只对主 `bell`**） | 13:12 | 完成。配置备份 `deploy-bak/bell-config.bak-20261011-131248`；重启后 `bell=RUNNING`、键仍在且未被注释（⇒ bell 启动**不**重写 config，手加的键不会被洗掉）；水位 4145610 在涨、ERROR=0 |
+| ③ 换到分支 tip（含 heal 闭环 + 跨洞防护） | 15:05 | 完成。`make build-bell-calib` 产物 `+git.2f808878`、不含主网标记；5 个共用实例停→原子换→起；复核 `/proc/<pid>/exe` 全指新件、回滚锚点 `deploy-bak/bell.bak-20261011-150533`（sha 与换装前一致）、配置未被改写、错误分桶全 0、`reconcile healed parts failed` = 0 |
+| ④ 装上「四判据检测器」（不需要真洞就能看状态） | 15:01 | 完成。`/opt/filscan-holewatch/holewatch.sh` + 一行 crontab（每 5 分钟）；只读 bell 日志 + 聚合器水位；指标推**独立 job 组** `filscan_holewatch_cali`（避免同名族 HELP/TYPE 不一致打断整个 `/metrics` gather）。自检三档：现役日志（未撞过洞）/ **历史真实缺块日志（c3=1，证明判据在真实数据上有效）**/ 合成日志（c1=c2=c3=1）。实测 cron 已在 15:05:02 自行跑过一次 |
+| ⑤ 等下一次撞洞验收四条 | 待发生 | 见下。**注意：这不阻塞任何事**——承重机制已在真库上逐条验证过（见 §8.14 与下方「真库验证」），撞洞只是最后的线上确认 |
+
+**为什么只对主 `bell` 开**：撞洞并卡住的批次循环是主 `bell` 的（其 config `OnlyExtractState = false`，状态抽取在它的 part 里跑）。`statebell` 是另一路（`OnlyExtractState = true`、独立 repo/mongo），`tmpbell` 是近链头 tmp 路径。灰度的原则是**一次只动一条路径**，等 ③ 有结论再评估是否扩到 `statebell`。
+
+**⚠ 前置：必须先验「分类器认不认真实故障文本」**，否则开关可能永远空转、且无人发现。
+`classifyPartFailure` 是纯子串匹配 ⇒ 直接把它的规则拿去数真实日志，等价于把分类器跑在真实文本上：
+
+| 子串（= 分类器规则） | cali（全部日志） | 主网（近 6 份日志） |
+|---|---|---|
+| `ipld: could not find` / `failed to load hamt node` / `failed to load state tree`（**state 类，可登记**） | **372 / 360 / 360** | 54 / 12 / 12 |
+| `not minimally encoded` / `failed to unmarshal`（data 类，可登记） | 0 / 0 | 0 / 0 |
+| `async persist wait timeout` / `context deadline exceeded`（传输类，**设计上不可登记**） | 0 / 0 | 11 / 74 |
+
+cali 真实报错原文（多行，尾段）：
+`… tipset execution failed: making vm: creating fvm opts: loading state tree: failed to load state tree <cid>: failed to load hamt node: blockstore get: ipld: could not find <cid>`
+⇒ cali 的故障形态**正中 state 类**（三个子串全中），开关不是空转；且 cali 上 data 类与传输类各 0 ⇒「只开 state」正好够。
+
+⇒ **主网要分清两件事**：它近期的失败里**传输类占多数**（74 次 `context deadline exceeded` + 11 次 `async persist wait timeout`，即 B 档治理的那一类），这类**故意不可登记**（瞬时故障不该固化成永久洞）；`state` 类在主网确实也发生（12 次 `failed to load hamt node`）。**所以开 `state` 对主网有用，但别指望它治主网那次落库超时事故**——那是另一条线（作业 deadline + B 档调参）治的。
+
+**验收四条（撞洞时逐条核对，缺一条都算没生效）**：
+1. `SkippedPart` 集合出现台账行；重复撞同一洞时 `attempts` 递增，而**不是**新增行；
+2. `final_height` 停在洞前，**绝不越过**；
+3. 日志里**同一轮出现多个不同高度**的 `extract job failed`——这是本次改动的核心行为（一轮暴露全部洞，取代「撞一个停一次」）；
+4. heal 补齐后水位自然追平、台账行出现 `healed_at`。
+
+**⚠ 坑一：启用开关的键在生成的配置模板里找不到。** `bell cfg init` 产出的模板里**没有** `SkippableErrorClasses`，因为编码器不输出值为 `nil` 的 slice（同段 `AllToCheckTableList` 有非空默认值才渲染）。**这不等于配了不生效**——实测 `[Segment.Extract] SkippableErrorClasses = ["state"]` 解码为 `[state]`，且负对照（赋成字符串）报
+`incompatible types: TOML value has type string; destination has type slice`，证明键确实绑定到字段。
+⇒ 该键必须**手工加在 `[Segment.Extract]` 段头之后**，别在模板里找它。
+
+**⚠ 坑二：主机自己的仓库可能比现役二进制还旧。** cali bell 主机的 `/root/shuqi/londobell` 停在
+`1af5aca3`（NV29 合并），而现役二进制是 `e419c1ad`（其下游）——**从主机 master 直接编会静默回退已上线的修复**。
+⇒ 一律 `cp -a` 出副本、检出目标提交、核对 ffi gitlink（必须与树里已装的 `libfilcrypto.a` 一致，否则版本串会骗人）后再编。cali 是 x86_64。
+
+### 8.13 三项前置求证（2026-10-11 已完成，结论如下）
 
 **① 段边界 `hi-epoch` 与发布水位 `final_height` 的关系 —— 稳态下完全相等。**
 
@@ -469,3 +561,46 @@ type extractOptions struct {
    （不会被旧 epoch 覆盖）。⇒ 它对**正确性无害**，对**性能有害**。
 2. ⇒ §8.2 的对象「继续往后抽」的代价应记为**重复键空转开销**，
    这进一步支持 §8.3 的「不落库」规则：不落库就没有这批空转。
+
+### 8.14 heal 闭环：`healed_at` 的唯一写入路径（2026-10-11 补）
+
+**缺口**：`model.SkippedPart.HealedAt` 此前**没有任何代码写入**（模型注释写「本段留空，heal 闭环是后续段的事」）。
+后果不是「少一条验收」，而是**防护永久生效**——跨洞防护按 `healed_at: null` 判「未修复」，一旦登记过一条洞，
+那条区间会永远拦住手动聚合，台账里也分不清「洞已补好」与「洞还在」。
+
+**判据（单一、可证）**：本实例**已发布的最终水位越过洞的末端**（`to_epoch ≤ watermark`）。
+理由：水位只在本轮真的抽取**并落库成功**后才前移（见 §8.3 的 `commitPrefix`），
+所以「水位 ≥ 洞末端」**等价于**「这段数据已重抽且正确」——不需要额外的证明机制。
+
+**实现要点**（`ReconcileHealedParts`）：
+
+- 调用点：`commitPrefix` **返回 nil 之后**（只有发布落地才存在「本轮新水位」）。
+  **必须每轮都试**，而不是只在「本轮有洞」时试——洞的愈合恰恰发生在**干净轮次**
+  （本轮整批成功、水位一举越过此前登记的洞末端），只在有洞时试会让洞永远等不到销项。
+- 每轮最多一次（`Extract` 每轮只走到那里一次），绝不下沉到 partRunner 按 part 调。
+- **失败只记日志、不影响批次**：发布已完成、数据是对的，销项失败不危险，不该把已正确的一批判成失败。
+  （与「台账写不进去就不允许跳过」那条铁律不同——那针对的是危险的「跳过」动作。）
+- 各实例只对自己**实际抽取过**的类别背书：主 bell（`OnlyExtractState=false`）为 `state`+`data`，
+  `statebell` 只为 `state`（避免用「只抽状态的水位」去证明一个 data 洞已修复）。
+  `statebell` 在 `EnableExtractState` 关闭时 `commitPrefix` 不前移任何水位 ⇒ 此时跳过对账。
+- **默认零影响**：`SkippableErrorClasses` 为空时台账没有行 ⇒ 无候选 ⇒ **零写入**。
+
+**★ 实现中踩到并修掉的一个规格缺陷（值得单列）**：初版用**一条 `updateMany`**（我的规格写错了），
+而 `lib/mgoutil/docdb.go` 的 `Update` 自带 `options.Update().SetUpsert(true)`，该 filter 又**没有任何等值条件**
+⇒ 稳态（每轮的 filter 恰恰都无匹配）下**每轮插入一行垃圾**。真库实测：
+
+```
+updateMany(predicate, {$set:{healed_at}}, {upsert:true}) => matched=0 modified=0 upsertedId=<新 id>
+集合行数 0 → 1 → 2 …          每轮 +1，约 1000 行/天
+插入行字段 = ["_id","healed_at"]   ⇒ 缺 from_epoch/to_epoch/error_class
+```
+
+**修法**：先 `Find` 候选 → **无候选直接返回（零写入）** → 有候选才按 **`_id` 等值 filter** 逐个 `Update`，
+并带 `$setOnInsert` 写全业务字段作双保险（万一竞态真发生插入，插进去的也是完整正确的行）。
+真库复验：**无候选时集合根本不被创建**；造一条洞后按 `_id` 销项，行数仍为 1、无垃圾行；
+已 healed 的不再入候选（不覆盖首次 heal 时间）；水位未越过的不入候选。
+
+⇒ 该 API 的语义取决于 **filter 里有没有等值条件**：`recordSkippedPart` 用 `{_id:"<from>-<to>"}` 等值过滤，
+它的 upsert 恰是设计意图；同一方法用在对账上就成了 bug。**回归测试要钉的是「无候选 ⇒ 一次 Update 都不发生」。**
+
+⇒ 至此 §8.9 验收第 4 条（heal 闭环）从「无法成立」变为**可测**。

@@ -227,8 +227,46 @@ func (s *Segment) Run(ctx context.Context) {
 	}
 }
 
-// Extract attempts to extract data between given tipset and the hi-bound of the segment
+// RoundOutcome 描述一次抽取轮次（Segment.ExtractRound）的结果，供上层（RaCailum.Run 循环）
+// 决定是否轮间退避。
+type RoundOutcome struct {
+	// Truncated 为 true 表示本轮被阻断面（已登记的洞 ∪ 失败 part ∪ 异步落库失败 part）截断：
+	// 水位只前移到阻断面之前的连续前缀，整批并未抽完。**这不是错误**（数据是对的、算部分成功），
+	// 但下一轮必然在同一阻断面重做整段，故 Run 循环应据此退避——否则每 MinPeriod（约 20s）
+	// 白抽一遍整段（实测 cali 每轮白跑 826 个高度）。
+	Truncated bool
+	// BlockedAt 是本轮最早阻断面的起始高度（Truncated 时才有效）；仅供日志观测。
+	BlockedAt abi.ChainEpoch
+}
+
+// roundOutcomeFromFailures 由阻断清单算本轮结果（纯函数，便于单测）：
+// 有阻断 ⇒ Truncated=true 并带上最早阻断面的起点；无阻断 ⇒ Truncated=false。
+//
+// 为什么「有阻断」就等于「被截断」：failures 的元素都来自批内的 part，其 FromEpoch 必 ≤ 批末，
+// 故 prefixLenBeforeFirstHole 必 < len(tss)——本轮绝不可能把整批发布完（见 prefix_commit.go）。
+func roundOutcomeFromFailures(fails []PartFailure) RoundOutcome {
+	b, ok := firstBlockingBoundary(fails)
+	if !ok {
+		return RoundOutcome{BlockedAt: -1}
+	}
+	return RoundOutcome{Truncated: true, BlockedAt: b.FromEpoch}
+}
+
+// Extract attempts to extract data between given tipset and the hi-bound of the segment.
+//
+// 只返回 error（丢弃 RoundOutcome）——供不在乎「本轮是否被阻断面截断」的调用方使用
+// （对外的手动抽取入口等）。需要据截断决定轮间退避的调用方（RaCailum.Run）请用 ExtractRound。
 func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
+	_, err := s.ExtractRound(ctx, rawts)
+	return err
+}
+
+// ExtractRound 是抽取的实现体：除 error 外还返回本轮的 RoundOutcome（是否被阻断面截断）。
+//
+// 阻断轮（Truncated）返回 nil error：它是部分成功、数据正确，只是水位停在阻断面之前；
+// 上层 Run 循环据此退避（避免每 MinPeriod 白抽一遍），**不要**把它当持久化失败记日志
+// ——运维告警是按 "failed to persist tipset" 这行做的（见 ra.go）。
+func (s *Segment) ExtractRound(ctx context.Context, rawts *types.TipSet) (RoundOutcome, error) {
 	ctx, span := trace.StartSpan(ctx, "segment.Extract")
 	span.AddAttributes(trace.Int64Attribute("epoch", int64(rawts.Height())))
 	defer span.End()
@@ -246,25 +284,25 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 
 	lo := s.bound.Lo.Epoch
 	if tsh <= lo {
-		return fmt.Errorf("%s is not belong to this segment", common.FormatTipSet(rawts))
+		return RoundOutcome{}, fmt.Errorf("%s is not belong to this segment", common.FormatTipSet(rawts))
 	}
 
 	hi := s.bound.Hi.Epoch
 	if tsh > hi+s.opts.Extract.MaxBackward {
-		return fmt.Errorf("%s is too far away from current upper bound @%d", common.FormatTipSet(rawts), hi)
+		return RoundOutcome{}, fmt.Errorf("%s is too far away from current upper bound @%d", common.FormatTipSet(rawts), hi)
 	}
 
 	if hi+s.opts.Extract.MinPeriod+s.opts.Extract.Confidence >= tsh {
-		return nil
+		return RoundOutcome{}, nil
 	}
 
 	tipsets, err := ExtractLinkedTipSets(s.dal.ChainStore, rawts, &hi, false)
 	if err != nil {
-		return err
+		return RoundOutcome{}, err
 	}
 
 	if !s.bound.Hi.Is(tipsets[0]) {
-		return fmt.Errorf("current segment is not the ancestor (%s) of the incoming chain: %s", s.bound.Hi.TSK, tipsets[0])
+		return RoundOutcome{}, fmt.Errorf("current segment is not the ancestor (%s) of the incoming chain: %s", s.bound.Hi.TSK, tipsets[0])
 	}
 
 	for i := 1; i < len(tipsets); i++ {
@@ -283,34 +321,62 @@ func (s *Segment) Extract(ctx context.Context, rawts *types.TipSet) error {
 
 	tipsets = tipsets[:tssize]
 	if len(tipsets) == 0 {
-		return nil
+		return RoundOutcome{}, nil
 	}
 
-	if err := s.ExtractTipSets(ctx, tipsets, false); err != nil {
-		return err
+	fails, ferr := s.ExtractTipSets(ctx, tipsets, false)
+	if ferr != nil {
+		return RoundOutcome{}, ferr // 真正的致命错误（actor set / dealID 加载、台账写失败等）：整批弃、不动水位
 	}
 
-	if err := s.Aggregate(ctx, tipsets); err != nil {
-		return err
+	// 只把「第一个阻断面之前的连续前缀」交给聚合与水位推进（★ 红线，见 prefix_commit.go / §8.3）。
+	// 无阻断时 prefix = 整批，行为与改动前一致；阻断面在批首（prefixLen==0）时不发布、不动水位。
+	// 阻断面在批中 ⇒ 只推前缀末；两种情况**都不算致命失败**（部分成功 / 下一轮从阻断面续跑）。
+	if perr := commitPrefix(ctx, tipsets, fails, prefixCommitDeps{
+		aggregate:        func(c context.Context, p []*common.LinkedTipSet) error { return s.Aggregate(c, p) },
+		saveFinalHeight:  func(c context.Context, h *common.LinkedTipSet) error { return s.SaveFinalHeight(c, h) },
+		saveStateHeight:  func(c context.Context, h *common.LinkedTipSet) error { return s.SaveStateFinalHeight(c, h) },
+		updateBoundary:   func(c context.Context, h *common.LinkedTipSet) error { return s.updateBoundary(c, h, nil) },
+		onlyExtractState: s.opts.Extract.OnlyExtractState,
+		saveStateEnabled: s.opts.Extract.ExtractOptions.EnabelExtract.EnableExtractState,
+	}); perr != nil {
+		// 发布本身落地失败（Aggregate / SaveFinalHeight / updateBoundary 报错）：真正的致命错误。
+		return RoundOutcome{}, perr
 	}
 
-	if s.opts.Extract.OnlyExtractState {
-		if s.opts.Extract.ExtractOptions.EnabelExtract.EnableExtractState {
-			if err := s.SaveStateFinalHeight(ctx, tipsets[len(tipsets)-1]); err != nil {
-				return err
+	// 本轮是否被阻断面截断（存在阻断 ⇒ 水位只推到阻断面之前）。这不是错误：数据对、算部分成功；
+	// 但下一轮会在同一阻断面重做整段，上层 Run 循环据此退避（见 RoundOutcome）。
+	outcome := roundOutcomeFromFailures(fails)
+
+	// ★ 台账 heal 闭环（healed_at 的唯一写入路径；§8.4 / §8.9 验收第 4 条）：发布成功后
+	// 对账一次，把「已被本实例已发布水位越过末端」的洞标记为已修复。
+	//
+	// 位置理由：只有在 commitPrefix 返回 nil 且本轮真的前移了水位时（prefixLen > 0），本轮的
+	// 发布才真正落地（Aggregate + SaveFinalHeight/SaveStateFinalHeight + updateBoundary 全部成功），
+	// 此刻「本实例已发布的最终水位」就是刚发布的前缀末高度。洞的愈合恰恰发生在**干净轮次**——本轮整批成功、
+	// 前缀 = 整批，水位一举越过此前登记的洞末端——所以本对账必须**每轮**都尝试，而不是只在
+	// 「本轮有洞」时尝试，否则洞永远等不到被销项。（前缀高度用与 commitPrefix 同一份纯函数
+	// prefixLenBeforeFirstHole 复算取得，不改 prefix_commit.go 的签名。）
+	//
+	// 「每轮最多一次」：Extract 每次调用只会执行到这里一次，此处也只调一次
+	// ReconcileHealedParts（内部是一条 updateMany），绝不在 partRunner 里按 part 调。
+	//
+	// 「失败不影响批次」：发布已完成、数据是对的，对账只是台账销项；失败只记一条日志，
+	// 绝不返回 error（与「台账写不进去就不允许跳过」那条铁律不同——那针对的是危险的「跳过」
+	// 动作，销项失败不危险，不该把已正确的一批判成失败、拖住水位）。
+	if prefixLen := prefixLenBeforeFirstHole(tipsets, fails); prefixLen > 0 {
+		// 只有「本轮真的前移了本实例负责的水位」才谈得上证明：statebell 在 EnableExtractState
+		// 关闭时不会前移任何水位（见 commitPrefix），此时前缀末并非水位，不能拿它对账。
+		if !s.opts.Extract.OnlyExtractState || s.opts.Extract.ExtractOptions.EnabelExtract.EnableExtractState {
+			watermark := tipsets[prefixLen-1].Height()
+			if herr := s.ReconcileHealedParts(ctx, watermark, healClassesFor(s.opts.Extract.OnlyExtractState)); herr != nil {
+				log.Warnw("reconcile healed parts failed; batch unaffected",
+					"watermark", int64(watermark), "err", herr.Error())
 			}
 		}
-	} else {
-		if err := s.SaveFinalHeight(ctx, tipsets[len(tipsets)-1]); err != nil {
-			return err
-		}
 	}
 
-	if err := s.updateBoundary(ctx, tipsets[len(tipsets)-1], nil); err != nil {
-		return err
-	}
-
-	return nil
+	return outcome, nil
 }
 
 func (s *Segment) ExtractToTemporaryDB(ctx context.Context, rawts *types.TipSet) error {
@@ -342,7 +408,7 @@ func (s *Segment) ExtractToTemporaryDB(ctx context.Context, rawts *types.TipSet)
 	// extract (hi, rawts]
 	tipsets = tipsets[1:]
 
-	if err := s.ExtractTipSets(ctx, tipsets, tmp); err != nil {
+	if _, err := s.ExtractTipSets(ctx, tipsets, tmp); err != nil {
 		return err
 	}
 	if err := s.updateBoundary(ctx, tipsets[len(tipsets)-1], nil); err != nil {

@@ -32,6 +32,25 @@ type extractOptions struct {
 	ExtractOptions extract.Options
 
 	OnlyExtractState bool
+
+	// 失败分级（§8.2 / §8.7）：允许「登记台账并继续往后抽」的错误类别。
+	// 默认必须为空 slice —— 空 = 完全维持现状（不登记、不跳过、失败即整批作废），
+	// 这样灰度回退是改配置而不是回滚二进制；确认链路无误后再按 state → data 逐类开。
+	// 注意：即便某类在此开启，仍需 classifyPartFailure 判定它属「可登记类别」才生效。
+	SkippableErrorClasses []string
+
+	// 护栏（§8.5）：未发布区间（链头 − 已发布水位）上限，超过即停止继续往后抽并告警。
+	// 默认 2000 高度（约 17 小时）。<=0 视为关闭护栏。
+	MaxUnpublishedRange abi.ChainEpoch
+
+	// 轮间退避（§8.6）：某轮失败后不再「下个 tipset（约 30 秒）到来即重跑整段」，
+	// 而是按指数退避等待，成功一轮立即复位。理由：失败轮都在已知会失败的高度上白跑
+	// ——实测 cali 每轮白跑 826 个高度、并持续消耗 2 核 mongo 的算力。退避不减少
+	// 失败次数，但能把无效消耗降到接近 0。
+	// 这两个字段只是为了把退避曲线可配置化，默认值与改动前的「无等待」相比更保守
+	// （更保守 = 失败时少空转），且不含任何「跳过/degraded」语义。
+	RoundBackoffInitial time.Duration // 默认 5m
+	RoundBackoffMax     time.Duration // 默认 30m
 }
 
 type persistOptions struct {
@@ -75,6 +94,17 @@ func DefaultOptions() Options {
 
 			ExtractOptions:   extract.DefaultOptions(),
 			OnlyExtractState: false,
+
+			// 失败分级默认关闭：空 slice = 完全维持现状（不登记、不跳过）。
+			SkippableErrorClasses: nil,
+			// 护栏：未发布区间上限 2000 高度（约 17 小时）。
+			MaxUnpublishedRange: 2000,
+
+			// 退避曲线：5m → 10m → 20m → 上限 30m（见 §8.6）。取值的根据是
+			// 「配置默认值必须与现状等价或更保守」——失败轮每轮都会在已知失败的高度上
+			// 白跑数十分钟，退避正是用来砍掉这段无效消耗，故上限取到 30m 而非更短。
+			RoundBackoffInitial: 5 * time.Minute,
+			RoundBackoffMax:     30 * time.Minute,
 		},
 
 		Persist: persistOptions{
@@ -171,6 +201,43 @@ func PersistWaitTimeout(d time.Duration) OptionFn {
 	return func(opt *Options) {
 		if d > 0 {
 			opt.Persist.WaitTimeout = d
+		}
+	}
+}
+
+// RoundBackoffInitial override the inter-round backoff initial duration by the given positive duration
+func RoundBackoffInitial(d time.Duration) OptionFn {
+	return func(opt *Options) {
+		if d > 0 {
+			opt.Extract.RoundBackoffInitial = d
+		}
+	}
+}
+
+// RoundBackoffMax override the inter-round backoff upper bound by the given positive duration
+func RoundBackoffMax(d time.Duration) OptionFn {
+	return func(opt *Options) {
+		if d > 0 {
+			opt.Extract.RoundBackoffMax = d
+		}
+	}
+}
+
+// SkippableErrorClasses override the error classes that are allowed to be recorded and skipped.
+// 空列表 = 完全维持现状（不登记、不跳过）——这也是默认值，灰度回退即改回空。
+// 传入 nil/空即显式关闭（覆盖默认值不改语义，因为默认本就是空）。
+func SkippableErrorClasses(classes ...string) OptionFn {
+	return func(opt *Options) {
+		opt.Extract.SkippableErrorClasses = append([]string(nil), classes...)
+	}
+}
+
+// MaxUnpublishedRange override the guard threshold (未发布区间上限) by the given non-negative value.
+// 0 视为关闭护栏（见 extract.go 的 partRunner.guardExceeded）。
+func MaxUnpublishedRange(r abi.ChainEpoch) OptionFn {
+	return func(opt *Options) {
+		if r >= 0 {
+			opt.Extract.MaxUnpublishedRange = r
 		}
 	}
 }
