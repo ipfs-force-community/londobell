@@ -8,6 +8,7 @@ import (
 
 	"context"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/gin-gonic/gin"
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -51,7 +52,17 @@ func GetBalance(c *gin.Context) {
 
 	// multi dbs query
 	{
-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, common2.BalanceAggregator, req, "ActorBalance")
+		// ActorBalance is only written in full at the zero hour; every regular
+		// tick carries a delta. Forward-fill from the most recent full snapshot
+		// so actors that did not move keep reporting their carried-forward
+		// balance. That snapshot bounds the scan window, which guarantees every
+		// actor has a row inside it.
+		fromEpoch, ok := latestActorBalanceFullSnapshotEpoch(req.StartEpoch)
+		if !ok {
+			alog.Warnf("no full ActorBalance snapshot at or before %d, querying that epoch alone", req.StartEpoch)
+		}
+
+		multiResult, err := multiquery.MultiRangeQuery(ctx, fromEpoch, req.StartEpoch+1, countUtils, common2.BalanceForwardFillPipeline(common2.BalanceAggregator), req, "ActorBalance")
 		if err != nil {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
@@ -76,6 +87,22 @@ func GetBalance(c *gin.Context) {
 			alog.Error(err)
 			util.ReturnOnErr(c, err)
 			return
+		}
+
+		// One row per shard was returned (each sorted Epoch desc, limited to
+		// 1); keep the newest. Report it under the requested epoch so the
+		// response shape is unchanged and the frontend needs no change.
+		if len(balanceRes) > 1 {
+			newest := 0
+			for i := range balanceRes {
+				if balanceRes[i].Epoch > balanceRes[newest].Epoch {
+					newest = i
+				}
+			}
+			balanceRes = []model.BalanceRes{balanceRes[newest]}
+		}
+		for i := range balanceRes {
+			balanceRes[i].Epoch = abi.ChainEpoch(req.StartEpoch)
 		}
 	}
 

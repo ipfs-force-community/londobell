@@ -604,3 +604,413 @@ updateMany(predicate, {$set:{healed_at}}, {upsert:true}) => matched=0 modified=0
 它的 upsert 恰是设计意图；同一方法用在对账上就成了 bug。**回归测试要钉的是「无候选 ⇒ 一次 Update 都不发生」。**
 
 ⇒ 至此 §8.9 验收第 4 条（heal 闭环）从「无法成立」变为**可测**。
+
+### 8.15 2026-10-12：三个新改动，与一个推翻上线计划的事实
+
+**判决句先行**：`fe652669`（阻断面截断发布 + 异步落库按 part 归属化）**已上主网并验证发布**；
+`b201e376`（ActorBalance 只写变化 + 读取侧前向填充）在 cali 双向验证完毕，**但决定不推主网**（见 8.15.1）；
+`44019e3f`（actor set 缓存）在 cali 灰度。
+
+#### 8.15.1 ★ 主网的常规 tick 根本不触发 ⇒ 满量快照只有「零时」一次
+
+主网主 bell 的 `/root/.bell/config`：`ActorBalanceTicks = 240000`、`Interval = 120`
+⇒ 常规 tick 周期 = 240000 × 120 = **2880 万 epoch（约 400 天）⇒ 永不触发**。
+日志佐证：主网所有 `actor balanced extracted` 的 epoch **全部 ≡ 2160 (mod 2880)**（本地午夜零时）；
+`ActorBalance` 集合里存在的 epoch 也只有 ≡2160 那一批（约 459 天、间隔 2880）。
+
+⇒ 两条推论：
+
+1. **满量快照每天一次**（本地午夜），不是每 12 小时一次。主网下一次 ≈ `6450214`。
+2. **`b201e376` 的写入侧改动在主网上是死代码**——它只在 tick 生效，而主网 tick 不触发；
+   零时那一次它按设计**仍写全量**（richlist 与批量消费者依赖全量快照）。
+   ⇒ 故 `b201e376` 与读取侧**不推主网**：零收益却要担「必须与读取侧同时上、否则余额查空」的耦合。
+   留在 cali 作试验床（cali 的 tick 会触发，正好持续验证这条路径），并作为将来「让零时那次也变便宜」的底座。
+
+#### 8.15.2 主网现在真正扛住满量快照的两件事（含一处推算，未实测）
+
+| 防护 | 依据 |
+|---|---|
+| 冷索引清理（21+4 个，索引 722.7→422.7GB） | 单批插入 1566ms → **300~500ms**（慢查询 6h 总量降 16 倍）；据此推算零时那次 384 万行 ≈ **19 分钟** |
+| 已上主网的 `fe652669` | 万一再被阻，水位推到阻断面并发布其前的连续前缀，站点不整段停更，且下一轮自动重抽自愈 |
+
+⚠️ 「19 分钟」是**推算不是实测**：清理后尚未经历过零时那次写入（上一次是 10-12 00:00，早于清理）。
+
+#### 8.15.3 `b201e376` 的关键实测（cali 双向验证）
+
+**写入侧**——用一个过去的 tick epoch `4147200` 强制触发（`bell offline extractor --local=false`，
+复制 tmpbell repo 到 /tmp 绕开 repo 锁，只抽 1 个 epoch，写临时库不碰生产库）：
+
+```
+tipset/tipset.go:1375  actor balanced extracted
+{"epoch":"4147200","mode":"changed","rows":34,"considered":199501,"terminated":0,"prev":"4146934"}
+```
+
+⇒ `mode=changed`；写 **34 行**而非 384 万行（**降幅约 11 万倍**，实测变化率 0.017%）；
+`prev=4146934` 正是算出来的上一期零时全量（`4146934 ≡ 2614 (mod 2880)`，cali 的零时残差是 2614，主网是 2160）。
+
+**两条否证**（省掉后来者弯路）：tmp 路径永远验不到 ActorBalance
+（`extractActorBalance` 首句就 `if tmp { return nil }`）；`statebell` 也不写它
+（其配置 `EnableExtractActorBalance=false` 且 `ActorBalanceTicks=240000`）。
+
+**读取侧**——cali `londobell-api-aggregators` 换到 `b201e376`：
+
+| 请求 epoch | 换前 | 换后 |
+|---|---|---|
+| `4147200`（快照期） | 有数据 | **逐字节相同**（无回归） |
+| `4148003` / `4147800` / `4148150`（非快照期） | `data:null` | 返回最近一期余额（前向填充生效） |
+| `5000000`（超链头） | — | `null`（越界保护） |
+
+richlist：`start=4147200` 与 `start=4148150` 返回字节数相同（70873）⇒ 仍取最近全量快照，语义未变。
+
+#### 8.15.4 主网前向填充查询的执行计划（只读实测）
+
+查询形状（`balance_forward_fill.go` 原文）：`$match{Epoch:{$gte:StartEpoch,$lt:EndEpoch}, Addr}` → `$sort{Epoch:-1}` → `$limit 1`。
+
+```
+计划：LIMIT <- FETCH <- IXSCAN[Epoch_1_Addr_1] direction=backward，无 COLLSCAN、无阻塞 SORT
+indexBounds 把 Addr 当等值推进 Epoch 区间内 ⇒ 是 seek，不是范围扫
+三个用例（最近在变 / 最远回看 / 不存在的地址）：0~4ms，keysExamined 1~2，docsExamined 0~1
+```
+
+集合现状：17.06 亿文档 / 589.5GB / 索引 193GB（`_id_` 118.9GB、`Epoch_1_Addr_1` 29.95GB、`Epoch_1_Balance_-1_Code_1` 44.2GB）。
+
+★ **唯一风险边界**：`Epoch_1_Addr_1` 是 **sparse** 索引 ⇒ **任何丢掉 `Epoch` 条件的 `ActorBalance` 查询会退化成 589GB 全扫**（已实测）。
+读取侧永远带 `Epoch` 区间 ⇒ 安全；**将来新增查询必须带 `Epoch` 条件**。
+代价是 O(窗口内不同 epoch 数) 次索引 seek（约 1ms/个）；今天窗口内只有 1 个 epoch，最坏 1~2 个。
+`{Addr:1,Epoch:-1}` 理论更优（不存在的地址也只需一次 seek），但收益为零 ⇒ **不建**（另建约 30~45GB、多小时）。
+
+#### 8.15.5 `44019e3f`：actor set 不再每轮重建
+
+实测依据与修法见技能 `filscan-data-pipeline-ops/references/bell-actor-set-rebuild-cost.md`。
+**关键否定**：持续刷的 `code not found ... exists in init state` WARN **几乎不花钱**（else 分支只打一行日志），
+它不是吞吐瓶颈；真正贵的是**每轮重建**（单次 3分13秒~8分00秒，占一轮 1/3~1/2，而 actor 数 25 分钟只涨 7 个）。
+修法复用仓内已有缓存机器（网络版本作 key + 30 轮/2000 epoch 有界兜底），未动数据语义；
+连带修掉 `loadActorSet` 返回缓存原指针、调用方锁外读可变字段的 data race。
+
+#### 8.15.6 教训：同一个坑两次都踩在「没量清楚就归因」
+
+1. 把「删除冷索引」说成放行了卡住的批次——实际发布**早于**删索引 2 分钟（时间戳一查就穿）。
+2. 把「聚合阶段静默」当成卡死——同一阶段历史耗时 24 秒到 6 分 46 秒都有（聚合器只在跑完打一行）。
+
+**规矩**：先拿时间戳与历史同类耗时对齐再下结论；**日志静默不等于卡死**；删除/变更与现象同时出现时，
+先排时间先后再谈因果。
+
+#### 8.15.7 `44019e3f` 的 cali 灰度实测（10-12 10:40）与一处量级更正
+
+**机制证明（两个非 tmp 进程都生效）**：
+
+```
+换前基线（近 8MB 窗口）：23 轮 = 23 次 actor set load（1:1，每轮重建），actor set reused = 0
+换后 bell（非 tmp）：    4 轮 ⇒ load=1（首轮冷构建）+ reused=3
+换后 statebell（非 tmp）：同样 ⇒ load=1 + reused=3
+对照组 tmpbell（原有缓存）：76 轮 ⇒ load=4、reused=72、
+  actor set cache invalidated, rebuilding {reason: budget-exhausted} 2 次，间隔 ≈31 轮 ⇒ 与 budget=30 相符
+```
+
+复核：5/5 程序 RUNNING、每个 pid exe=`/root/bell`、config sha 不变、panic/ERROR/failed-to-persist 全 0、水位 4148108→4148193。
+
+⚠️ **量级更正（重要）**：cali 的 actor set 只有 **47.5 万条**（`count` 199504 + `init-state` 275481），
+单次重建实测 **p50=1.14s / p90=1.81s / max=26.31s**（128 轮样本）——**不是 §8.15.5 里的 3分13秒~8分00秒**，
+后者是**主网**（384 万 + 386 万条）的量级。⇒ 该改动的收益**随规模放大**：cali 上只有 ~1.1s/轮（看不出），
+**主网上才是它要解决的问题**（每轮 3~8 分钟）。
+
+#### 8.15.8 上线裁定（10-12 10:4x）
+
+| commit | 裁定 | 依据 |
+|---|---|---|
+| `fe652669` | 已在主网 | 已实测发布 |
+| `b201e376`（改动 4） | **不推主网** | §8.15.1：主网 tick 不触发 ⇒ 写入侧在主网是死代码，零收益却要担读写耦合 |
+| `44019e3f`（改动 5） | **已推主网**（10-12 10:45:45 换件） | 纯性能、不动数据语义、无读写耦合，且收益恰在主网量级 |
+
+**改动 5 主网换件实测（10-12 11:19 独立复核）**：
+
+```
+version 1.37.0+mainnet+git.44019e3f.dirty · sha aa0feb0f6abbc5d79d958127b3a992dfaa868de7a62bbd44297d99669e6a86a4
+config sha 837813b210d184a2e67602834d5d5af8122ecb271a909375298dd2f68e088d89（**逐字节未变**）
+8 个程序全 RUNNING · pgrep 到的 exe 全指 /root/bell · 零 panic/ERROR/failed-to-persist/阻断面
+换件后 4 轮：actor set reused=3、actor set load=1（首轮冷构建）
+换前每轮 actor set load→loaded 实测 98.9~193.6 秒（5 轮样本）；换后同量级轮次 1 分 0 秒
+⇒ 每轮省约 1.6~2.5 分钟，占典型轮耗时（2m42s~4m0s）的 40~50%
+```
+
+（注：§8.15.5 与技能笔记里的「3 分 13 秒~8 分 00 秒」是另一个窗口的量级；实测区间是 **1.6~8 分钟**，取数口径一致时每轮省 1.6~2.5 分钟。）
+
+★ **换件后暴露的下一个吞吐嫌疑**：某轮 8 分 10 秒的长尾**不是** actor set 造成的——
+该轮分片 11:07:49 已全 done，但 `part [6448913,6448920]` 到 **11:15:16** 才落库，
+期间出现 `ActorAddress 18/3844882`、`FilSupply 1/1`（该 part `insertOps=7653`）。
+「3844882」若是每轮全量重算地址映射的 considered 数，则属与 actor set 同一类的浪费（调查中）。
+
+**改动 5 的风险边界**：缓存 key = 网络版本；另有 30 轮 / 2000 epoch 有界兜底；
+集合里查不到的 actor 走 per-message 兜底 `stm.LoadActor` 并回写；
+「actor 存在而 code 变了」不产生 MISS，由两个有界窗口封顶（真实 code 变更来源是升级迁移 ⇒ 被版本 key 抓住）。
+
+⚠️ **附带脚枪（必须记）**：`44019e3f` 是 `b201e376` 的后代，即**主网新件里也含改动 4 的代码**。
+在主网当前配置（`ActorBalanceTicks=240000`，tick 永不触发）下它是**惰性无害**的；
+**但若将来把 `ActorBalanceTicks` 调小，必须先上读取侧（前向填充）**，否则余额查询会出现空白。
+
+#### 8.15.9 `f7c45e7e`：ActorAddress 从「每小时全量重发」改成「只发增量 + 落库成功才记账」
+
+**问题（实测）**：`extractActorAddress`（`tipset.go:1585`）每小时 tick（`ActorAddressTicks` 默认 1 ×
+`Interval` 120 = 每 120 epoch）遍历 init 地址映射产出 ~384 万条 `ActorAddress` 文档；
+该集合 insert-only、`_id`=ActorID、驱动 `SetOrdered(false)` 且静默吞掉重复键 ⇒ **99.9995% 是重复键空转**。
+代价：落库 **424~456 秒（p50=435s，65 个样本，无快样本）**，而抽取本身只 13.9 秒。
+批次级：含整点 tick 的批次 p50=605s vs 不含 p50=166s ⇒ 差额 ≈440s 全是它。
+
+**决定性旁证（这条最值钱，别再试调参）**：10-11 把 `BatchInsertLimit` 4096→512（批小 8 倍），
+`insertOps` 从 950 涨到 7520 而耗时几乎不变（425→445s）⇒ 成本随「尝试写入的文档条数」走，不随往返次数走。
+
+**做法**：门控与遍历不变（仍每小时、仍走 ~384 万条），只把「尚未写过」的 ActorID 出成文档；
+并补「**落库成功才记账**」交握（发射进 per-part pending → insert 无错则 Commit 转 seen →
+失败/超时/取消/抽取阶段出错则 Discard 让下一轮重发）。零值语义有意为 `full`：状态为空必须退化成旧的全量行为，绝不静默跳过。
+
+★ **sethead 回滚的结论（为什么不能用游标）**：`cmd/bell/set_head.go:27` 把 ActorAddress 当 **epoch** 集合，
+回滚执行 `DeleteMany({Epoch:{$gt:head}})`；这类被删的行可以是**任意 ActorID**（重放被回滚的 epoch 会以原始、较小的
+ID 重建 actor，这些 ID 全在水位线以下）⇒ 游标永远不会重发 ⇒ **静默永久空洞**。持久化游标更差（sethead 同样不知道它）。
+故选进程内集合，运维规则：**sethead 之后重启 bell，下一个 tick 自愈**。
+（另一处删除路径 `Segment.DeleteItemsByEpoch`（`persist.go:405-450`）同样纯按 epoch 键，无 id 键删除路径。）
+
+**代价**：内存 3.85e6 条 ≈ **144 MiB**（实测 39.3 字节/条）；每次进程启动首个 tick 走一次全量 ≈435 秒
+（日志 `mode=full, emitted≈385万`，与平常 tick 不会混淆）。稳态 `mode=incremental`、`emitted` 个位数（主网实测 18 条/小时）。
+
+**状态**：已在分支实现并自测（`build` rc=0、三包 `-race` rc=0、`gofmt` 干净、`go vet` rc=0；
+新增用例覆盖「失败⇒下一轮重发」「成功⇒不再重发」「同 part 并发 exactly-once」「sethead 回滚需重启」等）。
+
+**cali 灰度实证（10-12，换件 `f7c45e7e`）**：
+
+```
+12:19:47  actor address extracted {"epoch":"4148400","mode":"full",       "emitted":199493,"skipped": 75988,"total":275481,"pending":199493}
+13:22:43  actor address extracted {"epoch":"4148520","mode":"incremental","emitted":     0,"skipped":275481,"total":275481,"pending":0}
+```
+
+⇒ 第一个 tick 冷启动全量（`emitted=199493`）、**第二个 tick `mode=incremental` 且 `emitted=0`**
+（旧行为每次都要重发全部 275,481 条）⇒ 机制在真实环境生效；`pending=0` 说明交握已全部记账。
+5 个程序 RUNNING、无回滚、无 panic/ERROR。
+
+**监视口径（零新增埋点，可直接做告警）**：① 单条 `documents inserted and updated` 里
+`insertOps ≥ 5000`，或 `ActorAddress: n/N` 满足 `N ≥ 1e6 且 n/N < 1%`；
+② 同一轮已打 `actor set reused`（可排除 actor set 重建）而 `tipsets extracting done` 耗时 > 5 分钟。
+
+#### 8.15.10 读取侧已上主网（10-12 12:40，A/B 通过）+ 富豪榜慢是既有问题
+
+**换件**：主网聚合器 `172.31.38.30`（hostname `londobell-agg-adapter`，**x86_64**，程序 `londobell-api-aggregators`）
+从 `dcbfc1ca`（sha `05ecdf46…`）换到 `b201e376`（sha `1380fc53…`，非 .dirty），只重启该一个程序；
+回滚锚点 `/root/deploy-bak/londobell-api-aggregators.bak-20261012-124029`。
+
+⚠️ **踩到的坑（记下来）**：主网 bell 主机 `172.31.36.19` 是 **aarch64**，而聚合器是 **x86_64** 且依赖 cgo+filecoin-ffi
+⇒ **不能跨机编译**，只能在该机原地构建（既有路线）。让 bell 机代编是错的。
+
+**A/B（同一地址 `01234`，换前/换后逐字相同的请求）**：
+
+| 请求 epoch | 换前 | 换后 |
+|---|---|---|
+| `6447600`（快照期） | 有数据 | **逐字节相同**（无回归） |
+| `6448000` / `6448500`（非快照期） | `data:null` | 返回最近一期余额（**前向填充生效**） |
+| `6450480`（未来期） | `null` | `null`（越界不回填、不报错） |
+| 不存在的地址 | — | `null`，毫秒级，无扫表迹象 |
+| 富豪榜 | 75546 字节 | 75546 字节（无回归） |
+
+复核：`version=1.37.0+mainnet+git.b201e376`、sha 与构建产物一致、`/ping` 200、下游后端 `172.31.34.109` 持续取数、
+站点首页与统计接口 200；换后窗口 0 个 4xx/5xx、0 panic。`balance` 接口实测 **96µs~1.2ms**。
+
+★ **富豪榜慢（~10.5 秒）是既有问题，不是这次换件引入**——判据是同一份日志里换件前后的耗时对比：
+
+```
+2026/10/10 16:05:06   5.76s
+2026/10/11 07:49:55  23.57s   ← 旧件
+2026/10/12 07:47:44  23.23s   ← 旧件
+2026/10/12 12:36:12  27.21s   ← 旧件（早于 12:40:29 换件）
+2026/10/12 12:36:20  10.59s   ← 旧件
+2026/10/12 12:41:23  10.82s   ← 新件
+2026/10/12 12:50:15  10.92s   ← 新件
+```
+
+⇒ 换件**之前**就有 5.8~27 秒的记录 ⇒ 独立的性能缺陷（富豪榜首屏慢），已并入改动 7 的调查范围
+（要求交出真实查询管道原文 + 主网 `explain("executionStats")`，先给结论再动手）。
+
+### 8.16 2026-10-12：午夜不再写全量名单 —— 改为「增量 + 每日前 N 快照」
+
+**判决句先行**：`ActorBalance` **从此没有任何一期是全量的**。零时（本地午夜）与常规 tick 走**同一条**路径：
+只写 Balance/Code 变了的 actor（实测约占 0.1%）。富豪榜需要的「某一期完整名单」改由一张**新的小集合
+`ActorBalanceTop`** 提供 —— 每天零时写一份**精确的前 N 名**（N 默认 10000）。全量写入只剩一种残留：
+**首期**（链上还没有任何基线）与**算不出基线**（见 §8.16.1）。
+
+#### 8.16.1 写侧新口径（`extract.PlanActorBalanceWrite`）
+
+| 情形 | 旧口径 | 新口径 |
+|---|---|---|
+| 本地午夜（零时） | **写全量**（384 万行） | **只写变化行**（与平常 tick 同形状） |
+| 常规 tick | 只写变化行 | 不变 |
+| 非快照 epoch | 不写 | 不变 |
+| 算不出上一期 / 上一期距现在 ≥ 一个 tick 周期 | 回退全量 | 不变（这是唯一的全量残留：给 delta 链一个起点，不是日更） |
+| 零时抽取开关关掉 | 无全量 | 不变：回退成「每个 tick 都全量」的旧行为 |
+
+零时**仍然是快照 epoch**（`IsSnapshotEpoch` 仍把零时算进去），只是不再是 full。所以 delta 链在每个零时
+都前进一步，只是那一步是增量。日志里零时的 `mode` 由 `full` 变成 `changed`。
+
+#### 8.16.2 新集合 `ActorBalanceTop`（`racailum/segment/model/actor_balance_top.go`）
+
+| 项 | 值 |
+|---|---|
+| 集合名 | `ActorBalanceTop`（常量 `model.ActorBalanceTopCollection`；读侧引用常量，不写字面量） |
+| 字段 | `_id`（`GenRegularHeadID(head, addr, epoch)`，与 ActorBalance 同构）、`Path`、`Addr`、`Epoch`、`Balance`、`Code`、`Rank`（1 起，1 = 余额最大） |
+| 写入频率 | **每天一次**，零时（`extract.IsTopSnapshotEpoch`），其余 epoch 不写 |
+| 规模 | N 行/天，N 默认 10000 ⇒ 约十几 MB/年（对比 ActorBalance 1.706e9 行 / 589.5GB） |
+| `N` 配置 | `extract.Options.ActorBalanceTopN`（默认 `DefaultActorBalanceTopN = 10000`）；**老配置文件没有这个字段 ⇒ 解出 0 ⇒ 走默认**（`EffectiveActorBalanceTopN`，0/负数一律等于默认，绝不等于「什么都不写」） |
+| 选择算法 | `extract.TopBalances`：**定长最小堆**（容量 N），键 = `(Balance 降序, Addr 升序)`；地址唯一 ⇒ 全序 ⇒ 结果与遍历顺序无关。外加一个便宜预筛 `WouldKeep`（先比根节点、不达标直接跳过），免得给 384 万个注定不入选的 actor 去构造 Code 字符串（`ActorNameByCode` 是 map 查询 + `Sprintf` + 切片分配） |
+| 取自哪一遍 | **`extractActorBalance` 已有的那一次状态树遍历**（`tree.ForEach` 本来就把每个 actor 都走一遍，只是多数不落行）⇒ 不额外遍历、不额外读链 |
+
+**精确性口径**：堆**不抽样、不近似**。一个 actor 被丢掉，只可能是因为已经有 N 个严格更靠前的候选在堆里。
+同额时按地址升序稳定排序，`Rank` 就是最终名次 ⇒ 「榜单读新集合」= 「对全部 actor 排序取前 1000」，
+两者逐项相等（§8.16.5 里有测试钉住）。
+
+⚠️ **唯一假设 = N 的余量**：选择是在**全部 actor**（不按 Code 过滤）上做的，富豪榜读的时候才过滤
+`Code ∈ {account, multisig, storageminer}` 且余额 > 0。所以 N 必须大于「排名在『第 1000 名财富榜候选』之前的
+非候选 actor 数」。取 10000（= 返回条数 1000 的 10 倍）就是这个余量。**若将来 actor 构成变了（例如大量
+高余额 EVM 合约挤进前 10000），N 必须跟着放大**——`TestRichListResponseNeedsTopNMargin` 把这个失败形态
+钉成了用例（余量不足时榜单会缩水，且用例明确记录「这是设计的唯一软肋」）。
+
+#### 8.16.3 读侧改动
+
+1. **富豪榜**（`richlist.go`）改查新集合：`MultiRangeQuery(..., RichListTopPipeline(RichListAggregator), req, rmodel.ActorBalanceTopCollection)`。
+   epoch 取「最近一期前 N 快照」= 最近一个本地午夜（`actorBalanceTopSnapshotEpoch`，内部就是
+   `LatestTopSnapshotHeight`）。**响应结构不变**（仍是 `{code:0, data:{totalCount:1000, richList:[{Addr,Balance,Code}]}}`）。
+   谓词与旧 `richlist.js` 逐字一致（同三个 Code、同「余额 > "0"」、同 `$limit 1000`），只多一条
+   `$sort` 次级键 `Addr: 1`，把并列时的顺序钉死成「地址升序」——与写侧 `Rank` 的稳定序一致。
+2. **单地址余额**（`balacne.go`）**仍走 ActorBalance + 前向填充**，但**前向填充窗口的下界从「最近一期全量」
+   改成 0**（`actorBalanceForwardFillStartEpoch()`）。理由：以前「每个 actor 在最近午夜都有一行」保证了
+   一天窗口够用；**现在没有全量期了**，一个从上周起就没动过的地址，在最近午夜**没有任何行** ⇒ 窗口只留
+   一天会静默返回空。窗口必须回溯到该地址最后一次写入，唯一安全的下界就是链的起点。
+   - **代价**：查询形状不变（仍带 `Epoch` 区间 ⇒ 仍是 `Epoch_1_Addr_1` 的 seek，**不会**退化成 589GB 全扫）；
+     变的是 seek 次数：从「窗口内 1 个 epoch」变成「该地址最后一次变化之前的快照 epoch 数」（量级 1e3，
+     ~1ms/次）。若真成为延迟问题，正解是补 `{Addr:1, Epoch:-1}` 索引，**不是**缩短窗口（缩短窗口会丢数据）。
+
+#### 8.16.4 ★ 不要再假设 `ActorBalance` 有任何一期是全量
+
+这是本次改动最重要的一条口径，写死在这里：
+
+- **任何** `ActorBalance` 的读取都**不得**再假设「某一期有全体 actor」。旧的「零时一定有全量」是读取侧
+  （富豪榜取整期、单地址余额取窗口下界）的隐含前提，**该前提已不存在**。
+- 因此：**富豪榜一律读 `ActorBalanceTop`**；单地址余额一律前向填充到链起点；
+  **任何新的「要一份完整名单」的需求，都不能去 `ActorBalance` 里找一期全量的**。
+- **`ActorBalanceFull` 模式仍然存在**（首期 / 算不出基线时的兜底），所以库里有极少数全量期，但
+  **这是兜底产物，不是契约**：不许依赖它存在、也不许依赖它在某个高度上。
+- **外部若需要全量名单（例如对拍、导出、审计）怎么办**：**另议**。可行方向有两条，本次都不做：
+  ① 需要时按需**离线重放**一个高度（`bell offline extractor`，见 §8.15.3 的强制触发手法）；
+  ② 若要常态化，就再定一份**显式的全量产物**（独立集合 / 落 PG），不要偷偷把全量塞回零时。
+  **在没有明确裁定之前，不要用「零时那份应该是全量」去写任何新代码。**
+
+#### 8.16.5 测试（表驱动，钉住口径）
+
+`racailum/segment/extract/snapshot_test.go`、`top_balances_test.go`、`racailum/segment/model/actor_balance_top_test.go`、
+`cmd/londobell-api/controller/aggregators/{actor_balance_snapshot_test.go,common/richlist_top_test.go}`：
+
+| 用例 | 钉住什么 |
+|---|---|
+| `TestZeroHourWritesChangesOnly` / `TestPlanActorBalanceWrite` | 零时 = `changed`（`mode.String()=="changed"`，与 tick 同形状）；生产节奏下三天内**没有任何** full；`PrevHeight < height` |
+| `TestPlanActorBalanceWritePreservesGate` | 门控表达式不变（零时或 tick + 开关），且零时**不再**产出 full |
+| `TestTopBalancesMatchesFullSort` | 精确性：堆结果 == 「全排序取前 N」逐项相等（含大量同额） |
+| `TestTopBalancesBoundaries` | 候选 < N / == N / > N / 全等额 / 全 0；全等额时取**最小地址**那批 |
+| `TestTopBalancesOrderIndependent` | 输入顺序无关（20 次洗牌 + 逆序） |
+| `TestTopBalancesWouldKeepMatchesAdd` | 便宜预筛 `WouldKeep` 与 `Add` 语义等价（跳过的候选不可能改变保留集） |
+| `TestRichListResponseEqualsFullSort` | **「榜单读新集合」== 「对全部候选排序取 1000」**（含 9000 个非候选压在候选之上的最坏余量场景） |
+| `TestRichListResponseNeedsTopNMargin` | 余量不足时确实会缩水 ⇒ 记录 N 的假设，不是掩盖 |
+| `TestRichListRowsFiltersAndOrders` | 读侧过滤（三个 Code、余额 > 0）+ 排序 + 截断 |
+| `TestLatestTopSnapshotHeight` / `TestIsTopSnapshotEpoch` / `TestEffectiveActorBalanceTopN` | 取最近一期、每日节奏、开关、N=0 ⇒ 默认 10000 |
+| `TestRichListTopPipelineShape` / `…HasNoExpr` / `…Switch` | 发给 mongo 的管道原文（`$match` 带 Epoch + Code$in == `extract.RichListCodes` + `Balance $gt "0"`；`$sort {balance:-1, Addr:1}`；`$limit 1000`；无 `$expr`）+ 回退开关 |
+| `TestActorBalanceForwardFillStartCoversChain` | 前向填充窗口下界 = 0（防止未来有人「优化」成一天的窗口） |
+| `TestRichListReadsTheTopCollection` / `TestActorBalanceTopDocument` | 读侧表名 == 写侧集合常量 ≠ `ActorBalance`；`Epoch` 字段名与索引前置列 |
+
+**测试真抓到过一个 bug**（记录，别重犯）：`TopBalances.Add` 的「满堆后是否保留」判断一开始写反了
+（`if !worst.ranksBefore(c)` 应为 `if !c.ranksBefore(worst)`）⇒ 保留的恰好是较差的候选。
+`TestTopBalancesMatchesFullSort` / `TestTopBalancesOrderIndependent` 直接变红抓到。
+
+#### 8.16.6 富豪榜 10.5 秒的定责取证（结论：**不是**改动 4 的回归）
+
+背景：换件后主网 `POST /aggregators/richlist {"start":6447600}` 要 10.5~10.9 秒（200、约 75546 字节）。
+取证分三层，全部只读：
+
+**(1) 改动 4 对富豪榜改了**什么**：只改了「取哪个 epoch」**。
+`git diff fe652669 b201e376 -- cmd/londobell-api/controller/aggregators/richlist.go` 只有一个 hunk：
+
+```diff
+-		multiResult, err := multiquery.MultiRangeQuery(ctx, req.StartEpoch, req.StartEpoch+1, countUtils, common2.RichListAggregator, req, "ActorBalance")
++		snapEpoch, ok := latestActorBalanceFullSnapshotEpoch(req.StartEpoch)
++		...
++		multiResult, err := multiquery.MultiRangeQuery(ctx, snapEpoch, snapEpoch+1, countUtils, common2.RichListAggregator, req, "ActorBalance")
+```
+
+集合（`ActorBalance`）、聚合器（`common2.RichListAggregator` = 上游 `richlist.js`，**当时没有本地覆盖**）、
+match/sort/limit/投影**全部逐字节未动**，也没有 `$expr`。而且 `6447600 mod 2880 = 2160` ⇒ **它本来就是零时**，
+`latestActorBalanceFullSnapshotEpoch(6447600) == 6447600` ⇒ **前后发给 mongo 的是同一条查询**。
+
+**(2) 真实管道原文 + executionStats**（主网 mongo `172.31.34.38:27017`，库 `bell` —— 正是聚合器
+`/root/multi/config` 的 `[Formal]`；**只读 `explain`，未建索引、未改任何配置**）：
+
+```js
+// 集合 bell.ActorBalance，Epoch=6447600（该期 3,844,504 行）
+[ {$match: {Epoch: 6447600, Code: {$in:["storageminer","account","multisig"]}, Balance: {$gt: "0"}}},
+  {$addFields: {balance: {$toDecimal: "$Balance"}}},
+  {$sort: {balance: -1}}, {$limit: 1000}, {$skip: 0}, {$limit: NumberLong("9223372036854775807")} ]
+```
+
+```
+winningPlan : FETCH ← IXSCAN[keyPattern {Epoch:1, Balance:-1, Code:1}] indexName Epoch_1_Balance_-1_Code_1 direction forward
+indexBounds : Epoch [6447600,6447600] · Balance [({}, "0")] · Code [account][multisig][storageminer]
+totalKeysExamined = 2,610,765
+totalDocsExamined = 2,109,150
+nReturned        = 2,109,150
+executionTimeMillis = 10,722
+COLLSCAN = 无
+```
+
+**真因**：`$sort` 落在 `$addFields` 算出来的 **decimal 字段 `balance`** 上 ⇒ **没有任何索引能服务这个排序**
+（索引里存的是字符串 `Balance`）⇒ 必须把匹配到的 **211 万条**全部取回、逐条 `$toDecimal`、再在内存里做 top-k
+（`$limit 1000` 只能省内存，省不掉这次扫描）。10.7 秒几乎全部是这一步。
+
+**(3) 换件前后耗时分布**（聚合器日志 `[GIN] … "/aggregators/richlist"`；换件时刻 **2026-10-12 12:40:37**，
+二进制 `/root/londobell-api-aggregators` 的 mtime 与 pid uptime 一致）：
+
+| 时间 | start | 耗时 | 二进制 |
+|---|---|---|---|
+| 10-10 16:05 | 6441840（零时，**827,392** 行） | **5.76s** | 旧 |
+| 10-11 07:49 | 6444720（零时，3,844,074 行） | **23.57s** | 旧 |
+| 10-12 07:47 | 6447600（零时，3,844,504 行） | **23.23s** | 旧 |
+| 10-12 12:35 | 6447600 | **27.21s** | **旧（换件前）** |
+| 10-12 12:36 | 6447600 | **10.59s** | **旧（换件前）** |
+| 10-12 12:41 / 12:49 / 12:49 / 12:50 / 12:50 | 6447600 | 10.82 / 10.64 / 10.51 / 10.89 / 10.92s | 新 |
+| 10-12 12:50 | `{}`（越界） | 163µs | 新 |
+
+⇒ **10.5 秒是既有现象，不是改动 4 引入的**：换件前 12:35/12:36（**旧二进制**）实测 27.2s / 10.6s，
+与换件后的 10.5~10.9s 同量级；耗时随**该期行数**走（82.7 万行 → 5.8s；384 万行 → 23s），与改动 4 无关。
+
+**一个真实的语义差（顺带说清，别当成回归的反面证据）**：主网 `ActorBalance` 只在零时落行
+（§8.15.1），实测非快照 epoch **0 行**（6448000 → 0、6449093 → 0）。所以旧代码对 `start=6448000`
+是「秒回、但**空白**」；新代码把它**前向**到 6447600（**正确、但慢**）。页面真实用的 start 是零时
+（后端 `172.31.34.109` 07:47 那次就是 6447600）⇒ **用户可见路径上前后是同一条查询**。
+
+**(4) 最小修法**：**就是本次新增的 `ActorBalanceTop`** —— 同一个管道打在 **1 万行/期**的小集合上，
+排序对象从 211 万条变成 1 万条 ⇒ 毫秒级。备选（本次都不采用，记录备查）：
+
+| 备选 | 代价 / 为什么不选 |
+|---|---|
+| 恢复原查询形状 | 原形状就是这条查询（start 是零时时前后完全一样）⇒ 恢复等于什么都没做 |
+| 把 `$sort` 从 decimal 换成字符串 `Balance` 让 `Epoch_1_Balance_-1_Code_1` 直接服务排序 | **排序会错**（字符串序：`"9"` > `"1000000000"`）⇒ 口径被削弱，禁止 |
+| 补索引让 decimal 排序可索引 | **做不到**：索引存的是字符串/数值，decimal 是聚合期算出来的字段；要索引只能改写入方（存一个数值排序键）⇒ 那已经是「改写入方」，与方案同量级却更绕 |
+| 查询前加 `$project` 只留 `Addr/Balance/Code/_id`，减小排序前取回的数据量 | 只能缓解（少拉 `Path`/`Addresses`），仍要遍历 211 万条；**不改变量级**，且要动上游 pipeline |
+| 前端/后端把 start 改成「最近零时」 | 前后端已经在传零时；且这正是新代码做的事 |
+
+（不建任何索引：以上结论均来自只读 `explain`；`Epoch_1_Balance_-1_Code_1` 已存在，无需新增。）
+
+#### 8.16.7 本次未做 / 已知缺口（接手者照做）
+
+1. **`sethead` 回滚不会清理 `ActorBalanceTop`**：`cmd/bell/set_head.go:27` 的 `epochCollections` 是**硬编码清单**，
+   没有新集合 ⇒ 回滚后新集合会留下高于水位的行。修法 = 把 `ActorBalanceTop` 加进那个清单（本次**未改**：
+   该文件不在允许改动的 `racailum/` 与 `cmd/londobell-api/` 范围内）。
+2. **`check` 工具不检查新集合**：`racailum/segment/options.go` 的 `AllToCheckTableList` 未纳入
+   `ActorBalanceTop`（`cmd/bell/check.go` 用反射按表名查 `ticksMap`/`zeroHourMap`，乱加会让它产出
+   无意义的边界；本次不碰，需要时单独议）。
+3. **新集合的索引需要运维建**：`model.ActorBalanceTop.Indexes()` 给了 `{Epoch,Balance}`、`{Epoch,Addr}`，
+   但本仓的索引历来由 mongo 脚本（`tool/mgoscripts/*.js`、`cmd/londobell-api/aggregators/index.js`）建 ⇒
+   上线时按那两行建索引（集合只有几万行，代价可忽略）。
+4. **`N` 的余量假设**（§8.16.2）：不是 bug，但需要有人定期看一眼「前 10000 里非候选 actor 的占比」。
+5. **本次未 commit、未部署**；主网仍在跑 §8.15.8 换上的那件（读数侧含改动 4、写侧零时仍全量）。

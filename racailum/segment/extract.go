@@ -362,10 +362,20 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 		err          error
 	)
 	if !tmp {
-		aset, err = actor.NewSet(ctx, s.dal.StateManager, tss[size-1], tmp)
+		// 非 tmp 路径复用与 tmp 同一套缓存（segment.Actorset + actorsetMu + storeActorSet），
+		// 而不是每轮从最新 tipset 的状态根从头重建 actor set（实测单次重建 3分13秒~8分00秒，
+		// 占一轮的 1/3~1/2）。缓存 key = 网络版本，另有有界兜底失效（见 acquireActorSet）。
+		ts := tss[size-1]
+		version := s.dal.GetNetworkVersion(ctx, ts.Height())
+
+		var why actorSetInvalidation
+		aset, why, err = acquireActorSet(version, ts.Height(), func() (*actor.Set, error) {
+			return actor.NewSet(ctx, s.dal.StateManager, ts, tmp)
+		})
 		if err != nil {
 			return nil, err
 		}
+		logActorSetOutcome(elog, why, version, ts.Height())
 
 		latestDealID, err = s.GetLatestDealID(ctx)
 		if err != nil {
@@ -374,38 +384,28 @@ func (s *Segment) ExtractTipSets(ctx context.Context, tss []*common.LinkedTipSet
 	} else {
 		ts := tss[0]
 		version := s.dal.GetNetworkVersion(ctx, ts.Height())
-		currentActorset := loadActorSet()
-		if currentActorset == nil {
-			aset, err = actor.NewSet(ctx, s.dal.StateManager, ts, tmp)
+
+		// 「版本变化」与「有界兜底失效」都要重建，但只有前者才套昂贵 epoch 守卫（保留原行为）：
+		// 升级边界恰落在昂贵 epoch 时，宁可沿用旧集合（同版本内本来也是复用的）也不做那次重载。
+		// 有界兜底是例行维护性重建，不受该守卫影响。
+		if cacheWhy := actorSetInvalidationOf(loadActorSet(), version, ts.Height()); cacheWhy == actorSetVersionChanged &&
+			s.opts.Extract.ExtractOptions.SkipExpensiveEpoch && tipset.IsExpensive(ctx, s.dal.StateManager, ts) {
+			// TODO: extract simple invoc results here
+			elog.Warn("ignore expensive epoch actor load")
+			// 保持原行为：不重建，aset 仍为 nil。
+		} else {
+			var why actorSetInvalidation
+			aset, why, err = acquireActorSet(version, ts.Height(), func() (*actor.Set, error) {
+				return actor.NewSet(ctx, s.dal.StateManager, ts, tmp)
+			})
 			if err != nil {
 				return nil, err
 			}
-			storeActorSet(&ActorSet{
-				Version: version,
-				Set:     aset,
-			})
-		} else {
-			if currentActorset.Version != version {
-				if s.opts.Extract.ExtractOptions.SkipExpensiveEpoch && tipset.IsExpensive(ctx, s.dal.StateManager, ts) {
-					// TODO: extract simple invoc results here
-					elog.Warn("ignore expensive epoch actor load")
-				} else {
-					aset, err = actor.NewSet(ctx, s.dal.StateManager, tss[0], tmp)
-					if err != nil {
-						return nil, err
-					}
-					storeActorSet(&ActorSet{
-						Version: version,
-						Set:     aset,
-					})
-					elog.Infof("reload new version: %s actor", version)
-				}
-			} else {
-				aset = currentActorset.Set
+			if why == actorSetVersionChanged {
+				elog.Infof("reload new version: %s actor", version)
 			}
-
+			logActorSetOutcome(elog, why, version, ts.Height())
 		}
-
 	}
 
 	pctx := &persistCtx{
@@ -628,6 +628,26 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 		return err
 	}
 
+	// Only a persisting part advances the process-local "already written
+	// ActorID" set. A part run with persist=false (§8.3: extracted but dropped
+	// after a recorded failure) keeps its own throwaway state, so the ActorIDs
+	// it would have written are NOT marked as done -- otherwise the re-run that
+	// eventually persists them would emit nothing and the rows would be lost
+	// until a restart. Dry runs (a different Segment / DryOptions) never touch
+	// this state either. See extract/actor_address.go.
+	//
+	// A persisting part also opens a per-part *pending* bucket. extractActorAddress
+	// files every ActorID it emits under it; the IDs are only promoted to "seen"
+	// once this part's persistence is confirmed (persistPartDocs). A failed /
+	// timed-out / never-attempted persist Discards the bucket, so the next round
+	// re-emits those ActorIDs instead of silently skipping them until a restart.
+	var aaPart *extract.ActorAddressPart
+	if persist {
+		aaPart = s.actorAddressState.BeginPart()
+		ectx.ActorAddressState = s.actorAddressState
+		ectx.ActorAddressPart = aaPart
+	}
+
 	var ewg multierror.Group
 	lim := limiter.New(s.opts.Extract.TipSetJobLimit)
 
@@ -690,10 +710,15 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 	}
 
 	if err := ewg.Wait(); err != nil {
+		if aaPart != nil {
+			// The part's docs never reach mongo: drop the pending ActorIDs so a
+			// later re-run re-emits them instead of skipping them until restart.
+			aaPart.Discard()
+		}
 		return fmt.Errorf("extract part: %w", err)
 	}
 
-	if err := s.persistPartDocs(ctx, elog, part, docs, persist); err != nil {
+	if err := s.persistPartDocs(ctx, elog, part, docs, persist, aaPart); err != nil {
 		return err
 	}
 
@@ -729,7 +754,12 @@ func (s *Segment) extractPart(ctx *persistCtx, part []*common.LinkedTipSet, tmp 
 //
 // 异步路径把 part 的 [起,止] 一并登记进 tracker：落库失败/超时时，交回上层的失败清单带
 // part 归属，从而能成为阻断面而不是整批作废（§8.2 注入口 ②）。
-func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, part []*common.LinkedTipSet, docs [][]common.Document, persist bool) error {
+//
+// aaPart 是本次 part 的 ActorAddress pending 桶（见 extract/actor_address.go）。
+// 落库成功 ⇒ Commit（pending 升格为已写、下一轮不再重发）；失败 / 超时 / ctx 取消 ⇒
+// Discard（pending 丢弃、下一轮重发）；persist=false ⇒ 压根没开桶（aaPart==nil），
+// 不记账。这条交握正是「同一条 ActorID 只有在其行真的落地之后才算发过」。
+func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, part []*common.LinkedTipSet, docs [][]common.Document, persist bool, aaPart *extract.ActorAddressPart) error {
 	if !persist {
 		elog.Infow("part extracted but not persisted (persist=false: skipped after a recorded failure)")
 		return nil
@@ -739,18 +769,29 @@ func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, part
 		select {
 		case ctx.persistSem <- struct{}{}:
 		case <-ctx.ctx.Done():
+			if aaPart != nil {
+				aaPart.Discard() // never scheduled ⇒ rows not written ⇒ re-emit next round
+			}
 			return ctx.ctx.Err()
 		}
 
 		from, to := partRange(part)
 		ctx.asyncPersist.Go(from, to, func() error {
 			defer func() { <-ctx.persistSem }()
-			if err := s.insertManyWithTimeout(ctx.ctx, elog, docs); err != nil {
+			err := s.insertManyWithTimeout(ctx.ctx, elog, docs)
+			if err != nil {
+				// Not confirmed written (transport error, timeout, or ctx cancel):
+				// drop the part's pending ActorIDs so the next round re-emits them.
+				if aaPart != nil {
+					aaPart.Discard()
+				}
 				if nerr := common.NonCtxCanceledErr(err); nerr != nil {
 					stats.Record(ctx.ctx, metrics.ExtractError.M(1))
 					elog.Errorf("insert extracted documents from tipsets: %s", err)
 					return nerr
 				}
+			} else if aaPart != nil {
+				aaPart.Commit() // the rows landed ⇒ they count as written
 			}
 
 			return nil
@@ -759,7 +800,13 @@ func (s *Segment) persistPartDocs(ctx *persistCtx, elog *zap.SugaredLogger, part
 	}
 
 	if err := s.insertManyWithTimeout(ctx.ctx, elog, docs); err != nil {
+		if aaPart != nil {
+			aaPart.Discard()
+		}
 		return fmt.Errorf("insert extracted documents from tipsets: %w", err)
+	}
+	if aaPart != nil {
+		aaPart.Commit()
 	}
 
 	return nil

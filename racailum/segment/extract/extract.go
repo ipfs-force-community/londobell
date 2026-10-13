@@ -28,6 +28,15 @@ func NewCtx(ctx context.Context, d common.DAL, l *zap.SugaredLogger, aset *actor
 	ectx.LatestDealID = latestDealID
 	ectx.FullNode = full
 	ectx.EventsBlockstore = eventsBlockstore
+
+	// A fresh, empty state makes the first actor-address tick of this context a
+	// full pass. The long-lived extraction path overrides it with the segment's
+	// per-process state right after NewCtx (see Segment.extractPart); callers
+	// that only dry-run or extract without persisting keep this throwaway state
+	// so they never advance the real one. Its part bucket is throwaway too: it
+	// is never Committed, so nothing leaks into the real state.
+	ectx.ActorAddressState = NewActorAddressWriteState()
+	ectx.ActorAddressPart = ectx.ActorAddressState.BeginPart()
 	return ectx, nil
 }
 
@@ -42,9 +51,24 @@ type Ctx struct {
 		Set *actor.Set
 	}
 
-	LatestDealID    int64 // latest dealID of DealProposal
-	FullNode        common.FullNodeApiGetter
+	LatestDealID     int64 // latest dealID of DealProposal
+	FullNode         common.FullNodeApiGetter
 	EventsBlockstore bstore.Blockstore
+
+	// ActorAddressState makes extractActorAddress emit only the ActorIDs that
+	// this process has not written yet instead of re-sending all ~3.84e6 rows
+	// every hour. It is per-process on purpose: an empty state (process start)
+	// turns the first tick into a full pass, which is also what heals rows a
+	// rollback (bell sethead) deleted. See extract/actor_address.go.
+	ActorAddressState *ActorAddressWriteState
+
+	// ActorAddressPart is the pending bucket of the part currently being
+	// extracted. extractActorAddress files every ActorID it emits under it;
+	// Segment.persistPartDocs Commits it once the part's insert landed, or
+	// Discards it on failure so the next round re-emits the IDs. Callers that
+	// do not persist get a throwaway part from NewCtx and never Commit it.
+	// See extract/actor_address.go.
+	ActorAddressPart *ActorAddressPart
 }
 
 // NewRes constructs a new extract result
