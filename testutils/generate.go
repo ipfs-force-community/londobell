@@ -47,7 +47,9 @@ func NewLocalBlockStore(ctx context.Context) (bstore.Blockstore, func() error, e
 	if err != nil {
 		return nil, nil, err
 	}
-	bbs := bstore.WrapIDStore(bs)
+	// lotus v1.37 removed bstore.WrapIDStore; the node blockstore itself is now
+	// built with RejectIdentityCids (see node/repo/fsrepo.go), so do the same here.
+	bbs := bstore.RejectIdentityCids(bs)
 	return bbs, bs.Close, nil
 }
 
