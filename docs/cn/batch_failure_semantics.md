@@ -1247,12 +1247,57 @@ Prometheus `:9090` 与 Grafana `:3000` 不通 ⇒ 规则要加在 Prometheus 的
     description: "最近一个已过零时期的富豪榜条数为 {{ with query \"filscan_balance_snapshot_rows\" }}{{ . | first | value }}{{ end }} 条；probe_ok=0 表示该期读不出榜（写失败或回退到了上一期）。"
 
 - alert: filscan富豪榜下游未跟进
-  expr: (filscan_committed_height - on(instance) filscan_table_cursor_height{table="chain.rich_actors"}) > 4320
+  expr: filscan_table_lag_height{network="mainnet",table="chain.rich_actors"} > 4320
   for: 2h
   labels: {severity: warning}
   annotations:
     summary: "PG chain.rich_actors 游标已越过一个日界仍未跟进"
-    description: "游标落后已发布高度 {{ $value }} 个高度（自然值在 0~2880 之间往复，>4320 说明漏了一期）。"
+    description: "该表落后链头 {{ $value }} 个高度（日快照表自然值在 0~2880 之间往复，>4320 = 越过 1.5 个日界说明漏了一期）。"
+
+- alert: filscan奖励流激活未翻
+  expr: (filscan_nv29_epoch <= filscan_latest_height) and (filscan_reward_stream_active == 0)
+  for: 30m
+  labels: {severity: critical}
+  annotations:
+    summary: "主网已过 NV29 激活高度，但奖励流仍未翻成激活"
+    description: "激活高度 {{ with query \"filscan_nv29_epoch\" }}{{ . | first | value }}{{ end }} 已被链头越过，但 reward_stream_service_24h 仍为 0（近 24h 服务奖励一分钱没产出）。先核 lotus StateGetNetworkParams 的 UpgradeSolsticeHeight 与 f02 actor 版本，再核 londobell 适配器的 nv29 判据（它实时读 ActorVersion()>=v19，不缓存）。"
 ```
 
-（第二条用的是**本来就存在**的指标，只是补一条规则；阈值取 4320 = 1.5 个日界，避开每天正常的 0~2880 往复。）
+**第二条改用同族现成指标**：`filscan_table_lag_height` 由同一个 exporter 直接产出
+（`{column="epoch",network="mainnet",table="chain.rich_actors"}`，2026-10-13 实测值 1266、链头 6451744），
+**不需要跨 job 做 `on(instance)` 拼接**（原来那版把桥推的 `filscan_committed_height` 与 exporter 的
+`filscan_table_cursor_height` 相减，两者**没有共同标签**，实际会算不出东西）。阈值仍取 4320 = 1.5 个日界。
+
+#### 8.16.13 COLLSCAN 日指标改口径：把「自己人噪音」摘出去（10-13）
+
+10-13 上午告警 `filscan夜间COLLSCAN回归` 响起（`filscan_collscan_24h` 达 22079，阈值 500）。**这不是索引修复回退**：
+按同口径复算近 24 小时，mongod 慢查询里 `planSummary` 含 COLLSCAN 的共 **17859** 条，其中
+
+| 来源 | 条数 |
+|---|---|
+| `tmpbell.ActorMessage` / `tmpbell.Message`（我们验证用的临时库） | 17790 |
+| `bell.OrphanBlock`（探针建索引时的对照查询） | 55 |
+| `bell.ActorBalance`（无界 countDocuments 手工查询） | 13 |
+| 其它 | 1 |
+
+且**客户端 100% 是回环（127.0.0.1/::1）或缺失**（全部来自我们在 mongo 本机敲的 shell）。
+**应用侧真实 COLLSCAN = 0 条。**
+
+**改法（不抬阈值、不改判据、不隐藏原始值）**：`/opt/filscan-mongo-triage/collscan_daily.sh` 里把计数拆成三条指标：
+
+| 指标 | 口径 |
+|---|---|
+| `filscan_collscan_24h` | **只算应用客户端**（客户端非回环非空、且 ns 不以 `tmpbell.` 开头）——**名字不变 ⇒ 上海侧规则一行都不用改** |
+| `filscan_collscan_24h_all` | 总条数（与原口径一致） |
+| `filscan_collscan_24h_excluded` | 被排除的自己人条数 |
+
+最长耗时同样拆为 `filscan_collscan_max_ms` / `filscan_collscan_max_ms_all`；脚本头部注释写清新口径与理由。
+改完立即手动跑一次，让被污染的指标当场纠正（告警随之自解）。
+
+**纪律**：这类「探针污染自己指标」的坑会反复出现——凡是**在数据库/服务本机敲的命令行查询**，都要
+假定它会进日志、进指标；写计数口径时先按「客户端是不是回环」分一次，再按临时库前缀分一次。
+
+**第三条是为 2026-10-19 NV29 激活准备的**（主网激活高度 6470279 ≈ 10-19 20:59:30 CST）。它要的四个指标
+（`filscan_nv29_epoch` / `filscan_latest_height` / `filscan_reward_stream_service_24h` / `filscan_reward_stream_active`）
+2026-10-13 已加进同一个指标桥（每分钟，`job=filscan_metrics`/`instance=backend-new01`），数据取自本机 API 的
+`TotalIndicators`。`filscan_reward_stream_active` 用**字符串判零**得出 1/0，避免把 attoFIL 大数转浮点后比较。
