@@ -672,9 +672,10 @@ func (dbsm *DataBaseStateManager) LoadDBCollectionsMap(ctx context.Context) erro
 		changedClaimCol := database.Collection("ChangedClaim")
 		changedDealStateCol := database.Collection("ChangedDealState")
 		filSupplyCol := database.Collection("FilSupply")
+		actorBalanceTopCol := database.Collection("ActorBalanceTop")
 		cols := make([]*mongo.Collection, 0)
 		cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol,
-			changedSectorCol, changedActorCol, filSupplyCol, changedClaimCol, changedDealStateCol, orphanBlockCol)
+			changedSectorCol, changedActorCol, filSupplyCol, changedClaimCol, changedDealStateCol, orphanBlockCol, actorBalanceTopCol)
 		dbsm.UpdateDBCollectionsMap(db.Url(), config2.Collections{DB: database, Cols: cols})
 	}
 
@@ -785,9 +786,10 @@ func GetCollectionsForDB(ctx context.Context, db config2.DB) (config2.Collection
 	changedClaimCol := database.Collection("ChangedClaim")
 	changedDealStateCol := database.Collection("ChangedDealState")
 	filSupplyCol := database.Collection("FilSupply")
+	actorBalanceTopCol := database.Collection("ActorBalanceTop")
 	cols := make([]*mongo.Collection, 0)
 	cols = append(cols, traceCol, actorBalanceCol, finalHeightCol, minerSectorHealthCol, tipSetCol, actorStateCol, minerFundsCol, claimedPowerCol, newDealProposalCol, messageCol, blockMessageCol, blockHeaderCol, actorMessageCol, ethHashCol, eventsRootCol, stateFinalHeightCol, evmInitCodeCol, actorEventCodeCol, actorAddressCol, createMessageCol,
-		changedSectorCol, changedActorCol, filSupplyCol, changedClaimCol, newDealProposalCol, changedDealStateCol, orphanBlockCol)
+		changedSectorCol, changedActorCol, filSupplyCol, changedClaimCol, newDealProposalCol, changedDealStateCol, orphanBlockCol, actorBalanceTopCol)
 
 	return config2.Collections{DB: database, Cols: cols}, nil
 }

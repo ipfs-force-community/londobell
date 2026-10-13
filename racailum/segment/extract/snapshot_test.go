@@ -116,31 +116,30 @@ func TestPreviousSnapshotHeight(t *testing.T) {
 	}
 }
 
-// TestLatestFullSnapshotHeight covers the richlist ependpoint's epoch lookup:
-// it must land on a zero hour (a full row-set), never on a delta tick.
-func TestLatestFullSnapshotHeight(t *testing.T) {
+// TestLatestTopSnapshotHeight covers the richlist endpoint's epoch lookup:
+// it must land on a local midnight (a daily top-N row-set).
+func TestLatestTopSnapshotHeight(t *testing.T) {
 	zh := zeroHourResidue(t)
 
 	cases := []struct {
 		name     string
 		height   abi.ChainEpoch
-		ticks    int
-		interval abi.ChainEpoch
 		zeroHour bool
 		want     abi.ChainEpoch
 		wantOK   bool
 	}{
-		{name: "on a tick -> the zero hour of the same day", height: testTick, ticks: testTicks, interval: testInterval, zeroHour: true, want: zh, wantOK: true},
-		{name: "on the zero hour itself", height: zh, ticks: testTicks, interval: testInterval, zeroHour: true, want: zh, wantOK: true},
-		{name: "next day", height: testTick + zh, ticks: testTicks, interval: testInterval, zeroHour: true, want: testTick + zh, wantOK: true},
-		{name: "just after a tick -> still the previous zero hour", height: testTick + 1, ticks: testTicks, interval: testInterval, zeroHour: true, want: zh, wantOK: true},
-		{name: "without zero hours -> the latest tick", height: 2*testTick + 900, ticks: testTicks, interval: testInterval, zeroHour: false, want: 2 * testTick, wantOK: true},
-		{name: "negative height", height: -1, ticks: testTicks, interval: testInterval, zeroHour: true, want: 0, wantOK: false},
+		{name: "on the zero hour itself", height: zh, zeroHour: true, want: zh, wantOK: true},
+		{name: "just after a zero hour -> that zero hour", height: zh + 1, zeroHour: true, want: zh, wantOK: true},
+		{name: "on a tick -> the zero hour of the same day", height: testTick, zeroHour: true, want: zh, wantOK: true},
+		{name: "next day's zero hour", height: testTick + zh, zeroHour: true, want: testTick + zh, wantOK: true},
+		{name: "zero-hour extraction off -> no top-N snapshot", height: 2*testTick + 900, zeroHour: false, want: 0, wantOK: false},
+		{name: "negative height", height: -1, zeroHour: true, want: 0, wantOK: false},
+		{name: "before the first zero hour", height: zh - 1, zeroHour: true, want: 0, wantOK: false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, ok := LatestFullSnapshotHeight(tc.height, tc.ticks, tc.interval, tc.zeroHour)
+			got, ok := LatestTopSnapshotHeight(tc.height, tc.zeroHour)
 			if ok != tc.wantOK {
 				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
 			}
@@ -148,18 +147,64 @@ func TestLatestFullSnapshotHeight(t *testing.T) {
 				t.Fatalf("got %d, want %d", got, tc.want)
 			}
 			if ok && got > tc.height {
-				t.Fatalf("full snapshot %d must not be above the requested height %d", got, tc.height)
+				t.Fatalf("top-N snapshot %d must not be above the requested height %d", got, tc.height)
 			}
-			if ok && tc.zeroHour && !common.IsZeroHour(true, got) {
-				t.Fatalf("full snapshot %d is not a zero hour", got)
+			if ok && !IsTopSnapshotEpoch(tc.zeroHour, got) {
+				t.Fatalf("top-N snapshot %d is not a top snapshot epoch", got)
 			}
 		})
 	}
 }
 
-// TestPlanActorBalanceWrite is the write-side decision table:
-// zero hour -> full, regular tick -> changed, everything else -> skip, and any
-// case without a usable full-snapshot base -> full (legacy behaviour).
+// TestIsTopSnapshotEpoch pins the daily cadence and the off switch: the top-N
+// snapshot is written at the local midnight and nowhere else, and never when
+// zero-hour extraction is disabled.
+func TestIsTopSnapshotEpoch(t *testing.T) {
+	zh := zeroHourResidue(t)
+
+	for h := abi.ChainEpoch(0); h < 3*testTick; h++ {
+		want := h%epochsPerDay == zh
+		if got := IsTopSnapshotEpoch(true, h); got != want {
+			t.Fatalf("height=%d: IsTopSnapshotEpoch(true)=%v, want %v", h, got, want)
+		}
+		if IsTopSnapshotEpoch(false, h) {
+			t.Fatalf("height=%d: top-N must be off when zero-hour extraction is off", h)
+		}
+	}
+}
+
+// TestEffectiveActorBalanceTopN pins the unset-config behaviour: an existing
+// config file predates the field and decodes to 0, which must mean the default
+// rather than "write nothing".
+func TestEffectiveActorBalanceTopN(t *testing.T) {
+	cases := []struct {
+		name string
+		in   int
+		want int
+	}{
+		{name: "unset", in: 0, want: DefaultActorBalanceTopN},
+		{name: "negative", in: -5, want: DefaultActorBalanceTopN},
+		{name: "configured", in: 250, want: 250},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := EffectiveActorBalanceTopN(tc.in); got != tc.want {
+				t.Fatalf("EffectiveActorBalanceTopN(%d) = %d, want %d", tc.in, got, tc.want)
+			}
+		})
+	}
+
+	// DefaultOptions must carry the default so a freshly written config still
+	// produces a top-N snapshot.
+	if got := DefaultOptions().ActorBalanceTopN; got != DefaultActorBalanceTopN {
+		t.Fatalf("DefaultOptions().ActorBalanceTopN = %d, want %d", got, DefaultActorBalanceTopN)
+	}
+}
+
+// TestPlanActorBalanceWrite is the write-side decision table: the zero hour and
+// a regular tick both write only the changed actors, everything else skips, and
+// any case without a usable base -> full (a re-anchor, not the daily cadence).
 func TestPlanActorBalanceWrite(t *testing.T) {
 	zh := zeroHourResidue(t)
 
@@ -173,15 +218,15 @@ func TestPlanActorBalanceWrite(t *testing.T) {
 		wantMode ActorBalanceMode
 		wantPrev abi.ChainEpoch
 	}{
-		{name: "zero hour -> full", height: zh, ticks: testTicks, interval: testInterval, zeroHour: true, enabled: true, wantMode: ActorBalanceFull},
-		{name: "zero hour next day -> full", height: zh + testTick, ticks: testTicks, interval: testInterval, zeroHour: true, enabled: true, wantMode: ActorBalanceFull},
+		{name: "zero hour -> changed against the previous snapshot, not full", height: zh, ticks: testTicks, interval: testInterval, zeroHour: true, enabled: true, wantMode: ActorBalanceChanged, wantPrev: 0},
+		{name: "zero hour next day -> changed against the previous tick", height: zh + testTick, ticks: testTicks, interval: testInterval, zeroHour: true, enabled: true, wantMode: ActorBalanceChanged, wantPrev: testTick},
 		{name: "regular tick -> changed against the zero hour", height: testTick, ticks: testTicks, interval: testInterval, zeroHour: true, enabled: true, wantMode: ActorBalanceChanged, wantPrev: zh},
 		{name: "regular tick day 2 -> changed", height: 2 * testTick, ticks: testTicks, interval: testInterval, zeroHour: true, enabled: true, wantMode: ActorBalanceChanged, wantPrev: zh + testTick},
 		{name: "neither zero hour nor tick -> skip", height: 1000, ticks: testTicks, interval: testInterval, zeroHour: true, enabled: true, wantMode: ActorBalanceSkip},
 		{name: "tick + 1 -> skip", height: testTick + 1, ticks: testTicks, interval: testInterval, zeroHour: true, enabled: true, wantMode: ActorBalanceSkip},
 		{name: "extraction disabled -> skip", height: zh, ticks: testTicks, interval: testInterval, zeroHour: true, enabled: false, wantMode: ActorBalanceSkip},
-		{name: "first snapshot (no previous) -> full", height: 0, ticks: testTicks, interval: testInterval, zeroHour: true, enabled: true, wantMode: ActorBalanceFull},
-		{name: "no zero-hour base at all -> full", height: testTick, ticks: testTicks, interval: testInterval, zeroHour: false, enabled: true, wantMode: ActorBalanceFull},
+		{name: "first snapshot (no previous) -> full re-anchor", height: 0, ticks: testTicks, interval: testInterval, zeroHour: true, enabled: true, wantMode: ActorBalanceFull},
+		{name: "no zero-hour base at all -> full (legacy fallback)", height: testTick, ticks: testTicks, interval: testInterval, zeroHour: false, enabled: true, wantMode: ActorBalanceFull},
 		{name: "stale base one tick interval back -> full", height: 7000, ticks: 10, interval: 100, zeroHour: true, enabled: true, wantMode: ActorBalanceFull},
 		{name: "recent zero-hour base -> changed", height: 6000, ticks: 10, interval: 100, zeroHour: true, enabled: true, wantMode: ActorBalanceChanged, wantPrev: 5040},
 	}
@@ -199,12 +244,49 @@ func TestPlanActorBalanceWrite(t *testing.T) {
 	}
 }
 
+// TestZeroHourWritesChangesOnly pins requirement 1: the midnight snapshot must
+// not write a full row-set any more. In the production cadence (zero-hour
+// extraction on, one tick per day) every snapshot epoch inside three days must
+// be a delta — the only full writes left are the no-base re-anchor.
+func TestZeroHourWritesChangesOnly(t *testing.T) {
+	sawZeroHour := false
+	for h := abi.ChainEpoch(1); h < 3*testTick; h++ {
+		plan := PlanActorBalanceWrite(h, testTicks, testInterval, true, true)
+
+		if plan.Mode == ActorBalanceSkip {
+			continue
+		}
+		if plan.Mode == ActorBalanceFull {
+			t.Fatalf("height=%d: production cadence must never write a full row-set (zero hour=%v)", h, common.IsZeroHour(true, h))
+		}
+		if plan.Mode != ActorBalanceChanged {
+			t.Fatalf("height=%d: unexpected mode %s", h, plan.Mode)
+		}
+		if plan.PrevHeight >= h {
+			t.Fatalf("height=%d: prev %d must be strictly below", h, plan.PrevHeight)
+		}
+
+		if common.IsZeroHour(true, h) {
+			sawZeroHour = true
+			if plan.Mode.String() != "changed" {
+				t.Fatalf("height=%d: zero hour must report the same shape as a tick, got %q", h, plan.Mode.String())
+			}
+		}
+	}
+
+	if !sawZeroHour {
+		t.Fatal("no zero hour was exercised in three days")
+	}
+}
+
 // TestPlanActorBalanceWritePreservesGate pins the planner to the exact gate
 // expression it replaced in extractActorBalance:
 //
 //	(!IsZeroHour && !IsExtract) || !EnableExtractActorBalance  ->  skip
 //
-// and to the extra rule that the zero hour always yields a full snapshot.
+// and to the new rule that replaced "the zero hour always yields a full
+// snapshot": the zero hour is a snapshot epoch like any other and must never
+// write a full row-set while a delta base exists.
 func TestPlanActorBalanceWritePreservesGate(t *testing.T) {
 	ctx := &Ctx{Opts: Options{StateRegular: ActorStateRegularOptions{Interval: testInterval}}}
 
@@ -217,11 +299,11 @@ func TestPlanActorBalanceWritePreservesGate(t *testing.T) {
 			if (plan.Mode != ActorBalanceSkip) != proceedLegacy {
 				t.Fatalf("enabled=%v height=%d: mode=%s, legacy gate proceeds=%v", enabled, h, plan.Mode, proceedLegacy)
 			}
-			if zeroHour && enabled && plan.Mode != ActorBalanceFull {
-				t.Fatalf("height=%d: zero hour must always write the full snapshot, got %s", h, plan.Mode)
-			}
 			if !enabled && plan.Mode != ActorBalanceSkip {
 				t.Fatalf("height=%d: disabled must skip, got %s", h, plan.Mode)
+			}
+			if zeroHour && enabled && plan.Mode == ActorBalanceFull {
+				t.Fatalf("height=%d: the zero hour must not write a full snapshot any more, got %s", h, plan.Mode)
 			}
 		}
 	}

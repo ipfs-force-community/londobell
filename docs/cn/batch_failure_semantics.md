@@ -1013,4 +1013,305 @@ COLLSCAN = 无
    但本仓的索引历来由 mongo 脚本（`tool/mgoscripts/*.js`、`cmd/londobell-api/aggregators/index.js`）建 ⇒
    上线时按那两行建索引（集合只有几万行，代价可忽略）。
 4. **`N` 的余量假设**（§8.16.2）：不是 bug，但需要有人定期看一眼「前 10000 里非候选 actor 的占比」。
-5. **本次未 commit、未部署**；主网仍在跑 §8.15.8 换上的那件（读数侧含改动 4、写侧零时仍全量）。
+5. ~~本次未 commit、未部署~~ ⇒ **已落地**：见 §8.16.8（收尾项 1–3 已闭合，`df409fdb` 已上主网两侧）。
+
+#### 8.16.8 收尾项闭合与主网部署（10-12 15:21–16:20）
+
+**§8.16.7 的三个缺口已闭合**
+
+1. `ActorBalanceTop` 已加入 `cmd/bell/set_head.go` 的 `epochCollections`（按 epoch 回滚时不会漏清它）与
+   `racailum/segment/options.go` 的 `AllToCheckTableList`；两条测试分别钉住，且都做了**负向验证**
+   （把清单项临时移出 ⇒ 测试 FAIL ⇒ 证明测试有牙）。
+2. 新集合的建索引脚本已由仓内 `tool/genindex` 依 `Indexes()` 生成，并在 cali 与主网各自执行、以 `getIndexes()` 读回确认：
+   `_id_` / `Epoch_1_Balance_1`(sparse) / `Epoch_1_Addr_1`(sparse)。
+
+**cali 灰度（先做，两侧都换）**：提交 `df409fdb`；写侧 bell `8e4a3ac3…`、读侧 agg `dc9fca6c…`；
+对**过去的零时 epoch** `4146934` 手动抽一次 ⇒ `mode=changed`、`top=10000`、`ActorBalanceTop:"10000/10000"`；
+富豪榜换前换后 top5 一致、集合相等（仅 76 条同额并列按新次级排序重排），延迟 `0.126/0.115/0.036s`（历史约 10.5s）；
+余额两例逐字节一致。灰度期发现的一处**部署顺序教训**见下。
+
+**主网部署（顺序：写侧 → 补写新集合 → 建索引 → 读侧）**
+
+| 项 | 值 |
+|---|---|
+| 提交 | `df409fdb` |
+| 写侧 bell | sha `f5d16094dcafe5d42162aac75e3983524f7efd4f22d41d415e2a6b2419027b87`，version `1.37.0+mainnet+git.df409fdb.dirty`；6 个 bell 系程序全 RUNNING；六个 `.ini` 文件 sha256 与换前逐字节一致；`/root/.bell/config` sha `837813b2…` 未变；备份 `/root/deploy-bak/bell.bak-20261012-152153` |
+| 补写 | `E0 = 6447600`（只读实测 `max(Epoch)`，残差 2160）：`actor balanced extracted {"epoch":"6447600","mode":"changed","rows":3596,"considered":3844504,"prev":"6444720","top":10000}` ⇒ 零时**已是增量**（3596 行，而非 3,844,504 行）；`ActorBalanceTop:"10000/10000"`，**其它集合全 0/N** ⇒ 本次唯一生产写入就是这 10000 行 |
+| 读侧 agg | sha `56afbf28611a91bea9b162dd18d9a69c23b41ae8ff4c24a78c19f1a9529ff9c1`，version `1.37.0+mainnet+git.df409fdb`；备份 `/root/deploy-bak/londobell-api-aggregators.bak-20261012-160042` |
+
+**A/B 与实测结果**
+
+- 富豪榜（同一请求 `{"start":6447600}`）：换前 **15.31 秒** → 换后 **44~60ms（约 320 倍）**；两次都 75546 字节、
+  `totalCount=1000`；**top5 一致、集合相等、余额序列逐字节相同**（唯一差异是同额并列按新的次级 `Addr:1` 排序）；
+  **全程未出现过 `data:null`**（换件期间与换后所有请求均 200）。
+- 单地址余额：快照期 `6447600`、非快照期 `6448320` 换前换后**逐字节一致**。
+- **A 项（前向填充下界=0）的真实代价**：冷 **0.94s**、热 **1.3~2ms**（换件后第一查 0.94s，同址再查 1.3~2ms）。
+  机制：窗口下界=0 ⇒ `(Epoch,Addr)` 稀疏索引被**逐 epoch 探测**，成本随**保留的日快照期数**（当前约 460 期）走，
+  与地址本身无关（每期命中 1 个文档、`docsExamined=0`）。**代价每天 +1 个 seek**。
+  裁定：**今晚不动**——冷 0.94s 只在索引页被换出时出现、热路径毫秒级，而主网 mongo 4.4 建 `{Addr:1,Epoch:-1}`
+  会**阻塞写入数小时**，两害相权取轻。列为「可缓步走的计划项」：等真实流量显示用户可感知变慢、
+  或冷代价涨到不可接受，再排维护窗口建索引。
+- 健康度：写侧换后窗口 panic/ERROR/failed-to-persist 全 0；水位按既有节奏推进（…6449534 → 6449555…）；
+  站点与各统计接口 200。读侧冷启动约 60 秒内 `/ping` 为空（正常）。
+
+**部署顺序教训（cali 灰度期发现，主网据此改正）**：换上新读侧后、新集合还没写入的那段窗口里，
+**富豪榜会返回 `data:null`（空榜）**——因为新读侧只读 `ActorBalanceTop`。cali 上真发生过，是事后补跑抽取才补上的。
+另外**手动抽取写进哪个库取决于 repo 副本**：用 `/root/.tmpbell` 的副本会写进 tmpbell 库，而富豪榜读 bell 库
+⇒ 必须用 `/root/.bell` 的副本才能补进生产库。主网因此改成「先换写侧 → 补写 → 再换读侧」，全程无空榜。
+
+**运维口径更正（免得下次捞不到日志）**：`actor balanced extracted` / `actor address extracted` 这类行的字段是
+**JSON**（`"mode": "changed"`），**不是 logfmt**（`mode=changed`）⇒ 监视脚本匹配串要用 `"mode"`。
+本次一路子代理按 `mode=` 写 grep，把主网第一个 tick 漏掉了，正是这个原因。
+
+**★ 一条真实轮耗时旁证（改动 6 的价值在生产里被量到）**：主网换件前那个含整点的轮
+`tipsets extracting started→done [6449157,6449177]` = **7 分 42 秒**，而相邻不含整点的轮是 21.9s / 22.6s / 10.0s
+⇒ 改动 6 消掉的就是这 7 分多钟（与只读实测的 424~456 秒吻合）。
+主网换后第一个 tick（14:06:31）：`actor address extracted {"mode":"full","emitted":3844939,"skipped":15637,"total":3860576}`
+（`emitted + skipped = total` 精确成立：前者=去重后的 ActorID 数，后者=init 映射里的别名条目）。
+
+**⚠️ 复核时抓到的一个口径回归（改动 7 引入，修法已派）**：余额接口对**未来 epoch** 不再返回 `data:null`。
+
+- 换件前（`b201e376`）实测：`start=6450480`（当时链路头约 6449xxx，属未来期）⇒ `data:null`；§8.15.10 记录在案。
+- 换件后（`df409fdb`）实测：`start=6450480` ⇒ **返回了数据**（`Epoch` 回显 6450480、余额取最近一期）。
+- 影响：为链上尚未发生的期数给出余额（越界保护丢失）。**修法**：以换件前实现的语义为准恢复上界保护 +
+  表驱动测试钉住 4 个边界（未来期 / 恰好等于上界 / 上界之内 / 极早期）。~~在修好并上线前，这个口径是**歪的**。~~
+  ⇒ **已于同一日 17:17 修复并上主网，见 §8.16.11。**
+
+#### 8.16.9 今晚的监控盲区（已查明，修法已拟定，待批）
+
+**今晚 00:00 是主网第一次「增量午夜」**（`6450480`）。现有全部信号都**跟着链走**，因此对「抽了但写了 0 行」这类
+**静默失败**没有保护：
+
+| 信号 | 覆盖 | 为什么盖不到 |
+|---|---|---|
+| `filscan_delay_second` / `filscan_final_height_lag_heights` / 高度差告警 | 链头与水位差 | 午夜写失败时水位照常推进 |
+| `filscan_committed_height` + `probe_ok`（10-09 补的） | bell 主库**已提交水位** | 同上，是水位不是内容 |
+| `filscan_log_error_events{pattern="failed_to_persist"}`（主网 bell 主机日志桥） | 落库报错 | 静默失败不报错 |
+| `filscan_table_lag_height` 一族 | **只覆盖后端 PG 表**（`chain.*` / `fevm.*` / `pros.*`） | mongo 的 `ActorBalance` / `ActorBalanceTop` 不在其中 |
+
+**与 10-09 那次 16.6 小时停摆是同一形状**：那次探针读的是**活跃指针**（贴着链头）而不是已提交水位，
+于是水位冻结时它读成「落后约 0」，规则整场没响。两次的教训一致：**要盯内容，不要只盯指针**。
+
+**拟定的修法（复用已有链路，不新增组件、不新增主机）**
+
+1. 在**已在跑**的 `/opt/filscan-metrics-bridge/push_metrics.sh`（`backend-new01`，每分钟，已经在推
+   `filscan_committed_height`）里追加约 10 行：算出「最近一个已过的本地午夜 epoch」（主网残差 2160，
+   用同脚本已取的 aggregator `final_height` 推），POST aggregator **现成**的 `/aggregators/richlist`，
+   推两个指标：`filscan_balance_snapshot_epoch`（那一期）与 `filscan_balance_snapshot_rows`（返回条数）。
+2. 告警规则：`rows ≥ 1000` 且「该 epoch 距今 ≤ 1 天」，否则报「午夜余额快照没写成」。
+3. 落地方式照 10-09 那次 committed 补丁的先例：备份 → 锚点插入 → `bash -n` → 手动跑一次 → 回读确认
+   既有指标仍在。
+
+**为什么用 richlist 而不是新查 mongo**：`backend-new01` 够不到 mongo 主机，但它够得到聚合器；
+而「那一期的榜能不能读出来」本身就是「那一期有没有写成」的等价判据（富豪榜现在读的就是 `ActorBalanceTop`）
+⇒ 一个现成端点、一个现成脚本、一条现成规则，覆盖写侧与读侧两侧。
+
+**状态**：机制类改动，**待用户拍板后再动手**。在它落地前，今晚这次增量午夜的成败没有自动告警兜底。
+
+#### 8.16.10 ★ 真正的下游消费者找到了（我先前一度判断成「没有消费者」，是错的）
+
+**先说错在哪**：我在聚合器日志里看到 `/aggregators/balance` 与 `/aggregators/richlist` 的调用**全部来自 127.0.0.1**
+（我自己的探针），就一度认为这两个接口没有生产消费者。**错在取样窗口**：那份日志只覆盖 10:03–16:44（约 7 小时），
+而真消费者的调用**每天只在日界那一刻发生一次**，7 小时窗口里当然看不到。
+
+**真消费者**（后端仓库 `filscan-backend-push`，现役二进制 `/root/filscan-syncer`）
+`modules/syncer/calculator/rich-list-task/actor_balance_task.go`（109 行，全文已读）：
+
+```go
+func (a ActorBalanceTask) Calc(ctx *syncer.Context) (err error) {
+    if ctx.Empty() { return }
+    currentDay := chain.CurrentEpoch().CurrentDay()
+    if currentDay == ctx.Epoch() {                      // 只在「日界」这一期动手（一天一次）
+        filters := types.Filters{Index: 0, Limit: 1000, Start: &currentDay}
+        richList, err = a.getRichList(ctx, filters)     // → ctx.Agg().RichList(...) = 聚合器 :1237
+        if richList == nil || richList.TotalCount == 0 {
+            err = mix.Warnf("获取富豪榜为空")              // 空榜 = 只告警、不写
+            return
+        }
+        actorBalanceList = a.toActorsBalance(richList, currentDay)
+        a.save(...)                                     // → PG chain.rich_actors（CreateInBatches 1000）
+    }
+}
+```
+
+（`getRichList` → `ctx.Agg().RichList`；`sync.toml` 的 `agg_address = http://172.31.38.30:1237` 就是本次改动的那个接口；
+`RollBack` 会 `delete from chain.rich_actors where epoch >= ?`。）
+
+**三个结论**
+
+1. **改动 7 与这个消费者完全兼容**：它只要**前 1000 行**（`Limit: 1000`），新集合每天写 10000 行 ⇒ **10 倍余量**。
+   换句话说，**过去每天写 384 万行，这个唯一真消费者只用得到其中 1000 行** —— 那 1.3GB/天确实近乎全废。
+2. **「先补写新集合、再换读侧」的顺序是对的**：若那一期新集合为空，它会 `warn("获取富豪榜为空")` 然后
+   **什么都不写**（PG 榜当天就缺）——cali 灰度里出现的空榜就是这个形状。
+3. **A 项（前向填充下界=0、冷 0.94s）至此结案**：`balance` 接口在生产**没有真实消费者**
+   （整份日志 66 次调用全部来自 127.0.0.1，是探针），而真消费者读的是 `ActorBalanceTop`
+   ⇒ 前向填充的冷代价**不落在任何用户路径上** ⇒ **不建** `{Addr:1,Epoch:-1}` 索引，将来有消费者出现再议。
+
+**残留风险（今晚日界）**：消费者的调用发生在**日界那一刻**，而写侧把该期数据写进 `ActorBalanceTop` 是在那之后
+（一轮批次处理完）⇒ 存在一个「先问后写」的时序窗口。两层缓解：
+
+1. 聚合器的榜单查询会回退到「不晚于该期的最近一期」⇒ 拿不到就返回**上一期**的榜（非空，但日期标成新的一天），
+   比空榜好，且次日自愈；
+2. `chain.rich_actors` **本来就有** `filscan_table_cursor_height` / `filscan_table_lag_height` 指标
+   （游标现停在 `6447600`，即上一个日界）⇒ 「游标是否越过了最近的日界」本身就是可告警的信号
+   ⇒ §8.16.9 那条拟议的探针（盯写侧）与这条（盯消费侧）合起来才覆盖两端。
+
+#### 8.16.11 越界回归已修复并上主网（10-12 17:17，只换读侧）
+
+**§8.16.8 里那条「口径是歪的」到此刻解除。**
+
+**修法**：显式恢复上界，判据落在「请求 epoch」上、与窗口无关。新增
+`cmd/londobell-api/controller/aggregators/balance_answerable.go`（纯函数 `planBalanceQuery`
+⇒ `{FromEpoch, ToEpoch, Answerable}`）：可回答范围 = 本实例各库声明 epoch 范围的并集
+`[min(Start), max(End)-1]`；范围外 ⇒ HTTP 200 + `data:null`（不查询、不报错）；范围内的窗口
+（`FromEpoch = actorBalanceForwardFillStartEpoch() = 0`、`ToEpoch = start + 1`）**逐字节未动**。
+提交 `2cd69ab2`。
+
+**原保护的真相（有 diff 证据）**：它从来不是一条独立判据，而是「前向填充窗口下界」的**副作用**——
+换件前窗口 = `[不晚于 start 的最近本地午夜, start+1)`；`start` 一旦越过已发布范围上方的第一个午夜，
+整个窗口就落在数据之上 ⇒ 查空 ⇒ `null`。改动 7 把下界改成 0（对下界而言是对的）⇒ 窗口覆盖全链
+⇒ 未来期匹配到最新已写行并回填 ⇒ 保护随下界一起丢了。
+（关键 diff：`-fromEpoch, ok := latestActorBalanceFullSnapshotEpoch(req.StartEpoch)` /
+`+fromEpoch := actorBalanceForwardFillStartEpoch()`；同一次改动还删掉了
+`latestActorBalanceFullSnapshotEpoch` 与 `rextract.LatestFullSnapshotHeight`。）
+
+**两处有意偏离换件前实现（子代理举证、我拍板保留）**
+
+1. **严格化**：换前的保护在「链头与其后第一个本地午夜之间」会放行（例如 `head+1` 会返回余额），
+   那是窗口算术的副作用而非口径。现在任何超出已覆盖范围的 epoch 一律 `null`。依据：`balance`
+   接口在生产没有真实消费者（见 §8.16.10），且「为尚未发生的期数给出余额」本身不该被支持。
+2. **极早期数保持前向填充**（换前是「精确一期」）：这是改动 7 有意修的「长期没动过的地址查余额查空」，保留。
+
+**A/B（两网都做，直证）**
+
+| 用例 | 换前 | 换后 |
+|---|---|---|
+| 未来期（主网 `H+10000`、cali `H+10000`） | **返回数据（缺陷）** | `data:null` ✓（另测 `H+1`、`H+120` 亦 null） |
+| 范围内整日期（主网 `6447600` / cali `4148960`） | 有数据 | `cmp` **逐字节相同** |
+| 范围内非整日期（主网 `6448320` / cali `4146960`） | 有数据 | `cmp` **逐字节相同** |
+| 低于范围（`start=0`） | null | null（相同） |
+| `/ping` `/version` `/final_height` `/richlist` | — | 形态不变（richlist 仍 75546 字节 / 1000 条 / 0.045s） |
+
+- cali：`2cd69ab2`（sha `f45f903f…`），只换聚合器那一个程序；281 秒窗口水位在涨、panic/ERROR 0。
+- 主网：`2cd69ab2`（sha `af6a2af9…`，version `1.37.0+mainnet+git.2cd69ab2`），**只换聚合器那一个程序**；
+  换后 8 分钟窗口 0 ERROR / 0 panic，水位续涨，其余程序未动；备份
+  `/root/deploy-bak/londobell-api-aggregators.bak-20261012-171714`。
+- 自查澄清：换件报告里那句「换前同一小时 762 条 ERROR」是**伪阳性**（INFO 行里含 `errors=0` 字样）；
+  我抽样复核最近 3000 行：真 ERROR **0** 条、伪阳性 5 条；换后全量计数 ERROR=0 / panic=0。
+
+**测试**（提交内）：`TestPlanBalanceQueryAnswerableRange`（7 子例：未来刚过顶 / 未来隔一天 / 恰好等于上界 /
+范围内快照期 / 范围内非快照期 / 早于最早覆盖期 / 无库均覆盖）与
+`TestPlanBalanceQueryUpperBoundIsLastCoveredEpoch`；`go build ./cmd/londobell-api/...` rc=0、
+`go test -count=1 -race ./cmd/londobell-api/controller/aggregators/` rc=0、`gofmt -l` 干净。
+
+#### 8.16.12 午夜余额快照探针已装（10-12 17:37，用户拍板后）
+
+**装在哪**：`backend-new01` 上**已在跑**的 `/opt/filscan-metrics-bridge/push_metrics.sh`（每分钟，cron），
+追加约 20 行。**没有新增组件、没有新增主机、没有新增脚本**。备份
+`push_metrics.sh.bak-20261012-173722`；插入用「写临时文件 + `os.replace`」原子替换（该脚本每分钟被 cron 拉起，
+原地截断写有被读成半截的风险）；`bash -n` 通过；手动跑一次 `OK lines=78 http=202`。
+
+**推的三个指标**（`job=filscan_metrics` / `instance=backend-new01`）：
+
+| 指标 | 含义 |
+|---|---|
+| `filscan_balance_snapshot_epoch` | 最近一个**已过**的本零时期（`E0 = 2160 + 2880·⌊(已发布高度−2160)/2880⌋`） |
+| `filscan_balance_snapshot_rows` | 该期的富豪榜返回条数（正常 1000） |
+| `filscan_balance_snapshot_probe_ok` | `1` = 条数 ≥1000 **且** `榜单(E0)` 与 `榜单(E0−1)` 不逐字节相同 |
+
+**为什么口径用「已发布高度」而不是墙钟**：写侧把每期数据写进 `ActorBalanceTop` 是**在发布之前**完成的
+⇒ 用已发布高度推出的零时期一定已经写过 ⇒ **本探针没有「先问后写」窗口**（§8.16.10 里那个窗口说的是
+后端消费者用「链上日界」当钟，两回事）。
+
+**为什么还要比 `榜单(E0)` 与 `榜单(E0−1)`**：榜单管道按 `Epoch` **精确匹配**，而请求期会被规范化回退到
+「不晚于它的最近零时期」⇒ 若 `E0` 那一期其实没写成，`E0` 与 `E0−1` 会回退到**同一个更早的期** ⇒ 两个响应
+**逐字节相同**。这样连「静默回退」都能抓到，而不只是「空榜」。（代价：真遇到「榜单一天没变」会误报，
+但余额每天都在变，实际不可能。）
+
+**实测初值**（装完即读网关）：`epoch=6447600`（与 PG 游标一致）、`rows=1000`、`probe_ok=1`。
+
+**★ 顺带发现一个新集合的历史边界**：初始化时探 `榜单(E0−1)` 得到 **0 条**——因为 `E0−1` 回退到上一个零时期
+`6444720`，而**那一期只有旧表有数据、`ActorBalanceTop` 还没有** ⇒ 新集合的历史**从切换点 `6447600` 才开始**。
+对现有消费者无影响（它只问当天那一期），但这是要记住的口径边界：**切换点之前的富豪榜历史查询会返回空**。
+
+**告警规则（10-13 已由 assistant 装上，不再是待办）**：上海监控机就是跳板机 `ky-jump`（`ssh ky-jump` = 139.196.147.220:62534）。
+`/usr/local/prometheus/prometheus.yml` 的 `rule_files:` 是**通配目录**（`rules/filscan-rule/*.yml`）⇒ 新增一个独立 `.yml`
+即被自动加载、**不用改 prometheus.yml、不用重启进程**。本次落在 `/usr/local/prometheus/rules/filscan-rule/filscan-ops-alerts.yml`
+（组 `filscan_ops_alerts`）。装法四步（该机 locale 坏、python3=3.6 ⇒ **中文内容一律 scp 传字节，远端命令保持 ASCII**）：
+
+1. 本地写好 → `scp` 直传目标路径；
+2. `/usr/local/prometheus/promtool check rules <file>` —— 必须 `SUCCESS: N rules found`；
+3. `curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:9090/-/reload` —— 必须 200；
+4. `curl -s http://127.0.0.1:9090/api/v1/rules` 读回三条（`state` / `health` / `labels`）+ 确认原有组数不变。
+
+**路由标签是硬要求**：Alertmanager 的子路由按 `match_re: {alert_level: ...}` 匹配，同目录 filscan 兄弟规则（含
+`filscan夜间COLLSCAN回归`）都只带 `alert_level: londobell` ⇒ 命中 receiver `ops_dingding_londobell`（钉钉 :8073）。
+**只给 `severity` 会落到默认 receiver `alert_01`**（另一个群）——本次先踩了这个、随后补上。
+回滚＝删掉该文件 + reload 一次（文件头注释里也写了）：
+
+```yaml
+- alert: filscan余额快照未写成
+  expr: filscan_balance_snapshot_probe_ok != 1
+  for: 30m
+  labels: {severity: critical}
+  annotations:
+    summary: "午夜余额快照未写成（probe_ok={{ $value }}）"
+    description: "最近一个已过零时期的富豪榜条数为 {{ with query \"filscan_balance_snapshot_rows\" }}{{ . | first | value }}{{ end }} 条；probe_ok=0 表示该期读不出榜（写失败或回退到了上一期）。"
+
+- alert: filscan富豪榜下游未跟进
+  expr: filscan_table_lag_height{network="mainnet",table="chain.rich_actors"} > 4320
+  for: 2h
+  labels: {severity: warning}
+  annotations:
+    summary: "PG chain.rich_actors 游标已越过一个日界仍未跟进"
+    description: "该表落后链头 {{ $value }} 个高度（日快照表自然值在 0~2880 之间往复，>4320 = 越过 1.5 个日界说明漏了一期）。"
+
+- alert: filscan奖励流激活未翻
+  expr: (filscan_nv29_epoch <= filscan_latest_height) and (filscan_reward_stream_active == 0)
+  for: 30m
+  labels: {severity: critical}
+  annotations:
+    summary: "主网已过 NV29 激活高度，但奖励流仍未翻成激活"
+    description: "激活高度 {{ with query \"filscan_nv29_epoch\" }}{{ . | first | value }}{{ end }} 已被链头越过，但 reward_stream_service_24h 仍为 0（近 24h 服务奖励一分钱没产出）。先核 lotus StateGetNetworkParams 的 UpgradeSolsticeHeight 与 f02 actor 版本，再核 londobell 适配器的 nv29 判据（它实时读 ActorVersion()>=v19，不缓存）。"
+```
+
+**第二条改用同族现成指标**：`filscan_table_lag_height` 由同一个 exporter 直接产出
+（`{column="epoch",network="mainnet",table="chain.rich_actors"}`，2026-10-13 实测值 1266、链头 6451744），
+**不需要跨 job 做 `on(instance)` 拼接**（原来那版把桥推的 `filscan_committed_height` 与 exporter 的
+`filscan_table_cursor_height` 相减，两者**没有共同标签**，实际会算不出东西）。阈值仍取 4320 = 1.5 个日界。
+
+**第三条是为 2026-10-19 NV29 激活准备的**（主网激活高度 6470279 ≈ 10-19 20:59:30 CST）。它要的四个指标
+（`filscan_nv29_epoch` / `filscan_latest_height` / `filscan_reward_stream_service_24h` / `filscan_reward_stream_active`）
+2026-10-13 已加进同一个指标桥（每分钟，`job=filscan_metrics`/`instance=backend-new01`），数据取自本机 API 的
+`TotalIndicators`。`filscan_reward_stream_active` 用**字符串判零**得出 1/0，避免把 attoFIL 大数转浮点后比较。
+
+#### 8.16.13 COLLSCAN 日指标改口径：按真实客户端归属拆分（10-13）
+
+10-13 上午告警 `filscan夜间COLLSCAN回归` 响起（`filscan_collscan_24h` 达 22079，阈值 500）。复算后**以噪音为主，但夹杂一条真实低效**。
+
+**取证的方法（坑在这里）**：mongod 的慢查询行（`c:COMMAND`/`c:WRITE`、`msg:"Slow query"`）**没有任何客户端地址字段** ——
+既无 `attr.remote`、也无顶层 `remote`/`client`，只有 `ctx:"connNNNN"`。客户端地址只出现在 `c:NETWORK` 行
+（`"Connection accepted"` 的 `attr.remote` + `attr.connectionId`）。⇒ **必须先用 `ctx ↔ connectionId` 建映射再归类**：
+直接去慢查询行上读「客户端字段」，拿到的是「字段不存在」，会把 100% 的行都错判成「本地/无客户端」。
+（本次就先踩了这个坑、据此下了错误结论，随后被实测纠正。）
+
+关联后近 24h 的真实分布（共 17594 条）：
+
+| 客户端 | 条数 | 性质 |
+|---|---|---|
+| `172.31.38.30`（主网聚合器/适配器主机） | 16569 | 验证用临时库（按集合统计 `tmpbell.*` = 17527 条） |
+| `172.31.36.19` | 1016 | 其中 **53 条是 `bell.OrphanBlock` 的真实全表扫**（61.8 万文档、单次≈1.1s、约每 25 分钟一次） |
+| `127.0.0.1`（本机 shell 探针） | 9 | 运维探针 |
+
+**改法（不抬阈值、不隐藏原始值）**：`filscan_collscan_24h` = **只算应用/服务客户端**
+（排除回环/缺失客户端 **且** 排除 `tmpbell.*` 临时库）——**名字不变 ⇒ 上海侧规则一行都不用改**；
+另推 `filscan_collscan_24h_all`（总数）与 `filscan_collscan_24h_excluded`（被排除数）；最长耗时同样拆 `_max_ms` / `_max_ms_all`。
+改完立即手动跑一次，让被污染的指标当场纠正（告警随之自解）。
+
+`bell.OrphanBlock` 那 53 条**不算自己人**——它是真实服务查询，所以并行修根因：给它建 `{Checked:1, Epoch:1}`
+（10-12 实测 615k docs / 7154ms 全表扫 → IXSCAN `docsExamined=50` / `execMs=1`，≈7145 倍提速；当时只当实验做完就
+`dropIndex` 回滚、**没留在生产**，本次真正建上）。
+
+**两条纪律**：①凡是在数据库/服务**本机**敲的命令行查询都会进日志、进指标 ⇒ 写计数口径时先按「客户端是不是回环」
+分一次、再按临时库前缀分一次；②**归类前先确认真实字段存在**，别把「字段不存在」当成「值是空的」——
+这次就是被后者骗了一轮。

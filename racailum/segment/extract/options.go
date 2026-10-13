@@ -13,6 +13,7 @@ func DefaultOptions() Options {
 		EnabelExtract:      defaultEnableExtractOptions(),
 		ZeroHourExtract:    defaultZeroHourExtractOptions(),
 		SkipExpensiveEpoch: true,
+		ActorBalanceTopN:   DefaultActorBalanceTopN,
 	}
 }
 
@@ -30,6 +31,12 @@ type Options struct {
 	EnabelExtract      EnableExtractOptions
 	ZeroHourExtract    ZeroHourExtractOptions
 	SkipExpensiveEpoch bool
+
+	// ActorBalanceTopN is the size of the daily top-N richlist snapshot
+	// written at each local midnight (a separate, tiny collection). 0 means
+	// DefaultActorBalanceTopN, which is also what every config file written
+	// before this field existed decodes to.
+	ActorBalanceTopN int
 }
 
 func defaultTipSetOptions() TipSetOptions {

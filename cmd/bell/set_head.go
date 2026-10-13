@@ -24,7 +24,7 @@ var (
 	dealProposalCollections = []string{"DealProposalDetail", "DealProposalSummary"}
 	// messageCollection         = "Message"
 	idCollections    = []string{"FinalHeight", "FilSupply", "StateFinalHeight", "Tipset"}
-	epochCollections = []string{"ActorBalance", "ActorEvent", "MinerFunds", "ActorState", "MinerSector", "NewDealProposal", "ActorAddress", "CreateMessage", "MinerDealSector", "MultisigBalance", "BlockHeader", "MinerSectorSummary", "DealProposal", "PendingTxns", "EthHash", "BlockMessage", "ChangedActor", "MinerSectorHealth", "MarketFunds", "EvmInitCode", "SectorClaim", "ActorMessage", "EventsRoot", "ExecTrace", "VerifiedRegistry", "ClaimedPower", "MiningProfitability"}
+	epochCollections = []string{"ActorBalance", "ActorBalanceTop", "ActorEvent", "MinerFunds", "ActorState", "MinerSector", "NewDealProposal", "ActorAddress", "CreateMessage", "MinerDealSector", "MultisigBalance", "BlockHeader", "MinerSectorSummary", "DealProposal", "PendingTxns", "EthHash", "BlockMessage", "ChangedActor", "MinerSectorHealth", "MarketFunds", "EvmInitCode", "SectorClaim", "ActorMessage", "EventsRoot", "ExecTrace", "VerifiedRegistry", "ClaimedPower", "MiningProfitability"}
 
 	setHeadCmd = &cli.Command{
 		Name:  "sethead",
