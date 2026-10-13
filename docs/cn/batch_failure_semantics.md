@@ -1234,8 +1234,20 @@ func (a ActorBalanceTask) Calc(ctx *syncer.Context) (err error) {
 `6444720`，而**那一期只有旧表有数据、`ActorBalanceTop` 还没有** ⇒ 新集合的历史**从切换点 `6447600` 才开始**。
 对现有消费者无影响（它只问当天那一期），但这是要记住的口径边界：**切换点之前的富豪榜历史查询会返回空**。
 
-**告警规则（待上海侧加，`assistant` 够不到）**：从内网只能连到 `:9091`（推送网关）与 `:9093`（Alertmanager），
-Prometheus `:9090` 与 Grafana `:3000` 不通 ⇒ 规则要加在 Prometheus 的规则文件里：
+**告警规则（10-13 已由 assistant 装上，不再是待办）**：上海监控机就是跳板机 `ky-jump`（`ssh ky-jump` = 139.196.147.220:62534）。
+`/usr/local/prometheus/prometheus.yml` 的 `rule_files:` 是**通配目录**（`rules/filscan-rule/*.yml`）⇒ 新增一个独立 `.yml`
+即被自动加载、**不用改 prometheus.yml、不用重启进程**。本次落在 `/usr/local/prometheus/rules/filscan-rule/filscan-ops-alerts.yml`
+（组 `filscan_ops_alerts`）。装法四步（该机 locale 坏、python3=3.6 ⇒ **中文内容一律 scp 传字节，远端命令保持 ASCII**）：
+
+1. 本地写好 → `scp` 直传目标路径；
+2. `/usr/local/prometheus/promtool check rules <file>` —— 必须 `SUCCESS: N rules found`；
+3. `curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:9090/-/reload` —— 必须 200；
+4. `curl -s http://127.0.0.1:9090/api/v1/rules` 读回三条（`state` / `health` / `labels`）+ 确认原有组数不变。
+
+**路由标签是硬要求**：Alertmanager 的子路由按 `match_re: {alert_level: ...}` 匹配，同目录 filscan 兄弟规则（含
+`filscan夜间COLLSCAN回归`）都只带 `alert_level: londobell` ⇒ 命中 receiver `ops_dingding_londobell`（钉钉 :8073）。
+**只给 `severity` 会落到默认 receiver `alert_01`**（另一个群）——本次先踩了这个、随后补上。
+回滚＝删掉该文件 + reload 一次（文件头注释里也写了）：
 
 ```yaml
 - alert: filscan余额快照未写成
