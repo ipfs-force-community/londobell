@@ -44,18 +44,36 @@ func RefreshMpool() {
 }
 
 func refreshMpoolCache(unStoredMsgs map[*types.TipSet][]*types.SignedMessage) {
+	// 并发契约：本函数被 1s ticker（RefreshMpool）与 HTTP handler（GetMpool）同时调用，
+	// 而 Go 的 map 并发读写是 fatal error（直接 exit 2，不是可恢复的 panic）。
+	// 所以对包级 poolCache 只做「持锁取快照 → 遍历快照写本地 newCache → 持锁换指针」，
+	// 遍历期间一个字节都不碰全局变量。
+	mu.Lock()
+	prev := poolCache
+	mu.Unlock()
+
 	newCache := make(map[cid.Cid]int64)
 	for _, msgs := range unStoredMsgs {
 		for _, msg := range msgs {
-			if _, ok := poolCache[msg.Cid()]; !ok {
-				poolCache[msg.Cid()] = time.Now().Unix()
+			ts, ok := prev[msg.Cid()]
+			if !ok {
+				ts = time.Now().Unix()
 			}
-			newCache[msg.Cid()] = poolCache[msg.Cid()]
+			newCache[msg.Cid()] = ts
 		}
 	}
+
 	mu.Lock()
 	poolCache = newCache
 	mu.Unlock()
+}
+
+// poolCacheAt 读单个 CID 的首次出现时间。handler 读侧与上面的刷新写侧并发，
+// 所以读也必须持锁（曾经直接在 handler 里读 poolCache[msg.Cid()]，与 ticker 打架）。
+func poolCacheAt(c cid.Cid) int64 {
+	mu.Lock()
+	defer mu.Unlock()
+	return poolCache[c]
 }
 
 func GetMpool(c *gin.Context) {
@@ -112,7 +130,7 @@ func GetMpool(c *gin.Context) {
 						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(),
 						From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value,
 						GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium,
-						Method: methodName, Hash: hash.String(), MsgTime: poolCache[msg.Cid()],
+						Method: methodName, Hash: hash.String(), MsgTime: poolCacheAt(msg.Cid()),
 					}}}
 					c.JSON(http.StatusOK, res)
 					return
@@ -172,7 +190,7 @@ func GetMpool(c *gin.Context) {
 						Cid: smsg.Message.Cid(), SignedCid: msg.Cid(), Epoch: head.Height(),
 						From: smsg.Message.From, To: smsg.Message.To, Value: smsg.Message.Value,
 						GasLimit: smsg.Message.GasLimit, GasPremium: smsg.Message.GasPremium,
-						Method: methodName, Hash: hash.String(), MsgTime: poolCache[msg.Cid()],
+						Method: methodName, Hash: hash.String(), MsgTime: poolCacheAt(msg.Cid()),
 					}}}
 					c.JSON(http.StatusOK, res)
 					return
@@ -213,7 +231,7 @@ func GetMpool(c *gin.Context) {
 							Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(),
 							From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value,
 							GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium,
-							Method: methodName, Hash: hash.String(), MsgTime: poolCache[msg.Cid()],
+							Method: methodName, Hash: hash.String(), MsgTime: poolCacheAt(msg.Cid()),
 						}}}
 
 						return nil
@@ -263,7 +281,7 @@ func GetMpool(c *gin.Context) {
 						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(),
 						From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value,
 						GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium,
-						Method: methodName, Hash: hash.String(), MsgTime: poolCache[msg.Cid()],
+						Method: methodName, Hash: hash.String(), MsgTime: poolCacheAt(msg.Cid()),
 					})
 					totalCount++
 					mutex.Unlock()
@@ -281,7 +299,7 @@ func GetMpool(c *gin.Context) {
 						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(),
 						From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value,
 						GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium,
-						Method: methodName, Hash: hash.String(), MsgTime: poolCache[msg.Cid()],
+						Method: methodName, Hash: hash.String(), MsgTime: poolCacheAt(msg.Cid()),
 					})
 					totalCount++
 					mutex.Unlock()
