@@ -86,9 +86,12 @@ func DefaultOptions() Options {
 
 			TipSetPartSizeLimit: 16,
 
-			// 20 分钟对「日边界全量 actor 余额」那类重 tipset 留了约 3 倍余量
-			// （线上实测该 tipset 约 6~8 分钟）；重试 1 次 = 最多 2 次尝试。
-			TipSetJobTimeout: 20 * time.Minute,
+			// 45 分钟：给「整点/日边界全量 actor 快照」那类重 tipset 留足余量。
+			// 2026-10-20 NV29 激活后实测该 tipset 单 job 达 30~40 分钟（迁移后 v19 状态树更大，
+			// 且与 actor 同步器的状态差异计算争抢 lotus 节点），20 分钟曾被判成 transport 失败
+			// ⇒ 该轮被标为 blocking boundary，提交水位钉死在整点前一个高度，下游
+			// miner/pro/sector/erc20/fns/nft 全部停摆。重试 1 次 = 最多 2 次尝试。
+			TipSetJobTimeout: 45 * time.Minute,
 			StateJobTimeout:  5 * time.Minute,
 			JobRetry:         1,
 
