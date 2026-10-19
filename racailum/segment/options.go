@@ -86,12 +86,13 @@ func DefaultOptions() Options {
 
 			TipSetPartSizeLimit: 16,
 
-			// 45 分钟：给「整点/日边界全量 actor 快照」那类重 tipset 留足余量。
-			// 2026-10-20 NV29 激活后实测该 tipset 单 job 达 30~40 分钟（迁移后 v19 状态树更大，
-			// 且与 actor 同步器的状态差异计算争抢 lotus 节点），20 分钟曾被判成 transport 失败
-			// ⇒ 该轮被标为 blocking boundary，提交水位钉死在整点前一个高度，下游
-			// miner/pro/sector/erc20/fns/nft 全部停摆。重试 1 次 = 最多 2 次尝试。
-			TipSetJobTimeout: 45 * time.Minute,
+			// 60 分钟：给「整点/日边界全量 actor 快照」那类重 tipset 留足余量（实测 30~40 分钟
+			// 的 1.5~2 倍）。2026-10-20 NV29 激活后 v19 状态树更大，且与 actor 同步器的状态差异
+			// 计算争抢 lotus 节点，该 tipset 单 job 曾达 30~40 分钟；旧的 20 分钟阈值把正常长任务
+			// 判成 transport 失败 ⇒ 该轮被标为 blocking boundary、提交水位钉死在整点前一个高度，
+			// 下游 miner/pro/sector/erc20/fns/nft 全部停摆（只能重启 bell 清内存态标记恢复）。
+			// 超时只在 job 真挂死时才起作用（最多 2 次尝试），宁可等也不必误杀。重试次数不变。
+			TipSetJobTimeout: 60 * time.Minute,
 			StateJobTimeout:  5 * time.Minute,
 			JobRetry:         1,
 
