@@ -4,11 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/ipfs/go-cid"
-
-	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/go-state-types/cbor"
-	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
@@ -46,22 +42,10 @@ func extractState(ctx *extract.Ctx, res *extract.Res, head *common.ActorHead, en
 	}
 
 	actor := head.Actor
-	actorVersion, err := actorstypes.VersionForNetwork(ctx.D.GetNetworkVersion(ctx.C, head.Epoch))
-	if err != nil {
-		return fmt.Errorf("get network.Version for height(%v): %w", head.Epoch, err)
-	}
-
-	var realCode cid.Cid
-	if actorVersion >= actorstypes.Version8 {
-		name := actors.CanonicalName(builtin.ActorNameByCode(head.Code))
-
-		var ok bool
-		realCode, ok = actors.GetActorCodeID(actorVersion, name)
-		if ok {
-			actor.Code = realCode
-		}
-	}
-
+	// 解码依据必须是 state tree 里真实的 actor code：
+	// 快照 label(head.Epoch) 与真实 state(ParentState) 在升级边界会跨版本
+	// （NV29 激活那一帧即如此），用 label 换算出的 code 覆盖真实 code
+	// 会导致 CBOR 字段数不符（v18/v19 reward state 差 3 个字段）。
 	state, err := vm.DumpActorState(consensus.NewTipSetExecutor(filcns.RewardFunc).NewActorRegistry(), actor, blkraw.RawData())
 	if err != nil {
 		return fmt.Errorf("dump actor state for %s (%s): %w", head.Addr, head.Head, err)
