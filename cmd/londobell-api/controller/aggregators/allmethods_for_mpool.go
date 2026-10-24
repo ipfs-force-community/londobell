@@ -3,10 +3,9 @@ package aggregators
 import (
 	"context"
 	"net/http"
-	"sync"
 
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
-	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
@@ -37,34 +36,38 @@ func GetAllMethodsForPendingMessages(c *gin.Context) {
 		return
 	}
 
-	var (
-		allMethods = make(map[string]int64)
-		g          multierror.Group
-		mutex      sync.Mutex
-	)
+	// 同 mpool 的默认分支：项数由 mpool 条数决定，不能每项起一个 goroutine（2026-10-24 OOM 根因）。
+	// 先按固定并发取 method name，再在主协程里累加，避免为计数再引入锁。
+	type poolItem struct {
+		cur *types.TipSet
+		msg *types.SignedMessage
+	}
+
+	items := make([]poolItem, 0, len(unStoredMsgs))
 	for cur, msgs := range unStoredMsgs {
-		for i := range msgs {
-			cur := cur
-			msg := msgs[i]
-			g.Go(func() error {
-				methodName, err := adapter.GetMethodName(ctx, alog, api, msg, cur)
-				if err != nil && err != util.ErrNotFound {
-					return err
-				}
-
-				mutex.Lock()
-				allMethods[methodName]++
-				mutex.Unlock()
-
-				return nil
-			})
+		for _, msg := range msgs {
+			items = append(items, poolItem{cur: cur, msg: msg})
 		}
 	}
 
-	if err := g.Wait(); err != nil {
+	methodNames := make([]string, len(items))
+	if err := util.RunBounded(ctx, len(items), func(ctx context.Context, idx int) error {
+		it := items[idx]
+		methodName, err := adapter.GetMethodName(ctx, alog, api, it.msg, it.cur)
+		if err != nil && err != util.ErrNotFound {
+			return err
+		}
+		methodNames[idx] = methodName
+		return nil
+	}); err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
+	}
+
+	allMethods := make(map[string]int64)
+	for _, methodName := range methodNames {
+		allMethods[methodName]++
 	}
 
 	var allMethodsRes []model.AllMethodsRes

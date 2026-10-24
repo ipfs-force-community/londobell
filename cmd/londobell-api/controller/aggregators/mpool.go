@@ -252,68 +252,63 @@ func GetMpool(c *gin.Context) {
 		}
 	}
 
-	var (
-		pendingMessages []model.PendingMessage
-		totalCount      int64
-		g               multierror.Group
-		mutex           sync.Mutex
-	)
+	// 每项一个 goroutine 会让并发数与 mpool 条数同涨（每条还要打一次 lotus RPC 取 method name），
+	// 与 2026-10-24 的 cgroup OOM 同根因：goroutine 数量不能由外部输入决定。
+	// 改成固定 worker 池（util.RunBounded），并发上限 16。
+	type poolItem struct {
+		cur *types.TipSet
+		msg *types.SignedMessage
+	}
+
+	items := make([]poolItem, 0, len(unStoredMsgs))
 	for cur, msgs := range unStoredMsgs {
-		for i := range msgs {
-			cur := cur
-			msg := msgs[i]
-			g.Go(func() error {
-				methodName, err := adapter.GetMethodName(ctx, alog, api, msg, cur)
-				if err != nil && err != util.ErrNotFound {
-					return err
-				}
-
-				// todo: InvokeEVM和其他未定义方法区分开??
-				// filter by methodName
-				if req.MethodName != "" && methodName == req.MethodName {
-					hash, err := util.NewEthHashFromSignedMessage(msg)
-					if err != nil {
-						return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid())
-					}
-
-					mutex.Lock()
-					pendingMessages = append(pendingMessages, model.PendingMessage{
-						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(),
-						From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value,
-						GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium,
-						Method: methodName, Hash: hash.String(), MsgTime: poolCacheAt(msg.Cid()),
-					})
-					totalCount++
-					mutex.Unlock()
-				}
-
-				if req.MethodName == "" {
-					hash, err := util.NewEthHashFromSignedMessage(msg)
-					if err != nil {
-						return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid())
-					}
-
-					// todo: methodName为空时加入mpool吗？
-					mutex.Lock()
-					pendingMessages = append(pendingMessages, model.PendingMessage{
-						Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(),
-						From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value,
-						GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium,
-						Method: methodName, Hash: hash.String(), MsgTime: poolCacheAt(msg.Cid()),
-					})
-					totalCount++
-					mutex.Unlock()
-				}
-
-				return nil
-			})
+		for _, msg := range msgs {
+			items = append(items, poolItem{cur: cur, msg: msg})
 		}
 	}
-	if err := g.Wait(); err != nil {
+
+	// 每项最多产出一条，按下标写回后再汇总：顺序与原来的「排序前」不一致也没关系，
+	// 下面按 MsgTime 重排，结果集与总量不变。
+	built := make([][]model.PendingMessage, len(items))
+	if err := util.RunBounded(ctx, len(items), func(ctx context.Context, idx int) error {
+		it := items[idx]
+
+		methodName, err := adapter.GetMethodName(ctx, alog, api, it.msg, it.cur)
+		if err != nil && err != util.ErrNotFound {
+			return err
+		}
+
+		// todo: InvokeEVM和其他未定义方法区分开??
+		// filter by methodName
+		if req.MethodName != "" && methodName != req.MethodName {
+			return nil
+		}
+
+		hash, err := util.NewEthHashFromSignedMessage(it.msg)
+		if err != nil {
+			return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, it.msg.Cid())
+		}
+
+		// todo: methodName为空时加入mpool吗？
+		built[idx] = []model.PendingMessage{{
+			Cid: it.msg.Message.Cid(), SignedCid: it.msg.Cid(), Epoch: it.cur.Height(),
+			From: it.msg.Message.From, To: it.msg.Message.To, Value: it.msg.Message.Value,
+			GasLimit: it.msg.Message.GasLimit, GasPremium: it.msg.Message.GasPremium,
+			Method: methodName, Hash: hash.String(), MsgTime: poolCacheAt(it.msg.Cid()),
+		}}
+
+		return nil
+	}); err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
+
+	pendingMessages := make([]model.PendingMessage, 0, len(items))
+	for _, b := range built {
+		pendingMessages = append(pendingMessages, b...)
+	}
+	totalCount := int64(len(pendingMessages))
 
 	// sort
 	sort.Slice(pendingMessages, func(i, j int) bool {
