@@ -1,0 +1,56 @@
+# 聚合器进程内部指标告警（指标由 agg 的 /debug/runtime 提供，经 node-exporter
+# textfile 收集器转发；写入脚本 agg_runtime_metrics.sh 在聚合器主机 /root/ 下，未入库）。
+#
+# 部署位置（监控机）：/opt/monitor/prometheus/rules/filscan/filscan-agg-runtime.yml
+# 改了之后必须三步都做，缺一步等于没改：
+#   promtool check rules <file>            # 语法
+#   promtool test rules filscan-agg-runtime.test.yml   # 触发逻辑（离线，不会真发告警）
+#   curl -X POST http://127.0.0.1:9090/-/reload        # 热加载
+groups:
+- name: filscan_agg_runtime
+  rules:
+   # 2026-10-24 事故（12.55GB cgroup OOM × 8 次）的直接前兆：协程栈爆炸（89 万协程 ≈ 6GB）。
+   # 当时没有这两个指标，只能靠 kill -USR1 抓 profile 反推。指标来自 agg 的 /debug/runtime
+   # 经 node-exporter textfile 转发（/opt/node-exporter/prom/agg_runtime.prom）。
+   - alert: 聚合器协程数异常
+     expr: filscan_agg_goroutines > 50000
+     for: 2m
+     labels:
+       alert_level: filscan
+     annotations:
+       description: "聚合器 {{ $labels.instance }} 协程数 {{ $value }}（常态 <200；2026-10-24 事故时达 89 万）"
+
+   - alert: 聚合器协程栈异常
+     expr: filscan_agg_stack_inuse_bytes > 2e9
+     for: 2m
+     labels:
+       alert_level: filscan
+     annotations:
+       description: "聚合器 {{ $labels.instance }} 协程栈占用 {{ $value | humanize1024 }}B（事故时 ≈6GB），优先查是否有 limit=0 全量请求"
+
+   # 出站闸门长期饱和 = 请求在排队，页面会变慢且协程堆积。
+   - alert: 聚合器分片闸门饱和
+     expr: increase(filscan_agg_shard_gate_saturated_total[5m]) > 100
+     for: 5m
+     labels:
+       alert_level: filscan
+     annotations:
+       description: "聚合器 {{ $labels.instance }} 5 分钟内分片闸门饱和 {{ $value }} 次（并发上限需复核或上游有重查询）"
+
+   # 请求级 deadline（默认 60s）命中激增：说明有请求长期跑不完，客户端多半已经放弃。
+   - alert: 聚合器请求超时激增
+     expr: increase(filscan_agg_request_deadline_hits_total[5m]) > 20
+     for: 5m
+     labels:
+       alert_level: filscan
+     annotations:
+       description: "聚合器 {{ $labels.instance }} 5 分钟内 {{ $value }} 个请求撞到 deadline，查是否有超大分页或全量请求"
+
+   # cgroup 使用率（12GB 上限）逼近前先告警，别等内核 OOM 杀进程。
+   - alert: 聚合器内存逼近上限
+     expr: filscan_agg_cgroup_usage_bytes / filscan_agg_cgroup_limit_bytes > 0.85
+     for: 3m
+     labels:
+       alert_level: filscan
+     annotations:
+       description: "聚合器 {{ $labels.instance }} cgroup 内存使用率 {{ $value | humanizePercentage }}（上限 12GB），距 OOM 不远"

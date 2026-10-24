@@ -1,0 +1,58 @@
+rule_files:
+  - filscan-agg-runtime.yml
+
+evaluation_interval: 1m
+
+tests:
+  # 1) 协程数：先常态（不告警），后飙到 6 万（2 分钟后告警）
+  - interval: 1m
+    input_series:
+      - series: 'filscan_agg_goroutines{instance="172.31.38.30:9100"}'
+        values: '100 100 60000 60000 60000 60000'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: 聚合器协程数异常
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: 聚合器协程数异常
+        exp_alerts:
+          - exp_labels:
+              alert_level: filscan
+              instance: 172.31.38.30:9100
+            exp_annotations:
+              description: '聚合器 172.31.38.30:9100 协程数 60000（常态 <200；2026-10-24 事故时达 89 万）'
+
+  # 2) 协程栈：4GB 触发（事故时 ≈6GB）
+  - interval: 1m
+    input_series:
+      - series: 'filscan_agg_stack_inuse_bytes{instance="172.31.38.30:9100"}'
+        values: '1048576 1048576 4e9 4e9 4e9 4e9'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: 聚合器协程栈异常
+        exp_alerts:
+          - exp_labels:
+              alert_level: filscan
+              instance: 172.31.38.30:9100
+            exp_annotations:
+              description: '聚合器 172.31.38.30:9100 协程栈占用 3.725GiB（事故时 ≈6GB），优先查是否有 limit=0 全量请求'
+
+  # 3) cgroup 内存使用率：0.78 不告警，0.89 告警
+  - interval: 1m
+    input_series:
+      - series: 'filscan_agg_cgroup_usage_bytes{instance="172.31.38.30:9100"}'
+        values: '1e10 1e10 1.15e10 1.15e10 1.15e10 1.15e10'
+      - series: 'filscan_agg_cgroup_limit_bytes{instance="172.31.38.30:9100"}'
+        values: '12884901888x6'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: 聚合器内存逼近上限
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: 聚合器内存逼近上限
+        exp_alerts:
+          - exp_labels:
+              alert_level: filscan
+              instance: 172.31.38.30:9100
+            exp_annotations:
+              description: '聚合器 172.31.38.30:9100 cgroup 内存使用率 89.25%（上限 12GB），距 OOM 不远'
