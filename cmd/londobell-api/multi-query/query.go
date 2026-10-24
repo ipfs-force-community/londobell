@@ -916,18 +916,34 @@ func MultiBiSearch(ctx context.Context, indexReq, limitReq int64, countUtils []C
 		}
 
 		remainSum := indexReq - sum
-		// 找到最大的一个start使得 start->countUtil.end的个数和>剩下的sum个数
-		start, rangeSum, startSum, err := BiSearch(ctx, remainSum, countUtils[i], countAgg, tableName, req)
-		if err != nil {
-			log.Errorf("bi search failed : %w", err)
-			return nil, err
+
+		// 偏移正好落在本段起点（第一页就是这种情况：indexReq=0 ⇒ remainSum=0）时不需要二分定位：
+		// 目标就是从本段最新 epoch 往前取 limit 条，而 countUtils[i].End+1 正好给出这个区间。
+		// 二分在这一支上要跑约 log2(epoch 跨度) ≈ 20 次范围 count（2026-10-24 实测：热点大地址
+		// 单次 count 数十毫秒，整页被拖到 1.8 秒；冷门小地址只要 0.13 秒——耗时与 limit 无关、
+		// 与 actor 的数据量有关，正是这 20 次 count 的代价）。
+		// 等价性：BiSearch 的结论 res 是「本段有数据的最新 epoch」，res 之后没有数据，
+		// 所以 GetDetail(End+1) 与 GetDetail(res+1) 取到的是同一批条目、同一顺序。
+		if remainSum <= 0 {
+			res, err := GetDetail(ctx, countUtils[i].End+1, limitReq, countUtils[i], aggregator, tableName, req)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, res...)
+		} else {
+			// 找到最大的一个start使得 start->countUtil.end的个数和>剩下的sum个数
+			start, rangeSum, startSum, err := BiSearch(ctx, remainSum, countUtils[i], countAgg, tableName, req)
+			if err != nil {
+				log.Errorf("bi search failed : %w", err)
+				return nil, err
+			}
+			// 从start+1开始，倒序统计从start+1->countUtils.start的 limit+剩下的sum个数的
+			res, err := GetDetail(ctx, start+1, limitReq+(startSum-(rangeSum-remainSum)), countUtils[i], aggregator, tableName, req)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, res[int(startSum-(rangeSum-remainSum)):]...)
 		}
-		// 从start+1开始，倒序统计从start+1->countUtils.start的 limit+剩下的sum个数的
-		res, err := GetDetail(ctx, start+1, limitReq+(startSum-(rangeSum-remainSum)), countUtils[i], aggregator, tableName, req)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, res[int(startSum-(rangeSum-remainSum)):]...)
 		// 从下一个countUtil开始
 		countUtilsIdx := i + 1
 		for len(result) < int(limitReq) && countUtilsIdx < len(countUtils) {
