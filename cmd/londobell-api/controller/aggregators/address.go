@@ -14,7 +14,7 @@ import (
 
 // formal db 每高度都更新，从formal获取即可, todo: 但会有延迟
 func GetAddress(c *gin.Context) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 
 	alog := log.With("method", "GetAddress")

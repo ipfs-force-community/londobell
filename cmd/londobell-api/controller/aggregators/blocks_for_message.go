@@ -26,7 +26,7 @@ var EpochByMessageCidAggregator = `
 `
 
 func GetBlocksForMessage(c *gin.Context) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 	var epoch int64
 	alog := log.With("method", "GetBlocksForMessage")

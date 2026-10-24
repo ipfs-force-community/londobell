@@ -70,7 +70,7 @@ func RequestLogger() gin.HandlerFunc {
 
 func Run(cctx *cli.Context, adapter bool) error {
 	router := gin.New()
-	router.Use(CrosHandler(), gin.Logger(), gin.Recovery(), RequestLogger())
+	router.Use(CrosHandler(), gin.Logger(), gin.Recovery(), RequestLogger(), RequestDeadline())
 	router.GET("/ping", Pong)
 
 	var (

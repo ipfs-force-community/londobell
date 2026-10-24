@@ -19,7 +19,7 @@ import (
 
 // todo: 出账单要用，req.EndEpoch一定要在finalHeight之前，才能保证账单准确性
 func GetMinersBlockReward(c *gin.Context) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 
 	alog := log.With("method", "GetMinersBlockReward")

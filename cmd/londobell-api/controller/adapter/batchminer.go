@@ -35,7 +35,7 @@ func GetBatchMinersInfo(c *gin.Context) {
 
 	fmt.Printf("BatchMinersReq: %v\n", req)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 
 	var ts *types.TipSet

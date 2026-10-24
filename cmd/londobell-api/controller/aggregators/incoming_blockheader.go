@@ -14,7 +14,7 @@ import (
 )
 
 func GetIncomingBlockHeader(c *gin.Context) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 
 	alog := log.With("method", "GetIncomingBlockHeader")

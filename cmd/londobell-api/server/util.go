@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -32,6 +33,12 @@ func serveHTTP(addr string, router *gin.Engine) (func(context.Context) error, <-
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: router,
+
+		// 至少别让慢速连接把文件描述符和协程一直占着。
+		// 不设 WriteTimeout：聚合器有 25~41 秒的正常重查询（热点大地址），
+		// 写超时会把正常响应砍断；请求级上限交给 RequestDeadline 中间件。
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {

@@ -17,7 +17,7 @@ import (
 
 // head作为主键，如果某高度未获取到数据，则按前高度的数据来，趋势图表现为平
 func GetActorStateForEpoch(c *gin.Context) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 
 	alog := log.With("method", "GetActorStateForEpoch")

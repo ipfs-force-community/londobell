@@ -26,7 +26,7 @@ func GetActorIDs(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 
 	var (

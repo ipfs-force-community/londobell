@@ -22,7 +22,7 @@ import (
 
 // todo: 请求高度区间, formal db每个高度都存，只从formal获取即可
 func GetMinersForOwner(c *gin.Context) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 
 	alog := log.With("method", "GetMinersForOwner")

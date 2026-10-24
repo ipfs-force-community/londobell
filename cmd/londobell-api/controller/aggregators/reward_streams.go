@@ -119,7 +119,7 @@ func checkRewardStreamsRows(n int) error {
 // GetRewardStreams 返回奖励 actor（f02）在 [start, end) 内的小时快照序列，
 // 每行四个原始计数器（字符串，缺则 "0"）+ Epoch，按 Epoch 升序，不做前值填充。
 func GetRewardStreams(c *gin.Context) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 
 	alog := log.With("method", "GetRewardStreams")

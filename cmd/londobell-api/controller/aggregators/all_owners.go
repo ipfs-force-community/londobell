@@ -16,7 +16,7 @@ import (
 
 // MinerFunds 每高度都会更新，只查formal即可
 func GetAllOwners(c *gin.Context) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 
 	alog := log.With("method", "GetAllOwners")
