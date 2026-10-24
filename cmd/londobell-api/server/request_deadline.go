@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,12 @@ import (
 // 对热点大地址）实测 25~41s，所以 60s 只砍「已经明显异常」的请求，不会误伤正常业务。
 // 等 C3（MultiBiSearch 并行化）把那些接口降到秒级后，可以再往下调。
 const defaultRequestTimeout = 60 * time.Second
+
+// deadlineHits 统计 RequestDeadline 实际触发（写 504 或 handler 因超时返回）的次数，
+// 由 /debug/runtime 暴露，用来验证请求级上限在生产上真的在生效。
+var deadlineHits int64
+
+func requestDeadlineHits() int64 { return atomic.LoadInt64(&deadlineHits) }
 
 // RequestDeadline 给每个请求挂上硬 deadline，并让 handler 继承请求的 context。
 //
@@ -46,6 +53,10 @@ func RequestDeadline() gin.HandlerFunc {
 
 		// 只有「超时且响应一个字都还没写」时才补 504：
 		// handler 已经写过响应体的（包括流式/分块）不再插手，避免破坏已发出的 JSON。
+		if ctx.Err() == context.DeadlineExceeded {
+			atomic.AddInt64(&deadlineHits, 1)
+		}
+
 		if ctx.Err() == context.DeadlineExceeded && !c.Writer.Written() {
 			c.AbortWithStatusJSON(http.StatusGatewayTimeout, model.CommonRes{
 				Code: model.Fail,

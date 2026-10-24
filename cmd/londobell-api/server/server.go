@@ -72,6 +72,7 @@ func Run(cctx *cli.Context, adapter bool) error {
 	router := gin.New()
 	router.Use(CrosHandler(), gin.Logger(), gin.Recovery(), RequestLogger(), RequestDeadline())
 	router.GET("/ping", Pong)
+	router.GET("/debug/runtime", DebugRuntime)
 
 	var (
 		err error
