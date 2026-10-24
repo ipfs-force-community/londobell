@@ -12,7 +12,6 @@ import (
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
-	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/adapter"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/controller/aggregators/common"
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/fullnode"
@@ -91,6 +90,12 @@ func GetMpool(c *gin.Context) {
 	}
 
 	api := fullnode.API.GetAppropriateAPI()
+
+	// poolItem 是一条待打包消息连同它所属的 tipset；hash 分支与默认分支都用它。
+	type poolItem struct {
+		cur *types.TipSet
+		msg *types.SignedMessage
+	}
 
 	unStoredMsgs, head, err := getUnStoredMsgs(ctx, api)
 	refreshMpoolCache(unStoredMsgs)
@@ -207,57 +212,63 @@ func GetMpool(c *gin.Context) {
 	}
 
 	if req.Hash != "" {
-		var g multierror.Group
+		// 原实现把 g.Wait() 和「返回响应」写在了 tipset 循环体内，所以只搜第一个 tipset 就返回。
+		// unStoredMsgs 是 map，遍历顺序随机 ⇒ 同一个 eth hash 前后两次请求结果会不一样
+		// （2026-10-24 实测：池内 76 条里 46 条查不回来）。
+		// 这里改成：扫完所有 tipset 再返回；并发仍然固定（util.RunBounded），不是每条一个 goroutine。
+		hashItems := make([]poolItem, 0, len(unStoredMsgs))
 		for cur, msgs := range unStoredMsgs {
-			for i := range msgs {
-				cur := cur
-				i := i
-				msg := msgs[i]
-				g.Go(func() error {
-					hash, err := util.NewEthHashFromSignedMessage(msg)
-					if err != nil {
-						alog.Error(fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, msg.Cid()))
-						return err
-					}
+			for _, msg := range msgs {
+				hashItems = append(hashItems, poolItem{cur: cur, msg: msg})
+			}
+		}
 
-					if req.Hash == hash.String() {
-						methodName, err := adapter.GetMethodName(ctx, alog, api, msg, cur)
-						if err != nil && err != util.ErrNotFound {
-							alog.Error(err)
-							return err
-						}
+		var (
+			matchMu sync.Mutex
+			matched *model.PendingMessage
+		)
+		if err := util.RunBounded(ctx, len(hashItems), func(ctx context.Context, idx int) error {
+			it := hashItems[idx]
 
-						res.Data = model.PendingMessagesRes{TotalCount: 1, PendingMessages: []model.PendingMessage{{
-							Cid: msg.Message.Cid(), SignedCid: msg.Cid(), Epoch: cur.Height(),
-							From: msg.Message.From, To: msg.Message.To, Value: msg.Message.Value,
-							GasLimit: msg.Message.GasLimit, GasPremium: msg.Message.GasPremium,
-							Method: methodName, Hash: hash.String(), MsgTime: poolCacheAt(msg.Cid()),
-						}}}
-
-						return nil
-					}
-
-					return nil
-				})
+			hash, err := util.NewEthHashFromSignedMessage(it.msg)
+			if err != nil {
+				return fmt.Errorf("newEthTxFromSignedMessage failed: %v, smsg: %v", err, it.msg.Cid())
+			}
+			if req.Hash != hash.String() {
+				return nil
 			}
 
-			if err := g.Wait(); err != nil {
-				alog.Error(err)
-				util.ReturnOnErr(c, err)
-				return
+			methodName, err := adapter.GetMethodName(ctx, alog, api, it.msg, it.cur)
+			if err != nil && err != util.ErrNotFound {
+				return err
 			}
 
-			c.JSON(http.StatusOK, res)
+			matchMu.Lock()
+			if matched == nil { // eth hash 唯一，取第一条即可
+				matched = &model.PendingMessage{
+					Cid: it.msg.Message.Cid(), SignedCid: it.msg.Cid(), Epoch: it.cur.Height(),
+					From: it.msg.Message.From, To: it.msg.Message.To, Value: it.msg.Message.Value,
+					GasLimit: it.msg.Message.GasLimit, GasPremium: it.msg.Message.GasPremium,
+					Method: methodName, Hash: hash.String(), MsgTime: poolCacheAt(it.msg.Cid()),
+				}
+			}
+			matchMu.Unlock()
+
+			return nil
+		}); err != nil {
+			alog.Error(err)
+			util.ReturnOnErr(c, err)
 			return
 		}
-	}
 
-	// 每项一个 goroutine 会让并发数与 mpool 条数同涨（每条还要打一次 lotus RPC 取 method name），
-	// 与 2026-10-24 的 cgroup OOM 同根因：goroutine 数量不能由外部输入决定。
-	// 改成固定 worker 池（util.RunBounded），并发上限 16。
-	type poolItem struct {
-		cur *types.TipSet
-		msg *types.SignedMessage
+		if matched != nil {
+			res.Data = model.PendingMessagesRes{TotalCount: 1, PendingMessages: []model.PendingMessage{*matched}}
+		}
+
+		// 无论查没查到都必须在 hash 分支返回：原实现在池子为空时会落到下面的通用分页分支，
+		// 把整个 pending 列表当成「这个 hash 的结果」返回。
+		c.JSON(http.StatusOK, res)
+		return
 	}
 
 	items := make([]poolItem, 0, len(unStoredMsgs))
