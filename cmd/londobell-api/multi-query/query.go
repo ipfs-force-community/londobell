@@ -9,8 +9,6 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/ipfs-force-community/londobell/lib/limiter"
-
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/common"
 
 	smodel "github.com/ipfs-force-community/londobell/cmd/londobell-api/multi-query/segment/model"
@@ -26,6 +24,57 @@ import (
 
 	"github.com/ipfs-force-community/londobell/cmd/londobell-api/model"
 )
+
+// pagingConcurrency 是单个请求内「段级并发」上限（沿用既有 16）。
+// 跨请求的总并发仍由 runShardQuery 里的全局闸门（fanout_gate.go）约束。
+const pagingConcurrency = 16
+
+// runSegmentQueries 用固定大小的 worker 池执行 n 个段级任务，任务函数按段下标把结果写回槽位。
+//
+// 为什么不再「每段一个 goroutine」：2026-10-24 生产事故中 agg 进程出现过 897,539 个 goroutine，
+// 其中 896,523 个堵在 MultiPagingQuery 的段级并发闸上排队（每段一个 goroutine，只有 16 个能进去执行），
+// goroutine 栈吃掉约 7 GB ⇒ 越过 cgroup 12 GiB 上限被内核 OOM 杀死（当天 09:13/09:22/09:31/10:11 四次）。
+// 段数由请求参数决定（index=0&limit=0 会翻成全量段），因此「每段一个 goroutine」等于把协程数量
+// 交给外部输入。这里改成固定 16 个 worker 消费下标队列：并发度、结果顺序、错误传播都与原实现一致，
+// 而 goroutine 数量不再随段数增长。
+func runSegmentQueries(ctx context.Context, n int, fn func(ctx context.Context, i int) error) error {
+	if n <= 0 {
+		return nil
+	}
+
+	workers := pagingConcurrency
+	if n < workers {
+		workers = n
+	}
+
+	var ewg multierror.Group
+	jobs := make(chan int)
+	for w := 0; w < workers; w++ {
+		ewg.Go(func() error {
+			var firstErr error
+			for i := range jobs {
+				if err := fn(ctx, i); err != nil && firstErr == nil {
+					firstErr = err
+				}
+			}
+			return firstErr
+		})
+	}
+
+	for i := 0; i < n; i++ {
+		jobs <- i
+	}
+	close(jobs)
+
+	// 注意：multierror.Group.Wait 返回 *multierror.Error（具体类型），无错误时为 nil 指针。
+	// 这里必须用具体类型比较：直接 `return ewg.Wait()` 会得到「非 nil 接口包着 nil 指针」，
+	// 调用方 if err != nil 永远成立（本补丁的用例 TestRunSegmentQueriesBoundedConcurrency 抓到过）。
+	if merr := ewg.Wait(); merr != nil {
+		return merr
+	}
+
+	return nil
+}
 
 func GetFinalHeight(ctx context.Context, cols common.Collections) (abi.ChainEpoch, error) {
 	var finalHeightRes []model.FinalHeightRes
@@ -522,57 +571,35 @@ func MultiPagingQuery(ctx context.Context, indexReq, limitReq int64, ptype Ptype
 		return nil, fmt.Errorf("invalid type of paging: %v", ptype)
 	}
 
-	// concurrent agg
-	var (
-		res    = make([][]bson.M, len(aggLists))
-		result = make([]bson.M, 0)
-		ewg    multierror.Group
-	)
-
-	// 请求内并发上限（沿用既有 16）。注意：这只约束单个请求，跨请求的总并发由
-	// runShardQuery 里的全局闸门（fanout_gate.go）约束。
-	lim := limiter.New(16)
-
-	for i := range aggLists {
-		i := i
+	// concurrent agg：固定 worker 池，goroutine 数不随段数增长（见 runSegmentQueries）。
+	res := make([][]bson.M, len(aggLists))
+	if err := runSegmentQueries(ctx, len(aggLists), func(ctx context.Context, i int) error {
 		aggList := aggLists[i]
-		ewg.Go(func() error {
-			if !lim.Acquire(ctx) {
-				// ctx 已取消。原实现返回 nil（静默跳过该段 ⇒ 结果被静默截断），
-				// 这里改成显式报错：宁可失败也不返回不完整数据。
-				return fmt.Errorf("acquire paging concurrency slot: %w", ctx.Err())
-			}
 
-			defer func() {
-				lim.Release(ctx)
-			}()
+		pipe, perr := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Start: aggList.start, End: aggList.end, Skip: aggList.skip, Limit: aggList.limit, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, Sort: req.Sort, To: req.To, Addrs: req.Addrs, Addr: req.Addr}, string(aggregator)) // todo: methodName
+		if perr != nil {
+			return perr
+		}
 
-			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Start: aggList.start, End: aggList.end, Skip: aggList.skip, Limit: aggList.limit, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, Sort: req.Sort, To: req.To, Addrs: req.Addrs, Addr: req.Addr}, string(aggregator)) // todo: methodName
-			if err != nil {
-				return err
-			}
-
-			for _, col := range aggList.cols.Cols {
-				if col != nil && col.Name() == tableName {
-					aggRes, err := runShardQuery(ctx, col, pipe, false)
-					if err != nil {
-						return err
-					}
-
-					res[i] = aggRes
-
-					return nil
+		for _, col := range aggList.cols.Cols {
+			if col != nil && col.Name() == tableName {
+				aggRes, qerr := runShardQuery(ctx, col, pipe, false)
+				if qerr != nil {
+					return qerr
 				}
+
+				res[i] = aggRes
+
+				return nil
 			}
+		}
 
-			return fmt.Errorf("no collection: %v", tableName)
-		})
-	}
-
-	if err := ewg.Wait(); err != nil {
+		return fmt.Errorf("no collection: %v", tableName)
+	}); err != nil {
 		return nil, err
 	}
 
+	result := make([]bson.M, 0, len(res))
 	for i := 0; i < len(res); i++ {
 		result = append(result, res[i]...)
 	}
@@ -638,12 +665,6 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 		}
 	}
 
-	var (
-		ewg    multierror.Group
-		res    = make([][]bson.M, len(aggLists))
-		result = make([]bson.M, 0)
-	)
-
 	// 防止有分页需求的脚本。
 	// 原实现在每个 goroutine 内部写 req.Limit（同一个被闭包捕获的变量）并读它，
 	// 是既有的数据竞争（go test -race 可复现）。这里提到循环外只写一次：
@@ -652,34 +673,33 @@ func MultiRangeQuery(ctx context.Context, startEpoch, endEpoch int64, countUtils
 		req.Limit = math.MaxInt64
 	}
 
-	for i := range aggLists {
-		i := i
+	// concurrent agg：固定 worker 池，goroutine 数不随段数增长（见 runSegmentQueries）。
+	res := make([][]bson.M, len(aggLists))
+	if err := runSegmentQueries(ctx, len(aggLists), func(ctx context.Context, i int) error {
 		aggList := aggLists[i]
-		ewg.Go(func() error {
-			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Addr: req.Addr, Addrs: req.Addrs, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, Cids: req.Cids, ID: req.ID, Sort: req.Sort, To: req.To, Skip: req.Index * req.Limit, Limit: req.Limit, ExpirationStartEpoch: req.ExpirationStartEpoch, ExpirationEndEpoch: req.ExpirationEndEpoch, SectorSize: req.SectorSize, TransferType: req.TransferType}, string(aggregator))
-			if err != nil {
-				return err
-			}
 
-			for _, col := range aggList.cols.Cols {
-				if col != nil && col.Name() == tableName {
-					aggRes, err := runShardQuery(ctx, col, pipe, false)
-					if err != nil {
-						return err
-					}
+		pipe, perr := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Addr: req.Addr, Addrs: req.Addrs, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, Cids: req.Cids, ID: req.ID, Sort: req.Sort, To: req.To, Skip: req.Index * req.Limit, Limit: req.Limit, ExpirationStartEpoch: req.ExpirationStartEpoch, ExpirationEndEpoch: req.ExpirationEndEpoch, SectorSize: req.SectorSize, TransferType: req.TransferType}, string(aggregator))
+		if perr != nil {
+			return perr
+		}
 
-					res[i] = aggRes
+		for _, col := range aggList.cols.Cols {
+			if col != nil && col.Name() == tableName {
+				aggRes, qerr := runShardQuery(ctx, col, pipe, false)
+				if qerr != nil {
+					return qerr
 				}
+
+				res[i] = aggRes
 			}
+		}
 
-			return nil
-		})
-	}
-
-	if err := ewg.Wait(); err != nil {
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
+	result := make([]bson.M, 0, len(res))
 	for i := 0; i < len(res); i++ {
 		result = append(result, res[i]...)
 	}
@@ -1126,57 +1146,35 @@ func MultiPagingQueryForDeal(ctx context.Context, indexReq, limitReq int64, ptyp
 		})
 	}
 
-	// concurrent agg
-	var (
-		res    = make([][]bson.M, len(aggLists))
-		result = make([]bson.M, 0)
-		ewg    multierror.Group
-	)
-
-	// 请求内并发上限（沿用既有 16）。注意：这只约束单个请求，跨请求的总并发由
-	// runShardQuery 里的全局闸门（fanout_gate.go）约束。
-	lim := limiter.New(16)
-
-	for i := range aggLists {
-		i := i
+	// concurrent agg：固定 worker 池，goroutine 数不随段数增长（见 runSegmentQueries）。
+	res := make([][]bson.M, len(aggLists))
+	if err := runSegmentQueries(ctx, len(aggLists), func(ctx context.Context, i int) error {
 		aggList := aggLists[i]
-		ewg.Go(func() error {
-			if !lim.Acquire(ctx) {
-				// ctx 已取消。原实现返回 nil（静默跳过该段 ⇒ 结果被静默截断），
-				// 这里改成显式报错：宁可失败也不返回不完整数据。
-				return fmt.Errorf("acquire paging concurrency slot: %w", ctx.Err())
-			}
 
-			defer func() {
-				lim.Release(ctx)
-			}()
+		pipe, perr := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Start: aggList.start, End: aggList.end, Skip: aggList.skip, Limit: aggList.limit, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, Sort: req.Sort, To: req.To, Addrs: req.Addrs, Addr: req.Addr}, string(aggregator)) // todo: methodName
+		if perr != nil {
+			return perr
+		}
 
-			pipe, err := util.Parse(model.Ctx{StartEpoch: aggList.start, EndEpoch: aggList.end, Start: aggList.start, End: aggList.end, Skip: aggList.skip, Limit: aggList.limit, Method: req.Method, MethodName: req.MethodName, Cid: req.Cid, ID: req.ID, Sort: req.Sort, To: req.To, Addrs: req.Addrs, Addr: req.Addr}, string(aggregator)) // todo: methodName
-			if err != nil {
-				return err
-			}
-
-			for _, col := range aggList.cols.Cols {
-				if col != nil && col.Name() == tableName {
-					aggRes, err := runShardQuery(ctx, col, pipe, false)
-					if err != nil {
-						return err
-					}
-
-					res[i] = aggRes
-
-					return nil
+		for _, col := range aggList.cols.Cols {
+			if col != nil && col.Name() == tableName {
+				aggRes, qerr := runShardQuery(ctx, col, pipe, false)
+				if qerr != nil {
+					return qerr
 				}
+
+				res[i] = aggRes
+
+				return nil
 			}
+		}
 
-			return fmt.Errorf("no collection: %v", tableName)
-		})
-	}
-
-	if err := ewg.Wait(); err != nil {
+		return fmt.Errorf("no collection: %v", tableName)
+	}); err != nil {
 		return nil, err
 	}
 
+	result := make([]bson.M, 0, len(res))
 	for i := 0; i < len(res); i++ {
 		result = append(result, res[i]...)
 	}
