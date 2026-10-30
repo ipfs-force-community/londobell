@@ -12,8 +12,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/filecoin-project/lotus/chain/types"
-
-	"github.com/ipfs-force-community/londobell/racailum/segment"
 )
 
 func (t *TmpBell) ExtractIncomingHead(ctx context.Context, tempDBCapacity uint) {
@@ -87,7 +85,18 @@ func (t *TmpBell) ExtractIncomingHead(ctx context.Context, tempDBCapacity uint) 
 			}
 			stats.Record(ctx, metrics.GetTipSetError.M(0))
 
-			segment.ClearActorSet() // need?
+			// 分叉后**不要**清 actor set 缓存：缓存里有 772 万条（主网实测
+			// count=3855373 + init-state=3871211）actor code 映射，清一次就要全量重建，
+			// 实测 4.5~6.5 分钟，这段时间实时水位（tmp 库最新 tipset）不前进。
+			// 主网分叉极密（2026-10-30 实测 tmp.log 11 小时内 18 次，约每 20~40 分钟一次），
+			// 每次清缓存 ⇒ 每次 5 分钟停更；一旦与「预算/窗口」常规重建撞在同一高度，
+			// 就是 12 分钟停更（当天 05:16 / 08:18 / 12:18 各一次，delay 峰值 751s 触警）。
+			// 不复用的正确性由两处兜底，故这里可以安全地保留缓存：
+			//  1) acquireActorSet 的有界失效：网络版本变化 / 30 轮复用预算 / epoch 窗口，
+			//     条件满足时仍会重建，分叉造成的陈旧最多持续到下一次有界失效；
+			//  2) LookupMethodInfo 的逐消息兜底：缓存查不到的 actor 会走
+			//     stm.LoadActor(ctx, call.To, ts) 从该 tipset 状态读取并回填缓存
+			//     （分叉新增的 actor 正好走这条路）。
 			log.Infof("handle fork successfully")
 			continue
 		}
