@@ -118,6 +118,11 @@ func (m *MockDAL) MessagesForTipset(ctx context.Context, ts *types.TipSet) ([]ty
 	return args.Get(0).([]types.ChainMsg), args.Error(1)
 }
 
+func (m *MockDAL) GetTipsetByHeight(ctx context.Context, h abi.ChainEpoch, ts *types.TipSet, prev bool) (*types.TipSet, error) {
+	args := m.Called(ctx, h, ts, prev)
+	return args.Get(0).(*types.TipSet), args.Error(1)
+}
+
 /*
 Network: calibration
 Epoch: 792000
