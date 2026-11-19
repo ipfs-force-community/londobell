@@ -100,13 +100,14 @@ func GetMpool(c *gin.Context) {
 	}
 
 	unStoredMsgs, head, err := getUnStoredMsgs(ctx, api)
-	refreshMpoolCache(unStoredMsgs)
-
 	if err != nil {
 		alog.Error(err)
 		util.ReturnOnErr(c, err)
 		return
 	}
+	// 必须在 err 判空之后再刷新：getUnStoredMsgs 出错时返回的是空/部分 map，
+	// 提前刷新会把 poolCache 换成空表，一次瞬时错误就丢掉全部首见时间。
+	refreshMpoolCache(unStoredMsgs)
 
 	if req.Cid != "" {
 		mcid, err := cid.Decode(req.Cid)
