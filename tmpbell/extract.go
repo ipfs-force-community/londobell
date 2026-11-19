@@ -207,10 +207,13 @@ func (t *TmpBell) SearchCommonAncestor(ctx context.Context, base, external *type
 				return nil, errZeroHeight
 			}
 
-			external, err = t.activeSeg.GetTipSetByTSk(ctx, external.Parents())
+			// 先把父 TSK 存下来：GetTipSetByTSk 失败时会把 external 赋成 nil，
+			// fallback 若再调 external.Parents() 会在 nil receiver 上 panic（Parents 取 ts.blks[0]）。
+			parentTSK := external.Parents()
+			external, err = t.activeSeg.GetTipSetByTSk(ctx, parentTSK)
 			if err != nil {
 				log.Warnf("get external.Parent from full node")
-				external, err = t.Full.GetAppropriateAPI().ChainGetTipSet(ctx, external.Parents())
+				external, err = t.Full.GetAppropriateAPI().ChainGetTipSet(ctx, parentTSK)
 				if err != nil {
 					return nil, err
 				}
