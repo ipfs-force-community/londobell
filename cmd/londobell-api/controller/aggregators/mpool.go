@@ -35,7 +35,9 @@ func RefreshMpool() {
 		unStoredMsgs, _, err := getUnStoredMsgs(context.Background(), api)
 		if err != nil {
 			tlog.Error(err)
-			break
+			// 瞬时 RPC/DB 错误只跳过本轮；用 break 会永久退出 for range，
+			// 首见时间缓存从此不再刷新（本 goroutine 只在 server 启动时拉起一次）。
+			continue
 		}
 		refreshMpoolCache(unStoredMsgs)
 
