@@ -100,12 +100,16 @@ func (a *AppropriateAPI) Choose(ctx context.Context) error {
 
 		headTs, err := api.ChainHead(ctx)
 		if err != nil {
+			// NewFullNodeRPCV0 已建连，失败路径必须释放 closer，
+			// 否则每 15s 一轮 Choose 会泄漏一条连接及其读循环 goroutine。
+			closer()
 			log.Warnf("api:%v is not accessiable", url)
 			continue
 		}
 
 		headWeight, err := api.ChainTipSetWeight(ctx, headTs.Key())
 		if err != nil {
+			closer()
 			log.Warnf("api:%v is not accessiable", url)
 			continue
 		}
